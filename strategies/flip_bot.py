@@ -215,6 +215,41 @@ def _prev_close(sym: str) -> float:
         return 0.0
 
 
+def _vix_term_structure_regime(vix: float, vix3m: float) -> dict:
+    if vix <= 0 or vix3m <= 0:
+        return {"regime": "unknown", "ratio": 0.0}
+    ratio = round(vix3m / vix, 4)
+    if vix > vix3m:
+        regime = "backwardation"
+    elif ratio >= 1.03:
+        regime = "contango"
+    else:
+        regime = "flat"
+    return {"regime": regime, "ratio": ratio, "vix": vix, "vix3m": vix3m}
+
+
+def _vix_term_structure_direction_ok(direction: str, regime: dict) -> bool:
+    name = str(regime.get("regime") or "unknown")
+    if direction == "bull" and name == "backwardation":
+        return False
+    return True
+
+
+def _fetch_vix_term_structure() -> dict:
+    try:
+        vix = float(yf.Ticker("^VIX").history(period="2d")["Close"].iloc[-1])
+        vix3m = float(yf.Ticker("^VIX3M").history(period="2d")["Close"].iloc[-1])
+        regime = _vix_term_structure_regime(vix, vix3m)
+        log.info(
+            f"VIX term structure: VIX={vix:.2f} VIX3M={vix3m:.2f} "
+            f"ratio={regime['ratio']:.3f} regime={regime['regime']}"
+        )
+        return regime
+    except Exception as exc:
+        log.warning(f"VIX term structure fetch failed: {exc} - proceeding without filter")
+        return {"regime": "unknown", "ratio": 0.0}
+
+
 def _intraday_bars(sym: str):
     try:
         return yf.Ticker(sym).history(period="1d", interval="1m", auto_adjust=True)
@@ -313,6 +348,59 @@ def _option_mid(occ_symbol: str) -> float:
         return 0.0
 
 
+def _vwap_50ema_bull_signal(hist, sym: str = "?") -> dict | None:
+    if hist is None or len(hist) < BEAR_TREND_MIN_BARS:
+        return None
+    required = {"High", "Low", "Close", "Volume"}
+    if not required.issubset(set(hist.columns)):
+        return None
+    df = hist.dropna(subset=["High", "Low", "Close", "Volume"]).copy()
+    if len(df) < BEAR_TREND_MIN_BARS:
+        return None
+
+    typical = (df["High"] + df["Low"] + df["Close"]) / 3
+    cumulative_volume = df["Volume"].cumsum()
+    if float(cumulative_volume.iloc[-1]) <= 0:
+        return None
+    df["vwap"] = (typical * df["Volume"]).cumsum() / cumulative_volume
+    df["ema50"] = df["Close"].ewm(span=50, adjust=False).mean()
+
+    close = float(df["Close"].iloc[-1])
+    prev_close = float(df["Close"].iloc[-2])
+    vwap = float(df["vwap"].iloc[-1])
+    ema50 = float(df["ema50"].iloc[-1])
+    ema50_prev = float(df["ema50"].iloc[-6]) if len(df) >= 6 else float(df["ema50"].iloc[0])
+    session_open = float(df["Open"].iloc[0]) if "Open" in df.columns else float(df["Close"].iloc[0])
+    vwap_distance = (close - vwap) / vwap if vwap > 0 else 0.0
+
+    checks = [
+        (close > vwap, 2, "above VWAP"),
+        (close > ema50, 2, "above 50EMA"),
+        (ema50 > ema50_prev, 1, "50EMA sloping up"),
+        (close > session_open, 1, "green session"),
+        (0 <= vwap_distance <= BEAR_TREND_MAX_VWAP_EXT, 2, "not extended from VWAP"),
+        (prev_close >= ema50 * 0.998, 1, "pullback held trend"),
+    ]
+    score = 0
+    reasons = []
+    for ok, points, reason in checks:
+        if ok:
+            score += points
+            reasons.append(reason)
+    log.info(
+        f"Bull trend [{sym}]: close={close:.2f} VWAP={vwap:.2f} EMA50={ema50:.2f} "
+        f"vwap_dist={vwap_distance*100:.2f}% score={min(10, score)}/10 reasons={reasons}"
+    )
+    return {
+        "score": min(10, score),
+        "close": close,
+        "vwap": vwap,
+        "ema50": ema50,
+        "vwap_distance": vwap_distance,
+        "reasons": reasons,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Setup finders
 # ---------------------------------------------------------------------------
@@ -340,6 +428,31 @@ def _atm_option(sym: str, right: str) -> tuple[str, float, float, str]:
         return "", 0.0, 0.0, ""
 
 
+def _orb_signal(sym: str) -> dict | None:
+    """5-min opening range breakout (first 5 bars 9:30–9:35 ET). Returns direction + key levels."""
+    try:
+        bars = _intraday_bars(sym)
+        if bars is None or len(bars) < 10:
+            return None
+        orb_bars = bars.iloc[:5]
+        orb_high = float(orb_bars["High"].max())
+        orb_low  = float(orb_bars["Low"].min())
+        close    = float(bars["Close"].iloc[-1])
+        if orb_high <= orb_low:
+            return None
+        range_pct = round((orb_high - orb_low) / orb_low * 100, 3)
+        direction = "bear" if close < orb_low else "bull" if close > orb_high else "neutral"
+        log.info(
+            f"ORB [{sym}]: high={orb_high:.2f} low={orb_low:.2f} "
+            f"close={close:.2f} range={range_pct:.2f}% direction={direction}"
+        )
+        return {"orb_high": orb_high, "orb_low": orb_low, "close": close,
+                "direction": direction, "range_pct": range_pct}
+    except Exception as exc:
+        log.warning(f"ORB [{sym}] failed: {exc}")
+        return None
+
+
 def find_0dte(account: float) -> dict | None:
     today    = date.today()
     catalyst = next(((d, t, mode) for d, t, mode in CATALYST_DAYS if d == today), None)
@@ -347,12 +460,26 @@ def find_0dte(account: float) -> dict | None:
     prev     = _prev_close("SPY")
     gap      = abs(price - prev) / prev if prev > 0 else 0.0
     up       = price > prev
+    is_monday = today.weekday() == 0
 
-    if not catalyst and gap < GAP_THRESHOLD:
-        log.info("0DTE: no catalyst, no gap")
+    orb = _orb_signal("SPY") if not catalyst else None
+    orb_break = orb is not None and orb["direction"] != "neutral"
+
+    if not catalyst and gap < GAP_THRESHOLD and not orb_break:
+        log.info("0DTE: no catalyst, no gap, no ORB break")
         return None
 
-    right = "PUT" if (not catalyst and not up) else "CALL"
+    if orb_break and not catalyst:
+        right    = "PUT" if orb["direction"] == "bear" else "CALL"
+        _trigger = (f"ORB {'BEAR' if right == 'PUT' else 'BULL'}"
+                    f"{' MONDAY' if is_monday else ''} range={orb['range_pct']:.1f}%")
+    elif not catalyst:
+        right    = "PUT" if not up else "CALL"
+        _trigger = f"GAP {'UP' if up else 'DOWN'} {gap*100:.1f}%"
+    else:
+        right    = "CALL"
+        _trigger = None
+
     occ, strike, px, exp = _atm_option("SPY", right)
     if not occ or px <= 0:
         return None
@@ -367,7 +494,7 @@ def find_0dte(account: float) -> dict | None:
         "strategy": "0dte", "symbol": "SPY", "right": right,
         "option_symbol": occ, "strike": strike, "expiry": exp,
         "contracts": contracts, "entry_price_est": px,
-        "catalyst": catalyst[1] if catalyst else f"GAP {'UP' if up else 'DOWN'} {gap*100:.1f}%",
+        "catalyst": catalyst[1] if catalyst else _trigger,
         "hard_close_date": str(today), "hard_close_time": "13:45",
     }
 
@@ -416,6 +543,10 @@ def find_bear_trend_day(account: float) -> dict | None:
         log.info("Bear trend: past 2pm ET entry cutoff — skip")
         return None
 
+    if not _vix_term_structure_direction_ok("bear", _fetch_vix_term_structure()):
+        log.info("Bear trend: VIX term structure filter blocked entry")
+        return None
+
     leaders = ["SPY", "QQQ", "IWM"]
     signals = {sym: _vwap_50ema_signal(_intraday_bars(sym), sym) for sym in leaders}
     valid = {sym: sig for sym, sig in signals.items() if sig and sig["score"] >= BEAR_TREND_MIN_CONFIDENCE}
@@ -442,6 +573,10 @@ def find_bear_trend_day(account: float) -> dict | None:
         log.info(f"Bear trend: SPY score {signal['score']}/10 < min {BEAR_TREND_MIN_CONFIDENCE} — skip")
         return None
 
+    orb = _orb_signal("SPY")
+    orb_dir = orb["direction"] if orb else "unavail"
+    log.info(f"Bear trend ORB [{orb_dir}]: {'confirms bear' if orb_dir == 'bear' else 'no extra confirm'}")
+
     occ, strike, px, exp = _atm_option("SPY", "PUT")
     if not occ or px <= 0:
         log.info("Bear trend: could not find SPY ATM put — skip")
@@ -464,7 +599,7 @@ def find_bear_trend_day(account: float) -> dict | None:
             "confidence": signal["score"],
             "hard_close_date": str(date.today()),
             "hard_close_time": "13:45",
-            "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text}",
+            "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text} | ORB={orb_dir}",
         }
 
     # ATM put too expensive for budget — try bear put debit spread
@@ -496,11 +631,60 @@ def find_bear_trend_day(account: float) -> dict | None:
                 "confidence": signal["score"],
                 "hard_close_date": str(date.today()),
                 "hard_close_time": "13:45",
-                "catalyst": f"VWAP/50EMA bear spread {signal['score']}/10: {reason_text}",
+                "catalyst": f"VWAP/50EMA bear spread {signal['score']}/10: {reason_text} | ORB={orb_dir}",
             }
 
     log.info(f"Bear trend: no spread fits budget ${max_risk:.0f} — skip")
     return None
+
+
+def find_bull_trend_day(account: float) -> dict | None:
+    now_et = _now_et()
+    if now_et.time() >= BEAR_TREND_ENTRY_CUTOFF_ET:
+        log.info("Bull trend: past 2pm ET entry cutoff - skip")
+        return None
+
+    if not _vix_term_structure_direction_ok("bull", _fetch_vix_term_structure()):
+        log.info("Bull trend: VIX term structure filter blocked entry")
+        return None
+
+    leaders = ["SPY", "QQQ", "IWM"]
+    signals = {sym: _vwap_50ema_bull_signal(_intraday_bars(sym), sym) for sym in leaders}
+    valid = {sym: sig for sym, sig in signals.items() if sig and sig["score"] >= BEAR_TREND_MIN_CONFIDENCE}
+    scores_str = " | ".join(
+        f"{sym}={sig['score']}/10" if sig else f"{sym}=no_data"
+        for sym, sig in signals.items()
+    )
+    log.info(f"Bull trend breadth: {scores_str} | confirmed={list(valid.keys())} need>=2")
+    if len(valid) < 2:
+        return None
+
+    signal = valid.get("SPY") or next(iter(valid.values()))
+    occ, strike, px, exp = _atm_option("SPY", "CALL")
+    if not occ or px <= 0:
+        log.info("Bull trend: could not find SPY ATM call - skip")
+        return None
+
+    max_risk = account * MAX_RISK_PCT
+    contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
+    if contracts < 1:
+        log.info(f"Bull trend: can't afford 1 SPY call at ${px:.2f} (budget ${max_risk:.0f})")
+        return None
+
+    return {
+        "strategy": "bull_trend",
+        "symbol": "SPY",
+        "right": "CALL",
+        "option_symbol": occ,
+        "strike": strike,
+        "expiry": exp,
+        "contracts": contracts,
+        "entry_price_est": px,
+        "confidence": signal["score"],
+        "hard_close_date": str(date.today()),
+        "hard_close_time": "13:45",
+        "catalyst": f"VWAP/50EMA bull trend {signal['score']}/10: {', '.join(signal['reasons'])}",
+    }
 
 
 def find_earnings(account: float) -> list[dict]:
@@ -678,6 +862,85 @@ def _submit(occ_symbol: str, qty: int, side: str, max_notional: float = 0.0) -> 
     return None
 
 
+def _submit_spread(setup: dict, max_notional: float = 0.0) -> dict | None:
+    qty = int(setup.get("contracts", 0))
+    if qty > MAX_CONTRACTS:
+        log.error(f"ORDER BLOCKED: {qty} spread contracts exceeds MAX_CONTRACTS={MAX_CONTRACTS}")
+        return None
+    if qty < 1:
+        return None
+
+    debit = float(setup.get("entry_price_est", 0.0) or 0.0)
+    notional = debit * qty * 100
+    if max_notional > 0 and notional > max_notional:
+        log.error(f"ORDER BLOCKED: spread notional ${notional:.0f} > budget ${max_notional:.0f}")
+        _alert(f"ORDER BLOCKED spread {setup.get('symbol')} x{qty}: cost ${notional:.0f} > risk budget ${max_notional:.0f}")
+        return None
+    if manual_reset_required():
+        msg = f"MANUAL RESET REQUIRED - spread order blocked by {DEFAULT_BLOCK_FILE}"
+        log.error(msg)
+        _alert(f"ORDER BLOCKED spread {setup.get('symbol')} x{qty}\nManual reset required before any new orders.")
+        return None
+
+    body = {
+        "order_class": "mleg",
+        "qty": str(qty),
+        "type": "limit",
+        "limit_price": str(round(debit, 2)),
+        "time_in_force": "day",
+        "legs": [
+            {"symbol": setup["option_symbol"], "side": "buy", "ratio_qty": "1"},
+            {"symbol": setup["short_option_symbol"], "side": "sell", "ratio_qty": "1"},
+        ],
+    }
+    try:
+        resp = _post("/v2/orders", body)
+        log.info(
+            f"Spread order OK: {resp.get('id')} buy {setup['option_symbol']} / "
+            f"sell {setup['short_option_symbol']} x{qty} debit=${debit:.2f}"
+        )
+        return resp
+    except Exception as exc:
+        log.error(f"Spread order failed: {exc}")
+        _alert(f"SPREAD ORDER FAILED {setup.get('symbol')} x{qty}\n{exc}")
+        return None
+
+
+def _spread_mid(long_symbol: str, short_symbol: str) -> float:
+    long_mid = _option_mid(long_symbol)
+    short_mid = _option_mid(short_symbol)
+    if long_mid <= 0 or short_mid < 0:
+        return 0.0
+    return round(max(0.0, long_mid - short_mid), 3)
+
+
+def _close_spread(trade: dict) -> dict | None:
+    qty = int(trade.get("contracts", 0))
+    if qty < 1:
+        return None
+    body = {
+        "order_class": "mleg",
+        "qty": str(qty),
+        "type": "market",
+        "time_in_force": "day",
+        "legs": [
+            {"symbol": trade["option_symbol"], "side": "sell", "ratio_qty": "1"},
+            {"symbol": trade["short_option_symbol"], "side": "buy", "ratio_qty": "1"},
+        ],
+    }
+    try:
+        resp = _post("/v2/orders", body)
+        log.info(
+            f"Spread close OK: {resp.get('id')} sell {trade['option_symbol']} / "
+            f"buy {trade['short_option_symbol']} x{qty}"
+        )
+        return resp
+    except Exception as exc:
+        log.error(f"Spread close failed: {exc}")
+        _alert(f"SPREAD CLOSE FAILED {trade.get('symbol')} x{qty}\n{exc}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Entry run
 # ---------------------------------------------------------------------------
@@ -699,6 +962,11 @@ def run_entry(account: float) -> None:
     s = find_bear_trend_day(account)
     if s:
         candidates.append(s)
+
+    if len(candidates) < slots:
+        s = find_bull_trend_day(account)
+        if s:
+            candidates.append(s)
 
     s = find_0dte(account)
     if s and len(candidates) < slots:
@@ -725,7 +993,11 @@ def run_entry(account: float) -> None:
     trades = _load()
     for setup in candidates:
         max_notional = account * MAX_RISK_PCT
-        resp = _submit(setup["option_symbol"], setup["contracts"], "buy", max_notional=max_notional)
+        is_spread = bool(setup.get("short_option_symbol"))
+        if is_spread:
+            resp = _submit_spread(setup, max_notional=max_notional)
+        else:
+            resp = _submit(setup["option_symbol"], setup["contracts"], "buy", max_notional=max_notional)
         if not resp:
             continue
 
@@ -743,12 +1015,16 @@ def run_entry(account: float) -> None:
             "symbol":          setup["symbol"],
             "right":           setup["right"],
             "option_symbol":   setup["option_symbol"],
+            "short_option_symbol": setup.get("short_option_symbol"),
             "strike":          setup["strike"],
+            "short_strike":    setup.get("short_strike"),
             "expiry":          setup["expiry"],
             "contracts":       setup["contracts"],
             "entry_price":     filled_price,
             "target_price":    round(filled_price * PROFIT_MULT, 3),
             "stop_price":      round(filled_price * STOP_MULT, 3),
+            "max_loss":        setup.get("max_loss"),
+            "max_gain":        setup.get("max_gain"),
             "hard_close_date": setup.get("hard_close_date"),
             "hard_close_time": setup.get("hard_close_time"),
             "entry_date":      str(date.today()),
@@ -788,7 +1064,8 @@ def run_monitor() -> None:
             continue
 
         occ    = trade["option_symbol"]
-        mid    = _option_mid(occ)
+        is_spread = bool(trade.get("short_option_symbol"))
+        mid    = _spread_mid(occ, trade["short_option_symbol"]) if is_spread else _option_mid(occ)
         entry  = trade["entry_price"]
         target = trade["target_price"]
         stop   = trade["stop_price"]
@@ -820,7 +1097,7 @@ def run_monitor() -> None:
                 reason = "MAX HOLD 3 DAYS"
 
         if reason:
-            resp = _submit(occ, qty, "sell")
+            resp = _close_spread(trade) if is_spread else _submit(occ, qty, "sell")
             if resp:
                 trade["status"]      = "closed"
                 trade["exit_price"]  = mid
