@@ -163,6 +163,37 @@ def _save(trades: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Account helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_alpaca_equity() -> float:
+    """Fetch live equity from Alpaca paper account. Returns 0.0 on failure."""
+    try:
+        r = req.get(f"{BASE}/v2/account", headers=HDR, timeout=10)
+        if r.status_code == 200:
+            eq = float(r.json().get("equity", 0) or 0)
+            log.info(f"Alpaca equity fetched: ${eq:,.2f}")
+            return eq
+    except Exception as exc:
+        log.warning(f"Could not fetch Alpaca equity: {exc}")
+    return 0.0
+
+
+def resolve_account_size(cli_override: float | None = None) -> float:
+    """Priority: CLI arg > FLIP_ACCOUNT_SIZE_OVERRIDE env var > live Alpaca equity > $5000 fallback."""
+    if cli_override is not None and cli_override > 0:
+        return cli_override
+    if ACCOUNT_OVERRIDE > 0:
+        log.info(f"Using ACCOUNT_OVERRIDE: ${ACCOUNT_OVERRIDE:,.2f}")
+        return ACCOUNT_OVERRIDE
+    live = _fetch_alpaca_equity()
+    if live > 0:
+        return live
+    log.warning("Could not resolve account size — falling back to $5,000")
+    return 5_000.0
+
+
+# ---------------------------------------------------------------------------
 # Price helpers
 # ---------------------------------------------------------------------------
 
@@ -344,6 +375,36 @@ def find_0dte(account: float) -> dict | None:
 BEAR_TREND_ENTRY_CUTOFF_ET = dtime(14, 0)  # no new entries after 2:00pm ET (1:00pm CT)
 
 
+def _bear_put_spread(sym: str, exp: str, atm_strike: float, max_risk: float) -> tuple[float, float, float] | None:
+    """Find narrowest bear put spread (buy ATM, sell OTM) whose net debit fits max_risk per contract.
+    Returns (net_debit, long_strike, short_strike) or None."""
+    try:
+        t = yf.Ticker(sym)
+        chain = t.option_chain(exp)
+        puts = chain.puts
+        if puts.empty:
+            return None
+        for width in [2, 3, 5, 7, 10]:
+            short_target = atm_strike - width
+            long_rows  = puts[abs(puts["strike"] - atm_strike)   < 0.6]
+            short_rows = puts[abs(puts["strike"] - short_target) < 0.6]
+            if long_rows.empty or short_rows.empty:
+                continue
+            long_ask  = float(long_rows["ask"].iloc[0])
+            short_bid = float(short_rows["bid"].iloc[0])
+            if long_ask <= 0 or short_bid < 0:
+                continue
+            net_debit = round(long_ask - short_bid, 3)
+            if net_debit <= 0:
+                continue
+            if net_debit * 100 <= max_risk:
+                return (net_debit, float(long_rows["strike"].iloc[0]), float(short_rows["strike"].iloc[0]))
+        return None
+    except Exception as exc:
+        log.warning(f"Bear put spread lookup failed: {exc}")
+        return None
+
+
 def _now_et():
     from zoneinfo import ZoneInfo
     return datetime.now(ZoneInfo("America/New_York"))
@@ -388,25 +449,58 @@ def find_bear_trend_day(account: float) -> dict | None:
 
     max_risk = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
-    if contracts < 1:
-        log.info(f"Bear trend: can't afford 1 SPY put at ${px:.2f} (budget ${max_risk:.0f})")
-        return None
-
     reason_text = ", ".join(signal["reasons"])
-    return {
-        "strategy": "bear_trend",
-        "symbol": "SPY",
-        "right": "PUT",
-        "option_symbol": occ,
-        "strike": strike,
-        "expiry": exp,
-        "contracts": contracts,
-        "entry_price_est": px,
-        "confidence": signal["score"],
-        "hard_close_date": str(date.today()),
-        "hard_close_time": "13:45",
-        "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text}",
-    }
+
+    if contracts >= 1:
+        return {
+            "strategy": "bear_trend",
+            "symbol": "SPY",
+            "right": "PUT",
+            "option_symbol": occ,
+            "strike": strike,
+            "expiry": exp,
+            "contracts": contracts,
+            "entry_price_est": px,
+            "confidence": signal["score"],
+            "hard_close_date": str(date.today()),
+            "hard_close_time": "13:45",
+            "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text}",
+        }
+
+    # ATM put too expensive for budget — try bear put debit spread
+    log.info(f"Bear trend: SPY put ${px:.2f} exceeds budget ${max_risk:.0f} — trying bear put spread")
+    spread = _bear_put_spread("SPY", exp, strike, max_risk)
+    if spread:
+        net_debit, long_strike, short_strike = spread
+        spread_contracts = min(int(max_risk // (net_debit * 100)), MAX_CONTRACTS)
+        if spread_contracts >= 1:
+            long_occ  = _occ("SPY", exp, "PUT", long_strike)
+            short_occ = _occ("SPY", exp, "PUT", short_strike)
+            log.info(
+                f"Bear trend: spread {long_strike:.0f}/{short_strike:.0f}P "
+                f"net_debit=${net_debit:.2f} x{spread_contracts}"
+            )
+            return {
+                "strategy": "bear_trend_spread",
+                "symbol": "SPY",
+                "right": "PUT",
+                "option_symbol": long_occ,
+                "short_option_symbol": short_occ,
+                "strike": long_strike,
+                "short_strike": short_strike,
+                "expiry": exp,
+                "contracts": spread_contracts,
+                "entry_price_est": net_debit,
+                "max_loss": round(net_debit * spread_contracts * 100, 2),
+                "max_gain": round((long_strike - short_strike - net_debit) * spread_contracts * 100, 2),
+                "confidence": signal["score"],
+                "hard_close_date": str(date.today()),
+                "hard_close_time": "13:45",
+                "catalyst": f"VWAP/50EMA bear spread {signal['score']}/10: {reason_text}",
+            }
+
+    log.info(f"Bear trend: no spread fits budget ${max_risk:.0f} — skip")
+    return None
 
 
 def find_earnings(account: float) -> list[dict]:
@@ -804,7 +898,7 @@ def main() -> None:
         log.error("Alpaca keys missing in agent/.env")
         sys.exit(1)
 
-    account = args.account if args.account is not None else (ACCOUNT_OVERRIDE if ACCOUNT_OVERRIDE > 0 else 200.0)
+    account = resolve_account_size(args.account)
 
     if args.status:
         print_status()
