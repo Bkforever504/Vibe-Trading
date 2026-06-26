@@ -35,8 +35,11 @@ from datetime import date, datetime, time as dtime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
+import socket
 import requests as req
 from dotenv import load_dotenv
+
+socket.setdefaulttimeout(25)  # prevent yfinance from hanging Task Scheduler
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
@@ -1177,16 +1180,20 @@ def main() -> None:
 
     account = resolve_account_size(args.account)
 
-    if args.status:
-        print_status()
-    elif args.close_all:
-        close_all()
-    elif args.entry:
-        run_entry(account)
-    elif args.monitor:
-        run_monitor()
-    else:
-        ap.print_help()
+    try:
+        if args.status:
+            print_status()
+        elif args.close_all:
+            close_all()
+        elif args.entry:
+            run_entry(account)
+        elif args.monitor:
+            run_monitor()
+        else:
+            ap.print_help()
+    except Exception as exc:
+        log.exception(f"FATAL unhandled exception: {exc}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
