@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 from research.pine_strategy_lab import (
     BacktestMetrics,
     PineStrategyIdea,
@@ -10,6 +13,7 @@ from research.pine_strategy_lab import (
     scan_pine_red_flags,
     write_candidate_report,
 )
+from research.pine_strategy_lab_backtest import _equity_curve, _metrics_from_equity
 
 
 def test_parse_pine_strategy_extracts_safe_metadata():
@@ -249,3 +253,29 @@ def test_load_manifest_runs_scanner_on_pine_files(tmp_path: Path):
     evaluations = load_manifest_evaluations(manifest)
     assert evaluations[0].status == "rejected"
     assert any("[repaint]" in r for r in evaluations[0].reject_reasons)
+
+
+def test_backtest_metrics_use_completed_trade_pnl_not_bar_returns():
+    idx = pd.date_range("2024-01-01", periods=6, freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": [100, 110, 105, 107, 103, 110],
+            "high": [100, 110, 105, 107, 103, 110],
+            "low": [100, 110, 105, 107, 103, 110],
+            "close": [100, 110, 105, 107, 103, 110],
+            "volume": [1_000] * 6,
+        },
+        index=idx,
+    )
+    signals = pd.Series([1, 1, 0, -1, -1, 0], index=idx)
+
+    equity = _equity_curve(ohlcv, signals, slippage_pct=0.0, commission_pct=0.0)
+    metrics = _metrics_from_equity(equity, signals)
+
+    assert metrics["trade_count"] == 2
+    assert metrics["profit_factor"] == pytest.approx(1.511, rel=1e-3)
+    assert metrics["avg_win_pct"] == pytest.approx(5.0, rel=1e-3)
+    assert metrics["avg_loss_pct"] == pytest.approx(-3.309, rel=1e-3)
+    assert metrics["expectancy_pct"] == pytest.approx(0.844, rel=1e-3)
+    assert metrics["max_consecutive_losses"] == 1
+    assert metrics["time_in_market_pct"] == pytest.approx(66.667, rel=1e-3)

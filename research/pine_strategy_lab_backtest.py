@@ -60,7 +60,7 @@ def _equity_curve(
     """Vectorized simulation. Signal shifts 1 bar — no same-bar fills."""
     pos = signals.reindex(ohlcv.index).fillna(0).shift(1).fillna(0)
     bar_ret = ohlcv["close"].pct_change().fillna(0)
-    fill_cost = pos.diff().abs() * (slippage_pct + commission_pct) / 100
+    fill_cost = pos.diff().abs().fillna(0) * (slippage_pct + commission_pct) / 100
     strat_ret = pos * bar_ret - fill_cost
     return (1 + strat_ret).cumprod()
 
@@ -69,13 +69,72 @@ def _metrics_from_equity(equity: pd.Series, signals: pd.Series) -> dict:
     total_return = float((equity.iloc[-1] - 1) * 100)
     dd = (equity - equity.cummax()) / equity.cummax()
     max_dd = float(abs(dd.min()) * 100)
-    trade_count = int((signals.reindex(equity.index).diff().abs() > 0).sum())
-    bar_ret = equity.pct_change().dropna()
-    wins = float(bar_ret[bar_ret > 0].sum())
-    losses = float(abs(bar_ret[bar_ret < 0].sum()))
-    pf = wins / losses if losses > 0 else 99.0
-    return {"total_return_pct": total_return, "profit_factor": pf,
-            "max_drawdown_pct": max_dd, "trade_count": trade_count}
+    trade_returns = _completed_trade_returns(equity, signals)
+    wins = [r for r in trade_returns if r > 0]
+    losses = [r for r in trade_returns if r < 0]
+    avg_win = float(sum(wins) / len(wins) * 100) if wins else 0.0
+    avg_loss = float(sum(losses) / len(losses) * 100) if losses else 0.0
+    expectancy = float(sum(trade_returns) / len(trade_returns) * 100) if trade_returns else 0.0
+    pos = _positions_from_signals(signals, equity.index)
+    return {"total_return_pct": total_return, "profit_factor": _profit_factor(trade_returns),
+            "max_drawdown_pct": max_dd, "trade_count": len(trade_returns),
+            "avg_win_pct": avg_win, "avg_loss_pct": avg_loss,
+            "expectancy_pct": expectancy,
+            "max_consecutive_losses": _max_consecutive_losses(trade_returns),
+            "time_in_market_pct": float((pos != 0).mean() * 100)}
+
+
+def _positions_from_signals(signals: pd.Series, index: pd.Index) -> pd.Series:
+    return signals.reindex(index).fillna(0).shift(1).fillna(0)
+
+
+def _completed_trade_returns(equity: pd.Series, signals: pd.Series) -> list[float]:
+    pos = _positions_from_signals(signals, equity.index)
+    trade_returns: list[float] = []
+    entry_equity: float | None = None
+    open_pos = 0.0
+
+    for i, current_pos in enumerate(pos):
+        current_pos = float(current_pos)
+        prev_equity = float(equity.iloc[i - 1]) if i > 0 else 1.0
+
+        if open_pos == 0 and current_pos != 0:
+            entry_equity = prev_equity
+            open_pos = current_pos
+            continue
+
+        if open_pos != 0 and current_pos != open_pos:
+            if entry_equity and entry_equity > 0:
+                trade_returns.append(float(equity.iloc[i] / entry_equity - 1))
+            entry_equity = prev_equity if current_pos != 0 else None
+            open_pos = current_pos
+
+    if open_pos != 0 and entry_equity and entry_equity > 0:
+        trade_returns.append(float(equity.iloc[-1] / entry_equity - 1))
+
+    return trade_returns
+
+
+def _max_consecutive_losses(trade_returns: list[float]) -> int:
+    longest = 0
+    current = 0
+    for ret in trade_returns:
+        if ret < 0:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
+
+
+def _profit_factor(trade_returns: list[float]) -> float:
+    wins = [r for r in trade_returns if r > 0]
+    losses = [r for r in trade_returns if r < 0]
+    gross_win = float(sum(wins))
+    gross_loss = float(abs(sum(losses)))
+    if gross_loss > 0:
+        return gross_win / gross_loss
+    return 99.0 if gross_win > 0 else 0.0
 
 
 def _walk_forward_pass_rate(
@@ -98,10 +157,7 @@ def _walk_forward_pass_rate(
         valid += 1
         sig = strategy_fn(test)
         eq = _equity_curve(test, sig, slippage_pct, commission_pct)
-        bar_ret = eq.pct_change().dropna()
-        w = float(bar_ret[bar_ret > 0].sum())
-        l = float(abs(bar_ret[bar_ret < 0].sum()))
-        fold_pf = w / l if l > 0 else (0.0 if w == 0 else 99.0)
+        fold_pf = _profit_factor(_completed_trade_returns(eq, sig))
         if fold_pf > 1.0:
             passes += 1
     return passes / valid if valid > 0 else 0.0
@@ -122,10 +178,7 @@ def run_backtest(strategy_fn: StrategyFn, config: BacktestConfig) -> BacktestMet
 
     oos_sig = strategy_fn(oos_data)
     oos_eq = _equity_curve(oos_data, oos_sig, config.slippage_pct, config.commission_pct)
-    oos_ret = oos_eq.pct_change().dropna()
-    oos_w = float(oos_ret[oos_ret > 0].sum())
-    oos_l = float(abs(oos_ret[oos_ret < 0].sum()))
-    oos_pf = oos_w / oos_l if oos_l > 0 else 99.0
+    oos_pf = _profit_factor(_completed_trade_returns(oos_eq, oos_sig))
 
     wf_rate = _walk_forward_pass_rate(
         strategy_fn, ohlcv,
@@ -140,4 +193,9 @@ def run_backtest(strategy_fn: StrategyFn, config: BacktestConfig) -> BacktestMet
         trade_count=is_m["trade_count"],
         out_of_sample_profit_factor=round(min(oos_pf, 99.0), 3),
         walk_forward_pass_rate=round(wf_rate, 3),
+        avg_win_pct=round(is_m["avg_win_pct"], 3),
+        avg_loss_pct=round(is_m["avg_loss_pct"], 3),
+        expectancy_pct=round(is_m["expectancy_pct"], 3),
+        max_consecutive_losses=is_m["max_consecutive_losses"],
+        time_in_market_pct=round(is_m["time_in_market_pct"], 3),
     )
