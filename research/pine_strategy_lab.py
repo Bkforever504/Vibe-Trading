@@ -148,6 +148,24 @@ def scan_pine_red_flags(source: str) -> RedFlagReport:
             message="ta.pivothigh/pivotlow — pivot confirmation requires future bars, repaints in realtime",
         ))
 
+    # fill_orders_on_price_change=true (Pine v6): limit orders fill on any intrabar
+    # price move, not just bar open. Overstates fill rate and win rate in backtests.
+    if re.search(r"fill_orders_on_price_change\s*=\s*true", source, re.IGNORECASE):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="fill_on_price_change",
+            message="fill_orders_on_price_change=true — limit orders fill on any intrabar tick, inflating fill rate vs live trading",
+        ))
+
+    # Pine v6 changed the default order execution model. Strategies written for v5
+    # and converted to v6 may show different backtest results without code changes.
+    if re.search(r"^\s*//@version=6\b", source, re.MULTILINE):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="pine_v6",
+            message="//@version=6 — order execution model changed in v6; re-validate backtest results against TradingView v6 changelog",
+        ))
+
     return RedFlagReport(flags=flags)
 
 
@@ -188,6 +206,9 @@ class BacktestMetrics:
     expectancy_pct: float = 0.0
     max_consecutive_losses: int = 0
     time_in_market_pct: float = 0.0
+    sharpe_ratio: float = 0.0
+    win_rate_pct: float = 0.0
+    calmar_ratio: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -242,6 +263,9 @@ def evaluate_candidate(
     score += min(metrics.walk_forward_pass_rate, 1.0) * 1.8
     score += min(metrics.trade_count / 200, 1.0) * 0.9
     score -= min(metrics.max_drawdown_pct / 20, 2.0)
+    # Sharpe bonus: up to +0.6 for Sharpe >= 3.0 (only when explicitly computed)
+    if metrics.sharpe_ratio > 0:
+        score += min(metrics.sharpe_ratio / 3.0, 1.0) * 0.6
     score -= len(reject_reasons) * 1.15
     score -= len(red_flag_warnings) * 0.4  # 0.4 pts per unresolved warning
     score = round(max(0.0, min(10.0, score)), 1)
@@ -261,8 +285,8 @@ def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -
         "",
         "Research filter only. No strategy promoted to live without paper-forward validation and execution guard sign-off.",
         "",
-        "| Strategy | Status | Confidence | PF | OOS PF | Trades | Max DD | Reject Reasons | Red Flag Warnings |",
-        "|---|---:|---:|---:|---:|---:|---:|---|---|",
+        "| Strategy | Status | Confidence | PF | OOS PF | Sharpe | WR% | Trades | Max DD | Reject Reasons | Red Flag Warnings |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for item in rows:
         reasons = ", ".join(item.reject_reasons) if item.reject_reasons else "-"
@@ -275,6 +299,8 @@ def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -
                 f"{item.confidence_score:.1f}",
                 f"{item.metrics.profit_factor:.2f}",
                 f"{item.metrics.out_of_sample_profit_factor:.2f}",
+                f"{item.metrics.sharpe_ratio:.2f}",
+                f"{item.metrics.win_rate_pct:.1f}%",
                 str(item.metrics.trade_count),
                 f"{item.metrics.max_drawdown_pct:.1f}%",
                 reasons,

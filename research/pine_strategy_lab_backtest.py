@@ -35,6 +35,7 @@ class BacktestConfig:
     commission_pct: float = _DEFAULT_COMMISSION_PCT
     oos_split: float = 0.20   # fraction of data held out for OOS
     wf_folds: int = 5
+    purge_bars: int = 5       # bars dropped between IS/OOS in each WF fold (prevents leakage)
 
 
 def fetch_ohlcv(symbol: str, start: str, end: str) -> pd.DataFrame:
@@ -49,6 +50,13 @@ def fetch_ohlcv(symbol: str, start: str, end: str) -> pd.DataFrame:
         raise ValueError(f"No price data for {symbol} {start}:{end}")
     df.columns = [c.lower() if isinstance(c, str) else c[0].lower() for c in df.columns]
     return df[["open", "high", "low", "close", "volume"]].copy()
+
+
+def _sharpe_ratio(daily_returns: pd.Series) -> float:
+    """Annualized Sharpe ratio assuming daily bars (252 trading days/year)."""
+    if len(daily_returns) < 2 or daily_returns.std() == 0:
+        return 0.0
+    return float((daily_returns.mean() / daily_returns.std()) * (252 ** 0.5))
 
 
 def _equity_curve(
@@ -76,12 +84,23 @@ def _metrics_from_equity(equity: pd.Series, signals: pd.Series) -> dict:
     avg_loss = float(sum(losses) / len(losses) * 100) if losses else 0.0
     expectancy = float(sum(trade_returns) / len(trade_returns) * 100) if trade_returns else 0.0
     pos = _positions_from_signals(signals, equity.index)
-    return {"total_return_pct": total_return, "profit_factor": _profit_factor(trade_returns),
-            "max_drawdown_pct": max_dd, "trade_count": len(trade_returns),
-            "avg_win_pct": avg_win, "avg_loss_pct": avg_loss,
-            "expectancy_pct": expectancy,
-            "max_consecutive_losses": _max_consecutive_losses(trade_returns),
-            "time_in_market_pct": float((pos != 0).mean() * 100)}
+    bar_ret = equity.pct_change().fillna(0)
+    win_rate = float(len(wins) / len(trade_returns) * 100) if trade_returns else 0.0
+    calmar = total_return / max_dd if max_dd > 0 else 0.0
+    return {
+        "total_return_pct": total_return,
+        "profit_factor": _profit_factor(trade_returns),
+        "max_drawdown_pct": max_dd,
+        "trade_count": len(trade_returns),
+        "avg_win_pct": avg_win,
+        "avg_loss_pct": avg_loss,
+        "expectancy_pct": expectancy,
+        "max_consecutive_losses": _max_consecutive_losses(trade_returns),
+        "time_in_market_pct": float((pos != 0).mean() * 100),
+        "sharpe_ratio": _sharpe_ratio(bar_ret),
+        "win_rate_pct": win_rate,
+        "calmar_ratio": calmar,
+    }
 
 
 def _positions_from_signals(signals: pd.Series, index: pd.Index) -> pd.Series:
@@ -144,20 +163,25 @@ def _walk_forward_pass_rate(
     commission_pct: float,
     oos_split: float,
     folds: int,
+    purge_bars: int = 5,
 ) -> float:
     fold_size = len(ohlcv) // folds
     passes = 0
     valid = 0
     for i in range(folds):
         fold = ohlcv.iloc[i * fold_size: (i + 1) * fold_size]
-        split = int(len(fold) * (1 - oos_split))
-        test = fold.iloc[split:]
-        if len(test) < 10:
+        is_end = int(len(fold) * (1 - oos_split))
+        # Purge gap prevents IS boundary bars from leaking into OOS evaluation.
+        oos_start = min(is_end + purge_bars, len(fold))
+        oos = fold.iloc[oos_start:]
+        if len(oos) < 10:
             continue
         valid += 1
-        sig = strategy_fn(test)
-        eq = _equity_curve(test, sig, slippage_pct, commission_pct)
-        fold_pf = _profit_factor(_completed_trade_returns(eq, sig))
+        # Pass full fold so indicators (EMA, ATR, etc.) have proper warmup bars.
+        full_sig = strategy_fn(fold)
+        oos_sig = full_sig.reindex(oos.index)
+        oos_eq = _equity_curve(oos, oos_sig, slippage_pct, commission_pct)
+        fold_pf = _profit_factor(_completed_trade_returns(oos_eq, oos_sig))
         if fold_pf > 1.0:
             passes += 1
     return passes / valid if valid > 0 else 0.0
@@ -184,6 +208,7 @@ def run_backtest(strategy_fn: StrategyFn, config: BacktestConfig) -> BacktestMet
         strategy_fn, ohlcv,
         config.slippage_pct, config.commission_pct,
         config.oos_split, config.wf_folds,
+        purge_bars=config.purge_bars,
     )
 
     return BacktestMetrics(
@@ -198,4 +223,7 @@ def run_backtest(strategy_fn: StrategyFn, config: BacktestConfig) -> BacktestMet
         expectancy_pct=round(is_m["expectancy_pct"], 3),
         max_consecutive_losses=is_m["max_consecutive_losses"],
         time_in_market_pct=round(is_m["time_in_market_pct"], 3),
+        sharpe_ratio=round(is_m["sharpe_ratio"], 3),
+        win_rate_pct=round(is_m["win_rate_pct"], 3),
+        calmar_ratio=round(is_m["calmar_ratio"], 3),
     )
