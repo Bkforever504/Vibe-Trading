@@ -32,6 +32,8 @@ def main() -> int:
     p.add_argument("--wf-folds", type=int, default=5, dest="wf_folds")
     p.add_argument("--purge-bars", type=int, default=5, dest="purge_bars")
     p.add_argument("--include-vix", action="store_true", help="Merge ^VIX close into ohlcv as vix_close.")
+    p.add_argument("--defensive", default=None, metavar="SYMBOL", help="Rotate flat periods into this symbol (e.g. TLT, GLD).")
+    p.add_argument("--defensive-sma-window", type=int, default=None, help="Use defensive asset only when it is above this SMA.")
     p.add_argument("--pool-by-params", action="store_true", help="Pool metrics across symbols for each parameter set.")
     args = p.parse_args()
 
@@ -46,6 +48,8 @@ def main() -> int:
         wf_folds=args.wf_folds,
         purge_bars=args.purge_bars,
         include_vix=args.include_vix,
+        defensive_symbol=args.defensive,
+        defensive_sma_window=args.defensive_sma_window,
     )
     if args.pool_by_params:
         results = pool_sweep_results_by_params(results)
