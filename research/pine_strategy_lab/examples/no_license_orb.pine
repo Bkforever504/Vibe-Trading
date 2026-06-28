@@ -1,0 +1,11 @@
+//@version=5
+// Source: https://example.com/orb
+// NOTE: no license declared — fixture for reject-bank testing only
+strategy("NoCitation ORB", overlay=true)
+orbHigh = ta.highest(high, 6)
+orbLow  = ta.lowest(low, 6)
+vwap    = ta.vwap(hlc3)
+longCondition = close > orbHigh and close > vwap
+if longCondition
+    strategy.entry("Long", strategy.long)
+strategy.close("Long", when=close < orbLow)

@@ -1,0 +1,57 @@
+[
+  {
+    "pine_file": "examples/vwap_candidate.pine",
+    "metrics": {
+      "total_return_pct": 41.5,
+      "profit_factor": 1.65,
+      "max_drawdown_pct": 8.2,
+      "trade_count": 88,
+      "out_of_sample_profit_factor": 1.22,
+      "walk_forward_pass_rate": 0.66
+    }
+  },
+  {
+    "pine_file": "examples/moonshot_screamer.pine",
+    "metrics": {
+      "total_return_pct": 2000000.0,
+      "profit_factor": 850.0,
+      "max_drawdown_pct": 3.1,
+      "trade_count": 12,
+      "out_of_sample_profit_factor": 0.75,
+      "walk_forward_pass_rate": 0.15
+    }
+  },
+  {
+    "pine_file": "examples/overfit_rsi_swing.pine",
+    "metrics": {
+      "total_return_pct": 52.0,
+      "profit_factor": 2.0,
+      "max_drawdown_pct": 8.4,
+      "trade_count": 22,
+      "out_of_sample_profit_factor": 0.9,
+      "walk_forward_pass_rate": 0.45
+    }
+  },
+  {
+    "pine_file": "examples/high_dd_ema_trend.pine",
+    "metrics": {
+      "total_return_pct": 61.0,
+      "profit_factor": 1.75,
+      "max_drawdown_pct": 32.0,
+      "trade_count": 95,
+      "out_of_sample_profit_factor": 1.2,
+      "walk_forward_pass_rate": 0.65
+    }
+  },
+  {
+    "pine_file": "examples/no_license_orb.pine",
+    "metrics": {
+      "total_return_pct": 38.0,
+      "profit_factor": 1.8,
+      "max_drawdown_pct": 9.0,
+      "trade_count": 80,
+      "out_of_sample_profit_factor": 1.25,
+      "walk_forward_pass_rate": 0.7
+    }
+  }
+]

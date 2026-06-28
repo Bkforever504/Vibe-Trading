@@ -1,0 +1,10 @@
+//@version=5
+// @license MIT
+// Source: https://example.com/moonshot
+// WARNING: fixture for reject-bank testing only — not a real strategy
+strategy("Moonshot Screamer 2M%", overlay=true)
+rsi = ta.rsi(close, 2)
+longCondition = rsi < 10
+if longCondition
+    strategy.entry("Long", strategy.long)
+strategy.close("Long", when=rsi > 90)

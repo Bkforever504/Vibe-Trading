@@ -1,0 +1,6 @@
+//@version=5
+// License: MIT
+// Source: internal-example
+strategy("VWAP Pullback Candidate", overlay=true)
+vwap = ta.vwap(hlc3)
+ema50 = ta.ema(close, 50)

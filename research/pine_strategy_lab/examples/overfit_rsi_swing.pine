@@ -1,0 +1,11 @@
+//@version=5
+// @license MIT
+// Source: https://example.com/rsi-swing
+// WARNING: fixture for reject-bank testing only — not a real strategy
+strategy("OverfitRSI Swing", overlay=true)
+rsi = ta.rsi(close, 14)
+ema20 = ta.ema(close, 20)
+longCondition = rsi < 35 and close > ema20
+if longCondition
+    strategy.entry("Long", strategy.long)
+strategy.close("Long", when=rsi > 65)
