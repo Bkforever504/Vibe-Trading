@@ -57,3 +57,25 @@ def test_write_pine_source_report_includes_candidate_queue(tmp_path: Path) -> No
     assert "Pine Source Scan Report" in text
     assert "adaptive_ma.pine" in text
     assert "Translation Queue" in text
+
+
+def test_write_pine_source_report_includes_noncritical_strategy_review_queue(tmp_path: Path) -> None:
+    source = tmp_path / "strategies" / "momentum" / "macd_strategy.pine"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "//@version=5\n"
+        "// @license MIT\n"
+        "strategy('MACD Strategy', commission_type=strategy.commission.percent, commission_value=0.1)\n"
+        "if close > ta.ema(close, 20)\n"
+        "    strategy.entry('L', strategy.long)\n",
+        encoding="utf-8",
+    )
+
+    summary = scan_pine_source_dir(tmp_path)
+    out = tmp_path / "report.md"
+    write_pine_source_report(summary, out)
+
+    text = out.read_text(encoding="utf-8")
+    assert "Strategy Review Queue" in text
+    assert "macd_strategy.pine" in text
+    assert "no_slippage" in text
