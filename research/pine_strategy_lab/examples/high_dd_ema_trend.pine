@@ -1,0 +1,11 @@
+//@version=5
+// @license MIT
+// Source: https://example.com/ema-trend
+// WARNING: fixture for reject-bank testing only — not a real strategy
+strategy("HighDD EMA Trend", overlay=true)
+ema50 = ta.ema(close, 50)
+atr = ta.atr(14)
+longCondition = close > ema50
+if longCondition
+    strategy.entry("Long", strategy.long)
+    strategy.exit("SL", "Long", stop=close - atr * 8)
