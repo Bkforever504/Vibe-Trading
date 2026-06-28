@@ -183,6 +183,11 @@ class BacktestMetrics:
     trade_count: int
     out_of_sample_profit_factor: float
     walk_forward_pass_rate: float
+    avg_win_pct: float = 0.0
+    avg_loss_pct: float = 0.0
+    expectancy_pct: float = 0.0
+    max_consecutive_losses: int = 0
+    time_in_market_pct: float = 0.0
 
 
 @dataclass(frozen=True)

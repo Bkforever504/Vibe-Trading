@@ -1,0 +1,89 @@
+# Pine Strategy Lab
+
+Purpose:
+
+```text
+Turn legal/open-source TradingView Pine strategy ideas into a ranked research queue.
+```
+
+This is not a live-trading shortcut. It is a filter that rejects hype backtests before they can touch the bots.
+
+## Workflow
+
+1. Save only legal/open-source Pine strategies as `.pine` files.
+2. Convert or manually port the logic into Python for honest backtesting.
+3. Backtest with slippage, fees, realistic fills, trade-level metrics, out-of-sample windows, and walk-forward splits.
+4. Put the resulting metrics in a manifest.
+5. Generate a candidate report.
+6. Promote only `paper_candidate` strategies into shadow/paper-forward testing.
+
+## Manifest Format
+
+```json
+[
+  {
+    "pine_file": "examples/vwap_candidate.pine",
+    "metrics": {
+      "total_return_pct": 41.5,
+      "profit_factor": 1.65,
+      "max_drawdown_pct": 8.2,
+      "trade_count": 88,
+      "out_of_sample_profit_factor": 1.22,
+      "walk_forward_pass_rate": 0.66,
+      "avg_win_pct": 1.4,
+      "avg_loss_pct": -0.9,
+      "expectancy_pct": 0.28,
+      "max_consecutive_losses": 3,
+      "time_in_market_pct": 42.5
+    }
+  }
+]
+```
+
+Run:
+
+```powershell
+uv run --no-project python scripts\pine_strategy_lab_report.py --manifest research\pine_strategy_lab\manifest.json
+```
+
+## Rejection Gates
+
+The first-pass gates reject:
+
+- unknown or non-open-source license
+- fewer than 30 trades
+- suspiciously high profit factor above 10
+- max drawdown above 25%
+- out-of-sample profit factor below 1.15
+- walk-forward pass rate below 60%
+
+## Backtest Metric Standard
+
+The Python backtester uses completed-trade P&L for:
+
+- profit factor
+- trade count
+- average win
+- average loss
+- expectancy
+- max consecutive losses
+
+It also reports time in market from the shifted position series. Bar-by-bar equity returns are still used for total return and drawdown, but they no longer define profit factor.
+
+## Promotion Rule
+
+`paper_candidate` does not mean trade live.
+
+It means:
+
+```text
+Allowed into shadow/paper-forward testing only.
+```
+
+Live execution still requires:
+
+- paper validation
+- forward-test results
+- rule compliance
+- execution guard approval
+- confidence score near 9/10

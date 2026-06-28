@@ -60,7 +60,7 @@ def main() -> int:
         wf_folds=args.wf_folds,
     )
 
-    print(f"Running backtest: {args.strategy.name} on {args.symbol} {args.start}→{args.end}")
+    print(f"Running backtest: {args.strategy.name} on {args.symbol} {args.start} -> {args.end}")
     metrics = run_backtest(strategy_fn, config)
     d = asdict(metrics)
 
@@ -75,7 +75,7 @@ def main() -> int:
     print(f"Confidence: {result.confidence_score}/10")
     if result.reject_reasons:
         for r in result.reject_reasons:
-            print(f"  ✗ {r}")
+            print(f"  - {r}")
     return 0
 
 
