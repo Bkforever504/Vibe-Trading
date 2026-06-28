@@ -42,6 +42,115 @@ def _extract_license(source: str) -> str:
     return "unknown"
 
 
+# ---------------------------------------------------------------------------
+# Red-flag scanner — catches repaint traps and missing realistic assumptions
+# before any backtest metrics are considered.
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class RedFlag:
+    severity: str   # "critical" | "warning"
+    flag_id: str
+    message: str
+
+
+@dataclass(frozen=True)
+class RedFlagReport:
+    flags: list[RedFlag] = field(default_factory=list)
+
+    @property
+    def critical_flags(self) -> list[RedFlag]:
+        return [f for f in self.flags if f.severity == "critical"]
+
+    @property
+    def warning_flags(self) -> list[RedFlag]:
+        return [f for f in self.flags if f.severity == "warning"]
+
+    @property
+    def has_critical(self) -> bool:
+        return bool(self.critical_flags)
+
+
+def scan_pine_red_flags(source: str) -> RedFlagReport:
+    """
+    Scan Pine v5 source for repaint traps and unrealistic backtest settings.
+    Critical flags auto-reject. Warning flags penalise the confidence score.
+
+    References:
+      - https://www.tradingview.com/pine-script-docs/en/v5/concepts/Repainting.html
+      - TradingView strategy() parameter docs
+    """
+    flags: list[RedFlag] = []
+
+    # ── CRITICAL ────────────────────────────────────────────────────────────
+
+    # barmerge.lookahead_on: future bar data fed into current bar calculation.
+    # Makes every backtest look better than live trading will ever be.
+    if re.search(r"\bbarmerge\.lookahead_on\b", source):
+        flags.append(RedFlag(
+            severity="critical",
+            flag_id="lookahead_on",
+            message="barmerge.lookahead_on — lookahead bias, historical results unachievable live",
+        ))
+
+    # ── WARNING ─────────────────────────────────────────────────────────────
+
+    # request.security(): pulls data from a different symbol or timeframe.
+    # The realtime (unconfirmed) bar will repaint until it closes.
+    if re.search(r"\brequest\.security\s*\(", source):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="request_security",
+            message="request.security() — multi-timeframe data repaints on the unconfirmed realtime bar",
+        ))
+
+    # strategy() without commission_value: fills look free; real fills are not.
+    has_strategy_call = bool(re.search(r"\bstrategy\s*\(", source))
+    if has_strategy_call:
+        if not re.search(r"commission_value\s*=|commission_type\s*=", source):
+            flags.append(RedFlag(
+                severity="warning",
+                flag_id="no_commission",
+                message="strategy() missing commission parameters — backtest overstates real-world returns",
+            ))
+        # strategy() without slippage: market-order fills at exact bar close/open price.
+        if not re.search(r"\bslippage\s*=", source):
+            flags.append(RedFlag(
+                severity="warning",
+                flag_id="no_slippage",
+                message="strategy() missing slippage parameter — fills at exact price not achievable live",
+            ))
+
+    # process_orders_on_close=true: orders filled at the closing price of the
+    # triggering bar. Impossible to replicate in live trading.
+    if re.search(r"process_orders_on_close\s*=\s*true", source, re.IGNORECASE):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="process_orders_on_close",
+            message="process_orders_on_close=true — close-price fills are not achievable in live execution",
+        ))
+
+    # calc_on_every_tick=true: strategy recalculates on every tick, not on bar
+    # close. Results differ from confirmed-bar (default) backtesting.
+    if re.search(r"calc_on_every_tick\s*=\s*true", source, re.IGNORECASE):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="calc_on_every_tick",
+            message="calc_on_every_tick=true — tick-level recalculation produces realtime bar repaints",
+        ))
+
+    # ta.pivothigh / ta.pivotlow: require future bars to confirm a pivot.
+    # They repaint until enough bars have closed after the candidate pivot bar.
+    if re.search(r"\bta\.pivothigh\b|\bta\.pivotlow\b", source, re.IGNORECASE):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="pivot_repaint",
+            message="ta.pivothigh/pivotlow — pivot confirmation requires future bars, repaints in realtime",
+        ))
+
+    return RedFlagReport(flags=flags)
+
+
 INDICATOR_PATTERNS = {
     "EMA": re.compile(r"\bta\.ema\b|\bema\b", re.IGNORECASE),
     "SMA": re.compile(r"\bta\.sma\b|\bsma\b", re.IGNORECASE),
@@ -83,6 +192,7 @@ class CandidateEvaluation:
     status: str
     confidence_score: float
     reject_reasons: list[str]
+    red_flag_warnings: list[str] = field(default_factory=list)
 
 
 def parse_pine_strategy(source: str) -> PineStrategyIdea:
@@ -94,8 +204,13 @@ def parse_pine_strategy(source: str) -> PineStrategyIdea:
     return PineStrategyIdea(name=name, license=license_name, source_url=source_url, indicators=indicators)
 
 
-def evaluate_candidate(idea: PineStrategyIdea, metrics: BacktestMetrics) -> CandidateEvaluation:
+def evaluate_candidate(
+    idea: PineStrategyIdea,
+    metrics: BacktestMetrics,
+    red_flags: RedFlagReport | None = None,
+) -> CandidateEvaluation:
     reject_reasons: list[str] = []
+    red_flag_warnings: list[str] = []
 
     if not idea.is_open_source:
         reject_reasons.append("unknown or non-open-source license")
@@ -110,6 +225,12 @@ def evaluate_candidate(idea: PineStrategyIdea, metrics: BacktestMetrics) -> Cand
     if metrics.walk_forward_pass_rate < 0.6:
         reject_reasons.append("weak walk-forward pass rate")
 
+    if red_flags is not None:
+        for flag in red_flags.critical_flags:
+            reject_reasons.append(f"[repaint] {flag.message}")
+        for flag in red_flags.warning_flags:
+            red_flag_warnings.append(flag.message)
+
     score = 4.0
     score += min(metrics.profit_factor, 2.0) * 1.2
     score += min(metrics.out_of_sample_profit_factor, 1.8) * 1.1
@@ -117,10 +238,15 @@ def evaluate_candidate(idea: PineStrategyIdea, metrics: BacktestMetrics) -> Cand
     score += min(metrics.trade_count / 200, 1.0) * 0.9
     score -= min(metrics.max_drawdown_pct / 20, 2.0)
     score -= len(reject_reasons) * 1.15
+    score -= len(red_flag_warnings) * 0.4  # 0.4 pts per unresolved warning
     score = round(max(0.0, min(10.0, score)), 1)
 
     status = "rejected" if reject_reasons else "paper_candidate"
-    return CandidateEvaluation(idea=idea, metrics=metrics, status=status, confidence_score=score, reject_reasons=reject_reasons)
+    return CandidateEvaluation(
+        idea=idea, metrics=metrics, status=status,
+        confidence_score=score, reject_reasons=reject_reasons,
+        red_flag_warnings=red_flag_warnings,
+    )
 
 
 def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -> None:
@@ -128,27 +254,27 @@ def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -
     lines = [
         "# Pine Strategy Lab Candidate Report",
         "",
-        "This report is a research filter only. No strategy should be promoted to live execution without paper-forward validation and execution guard review.",
+        "Research filter only. No strategy promoted to live without paper-forward validation and execution guard sign-off.",
         "",
-        "| Strategy | Status | Confidence | PF | OOS PF | Trades | Max DD | Reject Reasons |",
-        "|---|---:|---:|---:|---:|---:|---:|---|",
+        "| Strategy | Status | Confidence | PF | OOS PF | Trades | Max DD | Reject Reasons | Red Flag Warnings |",
+        "|---|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for item in rows:
         reasons = ", ".join(item.reject_reasons) if item.reject_reasons else "-"
+        warnings = "; ".join(item.red_flag_warnings) if item.red_flag_warnings else "-"
         lines.append(
             "| "
-            + " | ".join(
-                [
-                    item.idea.name,
-                    item.status,
-                    f"{item.confidence_score:.1f}",
-                    f"{item.metrics.profit_factor:.2f}",
-                    f"{item.metrics.out_of_sample_profit_factor:.2f}",
-                    str(item.metrics.trade_count),
-                    f"{item.metrics.max_drawdown_pct:.1f}%",
-                    reasons,
-                ]
-            )
+            + " | ".join([
+                item.idea.name,
+                item.status,
+                f"{item.confidence_score:.1f}",
+                f"{item.metrics.profit_factor:.2f}",
+                f"{item.metrics.out_of_sample_profit_factor:.2f}",
+                str(item.metrics.trade_count),
+                f"{item.metrics.max_drawdown_pct:.1f}%",
+                reasons,
+                warnings,
+            ])
             + " |"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -160,9 +286,11 @@ def load_manifest_evaluations(manifest_path: Path) -> list[CandidateEvaluation]:
     evaluations: list[CandidateEvaluation] = []
     for row in manifest:
         pine_path = manifest_path.parent / row["pine_file"]
-        idea = parse_pine_strategy(pine_path.read_text(encoding="utf-8"))
+        source = pine_path.read_text(encoding="utf-8")
+        idea = parse_pine_strategy(source)
+        red_flags = scan_pine_red_flags(source)
         metrics = BacktestMetrics(**row["metrics"])
-        evaluations.append(evaluate_candidate(idea, metrics))
+        evaluations.append(evaluate_candidate(idea, metrics, red_flags=red_flags))
     return evaluations
 
 
