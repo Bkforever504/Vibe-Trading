@@ -246,6 +246,35 @@ def test_sma_momentum_vix_filter_blocks_and_flattens_high_vix():
     assert signals.tolist() == [0, 0, 0, 0, 1, 0, 0, 1]
 
 
+def test_rsi2_mean_reversion_can_match_handiko_prior_high_exit():
+    path = Path("research/pine_strategy_lab/examples/rsi2_mean_reversion_python.py")
+    spec = importlib.util.spec_from_file_location("rsi2_mean_reversion_python", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    idx = pd.date_range("2024-01-01", periods=10, freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": [100, 101, 102, 110, 120, 130, 125, 124, 131, 132],
+            "high": [100, 101, 102, 110, 120, 130, 126, 125, 131, 132],
+            "low": [100, 101, 102, 110, 120, 130, 125, 124, 131, 132],
+            "close": [100, 101, 102, 110, 120, 130, 125, 124, 131, 132],
+            "volume": [1_000] * 10,
+        },
+        index=idx,
+    )
+
+    signals = module.strategy(
+        ohlcv,
+        rsi_threshold=10,
+        trend_window=3,
+        exit_sma=2,
+        exit_mode="prior_high",
+    )
+
+    assert signals.tolist() == [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+
+
 def test_pool_sweep_results_by_params_combines_trade_counts_across_symbols(tmp_path: Path):
     strategy_file = tmp_path / "toy_strategy.py"
     strategy_file.write_text(
