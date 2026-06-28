@@ -49,12 +49,14 @@ def run_strategy_sweep(
     oos_split: float = 0.20,
     wf_folds: int = 5,
     purge_bars: int = 5,
+    include_vix: bool = False,
 ) -> list[SweepResult]:
     module = _load_strategy_module(strategy_path)
     strategy_fn = getattr(module, "strategy")
     grid = param_grid if param_grid is not None else _module_parameter_grid(module)
     results: list[SweepResult] = []
     data_cache: dict[tuple[str, str, str], pd.DataFrame] = {}
+    vix_cache: dict[tuple[str, str], pd.DataFrame] = {}
 
     for params in grid:
         wrapped = _bind_strategy_params(strategy_fn, params)
@@ -73,7 +75,13 @@ def run_strategy_sweep(
                 if backtest_fn is run_backtest:
                     cache_key = (symbol, start, end)
                     if cache_key not in data_cache:
-                        data_cache[cache_key] = fetch_fn(symbol, start, end)
+                        data = fetch_fn(symbol, start, end)
+                        if include_vix:
+                            vix_key = (start, end)
+                            if vix_key not in vix_cache:
+                                vix_cache[vix_key] = fetch_fn("^VIX", start, end)
+                            data = merge_vix_close(data, vix_cache[vix_key])
+                        data_cache[cache_key] = data
                     metrics = run_backtest_on_ohlcv(wrapped, data_cache[cache_key], config)
                 else:
                     metrics = backtest_fn(wrapped, config)
@@ -138,6 +146,13 @@ def write_sweep_report(results: list[SweepResult], path: Path) -> None:
         )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def merge_vix_close(ohlcv: pd.DataFrame, vix_ohlcv: pd.DataFrame) -> pd.DataFrame:
+    merged = ohlcv.copy()
+    vix_close = vix_ohlcv["close"].reindex(merged.index).ffill()
+    merged["vix_close"] = vix_close
+    return merged
 
 
 def pool_sweep_results_by_params(results: list[SweepResult]) -> list[SweepResult]:
