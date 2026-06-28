@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace
 import importlib.util
 from pathlib import Path
 from typing import Callable, Iterable
@@ -88,6 +89,7 @@ def run_strategy_sweep(
                     evaluation=evaluation,
                 ))
 
+    results = _attach_population_pbo(results)
     return sorted(
         results,
         key=lambda item: (
@@ -101,10 +103,13 @@ def run_strategy_sweep(
 
 
 def write_sweep_report(results: list[SweepResult], path: Path) -> None:
+    pbo_score = results[0].metrics.pbo_score if results else 0.0
     lines = [
         "# Pine Strategy Sweep Report",
         "",
         "Research only. Sweep winners still need red-flag review, paper-forward validation, and execution guard approval.",
+        "",
+        f"PBO score: {pbo_score:.2f} (0.00=stable, 1.00=likely overfit)",
         "",
         "| Strategy | Symbol | Window | Params | Status | Conf | PF | OOS PF | WF | Sharpe | WR% | Trades | Max DD |",
         "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
@@ -144,6 +149,47 @@ def _load_strategy_module(path: Path):
     if not hasattr(module, "strategy"):
         raise AttributeError(f"{path} must define strategy(ohlcv, **params)")
     return module
+
+
+def _attach_population_pbo(results: list[SweepResult]) -> list[SweepResult]:
+    pbo_score = estimate_pbo_score([result.metrics for result in results])
+    annotated: list[SweepResult] = []
+    for result in results:
+        metrics = replace(result.metrics, pbo_score=pbo_score)
+        evaluation = evaluate_candidate(result.evaluation.idea, metrics)
+        annotated.append(SweepResult(
+            strategy_name=result.strategy_name,
+            symbol=result.symbol,
+            start=result.start,
+            end=result.end,
+            params=result.params,
+            metrics=metrics,
+            evaluation=evaluation,
+        ))
+    return annotated
+
+
+def estimate_pbo_score(metrics: list[BacktestMetrics], max_combinations: int = 64) -> float:
+    """
+    Estimate Probability of Backtest Overfitting from a sweep population.
+
+    This is a lightweight CSCV-style proxy:
+    - split parameter rows into symmetric train/test combinations
+    - choose the train winner by in-sample profit factor
+    - mark overfit when that winner ranks in the bottom half by OOS profit factor
+
+    It is a research warning, not a formal statistical proof.
+    """
+    if len(metrics) < 4:
+        return 0.0
+
+    top_half_count = len(metrics) // 2
+    is_ranked = sorted(range(len(metrics)), key=lambda idx: metrics[idx].profit_factor, reverse=True)
+    oos_ranked = sorted(range(len(metrics)), key=lambda idx: metrics[idx].out_of_sample_profit_factor, reverse=True)
+    bottom_oos = set(oos_ranked[top_half_count:])
+    top_is = is_ranked[:top_half_count]
+    failures = sum(1 for idx in top_is if idx in bottom_oos)
+    return round(failures / len(top_is), 3) if top_is else 0.0
 
 
 def _module_parameter_grid(module) -> list[dict]:

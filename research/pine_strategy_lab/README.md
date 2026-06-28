@@ -73,6 +73,14 @@ def parameter_grid() -> list[dict]:
 
 The runner sorts by confidence, OOS profit factor, profit factor, then drawdown. Sweep winners are research candidates only; they still need red-flag review and 30+ forward-test signals before bot integration.
 
+Each sweep report includes a population-level PBO score:
+
+```text
+PBO score: 0.44 (0.00=stable, 1.00=likely overfit)
+```
+
+PBO is estimated from rank inversion across the sweep population: if the best in-sample parameter rows fall into the bottom half out-of-sample, the score rises. A score at or above `0.60` rejects the family/rows before bot integration.
+
 ## Rejection Gates
 
 The first-pass gates reject:
@@ -83,6 +91,7 @@ The first-pass gates reject:
 - max drawdown above 25%
 - out-of-sample profit factor below 1.15
 - walk-forward pass rate below 60%
+- PBO score at or above 0.60
 
 ## Backtest Metric Standard
 
