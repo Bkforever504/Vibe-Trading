@@ -214,6 +214,13 @@ def test_scan_detects_request_security_as_warning():
     assert "request_security" in ids
 
 
+def test_scan_detects_legacy_security_as_warning():
+    source = "//@version=3\nstudy('Legacy')\nout = security('SPY', 'D', close)\n"
+    report = scan_pine_red_flags(source)
+    ids = [f.flag_id for f in report.warning_flags]
+    assert "legacy_security" in ids
+
+
 def test_scan_detects_missing_commission_and_slippage():
     source = "//@version=5\n// @license MIT\nstrategy('NoSettings', overlay=true)\nif close > 0\n    strategy.entry('L', strategy.long)\n"
     report = scan_pine_red_flags(source)
