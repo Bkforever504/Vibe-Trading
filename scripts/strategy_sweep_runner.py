@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from research.pine_strategy_sweep import parse_date_ranges, run_strategy_sweep, write_sweep_report
+from research.pine_strategy_sweep import parse_date_ranges, pool_sweep_results_by_params, run_strategy_sweep, write_sweep_report
 
 
 def main() -> int:
@@ -31,6 +31,7 @@ def main() -> int:
     p.add_argument("--oos-split", type=float, default=0.20, dest="oos_split")
     p.add_argument("--wf-folds", type=int, default=5, dest="wf_folds")
     p.add_argument("--purge-bars", type=int, default=5, dest="purge_bars")
+    p.add_argument("--pool-by-params", action="store_true", help="Pool metrics across symbols for each parameter set.")
     args = p.parse_args()
 
     symbols = [symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip()]
@@ -44,6 +45,8 @@ def main() -> int:
         wf_folds=args.wf_folds,
         purge_bars=args.purge_bars,
     )
+    if args.pool_by_params:
+        results = pool_sweep_results_by_params(results)
     write_sweep_report(results, args.out)
 
     print(f"Wrote {args.out.resolve()}")

@@ -1,9 +1,16 @@
 from pathlib import Path
+import importlib.util
 
 import pandas as pd
 
 from research.pine_strategy_lab import BacktestMetrics
-from research.pine_strategy_sweep import estimate_pbo_score, parse_date_ranges, run_strategy_sweep, write_sweep_report
+from research.pine_strategy_sweep import (
+    estimate_pbo_score,
+    parse_date_ranges,
+    pool_sweep_results_by_params,
+    run_strategy_sweep,
+    write_sweep_report,
+)
 
 
 def test_parse_date_ranges_accepts_colon_pairs():
@@ -187,3 +194,71 @@ def strategy(ohlcv: pd.DataFrame, rank: int = 1) -> pd.Series:
 
     assert {result.metrics.pbo_score for result in results} == {1.0}
     assert all(result.evaluation.status == "rejected" for result in results)
+
+
+def test_sma_momentum_strategy_generates_long_flat_signals():
+    path = Path("research/pine_strategy_lab/examples/sma_momentum_python.py")
+    spec = importlib.util.spec_from_file_location("sma_momentum_python", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    idx = pd.date_range("2024-01-01", periods=8, freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": [10, 10, 10, 10, 13, 14, 15, 9],
+            "high": [10, 10, 10, 10, 13, 14, 15, 9],
+            "low": [10, 10, 10, 10, 13, 14, 15, 9],
+            "close": [10, 10, 10, 10, 13, 14, 15, 9],
+            "volume": [1_000] * 8,
+        },
+        index=idx,
+    )
+
+    signals = module.strategy(ohlcv, sma_window=3)
+
+    assert module.PARAM_GRID
+    assert signals.tolist() == [0, 0, 0, 0, 1, 1, 1, 0]
+
+
+def test_pool_sweep_results_by_params_combines_trade_counts_across_symbols(tmp_path: Path):
+    strategy_file = tmp_path / "toy_strategy.py"
+    strategy_file.write_text(
+        """
+import pandas as pd
+
+PARAM_GRID = [{"window": 200}]
+
+def strategy(ohlcv: pd.DataFrame, window: int = 200) -> pd.Series:
+    return pd.Series(0, index=ohlcv.index)
+""",
+        encoding="utf-8",
+    )
+
+    def fake_backtest(strategy_fn, config):
+        return BacktestMetrics(
+            total_return_pct=16.0,
+            profit_factor=1.6,
+            max_drawdown_pct=8.0,
+            trade_count=20,
+            out_of_sample_profit_factor=1.3,
+            walk_forward_pass_rate=0.7,
+            avg_win_pct=2.0,
+            avg_loss_pct=-1.0,
+            win_rate_pct=50.0,
+            sharpe_ratio=1.1,
+            calmar_ratio=2.0,
+        )
+
+    rows = run_strategy_sweep(
+        strategy_file,
+        symbols=["SPY", "QQQ"],
+        date_ranges=[("2020-01-01", "2024-12-31")],
+        backtest_fn=fake_backtest,
+    )
+    pooled = pool_sweep_results_by_params(rows)
+
+    assert len(pooled) == 1
+    assert pooled[0].symbol == "POOL[2]"
+    assert pooled[0].metrics.trade_count == 40
+    assert pooled[0].metrics.profit_factor == 2.0
+    assert pooled[0].evaluation.status == "paper_candidate"
