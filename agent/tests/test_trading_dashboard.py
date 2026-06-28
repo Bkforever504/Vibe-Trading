@@ -10,6 +10,8 @@ if str(ROOT) not in sys.path:
 
 from strategies.trading_dashboard import (
     bot_status_context,
+    daily_shadow_context,
+    daily_shadow_panel,
     momentum_shadow_context,
     momentum_shadow_panel,
     option_group_summaries,
@@ -221,6 +223,50 @@ def test_momentum_shadow_panel_renders_holdings_and_return() -> None:
     assert "SPY (50%)" in html
     assert "+2.50%" in html
     assert "No Alpaca orders" in html
+
+
+def test_daily_shadow_context_reads_latest_signal(tmp_path) -> None:
+    log = tmp_path / "rsi2_shadow_log.jsonl"
+    log.write_text(
+        """
+{"date":"2026-06-26","symbol":"QQQ","execution_mode":"shadow_only","primary_setup":{"name":"rsi2_prior_high_source","action":"hold_long","confidence":8.7},"comparison_setup":{"name":"rsi2_sma_exit_derived","action":"flat","confidence":9.1},"features":{"close":706.52,"rsi2":36.8759},"paper_rules":{"minimum_forward_days":30,"minimum_signals_before_review":10,"live_execution_allowed":false}}
+        """.strip(),
+        encoding="utf-8",
+    )
+
+    context = daily_shadow_context(log, "RSI-2 QQQ Shadow")
+
+    assert context["available"] is True
+    assert context["title"] == "RSI-2 QQQ Shadow"
+    assert context["latest"]["symbol"] == "QQQ"
+    assert context["log_count"] == 1
+    assert context["entry_count"] == 0
+    assert context["execution_enabled"] is False
+
+
+def test_daily_shadow_panel_renders_gate_status() -> None:
+    html = daily_shadow_panel({
+        "available": True,
+        "title": "KAMA QQQ Shadow",
+        "latest": {
+            "date": "2026-06-26",
+            "symbol": "QQQ",
+            "primary_setup": {"name": "kama_trend_fast3_slow20_slope3", "action": "flat", "confidence": 8.2},
+            "comparison_setup": {"name": "kama_trend_fast2_slow30_slope5", "action": "flat", "confidence": 8.0},
+            "features": {"close": 706.52, "kama": 710.1},
+        },
+        "log_count": 1,
+        "entry_count": 0,
+        "min_days": 30,
+        "min_entries": 10,
+        "execution_enabled": False,
+        "warnings": ["Shadow-only. No broker orders are wired."],
+    })
+
+    assert "KAMA QQQ Shadow" in html
+    assert "kama_trend_fast3_slow20_slope3" in html
+    assert "NOT READY" in html
+    assert "No broker orders" in html
 
 
 def test_bot_status_includes_momentum_rotation_shadow() -> None:

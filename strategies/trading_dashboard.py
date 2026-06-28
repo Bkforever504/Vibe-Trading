@@ -37,6 +37,8 @@ KALSHI_REPORT_FILE = REPORT_DIR / "kalshi-prediction-report.json"
 COPY_WATCHLIST_REPORT_FILE = REPORT_DIR / "copy-trader-watchlist.json"
 POLYMARKET_WALLET_REPORT_FILE = REPORT_DIR / "polymarket-wallet-tracker.json"
 MOMENTUM_SHADOW_LOG_FILE = ROOT / "data" / "momentum_shadow_log.jsonl"
+RSI2_SHADOW_LOG_FILE = ROOT / "data" / "rsi2_shadow_log.jsonl"
+KAMA_SHADOW_LOG_FILE = ROOT / "data" / "kama_shadow_log.jsonl"
 GUARD_BLOCK_LOG_FILE = RUNTIME_DIR / "guard-blocks.jsonl"
 KALSHI_GUARD_BLOCK_LOG_FILE = RUNTIME_DIR / "kalshi-guard-blocks.jsonl"
 ALPACA_BLOCK_FILE = RUNTIME_DIR / "MANUAL_RESET_REQUIRED.json"
@@ -357,6 +359,47 @@ def momentum_shadow_context(path: Path = MOMENTUM_SHADOW_LOG_FILE) -> dict:
         "latest": latest,
         "previous": previous,
         "last_period_return_pct": _shadow_period_return_pct(previous, latest),
+        "warnings": warnings,
+    }
+
+
+def daily_shadow_context(path: Path, title: str) -> dict:
+    entries = _read_jsonl(path)
+    if not entries:
+        return {
+            "available": False,
+            "title": title,
+            "execution_enabled": False,
+            "log_count": 0,
+            "entry_count": 0,
+            "latest": {},
+            "min_days": 30,
+            "min_entries": 10,
+            "warnings": [f"{title} log has not been generated yet."],
+        }
+
+    latest = entries[-1]
+    rules = latest.get("paper_rules") if isinstance(latest.get("paper_rules"), dict) else {}
+    min_days = int(_safe_float(rules.get("minimum_forward_days"), 30))
+    min_entries = int(_safe_float(rules.get("minimum_signals_before_review"), 10))
+    entry_count = sum(
+        1 for row in entries
+        if isinstance(row.get("primary_setup"), dict)
+        and row["primary_setup"].get("action") == "enter_long"
+    )
+    warnings = [
+        "Shadow-only. No broker orders are wired.",
+        f"Requires {min_days} log days and {min_entries} entry signals before execution review.",
+    ]
+    return {
+        "available": True,
+        "title": title,
+        "execution_enabled": False,
+        "log_count": len(entries),
+        "entry_count": entry_count,
+        "latest": latest,
+        "min_days": min_days,
+        "min_entries": min_entries,
         "warnings": warnings,
     }
 
@@ -855,6 +898,67 @@ def momentum_shadow_panel(context: dict) -> str:
     </div>"""
 
 
+def daily_shadow_panel(context: dict) -> str:
+    title = html.escape(str(context.get("title") or "Daily Shadow"))
+    warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
+    warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
+    if not warning_items:
+        warning_items = "<li>Shadow-only daily forward test.</li>"
+
+    if not context.get("available"):
+        return f"""
+    <div class="panel">
+      <h2>{title}</h2>
+      <p class="footer">No shadow log exists yet. Run the matching logger once.</p>
+      <ul>{warning_items}</ul>
+    </div>"""
+
+    latest = context.get("latest") if isinstance(context.get("latest"), dict) else {}
+    primary = latest.get("primary_setup") if isinstance(latest.get("primary_setup"), dict) else {}
+    comparison = latest.get("comparison_setup") if isinstance(latest.get("comparison_setup"), dict) else {}
+    features = latest.get("features") if isinstance(latest.get("features"), dict) else {}
+    log_count = int(_safe_float(context.get("log_count")))
+    entry_count = int(_safe_float(context.get("entry_count")))
+    min_days = int(_safe_float(context.get("min_days"), 30))
+    min_entries = int(_safe_float(context.get("min_entries"), 10))
+    ready = log_count >= min_days and entry_count >= min_entries
+    status_cls = "good" if ready else "warn"
+    status = "READY FOR REVIEW" if ready else "NOT READY"
+
+    feature_rows = []
+    for key, value in list(features.items())[:8]:
+        feature_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(key))}</td>"
+            f"<td>{html.escape(str(value))}</td>"
+            "</tr>"
+        )
+    feature_body = "".join(feature_rows) or '<tr><td colspan="2">No feature snapshot available.</td></tr>'
+
+    return f"""
+    <div class="panel">
+      <h2>{title}</h2>
+      <div class="tv-grid">
+        <div><span>Mode</span><strong class="good">shadow-only</strong></div>
+        <div><span>Latest</span><strong>{html.escape(str(latest.get('date') or ''))}</strong></div>
+        <div><span>Symbol</span><strong>{html.escape(str(latest.get('symbol') or ''))}</strong></div>
+        <div><span>Primary</span><strong>{html.escape(str(primary.get('action') or ''))}</strong></div>
+        <div><span>Logs</span><strong>{log_count}/{min_days}</strong></div>
+        <div><span>Entries</span><strong>{entry_count}/{min_entries}</strong></div>
+      </div>
+      <p class="footer">
+        Primary: {html.escape(str(primary.get('name') or ''))} (conf {html.escape(str(primary.get('confidence') or ''))}) |
+        Comparison: {html.escape(str(comparison.get('name') or ''))} (conf {html.escape(str(comparison.get('confidence') or ''))}) |
+        Gate: <strong class="{status_cls}">{status}</strong>
+      </p>
+      <table style="margin-top: 14px;">
+        <thead><tr><th>Feature</th><th>Value</th></tr></thead>
+        <tbody>{feature_body}</tbody>
+      </table>
+      <ul>{warning_items}</ul>
+    </div>"""
+
+
 def kalshi_guard_blocks_context(path: Path = KALSHI_GUARD_BLOCK_LOG_FILE, limit: int = 20) -> dict:
     return guard_blocks_context(path=path, limit=limit)
 
@@ -925,6 +1029,20 @@ def bot_status_context() -> dict:
                 "manual_reset": False,
                 "execution": "weekly-shadow-only",
             },
+            {
+                "name": "RSI-2 QQQ Shadow",
+                "mode": "shadow",
+                "live_enabled": False,
+                "manual_reset": False,
+                "execution": "daily-shadow-only",
+            },
+            {
+                "name": "KAMA QQQ Shadow",
+                "mode": "shadow",
+                "live_enabled": False,
+                "manual_reset": False,
+                "execution": "daily-shadow-only",
+            },
         ]
     }
 
@@ -932,7 +1050,7 @@ def bot_status_context() -> dict:
 def bot_status_panel(context: dict) -> str:
     _MODE_CLS = {
         "paper": "warn", "paper-auto": "warn", "live": "bad",
-        "dry-run": "good", "shadow": "good", "shadow-only": "good", "weekly-shadow-only": "good",
+        "dry-run": "good", "shadow": "good", "shadow-only": "good", "weekly-shadow-only": "good", "daily-shadow-only": "good",
         "watch": "good", "watch-only": "good", "blocked": "bad",
     }
     rows = []
@@ -943,7 +1061,7 @@ def bot_status_panel(context: dict) -> str:
         live_enabled = bool(bot.get("live_enabled"))
         manual_reset = bool(bot.get("manual_reset"))
         mode_cls = _MODE_CLS.get(mode, "warn")
-        exec_cls = "bad" if execution in ("live", "blocked") else "good" if execution in ("dry-run", "shadow-only", "weekly-shadow-only", "watch-only") else "warn"
+        exec_cls = "bad" if execution in ("live", "blocked") else "good" if execution in ("dry-run", "shadow-only", "weekly-shadow-only", "daily-shadow-only", "watch-only") else "warn"
         live_cls = "bad" if live_enabled else "good"
         reset_cls = "bad" if manual_reset else "good"
         rows.append(
@@ -1070,6 +1188,8 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
     copy_context = copy_watchlist_context()
     poly_wallet_context = polymarket_wallet_context()
     momentum_context = momentum_shadow_context()
+    rsi2_context = daily_shadow_context(RSI2_SHADOW_LOG_FILE, "RSI-2 QQQ Shadow")
+    kama_context = daily_shadow_context(KAMA_SHADOW_LOG_FILE, "KAMA QQQ Shadow")
     guard_context = guard_blocks_context()
     kalshi_guard_context = kalshi_guard_blocks_context()
     bot_status = bot_status_context()
@@ -1188,6 +1308,11 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
 
   <section class="grid" style="margin-top: 14px;">
     {momentum_shadow_panel(momentum_context)}
+  </section>
+
+  <section class="grid two">
+    {daily_shadow_panel(rsi2_context)}
+    {daily_shadow_panel(kama_context)}
   </section>
 
   <section class="grid" style="margin-top: 14px;">
