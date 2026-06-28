@@ -1,0 +1,17 @@
+//@version=5
+// @license MIT
+// Source: https://example.com/repaint-trap
+// WARNING: fixture for red-flag scanner testing only — intentionally bad
+strategy("Repaint Trap Example", overlay=true, process_orders_on_close=true)
+
+// Pulls higher-timeframe data with lookahead — classic repaint trap
+htf_close = request.security("SPY", "D", close, barmerge.gaps_off, barmerge.lookahead_on)
+
+// Pivot high/low — repaints until enough bars close
+ph = ta.pivothigh(high, 5, 5)
+pl = ta.pivotlow(low, 5, 5)
+
+longCondition = close > htf_close and not na(pl)
+if longCondition
+    strategy.entry("Long", strategy.long)
+strategy.close("Long", when=not na(ph))

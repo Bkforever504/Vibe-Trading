@@ -1,0 +1,21 @@
+//@version=5
+// @license MIT
+// Source: https://example.com/clean-ema
+// Realistic settings: commission and slippage declared, no MTF, no pivots
+strategy("Clean EMA Trend", overlay=true,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1,
+         slippage=2)
+
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+atr    = ta.atr(14)
+
+longCondition  = ta.crossover(ema20, ema50)
+shortCondition = ta.crossunder(ema20, ema50)
+
+if longCondition
+    strategy.entry("Long", strategy.long)
+    strategy.exit("SL", "Long", stop=close - atr * 2)
+if shortCondition
+    strategy.close("Long")
