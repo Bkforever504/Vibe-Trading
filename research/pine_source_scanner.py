@@ -143,6 +143,34 @@ def write_pine_source_report(summary: PineSourceSummary, path: Path) -> None:
             f"| `{row.relative_path}` | {row.name} | {row.script_type} | {row.category} | {row.version} | {row.license} | {tags} |"
         )
 
+    strategy_rows = [
+        row for row in summary.rows
+        if row.script_type == "strategy" and not row.critical_flags
+    ]
+    strategy_rows = sorted(
+        strategy_rows,
+        key=lambda row: (
+            len(row.warning_flags),
+            row.category,
+            row.relative_path,
+        ),
+    )
+    lines.extend([
+        "",
+        "## Strategy Review Queue",
+        "",
+        "Non-critical strategy files below still need realistic cost settings, repaint review, Python translation, and full OOS/WF/PBO testing before they can become candidates.",
+        "",
+        "| File | Name | Category | Version | License | Warnings | Tags |",
+        "|---|---|---|---:|---|---|---|",
+    ])
+    for row in strategy_rows[:60]:
+        warnings = ", ".join(row.warning_flags) if row.warning_flags else "-"
+        tags = ", ".join(row.indicators) if row.indicators else "-"
+        lines.append(
+            f"| `{row.relative_path}` | {row.name} | {row.category} | {row.version} | {row.license} | {warnings} | {tags} |"
+        )
+
     flagged = [row for row in summary.rows if row.critical_flags or row.warning_flags]
     lines.extend([
         "",
