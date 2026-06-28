@@ -72,6 +72,24 @@ def test_evaluate_candidate_rejects_suspicious_oos_profit_factor():
     assert "out-of-sample profit factor is suspiciously high" in result.reject_reasons
 
 
+def test_evaluate_candidate_rejects_high_pbo_score():
+    idea = PineStrategyIdea(name="Overfit Sweep Winner", license="MIT", indicators=["EMA"])
+    metrics = BacktestMetrics(
+        total_return_pct=35.0,
+        profit_factor=1.8,
+        max_drawdown_pct=8.0,
+        trade_count=90,
+        out_of_sample_profit_factor=1.3,
+        walk_forward_pass_rate=0.7,
+        pbo_score=0.75,
+    )
+
+    result = evaluate_candidate(idea, metrics)
+
+    assert result.status == "rejected"
+    assert "high probability of backtest overfitting" in result.reject_reasons
+
+
 def test_evaluate_candidate_promotes_robust_paper_candidate():
     idea = PineStrategyIdea(name="VWAP Pullback", license="MIT", source_url="https://example.com", indicators=["EMA", "VWAP"])
     metrics = BacktestMetrics(

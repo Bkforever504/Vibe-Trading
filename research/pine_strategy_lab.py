@@ -209,6 +209,7 @@ class BacktestMetrics:
     sharpe_ratio: float = 0.0
     win_rate_pct: float = 0.0
     calmar_ratio: float = 0.0
+    pbo_score: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -252,6 +253,8 @@ def evaluate_candidate(
         reject_reasons.append("weak out-of-sample profit factor")
     if metrics.walk_forward_pass_rate < 0.6:
         reject_reasons.append("weak walk-forward pass rate")
+    if metrics.pbo_score >= 0.6:
+        reject_reasons.append("high probability of backtest overfitting")
 
     if red_flags is not None:
         for flag in red_flags.critical_flags:
@@ -287,8 +290,8 @@ def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -
         "",
         "Research filter only. No strategy promoted to live without paper-forward validation and execution guard sign-off.",
         "",
-        "| Strategy | Status | Confidence | PF | OOS PF | Sharpe | WR% | Trades | Max DD | Reject Reasons | Red Flag Warnings |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
+        "| Strategy | Status | Confidence | PF | OOS PF | PBO | Sharpe | WR% | Trades | Max DD | Reject Reasons | Red Flag Warnings |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for item in rows:
         reasons = ", ".join(item.reject_reasons) if item.reject_reasons else "-"
@@ -301,6 +304,7 @@ def write_candidate_report(evaluations: list[CandidateEvaluation], path: Path) -
                 f"{item.confidence_score:.1f}",
                 f"{item.metrics.profit_factor:.2f}",
                 f"{item.metrics.out_of_sample_profit_factor:.2f}",
+                f"{item.metrics.pbo_score:.2f}",
                 f"{item.metrics.sharpe_ratio:.2f}",
                 f"{item.metrics.win_rate_pct:.1f}%",
                 str(item.metrics.trade_count),

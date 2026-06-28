@@ -2,6 +2,8 @@
 
 Research only. Sweep winners still need red-flag review, paper-forward validation, and execution guard approval.
 
+PBO score: 0.44 (0.00=stable, 1.00=likely overfit)
+
 | Strategy | Symbol | Window | Params | Status | Conf | PF | OOS PF | WF | Sharpe | WR% | Trades | Max DD |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | ema_crossover_python | SPY | 2022-01-01:2024-12-31 | fast=10, slow=30 | rejected | 7.9 | 3.35 | 3.53 | 0.60 | 0.72 | 50.0% | 8 | 12.4% |
