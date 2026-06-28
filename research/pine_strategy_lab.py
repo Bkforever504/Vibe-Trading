@@ -244,6 +244,8 @@ def evaluate_candidate(
         reject_reasons.append("too few trades")
     if metrics.profit_factor > 10:
         reject_reasons.append("profit factor is suspiciously high")
+    if metrics.out_of_sample_profit_factor > 10:
+        reject_reasons.append("out-of-sample profit factor is suspiciously high")
     if metrics.max_drawdown_pct > 25:
         reject_reasons.append("drawdown exceeds research limit")
     if metrics.out_of_sample_profit_factor < 1.15:
