@@ -46,6 +46,33 @@ Run:
 uv run --no-project python scripts\pine_strategy_lab_report.py --manifest research\pine_strategy_lab\manifest.json
 ```
 
+## Strategy Sweeps
+
+Use the sweep runner before promoting any translated strategy family into a bot-specific shadow module.
+
+```powershell
+uv run --no-project --with pandas --with yfinance python scripts\strategy_sweep_runner.py `
+  --strategy research\pine_strategy_lab\examples\ema_crossover_python.py `
+  --symbols SPY,QQQ,IWM `
+  --ranges 2020-01-01:2024-12-31 2022-01-01:2024-12-31 `
+  --out research\pine_strategy_lab\sweep_report.md
+```
+
+Supported strategy modules can expose either:
+
+```python
+PARAM_GRID = [{"fast": 9, "slow": 21}, {"fast": 20, "slow": 50}]
+```
+
+or:
+
+```python
+def parameter_grid() -> list[dict]:
+    return [{"lookback": 10}, {"lookback": 20}]
+```
+
+The runner sorts by confidence, OOS profit factor, profit factor, then drawdown. Sweep winners are research candidates only; they still need red-flag review and 30+ forward-test signals before bot integration.
+
 ## Rejection Gates
 
 The first-pass gates reject:

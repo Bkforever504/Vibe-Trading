@@ -193,6 +193,14 @@ def run_backtest(strategy_fn: StrategyFn, config: BacktestConfig) -> BacktestMet
     Returns BacktestMetrics for pasting into the manifest.
     """
     ohlcv = fetch_ohlcv(config.symbol, config.start, config.end)
+    return run_backtest_on_ohlcv(strategy_fn, ohlcv, config)
+
+
+def run_backtest_on_ohlcv(strategy_fn: StrategyFn, ohlcv: pd.DataFrame, config: BacktestConfig) -> BacktestMetrics:
+    """
+    Run IS + OOS backtest and walk-forward validation on already-fetched OHLCV data.
+    This lets sweep jobs reuse the same market data across many parameter rows.
+    """
     split = int(len(ohlcv) * (1 - config.oos_split))
     is_data, oos_data = ohlcv.iloc[:split], ohlcv.iloc[split:]
 
