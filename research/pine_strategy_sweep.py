@@ -140,6 +140,45 @@ def write_sweep_report(results: list[SweepResult], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def pool_sweep_results_by_params(results: list[SweepResult]) -> list[SweepResult]:
+    groups: dict[tuple, list[SweepResult]] = {}
+    for result in results:
+        key = (
+            result.strategy_name,
+            result.start,
+            result.end,
+            tuple(sorted(result.params.items())),
+        )
+        groups.setdefault(key, []).append(result)
+
+    pooled: list[SweepResult] = []
+    for (strategy_name, start, end, params_tuple), rows in groups.items():
+        params = dict(params_tuple)
+        metrics = _pool_metrics([row.metrics for row in rows])
+        idea = PineStrategyIdea(name=f"{strategy_name}_pooled", license="mit")
+        evaluation = evaluate_candidate(idea, metrics)
+        pooled.append(SweepResult(
+            strategy_name=strategy_name,
+            symbol=f"POOL[{len(rows)}]",
+            start=start,
+            end=end,
+            params=params,
+            metrics=metrics,
+            evaluation=evaluation,
+        ))
+
+    return sorted(
+        pooled,
+        key=lambda item: (
+            item.evaluation.confidence_score,
+            item.metrics.out_of_sample_profit_factor,
+            item.metrics.profit_factor,
+            -item.metrics.max_drawdown_pct,
+        ),
+        reverse=True,
+    )
+
+
 def _load_strategy_module(path: Path):
     spec = importlib.util.spec_from_file_location("_sweep_strategy", path)
     if spec is None or spec.loader is None:
@@ -149,6 +188,53 @@ def _load_strategy_module(path: Path):
     if not hasattr(module, "strategy"):
         raise AttributeError(f"{path} must define strategy(ohlcv, **params)")
     return module
+
+
+def _pool_metrics(metrics_rows: list[BacktestMetrics]) -> BacktestMetrics:
+    trade_count = sum(row.trade_count for row in metrics_rows)
+    gross_win = 0.0
+    gross_loss = 0.0
+    weighted_win_rate = 0.0
+    weighted_avg_win = 0.0
+    weighted_avg_loss = 0.0
+    for row in metrics_rows:
+        wins = row.trade_count * row.win_rate_pct / 100
+        losses = max(0.0, row.trade_count - wins)
+        gross_win += wins * max(row.avg_win_pct, 0.0)
+        gross_loss += losses * abs(min(row.avg_loss_pct, 0.0))
+        weighted_win_rate += row.win_rate_pct * row.trade_count
+        weighted_avg_win += row.avg_win_pct * row.trade_count
+        weighted_avg_loss += row.avg_loss_pct * row.trade_count
+
+    profit_factor = gross_win / gross_loss if gross_loss > 0 else (99.0 if gross_win > 0 else 0.0)
+    return BacktestMetrics(
+        total_return_pct=round(sum(row.total_return_pct for row in metrics_rows) / len(metrics_rows), 3),
+        profit_factor=round(min(profit_factor, 99.0), 3),
+        max_drawdown_pct=round(max(row.max_drawdown_pct for row in metrics_rows), 3),
+        trade_count=trade_count,
+        out_of_sample_profit_factor=round(_median([row.out_of_sample_profit_factor for row in metrics_rows]), 3),
+        walk_forward_pass_rate=round(sum(row.walk_forward_pass_rate for row in metrics_rows) / len(metrics_rows), 3),
+        avg_win_pct=round(weighted_avg_win / trade_count, 3) if trade_count else 0.0,
+        avg_loss_pct=round(weighted_avg_loss / trade_count, 3) if trade_count else 0.0,
+        expectancy_pct=round(sum(row.expectancy_pct * row.trade_count for row in metrics_rows) / trade_count, 3) if trade_count else 0.0,
+        max_consecutive_losses=max(row.max_consecutive_losses for row in metrics_rows),
+        time_in_market_pct=round(sum(row.time_in_market_pct for row in metrics_rows) / len(metrics_rows), 3),
+        sharpe_ratio=round(sum(row.sharpe_ratio for row in metrics_rows) / len(metrics_rows), 3),
+        win_rate_pct=round(weighted_win_rate / trade_count, 3) if trade_count else 0.0,
+        calmar_ratio=round(sum(row.calmar_ratio for row in metrics_rows) / len(metrics_rows), 3),
+        pbo_score=round(max(row.pbo_score for row in metrics_rows), 3),
+    )
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    if n % 2:
+        return float(ordered[mid])
+    return float((ordered[mid - 1] + ordered[mid]) / 2)
 
 
 def _attach_population_pbo(results: list[SweepResult]) -> list[SweepResult]:

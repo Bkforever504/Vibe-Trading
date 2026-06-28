@@ -73,6 +73,19 @@ def parameter_grid() -> list[dict]:
 
 The runner sorts by confidence, OOS profit factor, profit factor, then drawdown. Sweep winners are research candidates only; they still need red-flag review and 30+ forward-test signals before bot integration.
 
+For daily strategies that do not trade often enough per instrument, use pooled-universe evaluation:
+
+```powershell
+uv run --no-project --with pandas --with yfinance python scripts\strategy_sweep_runner.py `
+  --strategy research\pine_strategy_lab\examples\sma_momentum_python.py `
+  --symbols SPY,QQQ,IWM,GLD,TLT,XLK,XLF,XLE,XLV,EEM `
+  --ranges 2020-01-01:2024-12-31 2022-01-01:2024-12-31 `
+  --pool-by-params `
+  --out research\pine_strategy_lab\sma_momentum_pooled_sweep_report.md
+```
+
+Pooling groups rows by parameter set and date window, combines trade counts across symbols, and evaluates the basket as one research candidate. This is appropriate for daily mean-reversion or momentum systems where one ticker cannot produce enough completed trades alone.
+
 Each sweep report includes a population-level PBO score:
 
 ```text
