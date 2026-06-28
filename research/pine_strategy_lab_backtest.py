@@ -65,11 +65,25 @@ def _equity_curve(
     slippage_pct: float,
     commission_pct: float,
 ) -> pd.Series:
-    """Vectorized simulation. Signal shifts 1 bar — no same-bar fills."""
+    """Vectorized simulation. Signal shifts 1 bar — no same-bar fills.
+
+    If ohlcv contains a 'defensive_close' column, flat periods (signal=0)
+    earn the defensive asset's return instead of cash (0%). Both equity-leg
+    and defensive-leg transitions pay slippage + commission.
+    """
     pos = signals.reindex(ohlcv.index).fillna(0).shift(1).fillna(0)
     bar_ret = ohlcv["close"].pct_change().fillna(0)
     fill_cost = pos.diff().abs().fillna(0) * (slippage_pct + commission_pct) / 100
     strat_ret = pos * bar_ret - fill_cost
+
+    if "defensive_close" in ohlcv.columns:
+        def_ret = ohlcv["defensive_close"].pct_change().fillna(0)
+        flat = (pos == 0).astype(float)
+        if "defensive_risk_on" in ohlcv.columns:
+            flat = flat * ohlcv["defensive_risk_on"].reindex(ohlcv.index).fillna(False).astype(float)
+        def_fill_cost = flat.diff().abs().fillna(0) * (slippage_pct + commission_pct) / 100
+        strat_ret = strat_ret + flat * def_ret - def_fill_cost
+
     return (1 + strat_ret).cumprod()
 
 

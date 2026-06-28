@@ -6,6 +6,7 @@ import pandas as pd
 from research.pine_strategy_lab import BacktestMetrics
 from research.pine_strategy_sweep import (
     estimate_pbo_score,
+    merge_defensive_close,
     merge_vix_close,
     parse_date_ranges,
     pool_sweep_results_by_params,
@@ -215,7 +216,7 @@ def test_sma_momentum_strategy_generates_long_flat_signals():
         index=idx,
     )
 
-    signals = module.strategy(ohlcv, sma_window=3)
+    signals = module.strategy(ohlcv, sma_window=3, atr_window=1, atr_mult=99)
 
     assert module.PARAM_GRID
     assert signals.tolist() == [0, 0, 0, 0, 1, 1, 1, 0]
@@ -240,7 +241,7 @@ def test_sma_momentum_vix_filter_blocks_and_flattens_high_vix():
         index=idx,
     )
 
-    signals = module.strategy(ohlcv, sma_window=3, vix_threshold=30)
+    signals = module.strategy(ohlcv, sma_window=3, atr_window=1, atr_mult=99, vix_threshold=30)
 
     assert signals.tolist() == [0, 0, 0, 0, 1, 0, 0, 1]
 
@@ -297,3 +298,14 @@ def test_merge_vix_close_aligns_vix_column_to_target_index():
     merged = merge_vix_close(ohlcv, vix)
 
     assert merged["vix_close"].tolist() == [18, 18, 31]
+
+
+def test_merge_defensive_close_can_add_defensive_risk_filter():
+    idx = pd.date_range("2024-01-01", periods=5, freq="D")
+    ohlcv = pd.DataFrame({"close": [10, 11, 12, 13, 14]}, index=idx)
+    defensive = pd.DataFrame({"close": [10, 11, 12, 9, 8]}, index=idx)
+
+    merged = merge_defensive_close(ohlcv, defensive, defensive_sma_window=2)
+
+    assert merged["defensive_close"].tolist() == [10, 11, 12, 9, 8]
+    assert merged["defensive_risk_on"].tolist() == [False, True, True, False, False]

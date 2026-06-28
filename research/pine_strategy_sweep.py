@@ -50,6 +50,8 @@ def run_strategy_sweep(
     wf_folds: int = 5,
     purge_bars: int = 5,
     include_vix: bool = False,
+    defensive_symbol: str | None = None,
+    defensive_sma_window: int | None = None,
 ) -> list[SweepResult]:
     module = _load_strategy_module(strategy_path)
     strategy_fn = getattr(module, "strategy")
@@ -57,6 +59,7 @@ def run_strategy_sweep(
     results: list[SweepResult] = []
     data_cache: dict[tuple[str, str, str], pd.DataFrame] = {}
     vix_cache: dict[tuple[str, str], pd.DataFrame] = {}
+    defensive_cache: dict[tuple[str, str], pd.DataFrame] = {}
 
     for params in grid:
         wrapped = _bind_strategy_params(strategy_fn, params)
@@ -81,6 +84,15 @@ def run_strategy_sweep(
                             if vix_key not in vix_cache:
                                 vix_cache[vix_key] = fetch_fn("^VIX", start, end)
                             data = merge_vix_close(data, vix_cache[vix_key])
+                        if defensive_symbol is not None:
+                            def_key = (start, end)
+                            if def_key not in defensive_cache:
+                                defensive_cache[def_key] = fetch_fn(defensive_symbol, start, end)
+                            data = merge_defensive_close(
+                                data,
+                                defensive_cache[def_key],
+                                defensive_sma_window=defensive_sma_window,
+                            )
                         data_cache[cache_key] = data
                     metrics = run_backtest_on_ohlcv(wrapped, data_cache[cache_key], config)
                 else:
@@ -152,6 +164,25 @@ def merge_vix_close(ohlcv: pd.DataFrame, vix_ohlcv: pd.DataFrame) -> pd.DataFram
     merged = ohlcv.copy()
     vix_close = vix_ohlcv["close"].reindex(merged.index).ffill()
     merged["vix_close"] = vix_close
+    return merged
+
+
+def merge_defensive_close(
+    ohlcv: pd.DataFrame,
+    defensive_ohlcv: pd.DataFrame,
+    defensive_sma_window: int | None = None,
+) -> pd.DataFrame:
+    """Merge defensive asset close into equity OHLCV as 'defensive_close'.
+
+    The backtester uses this column to earn defensive returns during flat
+    periods (signal=0) instead of sitting in cash.
+    """
+    merged = ohlcv.copy()
+    defensive_close = defensive_ohlcv["close"].reindex(merged.index).ffill()
+    merged["defensive_close"] = defensive_close
+    if defensive_sma_window is not None:
+        defensive_sma = defensive_close.rolling(defensive_sma_window).mean()
+        merged["defensive_risk_on"] = (defensive_close > defensive_sma).fillna(False)
     return merged
 
 
