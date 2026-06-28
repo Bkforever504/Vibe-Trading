@@ -207,6 +207,27 @@ def test_scan_detects_pivot_repaint():
     assert "pivot_repaint" in ids
 
 
+def test_scan_detects_fill_on_price_change():
+    source = "//@version=5\n// @license MIT\nstrategy('X', overlay=true, fill_orders_on_price_change=true)\n"
+    report = scan_pine_red_flags(source)
+    ids = [f.flag_id for f in report.warning_flags]
+    assert "fill_on_price_change" in ids
+
+
+def test_scan_detects_pine_v6():
+    source = "//@version=6\n// @license MIT\nstrategy('X', overlay=true)\n"
+    report = scan_pine_red_flags(source)
+    ids = [f.flag_id for f in report.warning_flags]
+    assert "pine_v6" in ids
+
+
+def test_scan_v6_is_warning_not_critical():
+    source = "//@version=6\n// @license MIT\nstrategy('X', overlay=true)\n"
+    report = scan_pine_red_flags(source)
+    assert not report.has_critical
+    assert any(f.flag_id == "pine_v6" for f in report.warning_flags)
+
+
 def test_evaluate_critical_redflag_causes_rejection():
     idea = PineStrategyIdea(name="Trap", license="MIT")
     metrics = BacktestMetrics(50.0, 1.8, 8.0, 100, 1.3, 0.70)
@@ -279,3 +300,6 @@ def test_backtest_metrics_use_completed_trade_pnl_not_bar_returns():
     assert metrics["expectancy_pct"] == pytest.approx(0.844, rel=1e-3)
     assert metrics["max_consecutive_losses"] == 1
     assert metrics["time_in_market_pct"] == pytest.approx(66.667, rel=1e-3)
+    assert metrics["win_rate_pct"] == pytest.approx(50.0, rel=1e-3)
+    assert metrics["sharpe_ratio"] > 0        # positive return → positive Sharpe
+    assert metrics["calmar_ratio"] > 0        # positive return → positive Calmar
