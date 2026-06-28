@@ -131,6 +131,13 @@ def test_parse_pine_mozilla_full_text():
     assert idea.is_open_source is True
 
 
+def test_parse_pine_gpl_short_sentence():
+    source = "//@version=4\n// Script may be freely distributed under the terms of the GPL-3.0 license.\nstudy('Test')\n"
+    idea = parse_pine_strategy(source)
+    assert idea.license == "gpl-3.0"
+    assert idea.is_open_source is True
+
+
 def test_parse_pine_unknown_license_rejected():
     source = "//@version=5\nstrategy('NoLicense')\nrsi = ta.rsi(close, 14)\n"
     idea = parse_pine_strategy(source)

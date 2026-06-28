@@ -26,6 +26,7 @@ _LICENSE_PATTERNS = [
 _LICENSE_FULL_TEXT = [
     (re.compile(r"mozilla\s+public\s+license\s+2\.0", re.IGNORECASE), "mpl-2.0"),
     (re.compile(r"apache\s+license.*?2\.0", re.IGNORECASE), "apache-2.0"),
+    (re.compile(r"\bgpl-?3\.0\s+licen[sc]e\b", re.IGNORECASE), "gpl-3.0"),
     (re.compile(r"gnu\s+general\s+public\s+license.*?3", re.IGNORECASE), "gpl-3.0"),
     (re.compile(r"\bmit\s+license\b", re.IGNORECASE), "mit"),
 ]
@@ -102,6 +103,13 @@ def scan_pine_red_flags(source: str) -> RedFlagReport:
             severity="warning",
             flag_id="request_security",
             message="request.security() — multi-timeframe data repaints on the unconfirmed realtime bar",
+        ))
+
+    if re.search(r"(?<!\.)\bsecurity\s*\(", source):
+        flags.append(RedFlag(
+            severity="warning",
+            flag_id="legacy_security",
+            message="legacy security() - multi-timeframe data can repaint unless the expression is confirmed/offset",
         ))
 
     # strategy() without commission_value: fills look free; real fills are not.
