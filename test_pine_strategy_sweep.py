@@ -275,6 +275,79 @@ def test_rsi2_mean_reversion_can_match_handiko_prior_high_exit():
     assert signals.tolist() == [0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
 
 
+def test_alorse_rsi_ema_reverses_between_long_and_short_thresholds():
+    path = Path("research/pine_strategy_lab/examples/alorse_rsi_ema_python.py")
+    spec = importlib.util.spec_from_file_location("alorse_rsi_ema_python", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    closes = list(range(100, 130)) + [125, 120, 115, 125, 130, 135, 140]
+    idx = pd.date_range("2024-01-01", periods=len(closes), freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": [1_000] * len(closes),
+        },
+        index=idx,
+    )
+
+    signals = module.strategy(
+        ohlcv,
+        rsi_length=2,
+        rsi_overbought=70,
+        rsi_oversold=30,
+        ma_length=10,
+        ma2_length=20,
+    )
+
+    assert module.PARAM_GRID
+    assert signals.iloc[29:33].tolist() == [-1, 1, 1, 1]
+    assert signals.iloc[33:].tolist() == [-1, -1, -1, -1]
+
+
+def test_alorse_macd_bb_rsi_enters_on_reversal_and_exits_on_upper_band():
+    path = Path("research/pine_strategy_lab/examples/alorse_macd_bb_rsi_python.py")
+    spec = importlib.util.spec_from_file_location("alorse_macd_bb_rsi_python", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    closes = [110, 108, 106, 104, 102, 100, 99, 98, 99, 101, 104, 108, 112, 116]
+    idx = pd.date_range("2024-01-01", periods=len(closes), freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": [1_000] * len(closes),
+        },
+        index=idx,
+    )
+
+    signals = module.strategy(
+        ohlcv,
+        fast_length=2,
+        slow_length=5,
+        signal_length=2,
+        bb_length=5,
+        bb_mult=1.0,
+        rsi_length=2,
+        entry_rsi_max=65,
+        exit_rsi_min=65,
+        use_green_bar_filter=False,
+    )
+
+    assert module.PARAM_GRID
+    assert 1 in signals.tolist()
+    first_entry = signals[signals == 1].index[0]
+    first_flat_after_entry = signals.loc[first_entry:][signals.loc[first_entry:] == 0].index[0]
+    assert first_entry == idx[6]
+    assert first_flat_after_entry == idx[9]
+
+
 def test_pool_sweep_results_by_params_combines_trade_counts_across_symbols(tmp_path: Path):
     strategy_file = tmp_path / "toy_strategy.py"
     strategy_file.write_text(
