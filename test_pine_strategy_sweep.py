@@ -6,6 +6,7 @@ import pandas as pd
 from research.pine_strategy_lab import BacktestMetrics
 from research.pine_strategy_sweep import (
     estimate_pbo_score,
+    merge_vix_close,
     parse_date_ranges,
     pool_sweep_results_by_params,
     run_strategy_sweep,
@@ -220,6 +221,30 @@ def test_sma_momentum_strategy_generates_long_flat_signals():
     assert signals.tolist() == [0, 0, 0, 0, 1, 1, 1, 0]
 
 
+def test_sma_momentum_vix_filter_blocks_and_flattens_high_vix():
+    path = Path("research/pine_strategy_lab/examples/sma_momentum_python.py")
+    spec = importlib.util.spec_from_file_location("sma_momentum_python", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    idx = pd.date_range("2024-01-01", periods=8, freq="D")
+    ohlcv = pd.DataFrame(
+        {
+            "open": [10, 10, 10, 10, 13, 14, 15, 16],
+            "high": [10, 10, 10, 10, 13, 14, 15, 16],
+            "low": [10, 10, 10, 10, 13, 14, 15, 16],
+            "close": [10, 10, 10, 10, 13, 14, 15, 16],
+            "volume": [1_000] * 8,
+            "vix_close": [18, 18, 18, 18, 18, 35, 35, 18],
+        },
+        index=idx,
+    )
+
+    signals = module.strategy(ohlcv, sma_window=3, vix_threshold=30)
+
+    assert signals.tolist() == [0, 0, 0, 0, 1, 0, 0, 1]
+
+
 def test_pool_sweep_results_by_params_combines_trade_counts_across_symbols(tmp_path: Path):
     strategy_file = tmp_path / "toy_strategy.py"
     strategy_file.write_text(
@@ -262,3 +287,13 @@ def strategy(ohlcv: pd.DataFrame, window: int = 200) -> pd.Series:
     assert pooled[0].metrics.trade_count == 40
     assert pooled[0].metrics.profit_factor == 2.0
     assert pooled[0].evaluation.status == "paper_candidate"
+
+
+def test_merge_vix_close_aligns_vix_column_to_target_index():
+    idx = pd.date_range("2024-01-01", periods=3, freq="D")
+    ohlcv = pd.DataFrame({"close": [10, 11, 12]}, index=idx)
+    vix = pd.DataFrame({"close": [18, 31]}, index=[idx[0], idx[2]])
+
+    merged = merge_vix_close(ohlcv, vix)
+
+    assert merged["vix_close"].tolist() == [18, 18, 31]
