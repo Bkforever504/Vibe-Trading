@@ -15,6 +15,8 @@ from strategies.trading_dashboard import (
     momentum_shadow_context,
     momentum_shadow_panel,
     option_group_summaries,
+    portfolio_guard_context,
+    portfolio_guard_panel,
     polymarket_fed_whale_context,
     polymarket_fed_whale_panel,
     polymarket_wallet_context,
@@ -402,3 +404,46 @@ def test_bot_status_includes_momentum_rotation_shadow() -> None:
     assert momentum["mode"] == "shadow"
     assert momentum["live_enabled"] is False
     assert momentum["execution"] == "weekly-shadow-only"
+
+
+def test_portfolio_guard_panel_renders_active_kill_and_thresholds(tmp_path, monkeypatch) -> None:
+    from strategies import trading_dashboard
+
+    env_dir = tmp_path / "agent"
+    env_dir.mkdir()
+    env_file = env_dir / ".env"
+    env_file.write_text(
+        "PORTFOLIO_SOFT_WARNING_DOLLARS=500\n"
+        "PORTFOLIO_MAX_DAILY_LOSS_DOLLARS=750\n"
+        "PORTFOLIO_EMERGENCY_KILL_DOLLARS=1500\n"
+        "PORTFOLIO_SOFT_BREACH_POLLS_REQUIRED=2\n",
+        encoding="utf-8",
+    )
+    kill_file = tmp_path / "PORTFOLIO_KILL_SWITCH.json"
+    kill_file.write_text(
+        """
+        {
+          "status": "killed",
+          "reason": "max_daily_loss",
+          "daily_pnl_dollars": -800,
+          "triggered_at": "2026-06-29T15:05:00Z"
+        }
+        """,
+        encoding="utf-8",
+    )
+    state_file = tmp_path / "portfolio_monitor_state.json"
+    state_file.write_text(
+        '{"soft_breach_count": 2, "soft_warning_sent": true, "trade_date": "2026-06-29"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(trading_dashboard, "ROOT", tmp_path)
+
+    context = portfolio_guard_context(kill_file=kill_file, state_file=state_file)
+    html = portfolio_guard_panel(context)
+
+    assert context["active"] is True
+    assert context["hard_kill_dollars"] == 750
+    assert "Portfolio Kill Switch" in html
+    assert "ACTIVE - all bots halted" in html
+    assert "after 2/2 polls" in html
+    assert "max_daily_loss" in html
