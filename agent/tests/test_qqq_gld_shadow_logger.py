@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import scripts.qqq_gld_shadow_logger as qqq_gld_logger
 from scripts.qqq_gld_shadow_logger import compute_signal_from_close, log_entry
 
 
@@ -18,7 +19,8 @@ def _close(qqq: list[float], gld: list[float]) -> pd.DataFrame:
     return pd.DataFrame({"QQQ": qqq, "GLD": gld}, index=idx)
 
 
-def test_compute_signal_selects_qqq_when_relative_momentum_is_stronger() -> None:
+def test_compute_signal_selects_qqq_when_relative_momentum_is_stronger(monkeypatch) -> None:
+    monkeypatch.setattr(qqq_gld_logger, "fetch_vix_context", lambda: {"close": 18.5, "regime": "normal"})
     close = _close(
         qqq=[100, 101, 102, 103, 106, 109],
         gld=[100, 100, 100, 101, 101, 101],
@@ -30,9 +32,11 @@ def test_compute_signal_selects_qqq_when_relative_momentum_is_stronger() -> None
     assert entry["action"] == "hold_qqq"
     assert entry["confidence"] == 9.0
     assert entry["paper_rules"]["leveraged_tqqq_allowed"] is False
+    assert entry["vix_context"]["regime"] == "normal"
 
 
-def test_compute_signal_rotates_to_gld_when_defensive_momentum_leads() -> None:
+def test_compute_signal_rotates_to_gld_when_defensive_momentum_leads(monkeypatch) -> None:
+    monkeypatch.setattr(qqq_gld_logger, "fetch_vix_context", lambda: {"close": 22.0, "regime": "elevated"})
     close = _close(
         qqq=[100, 100, 106, 108, 110, 100],
         gld=[100, 100, 101, 102, 106, 110],

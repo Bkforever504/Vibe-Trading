@@ -26,7 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.market_data import fetch_ohlcv, data_source
+from scripts.market_data import fetch_ohlcv, data_source, fetch_vix_context
+from scripts.shadow_alerts import maybe_send_shadow_alert
 
 RSI2_STRATEGY_PATH = ROOT / "research" / "pine_strategy_lab" / "examples" / "rsi2_mean_reversion_python.py"
 
@@ -79,6 +80,7 @@ def compute_signal_from_ohlcv(ohlcv: pd.DataFrame, symbol: str = SYMBOL, as_of: 
         "symbol": symbol,
         "execution_mode": "shadow_only",
         "data_source": data_source(),
+        "vix_context": fetch_vix_context(),
         "primary_setup": _setup_payload(
             name="rsi2_prior_high_source",
             params=PRIMARY_PARAMS,
@@ -204,6 +206,7 @@ def main() -> int:
     entry = compute_signal_from_ohlcv(df, symbol=SYMBOL)
     prev = load_last_entry(LOG_PATH)
     print_report(entry, prev)
+    maybe_send_shadow_alert("RSI-2 QQQ", entry, prev)
     log_entry(entry, LOG_PATH)
     print(f"Logged to {LOG_PATH}")
     return 0

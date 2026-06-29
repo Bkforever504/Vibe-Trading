@@ -15,6 +15,7 @@ auto_adjust=True behavior.
 from __future__ import annotations
 
 import os
+import urllib.request
 import warnings
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -198,3 +199,45 @@ def _fetch_close_yfinance(symbols: list[str], lookback_days: int) -> pd.DataFram
 def data_source() -> str:
     """Return which source will be used — useful for logging."""
     return "alpaca" if _alpaca_available() else "yfinance"
+
+
+def fetch_vix_context() -> dict:
+    """Fetch latest VIX close from CBOE's public history CSV.
+
+    This is context only. It does not change strategy signals.
+    """
+    url = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        rows = [line.strip().split(",") for line in raw.splitlines() if line.strip()]
+        if len(rows) < 2:
+            raise ValueError("empty VIX history")
+        header = [h.strip().upper() for h in rows[0]]
+        date_idx = header.index("DATE")
+        close_idx = header.index("CLOSE")
+        last = rows[-1]
+        vix_close = float(last[close_idx])
+        return {
+            "source": "cboe_vix_history",
+            "date": last[date_idx],
+            "close": round(vix_close, 2),
+            "above_20": vix_close >= 20.0,
+            "regime": _vix_regime(vix_close),
+        }
+    except Exception as exc:
+        return {
+            "source": "cboe_vix_history",
+            "available": False,
+            "error": str(exc)[:160],
+        }
+
+
+def _vix_regime(vix_close: float) -> str:
+    if vix_close < 15:
+        return "low_vol"
+    if vix_close < 20:
+        return "normal"
+    if vix_close < 30:
+        return "elevated"
+    return "panic"

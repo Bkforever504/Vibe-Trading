@@ -26,7 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.market_data import fetch_ohlcv, data_source
+from scripts.market_data import fetch_ohlcv, data_source, fetch_vix_context
+from scripts.shadow_alerts import maybe_send_shadow_alert
 
 WR_STRATEGY_PATH = ROOT / "research" / "pine_strategy_lab" / "examples" / "williams_r_oversold_python.py"
 
@@ -93,6 +94,7 @@ def compute_signal_from_ohlcv(
         "comparison_symbol": COMPARISON_SYMBOL,
         "execution_mode": "shadow_only",
         "data_source": data_source(),
+        "vix_context": fetch_vix_context(),
         "primary_setup": _setup_payload(
             name="wr2_qqq_no_trend",
             symbol=PRIMARY_SYMBOL,
@@ -227,6 +229,7 @@ def main() -> int:
     entry = compute_signal_from_ohlcv(primary_df, comparison_df)
     prev = load_last_entry(LOG_PATH)
     print_report(entry, prev)
+    maybe_send_shadow_alert("Williams %R QQQ+SPY", entry, prev)
     log_entry(entry, LOG_PATH)
     print(f"Logged to {LOG_PATH}")
     return 0
