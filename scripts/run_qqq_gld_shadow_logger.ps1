@@ -10,7 +10,7 @@
 Set-Location "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 
 Write-Host "Running QQQ/GLD shadow logger..."
-uv run --no-project --with yfinance --with pandas python scripts\qqq_gld_shadow_logger.py
+uv run --no-project --with alpaca-py --with pandas python scripts\qqq_gld_shadow_logger.py
 
 Write-Host ""
 Write-Host "Running QQQ/GLD shadow report..."

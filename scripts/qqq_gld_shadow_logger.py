@@ -14,14 +14,16 @@ logger intentionally tracks QQQ vs GLD only.
 from __future__ import annotations
 
 import json
-import warnings
-from datetime import date, timedelta
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.market_data import fetch_close as _market_fetch_close, data_source
 PRIMARY_SYMBOL = "QQQ"
 DEFENSIVE_SYMBOL = "GLD"
 LOOKBACK_DAYS = 40
@@ -30,24 +32,7 @@ LOG_PATH = ROOT / "data" / "qqq_gld_shadow_log.jsonl"
 
 
 def fetch_close(symbols: list[str], lookback_days: int = 220) -> pd.DataFrame:
-    try:
-        import yfinance as yf
-    except ImportError as exc:
-        raise ImportError("yfinance required: uv add yfinance") from exc
-
-    today = date.today()
-    start = (today - timedelta(days=lookback_days * 2)).strftime("%Y-%m-%d")
-    end = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-    frames: dict[str, pd.Series] = {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for symbol in symbols:
-            df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=True)
-            if df.empty:
-                raise ValueError(f"No price data for {symbol} {start}:{end}")
-            df.columns = [col.lower() if isinstance(col, str) else col[0].lower() for col in df.columns]
-            frames[symbol] = df["close"]
-    return pd.DataFrame(frames).dropna()
+    return _market_fetch_close(symbols, lookback_days=lookback_days * 2)
 
 
 def compute_signal_from_close(
@@ -84,6 +69,7 @@ def compute_signal_from_close(
         "date": as_of_date,
         "strategy": "qqq_gld_40d_rotation",
         "execution_mode": "shadow_only",
+        "data_source": data_source(),
         "primary_symbol": PRIMARY_SYMBOL,
         "defensive_symbol": DEFENSIVE_SYMBOL,
         "selected": selected,
