@@ -15,8 +15,12 @@ from strategies.trading_dashboard import (
     momentum_shadow_context,
     momentum_shadow_panel,
     option_group_summaries,
+    polymarket_fed_whale_context,
+    polymarket_fed_whale_panel,
     polymarket_wallet_context,
     polymarket_wallet_panel,
+    social_arbitrage_context,
+    social_arbitrage_panel,
     tradingview_context,
     tradingview_panel,
 )
@@ -176,6 +180,87 @@ def test_polymarket_wallet_panel_renders_read_only_wallet_report(tmp_path) -> No
     assert "0xabc" in html
     assert "execution disabled" in html
     assert "public Polymarket endpoints only" in html
+
+
+def test_fed_whale_panel_renders_consensus_and_read_only_status(tmp_path) -> None:
+    report = tmp_path / "polymarket-fed-whale-watch.json"
+    report.write_text(
+        """
+        {
+          "mode": "read_only",
+          "execution_enabled": false,
+          "markets_scanned": 1,
+          "whale_trade_count": 3,
+          "consensus_count": 1,
+          "consensus": [
+            {
+              "market": "Will the Fed cut in July?",
+              "outcome": "Yes",
+              "side": "BUY",
+              "wallet_count": 3,
+              "total_notional": 275000,
+              "action": "paper_watch"
+            }
+          ],
+          "top_whale_trades": [
+            {
+              "wallet": "0xaaaaaaaaaaaaaaaa",
+              "outcome": "Yes",
+              "side": "BUY",
+              "notional": 160000,
+              "price": 0.4,
+              "known_profile_status": "unknown"
+            }
+          ],
+          "warnings": ["Read-only Fed/rates intelligence."]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    context = polymarket_fed_whale_context(report)
+    html = polymarket_fed_whale_panel(context)
+
+    assert context["consensus_count"] == 1
+    assert "Fed Whale Watch" in html
+    assert "Will the Fed cut in July?" in html
+    assert "$275,000.00" in html
+    assert "execution disabled" in html
+
+
+def test_social_arbitrage_panel_renders_research_only_ideas(tmp_path) -> None:
+    report = tmp_path / "social-arbitrage-watchlist.json"
+    report.write_text(
+        """
+        {
+          "mode": "research_only",
+          "execution_enabled": false,
+          "observation_count": 2,
+          "idea_count": 1,
+          "ideas": [
+            {
+              "ticker": "NVDA",
+              "theme": "ai demand",
+              "score": 8.2,
+              "source_count": 2,
+              "sources": ["tiktok", "youtube"],
+              "action": "paper_watch"
+            }
+          ],
+          "warnings": ["Research-only social trend scanner."]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    context = social_arbitrage_context(report)
+    html = social_arbitrage_panel(context)
+
+    assert context["idea_count"] == 1
+    assert "Social Arbitrage Watchlist" in html
+    assert "NVDA" in html
+    assert "paper_watch" in html
+    assert "execution disabled" in html
 
 
 def test_momentum_shadow_context_calculates_forward_return_from_log(tmp_path) -> None:

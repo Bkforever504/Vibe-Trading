@@ -36,6 +36,8 @@ TRADINGVIEW_REPORT_FILE = REPORT_DIR / "tradingview-validation.json"
 KALSHI_REPORT_FILE = REPORT_DIR / "kalshi-prediction-report.json"
 COPY_WATCHLIST_REPORT_FILE = REPORT_DIR / "copy-trader-watchlist.json"
 POLYMARKET_WALLET_REPORT_FILE = REPORT_DIR / "polymarket-wallet-tracker.json"
+POLYMARKET_FED_WHALE_REPORT_FILE = REPORT_DIR / "polymarket-fed-whale-watch.json"
+SOCIAL_ARBITRAGE_REPORT_FILE = REPORT_DIR / "social-arbitrage-watchlist.json"
 MOMENTUM_SHADOW_LOG_FILE = ROOT / "data" / "momentum_shadow_log.jsonl"
 RSI2_SHADOW_LOG_FILE = ROOT / "data" / "rsi2_shadow_log.jsonl"
 KAMA_SHADOW_LOG_FILE = ROOT / "data" / "kama_shadow_log.jsonl"
@@ -282,6 +284,63 @@ def polymarket_wallet_context(path: Path = POLYMARKET_WALLET_REPORT_FILE) -> dic
         "execution_enabled": bool(report.get("execution_enabled")),
         "wallet_count": int(_safe_float(report.get("wallet_count"))),
         "wallets": [item for item in wallets if isinstance(item, dict)][:5],
+        "warnings": [str(item) for item in warnings],
+    }
+
+
+def polymarket_fed_whale_context(path: Path = POLYMARKET_FED_WHALE_REPORT_FILE) -> dict:
+    report = load_json(path, {})
+    if not isinstance(report, dict) or not report:
+        return {
+            "available": False,
+            "mode": "read_only",
+            "execution_enabled": False,
+            "markets_scanned": 0,
+            "whale_trade_count": 0,
+            "consensus_count": 0,
+            "consensus": [],
+            "top_whale_trades": [],
+            "warnings": ["Polymarket Fed whale watch report has not been generated yet."],
+        }
+
+    warnings = report.get("warnings") if isinstance(report.get("warnings"), list) else []
+    consensus = report.get("consensus") if isinstance(report.get("consensus"), list) else []
+    trades = report.get("top_whale_trades") if isinstance(report.get("top_whale_trades"), list) else []
+    return {
+        "available": True,
+        "mode": str(report.get("mode") or "read_only"),
+        "execution_enabled": bool(report.get("execution_enabled")),
+        "markets_scanned": int(_safe_float(report.get("markets_scanned"))),
+        "whale_trade_count": int(_safe_float(report.get("whale_trade_count"))),
+        "consensus_count": int(_safe_float(report.get("consensus_count"))),
+        "consensus": [item for item in consensus if isinstance(item, dict)][:5],
+        "top_whale_trades": [item for item in trades if isinstance(item, dict)][:8],
+        "warnings": [str(item) for item in warnings],
+    }
+
+
+def social_arbitrage_context(path: Path = SOCIAL_ARBITRAGE_REPORT_FILE) -> dict:
+    report = load_json(path, {})
+    if not isinstance(report, dict) or not report:
+        return {
+            "available": False,
+            "mode": "research_only",
+            "execution_enabled": False,
+            "observation_count": 0,
+            "idea_count": 0,
+            "ideas": [],
+            "warnings": ["Social arbitrage watchlist report has not been generated yet."],
+        }
+
+    warnings = report.get("warnings") if isinstance(report.get("warnings"), list) else []
+    ideas = report.get("ideas") if isinstance(report.get("ideas"), list) else []
+    return {
+        "available": True,
+        "mode": str(report.get("mode") or "research_only"),
+        "execution_enabled": bool(report.get("execution_enabled")),
+        "observation_count": int(_safe_float(report.get("observation_count"))),
+        "idea_count": int(_safe_float(report.get("idea_count"))),
+        "ideas": [item for item in ideas if isinstance(item, dict)][:8],
         "warnings": [str(item) for item in warnings],
     }
 
@@ -827,6 +886,103 @@ def polymarket_wallet_panel(context: dict) -> str:
     </div>"""
 
 
+def polymarket_fed_whale_panel(context: dict) -> str:
+    warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
+    warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
+    if not warning_items:
+        warning_items = "<li>Read-only Fed whale intelligence. No prediction-market orders are wired.</li>"
+
+    consensus_rows = []
+    for item in context.get("consensus", []):
+        consensus_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(item.get('market') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('outcome') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('side') or ''))}</td>"
+            f"<td>{int(_safe_float(item.get('wallet_count')))}</td>"
+            f"<td>{_money(_safe_float(item.get('total_notional')))}</td>"
+            f"<td>{html.escape(str(item.get('action') or ''))}</td>"
+            "</tr>"
+        )
+    consensus_body = "".join(consensus_rows) or '<tr><td colspan="6">No Fed whale consensus yet.</td></tr>'
+
+    trade_rows = []
+    for trade in context.get("top_whale_trades", []):
+        wallet = str(trade.get("wallet") or "")
+        short_wallet = wallet[:8] + "..." + wallet[-4:] if len(wallet) > 14 else wallet
+        trade_rows.append(
+            "<tr>"
+            f"<td>{html.escape(short_wallet)}</td>"
+            f"<td>{html.escape(str(trade.get('outcome') or ''))}</td>"
+            f"<td>{html.escape(str(trade.get('side') or ''))}</td>"
+            f"<td>{_money(_safe_float(trade.get('notional')))}</td>"
+            f"<td>{_safe_float(trade.get('price')):.3f}</td>"
+            f"<td>{html.escape(str(trade.get('known_profile_status') or 'unknown'))}</td>"
+            "</tr>"
+        )
+    trade_body = "".join(trade_rows) or '<tr><td colspan="6">No whale trades above threshold.</td></tr>'
+    exec_status = "execution disabled" if not context.get("execution_enabled") else "execution requested but blocked"
+
+    return f"""
+    <div class="panel">
+      <h2>Fed Whale Watch</h2>
+      <div class="tv-grid">
+        <div><span>Mode</span><strong>{html.escape(str(context.get('mode') or 'read_only'))}</strong></div>
+        <div><span>Orders</span><strong class="good">{html.escape(exec_status)}</strong></div>
+        <div><span>Markets</span><strong>{int(_safe_float(context.get('markets_scanned')))}</strong></div>
+        <div><span>Whale trades</span><strong>{int(_safe_float(context.get('whale_trade_count')))}</strong></div>
+        <div><span>Consensus</span><strong>{int(_safe_float(context.get('consensus_count')))}</strong></div>
+      </div>
+      <table style="margin-top: 14px;">
+        <thead><tr><th>Market</th><th>Outcome</th><th>Side</th><th>Wallets</th><th>Notional</th><th>Action</th></tr></thead>
+        <tbody>{consensus_body}</tbody>
+      </table>
+      <table style="margin-top: 14px;">
+        <thead><tr><th>Wallet</th><th>Outcome</th><th>Side</th><th>Notional</th><th>Price</th><th>Profile</th></tr></thead>
+        <tbody>{trade_body}</tbody>
+      </table>
+      <ul>{warning_items}</ul>
+    </div>"""
+
+
+def social_arbitrage_panel(context: dict) -> str:
+    warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
+    warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
+    if not warning_items:
+        warning_items = "<li>Research-only social trend scanner. No broker orders are wired.</li>"
+
+    rows = []
+    for idea in context.get("ideas", []):
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(idea.get('ticker') or ''))}</td>"
+            f"<td>{html.escape(str(idea.get('theme') or ''))}</td>"
+            f"<td>{_safe_float(idea.get('score')):.1f}</td>"
+            f"<td>{int(_safe_float(idea.get('source_count')))}</td>"
+            f"<td>{html.escape(', '.join(str(src) for src in idea.get('sources', [])[:4]))}</td>"
+            f"<td>{html.escape(str(idea.get('action') or ''))}</td>"
+            "</tr>"
+        )
+    body = "".join(rows) or '<tr><td colspan="6">No social-arb ideas loaded yet.</td></tr>'
+    exec_status = "execution disabled" if not context.get("execution_enabled") else "execution requested but blocked"
+
+    return f"""
+    <div class="panel">
+      <h2>Social Arbitrage Watchlist</h2>
+      <div class="tv-grid">
+        <div><span>Mode</span><strong>{html.escape(str(context.get('mode') or 'research_only'))}</strong></div>
+        <div><span>Orders</span><strong class="good">{html.escape(exec_status)}</strong></div>
+        <div><span>Observations</span><strong>{int(_safe_float(context.get('observation_count')))}</strong></div>
+        <div><span>Ideas</span><strong>{int(_safe_float(context.get('idea_count')))}</strong></div>
+      </div>
+      <table style="margin-top: 14px;">
+        <thead><tr><th>Ticker</th><th>Theme</th><th>Score</th><th>Sources</th><th>Platforms</th><th>Action</th></tr></thead>
+        <tbody>{body}</tbody>
+      </table>
+      <ul>{warning_items}</ul>
+    </div>"""
+
+
 def momentum_shadow_panel(context: dict) -> str:
     warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
     warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
@@ -1023,6 +1179,20 @@ def bot_status_context() -> dict:
                 "execution": "watch-only",
             },
             {
+                "name": "Fed Whale Watch",
+                "mode": "watch",
+                "live_enabled": False,
+                "manual_reset": False,
+                "execution": "watch-only",
+            },
+            {
+                "name": "Social Arbitrage Watchlist",
+                "mode": "research",
+                "live_enabled": False,
+                "manual_reset": False,
+                "execution": "research-only",
+            },
+            {
                 "name": "Momentum Rotation Shadow",
                 "mode": "shadow",
                 "live_enabled": False,
@@ -1051,7 +1221,7 @@ def bot_status_panel(context: dict) -> str:
     _MODE_CLS = {
         "paper": "warn", "paper-auto": "warn", "live": "bad",
         "dry-run": "good", "shadow": "good", "shadow-only": "good", "weekly-shadow-only": "good", "daily-shadow-only": "good",
-        "watch": "good", "watch-only": "good", "blocked": "bad",
+        "watch": "good", "watch-only": "good", "research": "good", "research-only": "good", "blocked": "bad",
     }
     rows = []
     for bot in context.get("bots", []):
@@ -1061,7 +1231,7 @@ def bot_status_panel(context: dict) -> str:
         live_enabled = bool(bot.get("live_enabled"))
         manual_reset = bool(bot.get("manual_reset"))
         mode_cls = _MODE_CLS.get(mode, "warn")
-        exec_cls = "bad" if execution in ("live", "blocked") else "good" if execution in ("dry-run", "shadow-only", "weekly-shadow-only", "daily-shadow-only", "watch-only") else "warn"
+        exec_cls = "bad" if execution in ("live", "blocked") else "good" if execution in ("dry-run", "shadow-only", "weekly-shadow-only", "daily-shadow-only", "watch-only", "research-only") else "warn"
         live_cls = "bad" if live_enabled else "good"
         reset_cls = "bad" if manual_reset else "good"
         rows.append(
@@ -1187,6 +1357,8 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
     prediction_context = kalshi_context()
     copy_context = copy_watchlist_context()
     poly_wallet_context = polymarket_wallet_context()
+    fed_whale_context = polymarket_fed_whale_context()
+    social_context = social_arbitrage_context()
     momentum_context = momentum_shadow_context()
     rsi2_context = daily_shadow_context(RSI2_SHADOW_LOG_FILE, "RSI-2 QQQ Shadow")
     kama_context = daily_shadow_context(KAMA_SHADOW_LOG_FILE, "KAMA QQQ Shadow")
@@ -1304,6 +1476,11 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
 
   <section class="grid" style="margin-top: 14px;">
     {polymarket_wallet_panel(poly_wallet_context)}
+  </section>
+
+  <section class="grid two">
+    {polymarket_fed_whale_panel(fed_whale_context)}
+    {social_arbitrage_panel(social_context)}
   </section>
 
   <section class="grid" style="margin-top: 14px;">
