@@ -21,6 +21,8 @@ from strategies.trading_dashboard import (
     polymarket_wallet_panel,
     social_arbitrage_context,
     social_arbitrage_panel,
+    strategy_intake_context,
+    strategy_intake_panel,
     tradingview_context,
     tradingview_panel,
 )
@@ -260,6 +262,42 @@ def test_social_arbitrage_panel_renders_research_only_ideas(tmp_path) -> None:
     assert "Social Arbitrage Watchlist" in html
     assert "NVDA" in html
     assert "paper_watch" in html
+    assert "execution disabled" in html
+
+
+def test_strategy_intake_panel_renders_stage_counts_and_actions(tmp_path) -> None:
+    report = tmp_path / "strategy-intake-report.json"
+    report.write_text(
+        """
+        {
+          "mode": "research_only",
+          "execution_enabled": false,
+          "queue_count": 2,
+          "stage_counts": {"ready_for_port": 1, "needs_scan": 1},
+          "items": [
+            {
+              "id": "intake-001",
+              "strategy_name": "QQQ 225-Day MA Filter",
+              "market": "QQQ",
+              "timeframe": "daily",
+              "stage": "ready_for_port",
+              "readiness_score": 7.2,
+              "next_action": "Port to Python and run backtest."
+            }
+          ],
+          "warnings": ["Research-only strategy discovery queue."]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    context = strategy_intake_context(report)
+    html = strategy_intake_panel(context)
+
+    assert context["queue_count"] == 2
+    assert "Strategy Intake Factory" in html
+    assert "ready_for_port: 1" in html
+    assert "QQQ 225-Day MA Filter" in html
     assert "execution disabled" in html
 
 

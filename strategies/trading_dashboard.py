@@ -38,6 +38,7 @@ COPY_WATCHLIST_REPORT_FILE = REPORT_DIR / "copy-trader-watchlist.json"
 POLYMARKET_WALLET_REPORT_FILE = REPORT_DIR / "polymarket-wallet-tracker.json"
 POLYMARKET_FED_WHALE_REPORT_FILE = REPORT_DIR / "polymarket-fed-whale-watch.json"
 SOCIAL_ARBITRAGE_REPORT_FILE = REPORT_DIR / "social-arbitrage-watchlist.json"
+STRATEGY_INTAKE_REPORT_FILE = REPORT_DIR / "strategy-intake-report.json"
 MOMENTUM_SHADOW_LOG_FILE = ROOT / "data" / "momentum_shadow_log.jsonl"
 RSI2_SHADOW_LOG_FILE = ROOT / "data" / "rsi2_shadow_log.jsonl"
 KAMA_SHADOW_LOG_FILE = ROOT / "data" / "kama_shadow_log.jsonl"
@@ -341,6 +342,36 @@ def social_arbitrage_context(path: Path = SOCIAL_ARBITRAGE_REPORT_FILE) -> dict:
         "observation_count": int(_safe_float(report.get("observation_count"))),
         "idea_count": int(_safe_float(report.get("idea_count"))),
         "ideas": [item for item in ideas if isinstance(item, dict)][:8],
+        "warnings": [str(item) for item in warnings],
+    }
+
+
+def strategy_intake_context(path: Path = STRATEGY_INTAKE_REPORT_FILE) -> dict:
+    report = load_json(path, {})
+    if not isinstance(report, dict) or not report:
+        return {
+            "available": False,
+            "mode": "research_only",
+            "execution_enabled": False,
+            "queue_count": 0,
+            "stage_counts": {},
+            "items": [],
+            "top_next_actions": [],
+            "warnings": ["Strategy intake report has not been generated yet."],
+        }
+
+    warnings = report.get("warnings") if isinstance(report.get("warnings"), list) else []
+    items = report.get("items") if isinstance(report.get("items"), list) else []
+    actions = report.get("top_next_actions") if isinstance(report.get("top_next_actions"), list) else []
+    stage_counts = report.get("stage_counts") if isinstance(report.get("stage_counts"), dict) else {}
+    return {
+        "available": True,
+        "mode": str(report.get("mode") or "research_only"),
+        "execution_enabled": bool(report.get("execution_enabled")),
+        "queue_count": int(_safe_float(report.get("queue_count"))),
+        "stage_counts": stage_counts,
+        "items": [item for item in items if isinstance(item, dict)][:8],
+        "top_next_actions": [item for item in actions if isinstance(item, dict)][:5],
         "warnings": [str(item) for item in warnings],
     }
 
@@ -983,6 +1014,53 @@ def social_arbitrage_panel(context: dict) -> str:
     </div>"""
 
 
+def strategy_intake_panel(context: dict) -> str:
+    warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
+    warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
+    if not warning_items:
+        warning_items = "<li>Research-only strategy intake queue. No broker orders are wired.</li>"
+
+    stage_counts = context.get("stage_counts") if isinstance(context.get("stage_counts"), dict) else {}
+    stage_bits = []
+    for stage in ("ready_for_port", "needs_scan", "needs_rules", "review_backtest", "shadow_candidate", "rejected"):
+        count = int(_safe_float(stage_counts.get(stage)))
+        if count:
+            stage_bits.append(f"{html.escape(stage)}: {count}")
+    stage_text = ", ".join(stage_bits) if stage_bits else "No staged candidates yet."
+
+    rows = []
+    for item in context.get("items", []):
+        rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(item.get('id') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('strategy_name') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('market') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('timeframe') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('stage') or ''))}</td>"
+            f"<td>{_safe_float(item.get('readiness_score')):.1f}</td>"
+            f"<td>{html.escape(str(item.get('next_action') or ''))}</td>"
+            "</tr>"
+        )
+    body = "".join(rows) or '<tr><td colspan="7">No strategy intake items loaded yet.</td></tr>'
+    exec_status = "execution disabled" if not context.get("execution_enabled") else "execution requested but blocked"
+
+    return f"""
+    <div class="panel">
+      <h2>Strategy Intake Factory</h2>
+      <div class="tv-grid">
+        <div><span>Mode</span><strong>{html.escape(str(context.get('mode') or 'research_only'))}</strong></div>
+        <div><span>Orders</span><strong class="good">{html.escape(exec_status)}</strong></div>
+        <div><span>Queue</span><strong>{int(_safe_float(context.get('queue_count')))}</strong></div>
+        <div><span>Stages</span><strong>{html.escape(stage_text)}</strong></div>
+      </div>
+      <table style="margin-top: 14px;">
+        <thead><tr><th>ID</th><th>Strategy</th><th>Market</th><th>TF</th><th>Stage</th><th>Score</th><th>Next Action</th></tr></thead>
+        <tbody>{body}</tbody>
+      </table>
+      <ul>{warning_items}</ul>
+    </div>"""
+
+
 def momentum_shadow_panel(context: dict) -> str:
     warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
     warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
@@ -1193,6 +1271,13 @@ def bot_status_context() -> dict:
                 "execution": "research-only",
             },
             {
+                "name": "Strategy Intake Factory",
+                "mode": "research",
+                "live_enabled": False,
+                "manual_reset": False,
+                "execution": "research-only",
+            },
+            {
                 "name": "Momentum Rotation Shadow",
                 "mode": "shadow",
                 "live_enabled": False,
@@ -1359,6 +1444,7 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
     poly_wallet_context = polymarket_wallet_context()
     fed_whale_context = polymarket_fed_whale_context()
     social_context = social_arbitrage_context()
+    intake_context = strategy_intake_context()
     momentum_context = momentum_shadow_context()
     rsi2_context = daily_shadow_context(RSI2_SHADOW_LOG_FILE, "RSI-2 QQQ Shadow")
     kama_context = daily_shadow_context(KAMA_SHADOW_LOG_FILE, "KAMA QQQ Shadow")
@@ -1481,6 +1567,10 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
   <section class="grid two">
     {polymarket_fed_whale_panel(fed_whale_context)}
     {social_arbitrage_panel(social_context)}
+  </section>
+
+  <section class="grid" style="margin-top: 14px;">
+    {strategy_intake_panel(intake_context)}
   </section>
 
   <section class="grid" style="margin-top: 14px;">
