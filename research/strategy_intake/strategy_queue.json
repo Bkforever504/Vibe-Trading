@@ -215,8 +215,8 @@
     "backtest_status": "done",
     "decision": "paper_candidate",
     "rejection_reasons": [],
-    "next_action": "Build a QQQ/GLD shadow logger, not TQQQ. Forward-test 30-60 days and compare overlap with existing momentum rotation before any execution decision.",
-    "notes": "Ported to research/pine_strategy_lab/examples/tqqq_gld_rotation_python.py and swept QQQ/TQQQ with GLD defensive leg. Leveraged TQQQ rows were rejected for high DD. Nonleveraged QQQ/GLD variant passed: QQQ 2018-2024 lookback=40, conf 9.0, PF 4.24, OOS PF 5.64, WF 0.80, Sharpe 1.02, WR 51.4%, 35 trades, DD 24.3%; QQQ 2011-2024 lookback=42 also paper_candidate with conf 9.0, PF 2.28, OOS PF 4.61, WF 0.60, 72 trades, DD 18.1%."
+    "next_action": "Forward-test QQQ/GLD shadow logger for 30-60 days. Compare overlap with existing momentum rotation before any execution decision. Do not use TQQQ.",
+    "notes": "Ported to research/pine_strategy_lab/examples/tqqq_gld_rotation_python.py and swept QQQ/TQQQ with GLD defensive leg. Leveraged TQQQ rows were rejected for high DD. Nonleveraged QQQ/GLD variant passed: QQQ 2018-2024 lookback=40, conf 9.0, PF 4.24, OOS PF 5.64, WF 0.80, Sharpe 1.02, WR 51.4%, 35 trades, DD 24.3%; QQQ 2011-2024 lookback=42 also paper_candidate with conf 9.0, PF 2.28, OOS PF 4.61, WF 0.60, 72 trades, DD 18.1%. QQQ/GLD shadow logger added at scripts/qqq_gld_shadow_logger.py; first live row logged 2026-06-26 selected QQQ with +17.40% return spread. Windows task QQQGLDShadowLogger scheduled weekly Monday 8:05AM CT."
   },
   {
     "id": "intake-008",
@@ -244,7 +244,7 @@
     "backtest_status": "done",
     "decision": "paper_candidate",
     "rejection_reasons": [],
-    "next_action": "Build Williams %R shadow logger for QQQ and SPY. Include signal-overlap report versus RSI-2 before promotion because both are oversold mean-reversion families.",
-    "notes": "Ported to research/pine_strategy_lab/examples/williams_r_oversold_python.py and swept SPY/QQQ over 2010-2024 and 2018-2024. Multiple paper candidates. Top row: QQQ 2018-2024 WR(2), entry -90, exit -50, max_hold 5, no trend filter, conf 10.0, PF 2.19, OOS PF 2.52, WF 1.00, Sharpe 1.09, WR 67.5%, 114 trades, DD 12.7%. SPY 2010-2024 WR(3) with SMA200 trend filter also passed: conf 10.0, PF 1.91, OOS PF 2.04, WF 1.00, 126 trades, DD 11.4%."
+    "next_action": "Forward-test Williams %R shadow logger for 30-60 days. Include signal-overlap report versus RSI-2 before promotion because both are oversold mean-reversion families.",
+    "notes": "Ported to research/pine_strategy_lab/examples/williams_r_oversold_python.py and swept SPY/QQQ over 2010-2024 and 2018-2024. Multiple paper candidates. Top row: QQQ 2018-2024 WR(2), entry -90, exit -50, max_hold 5, no trend filter, conf 10.0, PF 2.19, OOS PF 2.52, WF 1.00, Sharpe 1.09, WR 67.5%, 114 trades, DD 12.7%. SPY 2010-2024 WR(3) with SMA200 trend filter also passed: conf 10.0, PF 1.91, OOS PF 2.04, WF 1.00, 126 trades, DD 11.4%. Williams %R shadow logger exists at scripts/williams_r_shadow_logger.py with report script scripts/williams_r_shadow_report.py; keep shadow-only until 30 days / 10 entry signals and RSI-2 overlap review are complete."
   }
 ]
