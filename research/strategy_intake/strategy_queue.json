@@ -20,12 +20,16 @@
     ],
     "license_or_permission_notes": "Strategy concept published publicly. No Pine code to copy — Python port.",
     "pine_status": "not_started",
-    "python_status": "not_started",
-    "backtest_status": "pending",
-    "decision": "pending",
-    "rejection_reasons": [],
-    "next_action": "Port to python strategy file. Run sweep on QQQ/SPY 2015-2024. Likely similar to existing KAMA trend — check orthogonality.",
-    "notes": "Claimed: 1061% over 25 years vs 628% buy-hold, max DD 28.6%. Source uses daily bars. Very simple — few parameters = low PBO risk."
+    "python_status": "done",
+    "backtest_status": "done",
+    "decision": "rejected",
+    "rejection_reasons": [
+      "PBO 0.67 exceeds 0.60 gate",
+      "Exact 225-day QQQ variant produced only 21 trades over 2015-2024",
+      "Most rows showed suspicious no-loss OOS PF=99 artifact"
+    ],
+    "next_action": "Park. Do not build shadow logger unless a materially different rule set raises trade count and lowers PBO without suspicious OOS artifacts.",
+    "notes": "Codex ported to research/pine_strategy_lab/examples/qqq_225_ma_filter_python.py and swept QQQ/SPY 2015-2024 plus 2018-2024. Best row was SPY SMA(200), conf 6.5, PF 3.75, OOS PF 9.52, WF 0.60, 23 trades, DD 17.7%, but global PBO was 0.67 and all rows remained rejected. Exact intake idea QQQ SMA(225) had conf 5.0, PF 3.50, OOS PF 99.00, WF 0.60, 21 trades, DD 24.3%."
   },
   {
     "id": "intake-002",
@@ -99,7 +103,9 @@
     "exit_rules": "TBD",
     "position_sizing": "TBD",
     "session_rules": "TBD",
-    "ambiguities": ["Collection not yet scanned. Need pine_source_scan_report.py run first."],
+    "ambiguities": [
+      "Collection not yet scanned. Need pine_source_scan_report.py run first."
+    ],
     "license_or_permission_notes": "Check repo license.",
     "pine_status": "needs_scan",
     "python_status": "not_started",
@@ -133,7 +139,9 @@
     "python_status": "not_started",
     "backtest_status": "pending",
     "decision": "pending",
-    "rejection_reasons": ["High parameter count concern — PBO risk before even scanning."],
+    "rejection_reasons": [
+      "High parameter count concern — PBO risk before even scanning."
+    ],
     "next_action": "Clone and scan. If sub-strategies are simple (MA cross, RSI threshold etc.), worth porting. If opaque or indicator-heavy, reject early.",
     "notes": "Multi-indicator confluence is academically interesting but parameter explosion = likely high PBO."
   },
@@ -190,7 +198,9 @@
     "python_status": "not_started",
     "backtest_status": "pending",
     "decision": "pending",
-    "rejection_reasons": ["TQQQ leverage decay concern. 3x leveraged ETF not suitable for our paper trading stack without careful sizing."],
+    "rejection_reasons": [
+      "TQQQ leverage decay concern. 3x leveraged ETF not suitable for our paper trading stack without careful sizing."
+    ],
     "next_action": "Deprioritize due to leverage. If tested, use QQQ/GLD non-leveraged version first. Similar logic to existing momentum rotation — check if orthogonal.",
     "notes": "Overlaps conceptually with existing momentum rotation top-2. Non-leveraged version may be redundant with current candidate."
   },
