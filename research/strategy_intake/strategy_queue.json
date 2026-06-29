@@ -53,12 +53,16 @@
     ],
     "license_or_permission_notes": "Academic/public concept.",
     "pine_status": "not_started",
-    "python_status": "not_started",
-    "backtest_status": "pending",
-    "decision": "pending",
-    "rejection_reasons": [],
-    "next_action": "Port to Python. Test 2000-2024. Concern: only ~1 trade per year = very few trades for OOS/WF gates. May fail trade count gate.",
-    "notes": "Well-documented seasonal anomaly. Low trade count is the key risk — our gate requires 20+ trades which needs 20+ years."
+    "python_status": "done",
+    "backtest_status": "done",
+    "decision": "rejected",
+    "rejection_reasons": [
+      "Too few trades: best 2000-2024 row produced only 20 trades",
+      "Max drawdown exceeded 25% gate on best rows",
+      "Several rows had suspicious PF/OOS artifacts from very low trade count"
+    ],
+    "next_action": "Park. Seasonal best-six-months is too sparse for our 30+ trade evidence gate unless tested over a much longer instrument history.",
+    "notes": "Ported to research/pine_strategy_lab/examples/seasonal_macd_best_months_python.py and swept SPY/QQQ over 2000-2024, 2010-2024, 2018-2024. Best row: SPY 2000-2024 entry_month=10 exit_month=5, conf 6.5, PF 7.82, OOS PF 9.93, WF 1.00, Sharpe 0.56, WR 80%, 20 trades, DD 32.4%. Rejected because the attractive PF comes from too few trades and high drawdown."
   },
   {
     "id": "intake-003",
@@ -81,13 +85,16 @@
       "Pine code — check for repainting."
     ],
     "license_or_permission_notes": "Check repo license before cloning.",
-    "pine_status": "needs_scan",
+    "pine_status": "scanned",
     "python_status": "not_started",
     "backtest_status": "pending",
     "decision": "pending",
-    "rejection_reasons": [],
-    "next_action": "Clone repo. Run pine_source_scanner. Check for repaint/lookahead. Port to Python if clean.",
-    "notes": "Pinbar reversal is a classic candlestick pattern. Daily bars = low signal frequency concern."
+    "rejection_reasons": [
+      "Pine strategy has no commission/slippage settings",
+      "License unknown in scanner output"
+    ],
+    "next_action": "Manual review before port. If license is acceptable, add realistic costs and port only as a low-priority daily candlestick test.",
+    "notes": "Cloned samgozman/pinbar-strategy-tradingview and scanned one Pine strategy. No critical repaint flags. Warnings: no_commission, no_slippage. Daily pinbar signal frequency may be low, so do not prioritize ahead of confirmed Williams %R and QQQ/GLD candidates."
   },
   {
     "id": "intake-004",
@@ -107,13 +114,17 @@
       "Collection not yet scanned. Need pine_source_scan_report.py run first."
     ],
     "license_or_permission_notes": "Check repo license.",
-    "pine_status": "needs_scan",
+    "pine_status": "scanned",
     "python_status": "not_started",
     "backtest_status": "pending",
-    "decision": "pending",
-    "rejection_reasons": [],
-    "next_action": "Clone repo to research/pine_sources/. Run scanner. Identify strategy files vs indicators. Evaluate top candidates.",
-    "notes": "Appeared in multiple GitHub search results. Unknown quality — scan first."
+    "decision": "scan_only",
+    "rejection_reasons": [
+      "No strategy() files found after normalizing .txt Pine scripts",
+      "2 critical lookahead_on files found",
+      "22 of 26 normalized scripts had scanner warnings"
+    ],
+    "next_action": "Use only as an indicator idea library. Clean indicators worth studying later: Market Structure Shift, Ankush Momentum, Vijay Thakare momentum/VWAP, Sideways Market Skipper. Do not promote without writing explicit non-repainting strategy rules first.",
+    "notes": "Original .txt repo normalized into 26 Pine-like files for scanning. Results: 26 indicators, 0 strategies, 4 clean, 22 warnings, 2 critical repaint files. This is not a direct backtest queue."
   },
   {
     "id": "intake-005",
@@ -135,15 +146,16 @@
       "High parameter count = high PBO risk."
     ],
     "license_or_permission_notes": "Check repo license.",
-    "pine_status": "needs_scan",
+    "pine_status": "scanned",
     "python_status": "not_started",
     "backtest_status": "pending",
     "decision": "pending",
     "rejection_reasons": [
-      "High parameter count concern — PBO risk before even scanning."
+      "License unknown in scanner output",
+      "High parameter count remains a PBO risk"
     ],
-    "next_action": "Clone and scan. If sub-strategies are simple (MA cross, RSI threshold etc.), worth porting. If opaque or indicator-heavy, reject early.",
-    "notes": "Multi-indicator confluence is academically interesting but parameter explosion = likely high PBO."
+    "next_action": "Manual translate after Williams %R / QQQ-GLD loggers. Scanner found no repaint warnings, but port must freeze defaults and sweep very narrowly to avoid parameter mining.",
+    "notes": "Cloned AlbertoCuadra/algo_trading_weighted_strategy. Scanner found one clean strategy: weighted_strategy.pine / Acrypto Weighted Strategy v1.4.9, Pine v5, tags EMA/SMA/RSI/MACD/ATR, no current scanner warnings. Candidate is clean enough to review, not yet validated."
   },
   {
     "id": "intake-006",
@@ -166,12 +178,16 @@
     ],
     "license_or_permission_notes": "Academic concept, freely reproducible.",
     "pine_status": "not_started",
-    "python_status": "not_started",
-    "backtest_status": "pending",
-    "decision": "pending",
-    "rejection_reasons": [],
-    "next_action": "Port to Python — very simple time-based logic. Test 2000-2024. Check trade count (~12/year = 120 trades over 10 years, passes gate). Concern: well-known anomaly may be arbitraged away.",
-    "notes": "Well-documented academic edge. ~12 entries per year = adequate trade count for gate. Simple = low PBO. Orthogonal to trend/momentum candidates already running."
+    "python_status": "done",
+    "backtest_status": "done",
+    "decision": "rejected",
+    "rejection_reasons": [
+      "PBO 0.83 exceeds 0.60 gate",
+      "All sweep rows rejected despite attractive headline PF",
+      "Seasonality edge appears parameter-sensitive across windows"
+    ],
+    "next_action": "Park. Do not build a shadow logger unless a non-mined canonical rule passes PBO on independent windows.",
+    "notes": "Ported to research/pine_strategy_lab/examples/month_end_seasonal_python.py and swept SPY/QQQ over 2000-2024, 2010-2024, 2018-2024 with first/last-day variants. Best row: SPY 2010-2024 first_days=3 last_days=4, conf 8.7, PF 1.80, OOS PF 1.62, WF 1.00, Sharpe 1.13, WR 75.8%, 186 trades, DD 5.7%, but global PBO 0.83 rejected the family."
   },
   {
     "id": "intake-007",
@@ -195,14 +211,12 @@
     ],
     "license_or_permission_notes": "Public concept.",
     "pine_status": "not_started",
-    "python_status": "not_started",
-    "backtest_status": "pending",
-    "decision": "pending",
-    "rejection_reasons": [
-      "TQQQ leverage decay concern. 3x leveraged ETF not suitable for our paper trading stack without careful sizing."
-    ],
-    "next_action": "Deprioritize due to leverage. If tested, use QQQ/GLD non-leveraged version first. Similar logic to existing momentum rotation — check if orthogonal.",
-    "notes": "Overlaps conceptually with existing momentum rotation top-2. Non-leveraged version may be redundant with current candidate."
+    "python_status": "done",
+    "backtest_status": "done",
+    "decision": "paper_candidate",
+    "rejection_reasons": [],
+    "next_action": "Build a QQQ/GLD shadow logger, not TQQQ. Forward-test 30-60 days and compare overlap with existing momentum rotation before any execution decision.",
+    "notes": "Ported to research/pine_strategy_lab/examples/tqqq_gld_rotation_python.py and swept QQQ/TQQQ with GLD defensive leg. Leveraged TQQQ rows were rejected for high DD. Nonleveraged QQQ/GLD variant passed: QQQ 2018-2024 lookback=40, conf 9.0, PF 4.24, OOS PF 5.64, WF 0.80, Sharpe 1.02, WR 51.4%, 35 trades, DD 24.3%; QQQ 2011-2024 lookback=42 also paper_candidate with conf 9.0, PF 2.28, OOS PF 4.61, WF 0.60, 72 trades, DD 18.1%."
   },
   {
     "id": "intake-008",
@@ -226,11 +240,11 @@
     ],
     "license_or_permission_notes": "Concept is public domain.",
     "pine_status": "not_started",
-    "python_status": "not_started",
-    "backtest_status": "pending",
-    "decision": "pending",
+    "python_status": "done",
+    "backtest_status": "done",
+    "decision": "paper_candidate",
     "rejection_reasons": [],
-    "next_action": "Port to Python. Very similar to RSI-2 in structure — %R is mathematically related to Stochastic. Check if edge is materially different from existing RSI-2 candidate before spending time.",
-    "notes": "Williams %R is closely related to RSI-2 conceptually. May be correlated with existing RSI-2 candidate — test correlation of signals before promoting."
+    "next_action": "Build Williams %R shadow logger for QQQ and SPY. Include signal-overlap report versus RSI-2 before promotion because both are oversold mean-reversion families.",
+    "notes": "Ported to research/pine_strategy_lab/examples/williams_r_oversold_python.py and swept SPY/QQQ over 2010-2024 and 2018-2024. Multiple paper candidates. Top row: QQQ 2018-2024 WR(2), entry -90, exit -50, max_hold 5, no trend filter, conf 10.0, PF 2.19, OOS PF 2.52, WF 1.00, Sharpe 1.09, WR 67.5%, 114 trades, DD 12.7%. SPY 2010-2024 WR(3) with SMA200 trend filter also passed: conf 10.0, PF 1.91, OOS PF 2.04, WF 1.00, 126 trades, DD 11.4%."
   }
 ]
