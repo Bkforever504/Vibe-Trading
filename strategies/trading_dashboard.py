@@ -46,6 +46,8 @@ GUARD_BLOCK_LOG_FILE = RUNTIME_DIR / "guard-blocks.jsonl"
 KALSHI_GUARD_BLOCK_LOG_FILE = RUNTIME_DIR / "kalshi-guard-blocks.jsonl"
 ALPACA_BLOCK_FILE = RUNTIME_DIR / "MANUAL_RESET_REQUIRED.json"
 KALSHI_BLOCK_FILE = RUNTIME_DIR / "KALSHI_MANUAL_RESET_REQUIRED.json"
+PORTFOLIO_KILL_FILE = RUNTIME_DIR / "PORTFOLIO_KILL_SWITCH.json"
+PORTFOLIO_MONITOR_STATE_FILE = RUNTIME_DIR / "portfolio_monitor_state.json"
 KALSHI_BOT_ENV = Path(os.path.expanduser(r"~\Desktop\MAILK-Repos\Kalshi-Weather-Bot\.env"))
 
 load_dotenv(dotenv_path=ROOT / "agent" / ".env")
@@ -1211,6 +1213,37 @@ def _read_env_flag(env_file: Path, key: str, default: str = "true") -> str:
     return default
 
 
+def _read_env_float(env_file: Path, key: str, default: float) -> float:
+    return _safe_float(_read_env_flag(env_file, key, str(default)), default)
+
+
+def _read_env_int(env_file: Path, key: str, default: int) -> int:
+    return int(_safe_float(_read_env_flag(env_file, key, str(default)), float(default)))
+
+
+def portfolio_guard_context(
+    kill_file: Path = PORTFOLIO_KILL_FILE,
+    state_file: Path = PORTFOLIO_MONITOR_STATE_FILE,
+) -> dict:
+    agent_env = ROOT / "agent" / ".env"
+    kill_payload = load_json(kill_file, {}) if kill_file.exists() else {}
+    state = load_json(state_file, {}) if state_file.exists() else {}
+    return {
+        "active": kill_file.exists(),
+        "kill_file": str(kill_file),
+        "reason": str(kill_payload.get("reason", "")) if isinstance(kill_payload, dict) else "",
+        "daily_pnl_dollars": _safe_float(kill_payload.get("daily_pnl_dollars") if isinstance(kill_payload, dict) else 0),
+        "triggered_at": str(kill_payload.get("triggered_at", "")) if isinstance(kill_payload, dict) else "",
+        "soft_warning_dollars": _read_env_float(agent_env, "PORTFOLIO_SOFT_WARNING_DOLLARS", 500),
+        "hard_kill_dollars": _read_env_float(agent_env, "PORTFOLIO_MAX_DAILY_LOSS_DOLLARS", 750),
+        "emergency_kill_dollars": _read_env_float(agent_env, "PORTFOLIO_EMERGENCY_KILL_DOLLARS", 1500),
+        "polls_required": _read_env_int(agent_env, "PORTFOLIO_SOFT_BREACH_POLLS_REQUIRED", 2),
+        "breach_count": int(_safe_float(state.get("soft_breach_count") if isinstance(state, dict) else 0)),
+        "soft_warning_sent": bool(state.get("soft_warning_sent")) if isinstance(state, dict) else False,
+        "trade_date": str(state.get("trade_date", "")) if isinstance(state, dict) else "",
+    }
+
+
 def bot_status_context() -> dict:
     agent_env = ROOT / "agent" / ".env"
     alpaca_paper = _read_env_flag(agent_env, "ALPACA_PAPER", "true").lower() == "true"
@@ -1340,6 +1373,35 @@ def bot_status_panel(context: dict) -> str:
     </div>"""
 
 
+def portfolio_guard_panel(context: dict) -> str:
+    active = bool(context.get("active"))
+    status_cls = "bad" if active else "good"
+    status = "ACTIVE - all bots halted" if active else "clear"
+    reason = html.escape(str(context.get("reason") or "none"))
+    triggered_at = html.escape(str(context.get("triggered_at") or ""))
+    daily_pnl = _safe_float(context.get("daily_pnl_dollars"))
+    soft = _safe_float(context.get("soft_warning_dollars"))
+    hard = _safe_float(context.get("hard_kill_dollars"))
+    emergency = _safe_float(context.get("emergency_kill_dollars"))
+    breach_count = int(_safe_float(context.get("breach_count")))
+    polls_required = int(_safe_float(context.get("polls_required"), 2))
+    trade_date = html.escape(str(context.get("trade_date") or ""))
+    soft_sent = "yes" if context.get("soft_warning_sent") else "no"
+    return f"""
+    <div class="panel">
+      <h2>Portfolio Kill Switch</h2>
+      <table>
+        <tbody>
+          <tr><th>Status</th><td class="{status_cls}"><strong>{status}</strong></td><th>Reason</th><td>{reason}</td></tr>
+          <tr><th>Triggered</th><td>{triggered_at or 'not active'}</td><th>Kill P&L</th><td class="{'bad' if daily_pnl < 0 else 'good'}">{_money(daily_pnl)}</td></tr>
+          <tr><th>Soft Warn</th><td>{_money(-abs(soft))}</td><th>Hard Kill</th><td>{_money(-abs(hard))} after {breach_count}/{polls_required} polls</td></tr>
+          <tr><th>Emergency</th><td>{_money(-abs(emergency))}</td><th>Soft Alert Sent</th><td>{soft_sent} {f'({trade_date})' if trade_date else ''}</td></tr>
+        </tbody>
+      </table>
+      <p class="footer">Portfolio halt file: {html.escape(str(context.get("kill_file", "")))}. Active halt requires manual review and deletion before trading resumes.</p>
+    </div>"""
+
+
 def kalshi_guard_blocks_panel(context: dict) -> str:
     if not context.get("available"):
         return """
@@ -1450,6 +1512,7 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
     kama_context = daily_shadow_context(KAMA_SHADOW_LOG_FILE, "KAMA QQQ Shadow")
     guard_context = guard_blocks_context()
     kalshi_guard_context = kalshi_guard_blocks_context()
+    portfolio_guard = portfolio_guard_context()
     bot_status = bot_status_context()
     equity = _safe_float(account.get("equity"))
     last_equity = _safe_float(account.get("last_equity"))
@@ -1584,6 +1647,10 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
 
   <section class="grid" style="margin-top: 14px;">
     {bot_status_panel(bot_status)}
+  </section>
+
+  <section class="grid" style="margin-top: 14px;">
+    {portfolio_guard_panel(portfolio_guard)}
   </section>
 
   <section class="grid" style="margin-top: 14px;">
