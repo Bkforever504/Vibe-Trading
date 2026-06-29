@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.market_data import fetch_close as _market_fetch_close, data_source
+from scripts.market_data import fetch_close as _market_fetch_close, data_source, fetch_vix_context
+from scripts.shadow_alerts import maybe_send_shadow_alert
 PRIMARY_SYMBOL = "QQQ"
 DEFENSIVE_SYMBOL = "GLD"
 LOOKBACK_DAYS = 40
@@ -70,6 +71,7 @@ def compute_signal_from_close(
         "strategy": "qqq_gld_40d_rotation",
         "execution_mode": "shadow_only",
         "data_source": data_source(),
+        "vix_context": fetch_vix_context(),
         "primary_symbol": PRIMARY_SYMBOL,
         "defensive_symbol": DEFENSIVE_SYMBOL,
         "selected": selected,
@@ -167,6 +169,7 @@ def main() -> int:
     entry = compute_signal_from_close(close)
     prev = load_last_entry(LOG_PATH)
     print_report(entry, prev)
+    maybe_send_shadow_alert("QQQ/GLD Rotation", entry, prev)
     log_entry(entry, LOG_PATH)
     print(f"Logged to {LOG_PATH}")
     return 0

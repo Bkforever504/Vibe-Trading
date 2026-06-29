@@ -149,3 +149,40 @@ def test_fetch_close_alpaca_handles_single_symbol_non_multiindex(monkeypatch, tm
     assert list(result.columns) == ["SPY"]
     assert result.index.tz is None
     assert result["SPY"].tolist() == [10.0, 11.0]
+
+
+def test_fetch_vix_context_parses_cboe_csv(monkeypatch) -> None:
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"DATE,OPEN,HIGH,LOW,CLOSE\n2026-06-26,17,18,16,21.34\n"
+
+    monkeypatch.setattr(market_data.urllib.request, "urlopen", lambda *args, **kwargs: FakeResponse())
+
+    context = market_data.fetch_vix_context()
+
+    assert context == {
+        "source": "cboe_vix_history",
+        "date": "2026-06-26",
+        "close": 21.34,
+        "above_20": True,
+        "regime": "elevated",
+    }
+
+
+def test_fetch_vix_context_returns_unavailable_on_error(monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise OSError("network down")
+
+    monkeypatch.setattr(market_data.urllib.request, "urlopen", fail)
+
+    context = market_data.fetch_vix_context()
+
+    assert context["available"] is False
+    assert context["source"] == "cboe_vix_history"
+    assert "network down" in context["error"]

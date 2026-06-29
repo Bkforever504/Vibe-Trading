@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.market_data import fetch_close, data_source
+from scripts.market_data import fetch_close, data_source, fetch_vix_context
+from scripts.shadow_alerts import maybe_send_shadow_alert
 
 SYMBOLS = ["SPY", "QQQ", "GLD", "XLE", "TLT", "IWM", "XLK", "XLV", "XLF", "XLI"]
 LOOKBACK_MONTHS = 12
@@ -69,6 +70,7 @@ def compute_current_signal(
         "universe": list(symbols),
         "execution_mode": "shadow_only",
         "data_source": data_source(),
+        "vix_context": fetch_vix_context(),
     }
 
 
@@ -162,7 +164,11 @@ def main() -> int:
     print("Fetching 12-month momentum data...")
     entry = compute_current_signal()
     prev = load_last_entry(LOG_PATH)
+    if prev is not None and set(prev.get("holdings", [])) != set(entry.get("holdings", [])):
+        entry["action"] = "rebalance"
+        entry["previous_holdings"] = list(prev.get("holdings", []))
     print_report(entry, prev)
+    maybe_send_shadow_alert("Momentum Rotation", entry, prev)
     log_entry(entry, LOG_PATH)
     print(f"Appended to {LOG_PATH}")
     return 0
