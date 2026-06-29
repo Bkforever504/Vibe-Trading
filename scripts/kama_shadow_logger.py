@@ -12,8 +12,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-import warnings
-from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -21,6 +19,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from scripts.market_data import fetch_ohlcv, data_source
 
 KAMA_STRATEGY_PATH = ROOT / "research" / "pine_strategy_lab" / "examples" / "kama_trend_python.py"
 
@@ -58,23 +58,6 @@ COMPARISON_PARAMS = {
 COMPARISON_CONFIDENCE = 9.1
 
 
-def fetch_ohlcv(symbol: str = SYMBOL, lookback_days: int = 520) -> pd.DataFrame:
-    try:
-        import yfinance as yf
-    except ImportError as exc:
-        raise ImportError("yfinance required: uv add yfinance") from exc
-
-    today = date.today()
-    start = (today - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-    end = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=True)
-    if df.empty:
-        raise ValueError(f"No price data for {symbol} {start}:{end}")
-    df.columns = [c.lower() if isinstance(c, str) else c[0].lower() for c in df.columns]
-    return df[["open", "high", "low", "close", "volume"]].dropna().copy()
-
 
 def compute_signal_from_ohlcv(ohlcv: pd.DataFrame, symbol: str = SYMBOL, as_of: str | None = None) -> dict:
     warmup = max(PRIMARY_PARAMS["length"], PRIMARY_PARAMS["slope_lookback"]) + 5
@@ -93,6 +76,7 @@ def compute_signal_from_ohlcv(ohlcv: pd.DataFrame, symbol: str = SYMBOL, as_of: 
         "date": as_of_date,
         "symbol": symbol,
         "execution_mode": "shadow_only",
+        "data_source": data_source(),
         "primary_setup": _setup_payload(
             name="kama_trend_fast3_slow20_slope3",
             params=PRIMARY_PARAMS,

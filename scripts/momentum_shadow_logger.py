@@ -10,12 +10,17 @@ Run once per week (Monday morning before market open is ideal).
 from __future__ import annotations
 
 import json
-import warnings
-from datetime import date, timedelta
+import sys
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.market_data import fetch_close, data_source
 
 SYMBOLS = ["SPY", "QQQ", "GLD", "XLE", "TLT", "IWM", "XLK", "XLV", "XLF", "XLI"]
 LOOKBACK_MONTHS = 12
@@ -24,34 +29,13 @@ TOP_N = 2
 LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "momentum_shadow_log.jsonl"
 
 
-def _fetch_close(symbols: list[str], start: str, end: str) -> pd.DataFrame:
-    try:
-        import yfinance as yf
-    except ImportError as exc:
-        raise ImportError("yfinance required: uv add yfinance") from exc
-    frames: dict[str, pd.Series] = {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        for sym in symbols:
-            df = yf.download(sym, start=start, end=end, progress=False, auto_adjust=True)
-            if df.empty:
-                raise ValueError(f"No price data for {sym} {start}:{end}")
-            df.columns = [c.lower() if isinstance(c, str) else c[0].lower() for c in df.columns]
-            frames[sym] = df["close"]
-    return pd.DataFrame(frames).dropna()
-
-
 def compute_current_signal(
     symbols: list[str] = SYMBOLS,
     lookback_days: int = LOOKBACK_DAYS,
     top_n: int = TOP_N,
 ) -> dict:
     today = date.today()
-    # Fetch 2× the lookback window to ensure we have enough trading days
-    # after skipping weekends and market holidays.
-    fetch_start = (today - timedelta(days=lookback_days * 2)).strftime("%Y-%m-%d")
-    fetch_end = today.strftime("%Y-%m-%d")
-    universe = _fetch_close(symbols, fetch_start, fetch_end)
+    universe = fetch_close(symbols, lookback_days=lookback_days * 2)
 
     if len(universe) < lookback_days + 5:
         raise ValueError(
@@ -84,6 +68,7 @@ def compute_current_signal(
         "top_n": TOP_N,
         "universe": list(symbols),
         "execution_mode": "shadow_only",
+        "data_source": data_source(),
     }
 
 
