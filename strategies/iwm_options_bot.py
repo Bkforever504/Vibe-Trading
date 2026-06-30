@@ -156,7 +156,7 @@ def _build_clients() -> tuple[TradingClient, OptionHistoricalDataClient]:
 
 
 # ── IV Rank (30-day HV as proxy over 252-day rolling window) ─────────────────
-def iv_rank(symbol: str) -> float:
+def _hv_proxy_iv_rank(symbol: str) -> float:
     ticker = yf.Ticker(symbol)
     hist   = ticker.history(period="1y")
     if len(hist) < 30:
@@ -171,6 +171,30 @@ def iv_rank(symbol: str) -> float:
     log.info(f"IV Rank {symbol}: {rank:.1f}  (HV30={current:.1f}, 52wk range {lo:.1f}-{hi:.1f})")
     return rank
 
+
+def iv_rank(symbol: str) -> float:
+    try:
+        from scripts.ivr_scanner import scan_symbol
+
+        scan = scan_symbol(symbol)
+        if scan.get("status") == "ok":
+            ivr = scan.get("ivr")
+            atm_iv = scan.get("current_iv_pct")
+            if ivr is not None:
+                log.info(
+                    f"IVR {symbol}: {float(ivr):.1f} "
+                    f"(ATM IV={atm_iv}%, source=alpaca_options_chain)"
+                )
+                return float(ivr)
+            log.info(
+                f"IVR {symbol}: accumulating history "
+                f"({scan.get('history_days')} readings); falling back to HV proxy"
+            )
+        else:
+            log.warning(f"IVR {symbol}: scanner unavailable ({scan.get('error')}); falling back to HV proxy")
+    except Exception as exc:
+        log.warning(f"IVR {symbol}: scanner failed ({exc}); falling back to HV proxy")
+    return _hv_proxy_iv_rank(symbol)
 
 # ── Earnings check ────────────────────────────────────────────────────────────
 def _has_earnings_soon(symbol: str, days: int = EARNINGS_SKIP_DAYS) -> bool:
@@ -1747,3 +1771,4 @@ if __name__ == "__main__":
     else:
         sym_list = [args.symbol.upper()] if args.symbol else None
         main(strategy=args.strategy, symbols=sym_list)
+
