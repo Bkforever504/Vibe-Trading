@@ -156,6 +156,19 @@ def score_trader(profile: TraderProfile) -> ScoredTrader:
     reasons: list[str] = []
     flags: list[str] = []
 
+    if profile.source == "public_leaderboard":
+        flags.append("missing exported trade history")
+        if profile.win_rate <= 0:
+            flags.append("public leaderboard lacks win rate")
+    if (
+        profile.source == "public_wallet"
+        and profile.trades >= 100
+        and profile.win_rate <= 0
+        and profile.realized_pnl == 0
+        and profile.profit_factor <= 0
+    ):
+        flags.append("unmeasurable pnl history")
+
     if profile.verified:
         score += 2
         reasons.append("verified history")
@@ -192,9 +205,14 @@ def score_trader(profile: TraderProfile) -> ScoredTrader:
     elif profile.avg_leverage >= 10:
         flags.append("high leverage")
 
-    if profile.source in {"public_wallet", "exported_history"}:
+    if profile.source in {"public_wallet", "exported_history", "public_profile"}:
         score += 1
-        reasons.append("public wallet history" if profile.source == "public_wallet" else "exported history")
+        if profile.source == "public_wallet":
+            reasons.append("public wallet history")
+        elif profile.source == "public_profile":
+            reasons.append("public profile history")
+        else:
+            reasons.append("exported history")
 
     diligence_score = 0
     if profile.pnl_smoothness >= 0.70:
@@ -238,7 +256,10 @@ def score_trader(profile: TraderProfile) -> ScoredTrader:
     if flags:
         score = max(0, score - len(flags))
 
-    status = "paper_watch" if score >= 7 and not flags else "review" if score >= 5 else "reject"
+    if "unmeasurable pnl history" in flags:
+        status = "reject"
+    else:
+        status = "paper_watch" if score >= 7 and not flags else "review" if score >= 5 else "reject"
     confidence = min(score, 10)
     conviction_score = min(max(score + min(diligence_score, 3), 0), 10)
     suggested_copy_size = 0.0
@@ -271,6 +292,25 @@ def kelly_fraction(profile: TraderProfile) -> float:
         return 0.0
     fraction = win_rate - ((1.0 - win_rate) / profile.profit_factor)
     return round(max(0.0, min(fraction, 1.0)), 4)
+
+
+def _rejection_guidance(flags: list[str]) -> list[str]:
+    guidance_map = {
+        "sample too small": "Need: 30+ trades minimum, 100+ preferred",
+        "choppy pnl curve": "Need: pnl_smoothness >= 0.70 (linear equity growth)",
+        "unverified social data": "Need: exported broker history or verified public wallet",
+        "large drawdown": "Need: max drawdown under 15%, never over 30%",
+        "high leverage": "Need: low/no leverage history before copy consideration",
+        "too few green months": "Need: 5+ green months or at least 65% positive months",
+        "weak month-to-month consistency": "Need: monthly_consistency >= 0.65",
+        "large losing month": "Need: no month worse than -10% of tracked notional",
+        "edge too small after fees": "Need: avg_edge_per_trade >= 0.02 and fee_adjusted_return >= 0.08",
+        "overtrading risk": "Need: selective or moderate trade cadence",
+        "missing exported trade history": "Need: exported fills/history before paper-copy approval",
+        "public leaderboard lacks win rate": "Need: measurable win rate from exported fills or public trade history",
+        "unmeasurable pnl history": "Need: realized P&L, win rate, and profit factor before copy consideration",
+    }
+    return [guidance_map.get(flag, f"Review required: {flag}") for flag in flags]
 
 
 def build_basket_consensus(
@@ -367,6 +407,18 @@ def build_report(
 ) -> dict[str, Any]:
     scored = [score_trader(profile) for profile in profiles if profile.handle]
     scored.sort(key=lambda item: (item.confidence, item.realized_pnl, item.trades), reverse=True)
+    rejected = [
+        {
+            "handle": item.handle,
+            "platform": item.platform,
+            "confidence": item.confidence,
+            "status": item.status,
+            "risk_flags": item.risk_flags,
+            "what_would_help": _rejection_guidance(item.risk_flags),
+        }
+        for item in scored
+        if item.status == "reject"
+    ]
     profile_by_key = {(profile.platform, profile.handle): profile for profile in profiles}
     paper_signals = []
     for signal in signals or []:
@@ -381,6 +433,8 @@ def build_report(
         "execution_enabled": False,
         "watched_count": len(scored),
         "watched_traders": [asdict(item) for item in scored],
+        "rejected_count": len(rejected),
+        "rejected_traders": rejected,
         "paper_signal_count": len(paper_signals),
         "paper_signals": paper_signals,
         "basket_consensus_count": len(basket),

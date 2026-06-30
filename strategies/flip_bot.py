@@ -36,15 +36,19 @@ from pathlib import Path
 from uuid import uuid4
 
 import socket
+import pandas as pd
 import requests as req
 from dotenv import load_dotenv
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 socket.setdefaulttimeout(25)  # prevent yfinance from hanging Task Scheduler
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
+    from execution_guard import evaluate_execution
 except ModuleNotFoundError:
     from strategies.risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
+    from strategies.execution_guard import evaluate_execution
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "agent", ".env"))
 
@@ -72,6 +76,7 @@ PAPER  = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 BASE   = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.markets"
 HDR    = {"APCA-API-KEY-ID": KEY, "APCA-API-SECRET-KEY": SECRET, "Content-Type": "application/json"}
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL", "")
+LIVE_EXECUTION_ENABLED = os.getenv("FLIP_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
 
 # ── State ─────────────────────────────────────────────────────────────────────
 STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\flip-trades.json"))
@@ -85,7 +90,7 @@ STOP_MULT         = 0.50   # entry * 0.50 = stop   (-50%)
 GAP_THRESHOLD     = 0.0075
 VOLUME_SPIKE      = 2.5
 MAX_OPEN_FLIPS    = 2
-BEAR_TREND_MIN_CONFIDENCE = 8
+BEAR_TREND_MIN_CONFIDENCE = 8.5  # matches ExecutionGuardConfig.min_confidence default
 BEAR_TREND_MAX_VWAP_EXT   = 0.015
 BEAR_TREND_MIN_BARS       = 55
 
@@ -351,6 +356,50 @@ def _option_mid(occ_symbol: str) -> float:
         return 0.0
 
 
+def _option_bid_ask_spread_cents(occ_symbol: str) -> int | None:
+    """Return bid-ask spread in cents, or None if unavailable."""
+    try:
+        r = req.get(
+            "https://data.alpaca.markets/v1beta1/options/snapshots",
+            headers=HDR, params={"symbols": occ_symbol}, timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        snap  = r.json().get("snapshots", {}).get(occ_symbol, {})
+        quote = snap.get("latestQuote", {})
+        bid   = float(quote.get("bp", 0) or 0)
+        ask   = float(quote.get("ap", 0) or 0)
+        if bid > 0 and ask > 0:
+            return int(round((ask - bid) * 100))
+        return None
+    except Exception:
+        return None
+
+
+def _extract_underlying(sym: str) -> str:
+    """Return underlying ticker from OCC option symbol or equity symbol as-is."""
+    for i, ch in enumerate(sym):
+        if ch.isdigit():
+            return sym[:i]
+    return sym
+
+
+def _fetch_broker_open_symbols() -> set[str]:
+    """Fetch open positions from Alpaca and return underlying tickers (broker truth)."""
+    try:
+        r = req.get(f"{BASE}/v2/positions", headers=HDR, timeout=10)
+        if r.status_code == 200:
+            positions = r.json()
+            if isinstance(positions, list):
+                syms = {_extract_underlying(str(p.get("symbol", ""))) for p in positions if p.get("symbol")}
+                syms.discard("")
+                log.info(f"Broker open position underlyings: {sorted(syms)}")
+                return syms
+    except Exception as exc:
+        log.warning(f"Broker positions fetch failed: {exc}")
+    return set()
+
+
 def _vwap_50ema_bull_signal(hist, sym: str = "?") -> dict | None:
     if hist is None or len(hist) < BEAR_TREND_MIN_BARS:
         return None
@@ -499,6 +548,7 @@ def find_0dte(account: float) -> dict | None:
         "contracts": contracts, "entry_price_est": px,
         "catalyst": catalyst[1] if catalyst else _trigger,
         "hard_close_date": str(today), "hard_close_time": "13:45",
+        "spread_cents": _option_bid_ask_spread_cents(occ),
     }
 
 
@@ -603,6 +653,7 @@ def find_bear_trend_day(account: float) -> dict | None:
             "hard_close_date": str(date.today()),
             "hard_close_time": "13:45",
             "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text} | ORB={orb_dir}",
+            "spread_cents": _option_bid_ask_spread_cents(occ),
         }
 
     # ATM put too expensive for budget — try bear put debit spread
@@ -641,6 +692,74 @@ def find_bear_trend_day(account: float) -> dict | None:
     return None
 
 
+def _bull_call_spread(sym: str, exp: str, atm_strike: float, max_risk: float) -> tuple[float, float, float] | None:
+    """Find narrowest bull call spread (buy ATM, sell OTM) whose net debit fits max_risk per contract.
+    Returns (net_debit, long_strike, short_strike) or None."""
+    try:
+        t = yf.Ticker(sym)
+        chain = t.option_chain(exp)
+        calls = chain.calls
+        if calls.empty:
+            return None
+        for width in [2, 3, 5, 7, 10]:
+            short_target = atm_strike + width
+            long_rows  = calls[abs(calls["strike"] - atm_strike)   < 0.6]
+            short_rows = calls[abs(calls["strike"] - short_target) < 0.6]
+            if long_rows.empty or short_rows.empty:
+                continue
+            long_ask  = float(long_rows["ask"].iloc[0])
+            short_bid = float(short_rows["bid"].iloc[0])
+            if long_ask <= 0 or short_bid < 0:
+                continue
+            net_debit = round(long_ask - short_bid, 3)
+            if net_debit <= 0:
+                continue
+            if net_debit * 100 <= max_risk:
+                return (net_debit, float(long_rows["strike"].iloc[0]), float(short_rows["strike"].iloc[0]))
+        return None
+    except Exception as exc:
+        log.warning(f"Bull call spread lookup failed: {exc}")
+        return None
+
+
+def _ttm_squeeze_context(hist) -> dict:
+    """Compute TTM Squeeze context for logging only. It never gates entries."""
+    if hist is None or len(hist) < 25:
+        return {"available": False, "reason": "insufficient_bars"}
+    try:
+        from scripts.ttm_squeeze_shadow_logger import compute_squeeze
+
+        df = hist.rename(columns={c: str(c).lower() for c in hist.columns}).copy()
+        required = {"high", "low", "close"}
+        if not required.issubset(set(df.columns)):
+            return {"available": False, "reason": "missing_ohlc"}
+        sqz = compute_squeeze(df)
+        row = sqz.iloc[-1]
+        prev = sqz.iloc[-2]
+        if bool(row.get("sqz_on")):
+            state = "on"
+        elif bool(row.get("sqz_off")):
+            state = "off"
+        else:
+            state = "none"
+        momentum = row.get("momentum")
+        prev_momentum = prev.get("momentum")
+        first_release = bool(prev.get("sqz_on")) and bool(row.get("sqz_off"))
+        return {
+            "available": True,
+            "state": state,
+            "first_release": first_release,
+            "momentum": round(float(momentum), 4) if not pd.isna(momentum) else None,
+            "momentum_rising": (
+                not pd.isna(momentum)
+                and not pd.isna(prev_momentum)
+                and float(momentum) > float(prev_momentum)
+            ),
+        }
+    except Exception as exc:
+        return {"available": False, "reason": str(exc)[:120]}
+
+
 def find_bull_trend_day(account: float) -> dict | None:
     now_et = _now_et()
     if now_et.time() >= BEAR_TREND_ENTRY_CUTOFF_ET:
@@ -652,7 +771,8 @@ def find_bull_trend_day(account: float) -> dict | None:
         return None
 
     leaders = ["SPY", "QQQ", "IWM"]
-    signals = {sym: _vwap_50ema_bull_signal(_intraday_bars(sym), sym) for sym in leaders}
+    bars = {sym: _intraday_bars(sym) for sym in leaders}
+    signals = {sym: _vwap_50ema_bull_signal(bars.get(sym), sym) for sym in leaders}
     valid = {sym: sig for sym, sig in signals.items() if sig and sig["score"] >= BEAR_TREND_MIN_CONFIDENCE}
     scores_str = " | ".join(
         f"{sym}={sig['score']}/10" if sig else f"{sym}=no_data"
@@ -663,6 +783,15 @@ def find_bull_trend_day(account: float) -> dict | None:
         return None
 
     signal = valid.get("SPY") or next(iter(valid.values()))
+    reason_text = ", ".join(signal["reasons"])
+    squeeze = _ttm_squeeze_context(bars.get("SPY"))
+    log.info(
+        "Bull trend TTM context: "
+        f"state={squeeze.get('state', 'unavailable')} "
+        f"release={squeeze.get('first_release')} "
+        f"momentum={squeeze.get('momentum')}"
+    )
+
     occ, strike, px, exp = _atm_option("SPY", "CALL")
     if not occ or px <= 0:
         log.info("Bull trend: could not find SPY ATM call - skip")
@@ -670,24 +799,66 @@ def find_bull_trend_day(account: float) -> dict | None:
 
     max_risk = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
-    if contracts < 1:
-        log.info(f"Bull trend: can't afford 1 SPY call at ${px:.2f} (budget ${max_risk:.0f})")
-        return None
 
-    return {
-        "strategy": "bull_trend",
-        "symbol": "SPY",
-        "right": "CALL",
-        "option_symbol": occ,
-        "strike": strike,
-        "expiry": exp,
-        "contracts": contracts,
-        "entry_price_est": px,
-        "confidence": signal["score"],
-        "hard_close_date": str(date.today()),
-        "hard_close_time": "13:45",
-        "catalyst": f"VWAP/50EMA bull trend {signal['score']}/10: {', '.join(signal['reasons'])}",
-    }
+    if contracts >= 1:
+        return {
+            "strategy": "bull_trend",
+            "symbol": "SPY",
+            "right": "CALL",
+            "option_symbol": occ,
+            "strike": strike,
+            "expiry": exp,
+            "contracts": contracts,
+            "entry_price_est": px,
+            "confidence": signal["score"],
+            "hard_close_date": str(date.today()),
+            "hard_close_time": "13:45",
+            "catalyst": (
+                f"VWAP/50EMA bull trend {signal['score']}/10: {reason_text} | "
+                f"TTM={squeeze.get('state', 'unavailable')}"
+            ),
+            "spread_cents": _option_bid_ask_spread_cents(occ),
+            "ttm_squeeze": squeeze,
+        }
+
+    # ATM call too expensive for budget — try bull call debit spread
+    log.info(f"Bull trend: SPY call ${px:.2f} exceeds budget ${max_risk:.0f} — trying bull call spread")
+    spread = _bull_call_spread("SPY", exp, strike, max_risk)
+    if spread:
+        net_debit, long_strike, short_strike = spread
+        spread_contracts = min(int(max_risk // (net_debit * 100)), MAX_CONTRACTS)
+        if spread_contracts >= 1:
+            long_occ  = _occ("SPY", exp, "CALL", long_strike)
+            short_occ = _occ("SPY", exp, "CALL", short_strike)
+            log.info(
+                f"Bull trend: spread {long_strike:.0f}/{short_strike:.0f}C "
+                f"net_debit=${net_debit:.2f} x{spread_contracts}"
+            )
+            return {
+                "strategy": "bull_trend_spread",
+                "symbol": "SPY",
+                "right": "CALL",
+                "option_symbol": long_occ,
+                "short_option_symbol": short_occ,
+                "strike": long_strike,
+                "short_strike": short_strike,
+                "expiry": exp,
+                "contracts": spread_contracts,
+                "entry_price_est": net_debit,
+                "max_loss": round(net_debit * spread_contracts * 100, 2),
+                "max_gain": round((short_strike - long_strike - net_debit) * spread_contracts * 100, 2),
+                "confidence": signal["score"],
+                "hard_close_date": str(date.today()),
+                "hard_close_time": "13:45",
+                "catalyst": (
+                    f"VWAP/50EMA bull spread {signal['score']}/10: {reason_text} | "
+                    f"TTM={squeeze.get('state', 'unavailable')}"
+                ),
+                "ttm_squeeze": squeeze,
+            }
+
+    log.info(f"Bull trend: no spread fits budget ${max_risk:.0f} — skip")
+    return None
 
 
 def find_earnings(account: float) -> list[dict]:
@@ -993,10 +1164,39 @@ def run_entry(account: float) -> None:
         log.info("No flip setup today — waiting")
         return
 
+    broker_symbols = _fetch_broker_open_symbols()
     trades = _load()
     for setup in candidates:
         max_notional = account * MAX_RISK_PCT
         is_spread = bool(setup.get("short_option_symbol"))
+        estimated_notional = float(setup.get("entry_price_est", 0.0) or 0.0) * int(setup.get("contracts", 0) or 0) * 100
+        confidence = setup.get("confidence", setup.get("score"))
+        local_open_symbols = {t.get("symbol", "") for t in open_trades + trades if t.get("status") == "open"}
+        decision = evaluate_execution(
+            bot="flip",
+            symbol=setup.get("symbol", ""),
+            action="entry",
+            paper=PAPER,
+            live_enabled=LIVE_EXECUTION_ENABLED,
+            confidence=float(confidence) if confidence is not None else None,
+            estimated_notional=estimated_notional,
+            max_notional=max_notional,
+            contracts=int(setup.get("contracts", 0) or 0),
+            max_contracts=MAX_CONTRACTS,
+            block_file=DEFAULT_BLOCK_FILE,
+            spread_cents=setup.get("spread_cents"),
+            open_symbols=local_open_symbols | broker_symbols,
+        )
+        if not decision.allowed:
+            log.warning(
+                f"EXECUTION BLOCKED {setup.get('symbol')} {setup.get('strategy')}: "
+                f"{decision.reason} details={decision.details}"
+            )
+            _alert(
+                f"ORDER BLOCKED {setup.get('symbol')} {setup.get('strategy')}\n"
+                f"reason={decision.reason}"
+            )
+            continue
         if is_spread:
             resp = _submit_spread(setup, max_notional=max_notional)
         else:

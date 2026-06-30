@@ -43,9 +43,9 @@ def should_alert(entry: dict, prev: dict | None) -> bool:
 
 def _entry_actions(entry: dict) -> list[tuple[str, dict]]:
     found: list[tuple[str, dict]] = []
-    for key in ("primary_setup", "comparison_setup"):
+    for key in ("primary_setup", "comparison_setup", "primary", "comparison"):
         setup = entry.get(key)
-        if isinstance(setup, dict) and setup.get("action") == "enter_long":
+        if isinstance(setup, dict) and str(setup.get("action", "")).startswith("enter_"):
             found.append((key, setup))
     return found
 
@@ -63,8 +63,9 @@ def format_alert(strategy_name: str, entry: dict) -> str:
 
     for key, setup in _entry_actions(entry):
         symbol = setup.get("symbol") or entry.get("symbol") or entry.get("primary_symbol") or ""
+        name = setup.get("name") or setup.get("strategy") or key
         lines.append(
-            f"{key}: `{setup.get('name')}` `{symbol}` action=`{setup.get('action')}` "
+            f"{key}: `{name}` `{symbol}` action=`{setup.get('action')}` "
             f"conf=`{setup.get('confidence')}`"
         )
 
