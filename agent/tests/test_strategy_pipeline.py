@@ -2,6 +2,7 @@ import copy
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 from research.strategy_language import interpret_description
 from research.strategy_pipeline import packet_id, validate_packet
@@ -140,3 +141,15 @@ def test_cli_intake_returns_needs_rules_without_inventing_fields(tmp_path):
     assert payload["execution_enabled"] is False
     assert payload["can_submit_orders"] is False
     assert list(tmp_path.iterdir()) == []
+
+
+def test_strat_packet_links_existing_shadow_implementation():
+    packet = json.loads(
+        Path("research/strategy_packets/strat_30m_continuation_v1.json").read_text(encoding="utf-8")
+    )
+    assert validate_packet(packet).valid is True
+    assert packet["adapter"]["module"] == "strategies.strat_30m_continuation"
+    assert packet["adapter"]["callable"] == "evaluate_strat_30m"
+    assert packet["monitor"]["script"] == "scripts/strat_30m_continuation_shadow.py"
+    assert packet["authority"]["mode"] == "research_only"
+    assert packet["research"]["evidence_type"] == "underlying_counterfactual"
