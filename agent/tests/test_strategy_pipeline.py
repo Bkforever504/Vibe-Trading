@@ -1,0 +1,100 @@
+import copy
+
+from research.strategy_language import interpret_description
+from research.strategy_pipeline import packet_id, validate_packet
+
+
+def _packet():
+    return {
+        "schema_version": 1,
+        "name": "SPY 30m continuation",
+        "thesis": "Enter after a confirmed first-30-minute range break.",
+        "market": {
+            "asset_class": "equity_options",
+            "symbols": ["SPY"],
+            "timeframe": "1m",
+            "timezone": "America/New_York",
+        },
+        "rules": {
+            "setup": "completed 30-minute opening range",
+            "entry": "close above opening-range high",
+            "stop": "opening-range low",
+            "targets": ["2R"],
+            "exit": "stop, target, or 15:45 ET",
+            "sizing": "fixed paper unit",
+            "session": "09:30-15:45 ET",
+        },
+        "data": {"bars": ["1m", "1d"], "point_in_time_required": True},
+        "research": {
+            "dataset_start": "2025-01-01",
+            "dataset_end": "2025-12-31",
+            "oos_start": "2025-10-01",
+            "oos_end": "2025-12-31",
+            "benchmark": "SPY",
+            "cost_model": "options_quote_mid_plus_half_spread",
+        },
+        "provenance": {"original_prompt": "explicit test prompt", "source": "test"},
+        "authority": {
+            "mode": "research_only",
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "promotion_requires_human_approval": True,
+        },
+    }
+
+
+def test_packet_id_is_stable_and_ignores_runtime_metadata():
+    left = _packet()
+    right = {**_packet(), "created_at": "2026-07-15T18:00:00Z"}
+    assert packet_id(left) == packet_id(right)
+
+
+def test_rule_change_creates_new_packet_id():
+    changed = copy.deepcopy(_packet())
+    changed["rules"]["targets"] = ["3R"]
+    assert packet_id(_packet()) != packet_id(changed)
+
+
+def test_missing_stop_fails_closed():
+    packet = _packet()
+    packet["rules"]["stop"] = ""
+    result = validate_packet(packet)
+    assert result.valid is False
+    assert "missing_rules.stop" in result.errors
+
+
+def test_authority_must_be_research_only():
+    packet = _packet()
+    packet["authority"]["execution_enabled"] = True
+    result = validate_packet(packet)
+    assert result.valid is False
+    assert "authority.execution_enabled_must_be_false" in result.errors
+
+
+def test_explicit_labeled_description_builds_complete_rules():
+    result = interpret_description(
+        "symbol: SPY; timeframe: 1m; setup: first 30 minute range complete; "
+        "entry: close above range high; stop: range low; target: 2R; "
+        "exit: stop, target, or 15:45 ET; sizing: fixed paper unit; "
+        "session: 09:30-15:45 ET"
+    )
+    assert result.status == "ready_for_validation"
+    assert result.fields["symbols"] == ["SPY"]
+    assert result.fields["rules"]["targets"] == ["2R"]
+
+
+def test_unlabeled_promo_language_never_invents_risk_rules():
+    result = interpret_description("Buy SPY calls when it looks ready to explode.")
+    assert result.status == "needs_rules"
+    assert "stop" in result.missing_fields
+    assert "exit" in result.missing_fields
+    assert result.fields.get("stop") is None
+
+
+def test_unknown_clause_is_preserved_as_ambiguity():
+    result = interpret_description(
+        "symbol: SPY; timeframe: 1m; setup: range; entry: break; stop: low; "
+        "target: 2R; exit: target or stop; sizing: fixed; session: regular; magic: high"
+    )
+    assert result.status == "needs_rules"
+    assert result.ambiguities == ("unsupported_clause.magic",)
