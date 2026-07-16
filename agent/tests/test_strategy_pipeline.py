@@ -1,4 +1,7 @@
 import copy
+import json
+import subprocess
+import sys
 
 from research.strategy_language import interpret_description
 from research.strategy_pipeline import packet_id, validate_packet
@@ -98,3 +101,42 @@ def test_unknown_clause_is_preserved_as_ambiguity():
     )
     assert result.status == "needs_rules"
     assert result.ambiguities == ("unsupported_clause.magic",)
+
+
+def test_cli_has_no_live_or_execute_command():
+    result = subprocess.run(
+        [sys.executable, "scripts/strategy_pipeline.py", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "intake" in result.stdout
+    assert "validate" in result.stdout
+    assert "run" in result.stdout
+    assert " live" not in result.stdout.lower()
+    assert "execute" not in result.stdout.lower()
+
+
+def test_cli_intake_returns_needs_rules_without_inventing_fields(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/strategy_pipeline.py",
+            "intake",
+            "--describe",
+            "Buy SPY calls when ready",
+            "--name",
+            "draft",
+            "--out-dir",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    payload = json.loads(result.stdout)
+    assert result.returncode == 2
+    assert payload["status"] == "needs_rules"
+    assert payload["execution_enabled"] is False
+    assert payload["can_submit_orders"] is False
+    assert list(tmp_path.iterdir()) == []
