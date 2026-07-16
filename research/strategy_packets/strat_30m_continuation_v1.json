@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "name": "The Strat 30-Minute Continuation Shadow",
+  "thesis": "A completed first-30-minute range break that also clears the prior-day extreme and agrees with full-timeframe continuity may identify a directional 60-minute underlying move without chasing the opening candle.",
+  "market": {
+    "asset_class": "equity_options_research_proxy",
+    "symbols": [
+      "SPY",
+      "QQQ",
+      "GOOGL",
+      "AMZN",
+      "NVDA",
+      "AAPL",
+      "MSFT",
+      "META",
+      "TSLA",
+      "AMD"
+    ],
+    "timeframe": "1m_with_daily_context",
+    "timezone": "America/New_York"
+  },
+  "rules": {
+    "setup": "Use at least four completed daily bars, classify the prior two daily bars as 1, 2U, 2D, or 3, and wait for the regular-session 09:30-09:59 ET opening range to complete.",
+    "entry": "After 10:00 ET, record a call proxy on the first bar that exceeds both the opening-range high and prior-day high with close above day, week, and month opens; record a put proxy on the symmetric downside condition.",
+    "stop": "Use the opposite side of the completed 30-minute opening range as the underlying invalidation level.",
+    "targets": [
+      "First favorable prior-week extreme when available",
+      "Otherwise leave first-level target unavailable rather than inventing one"
+    ],
+    "exit": "Evaluate the underlying counterfactual over a fixed 60-minute horizon and record MFE and MAE; this packet does not claim an option fill or live exit.",
+    "sizing": "One shadow observation per unique symbol, direction, and trigger timestamp; zero contracts and zero broker notional.",
+    "session": "Regular session only, opening range 09:30-09:59 ET and trigger window 10:00-15:59 ET."
+  },
+  "data": {
+    "bars": [
+      "1m regular-session OHLCV",
+      "completed 1d OHLCV"
+    ],
+    "point_in_time_required": true,
+    "option_quotes_required_for_option_pnl": true,
+    "stale_data_fallback_allowed": false
+  },
+  "research": {
+    "dataset_start": "2026-07-15",
+    "dataset_end": "2026-12-31",
+    "oos_start": "2026-07-15",
+    "oos_end": "2026-12-31",
+    "benchmark": "directional SPY underlying move over the same 60-minute horizon",
+    "cost_model": "underlying_counterfactual_only_no_option_fill_or_pnl",
+    "evidence_type": "underlying_counterfactual",
+    "minimum_forward_signals": 50,
+    "minimum_trading_days": 20,
+    "positive_expectancy_required": true,
+    "option_level_promotion_blocker": "Point-in-time option quotes and executable fill assumptions are required before any option-return claim."
+  },
+  "adapter": {
+    "kind": "linked_shadow_evaluator",
+    "module": "strategies.strat_30m_continuation",
+    "callable": "evaluate_strat_30m"
+  },
+  "monitor": {
+    "script": "scripts/strat_30m_continuation_shadow.py",
+    "log_path": "data/strat_30m_continuation_shadow_log.jsonl",
+    "report_path": "~/.vibe-trading/reports/strat-30m-continuation-shadow.json"
+  },
+  "provenance": {
+    "original_prompt": "Link the existing The Strat 30-minute continuation shadow strategy to the canonical strategy pipeline without duplicating its logic.",
+    "source": "local_existing_strategy",
+    "implementation_path": "strategies/strat_30m_continuation.py",
+    "monitor_path": "scripts/strat_30m_continuation_shadow.py"
+  },
+  "authority": {
+    "mode": "research_only",
+    "execution_enabled": false,
+    "can_submit_orders": false,
+    "promotion_requires_human_approval": true
+  }
+}
