@@ -1,0 +1,232 @@
+{
+  "preregistration": "research/MES_SMC_PREREGISTRATION_2026-07-19.md",
+  "dataset": "mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "sessions": 1148,
+  "development_sessions": 803,
+  "selection_sessions": 172,
+  "final_sessions": 173,
+  "configs": {
+    "sweep_fade_rr1.5": {
+      "development_regimes": [
+        {
+          "trades": 101,
+          "total_pnl": -119.23,
+          "expectancy": -1.18,
+          "win_rate": 0.4356,
+          "profit_factor": 0.962,
+          "max_drawdown": 748.5
+        },
+        {
+          "trades": 105,
+          "total_pnl": 55.85,
+          "expectancy": 0.53,
+          "win_rate": 0.4476,
+          "profit_factor": 1.0181,
+          "max_drawdown": 440.69
+        },
+        {
+          "trades": 117,
+          "total_pnl": -1012.66,
+          "expectancy": -8.66,
+          "win_rate": 0.359,
+          "profit_factor": 0.7407,
+          "max_drawdown": 1097.72
+        }
+      ],
+      "development": {
+        "trades": 323,
+        "total_pnl": -1076.04,
+        "expectancy": -3.33,
+        "win_rate": 0.4118,
+        "profit_factor": 0.8937,
+        "max_drawdown": 1405.01
+      },
+      "development_pass": false
+    },
+    "sweep_fade_rr2.0": {
+      "development_regimes": [
+        {
+          "trades": 101,
+          "total_pnl": -94.23,
+          "expectancy": -0.93,
+          "win_rate": 0.3663,
+          "profit_factor": 0.9732,
+          "max_drawdown": 868.92
+        },
+        {
+          "trades": 105,
+          "total_pnl": -71.65,
+          "expectancy": -0.68,
+          "win_rate": 0.3905,
+          "profit_factor": 0.9787,
+          "max_drawdown": 650.35
+        },
+        {
+          "trades": 117,
+          "total_pnl": -1120.16,
+          "expectancy": -9.57,
+          "win_rate": 0.3077,
+          "profit_factor": 0.7356,
+          "max_drawdown": 1255.22
+        }
+      ],
+      "development": {
+        "trades": 323,
+        "total_pnl": -1286.04,
+        "expectancy": -3.98,
+        "win_rate": 0.3529,
+        "profit_factor": 0.8844,
+        "max_drawdown": 1640.01
+      },
+      "development_pass": false
+    },
+    "fvg_gap4_rr1.5": {
+      "development_regimes": [
+        {
+          "trades": 247,
+          "total_pnl": 749.94,
+          "expectancy": 3.04,
+          "win_rate": 0.4656,
+          "profit_factor": 1.1053,
+          "max_drawdown": 1112.53
+        },
+        {
+          "trades": 218,
+          "total_pnl": 971.86,
+          "expectancy": 4.46,
+          "win_rate": 0.4725,
+          "profit_factor": 1.1637,
+          "max_drawdown": 502.61
+        },
+        {
+          "trades": 231,
+          "total_pnl": -386.63,
+          "expectancy": -1.67,
+          "win_rate": 0.4329,
+          "profit_factor": 0.9446,
+          "max_drawdown": 1132.43
+        }
+      ],
+      "development": {
+        "trades": 696,
+        "total_pnl": 1335.17,
+        "expectancy": 1.92,
+        "win_rate": 0.4569,
+        "profit_factor": 1.0666,
+        "max_drawdown": 1132.43
+      },
+      "development_pass": false
+    },
+    "fvg_gap4_rr2.0": {
+      "development_regimes": [
+        {
+          "trades": 247,
+          "total_pnl": -94.44,
+          "expectancy": -0.38,
+          "win_rate": 0.3684,
+          "profit_factor": 0.9888,
+          "max_drawdown": 1482.35
+        },
+        {
+          "trades": 218,
+          "total_pnl": 1061.86,
+          "expectancy": 4.87,
+          "win_rate": 0.4128,
+          "profit_factor": 1.1647,
+          "max_drawdown": 528.13
+        },
+        {
+          "trades": 231,
+          "total_pnl": -449.13,
+          "expectancy": -1.94,
+          "win_rate": 0.3766,
+          "profit_factor": 0.9416,
+          "max_drawdown": 1247.05
+        }
+      ],
+      "development": {
+        "trades": 696,
+        "total_pnl": 518.29,
+        "expectancy": 0.74,
+        "win_rate": 0.3851,
+        "profit_factor": 1.023,
+        "max_drawdown": 1482.35
+      },
+      "development_pass": false
+    },
+    "fvg_gap8_rr1.5": {
+      "development_regimes": [
+        {
+          "trades": 221,
+          "total_pnl": -469.96,
+          "expectancy": -2.13,
+          "win_rate": 0.4253,
+          "profit_factor": 0.9323,
+          "max_drawdown": 1446.06
+        },
+        {
+          "trades": 169,
+          "total_pnl": 27.75,
+          "expectancy": 0.16,
+          "win_rate": 0.4497,
+          "profit_factor": 1.0056,
+          "max_drawdown": 589.87
+        },
+        {
+          "trades": 182,
+          "total_pnl": -962.61,
+          "expectancy": -5.29,
+          "win_rate": 0.3956,
+          "profit_factor": 0.8345,
+          "max_drawdown": 1048.91
+        }
+      ],
+      "development": {
+        "trades": 572,
+        "total_pnl": -1404.81,
+        "expectancy": -2.46,
+        "win_rate": 0.4231,
+        "profit_factor": 0.9206,
+        "max_drawdown": 2484.96
+      },
+      "development_pass": false
+    },
+    "fvg_gap8_rr2.0": {
+      "development_regimes": [
+        {
+          "trades": 221,
+          "total_pnl": -914.33,
+          "expectancy": -4.14,
+          "win_rate": 0.3439,
+          "profit_factor": 0.8847,
+          "max_drawdown": 1640.43
+        },
+        {
+          "trades": 169,
+          "total_pnl": 327.13,
+          "expectancy": 1.94,
+          "win_rate": 0.4083,
+          "profit_factor": 1.0619,
+          "max_drawdown": 504.38
+        },
+        {
+          "trades": 182,
+          "total_pnl": -734.49,
+          "expectancy": -4.04,
+          "win_rate": 0.3516,
+          "profit_factor": 0.8826,
+          "max_drawdown": 973.01
+        }
+      ],
+      "development": {
+        "trades": 572,
+        "total_pnl": -1321.69,
+        "expectancy": -2.31,
+        "win_rate": 0.3654,
+        "profit_factor": 0.9321,
+        "max_drawdown": 2142.81
+      },
+      "development_pass": false
+    }
+  }
+}
