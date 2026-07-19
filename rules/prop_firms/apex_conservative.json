@@ -1,0 +1,23 @@
+{
+  "firm": "Apex Trader Funding",
+  "account_type": "Conservative placeholder",
+  "verified_as_of": "2026-06-21",
+  "automation": {
+    "allowed": false,
+    "status": "blocked_until_official_rules_verified",
+    "requires_local_device": true,
+    "notes": "Use blocked-by-default posture until Kenny verifies current official Apex automation rules in the member/help center."
+  },
+  "risk": {
+    "max_daily_loss": 1000,
+    "max_trailing_drawdown": 2500,
+    "max_contracts": 5
+  },
+  "consistency": {
+    "enabled": true,
+    "max_best_day_pct": 0.3,
+    "notes": "Placeholder. Must be replaced with exact current account rules before use."
+  },
+  "unknown_rules_block": true,
+  "sources": []
+}

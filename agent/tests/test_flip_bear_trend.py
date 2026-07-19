@@ -27,8 +27,20 @@ def test_bear_trend_candidate_uses_vwap_and_50ema(monkeypatch) -> None:
     _et = timezone(timedelta(hours=-4))
     monkeypatch.setattr(flip_bot, "_now_et", lambda: datetime(2026, 6, 24, 10, 30, tzinfo=_et))
 
-    closes = [100 - i * 0.05 for i in range(65)] + [97.0, 97.1, 97.0, 96.9, 96.8]
+    closes = [100 - i * 0.05 for i in range(65)] + [97.0, 97.4, 97.2, 97.0, 96.8]
     monkeypatch.setattr(flip_bot, "_intraday_bars", lambda symbol: _bars(closes))
+    monkeypatch.setattr(
+        flip_bot,
+        "_orb_breakout_retest_signal",
+        lambda symbol: {
+            "orb_high": 100.5,
+            "orb_low": 99.3,
+            "direction": "bear",
+            "entry_ready": True,
+            "retest_status": "retest_confirmed_fresh",
+            "retest_age_bars": 1,
+        },
+    )
     monkeypatch.setattr(flip_bot, "_atm_option", lambda sym, right: ("SPY260624P00730000", 730.0, 0.20, "2026-06-24"))
 
     setup = flip_bot.find_bear_trend_day(5000.0)

@@ -1,0 +1,278 @@
+{
+  "dataset": "examples\\mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "usable_sessions": 1108,
+  "development_sessions": 775,
+  "selection_sessions": 166,
+  "final_test_sessions": 167,
+  "grid_candidates": 8,
+  "development_survivors": 0,
+  "selection_survivors": 0,
+  "final_results": [],
+  "development_results": [
+    {
+      "config": {
+        "opening_threshold_pct": 0.0,
+        "stop_ticks": 20
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 258,
+          "total_pnl": -1883.25,
+          "expectancy": -7.3,
+          "win_rate": 0.2791,
+          "profit_factor": 0.6612,
+          "max_drawdown": 2197.75
+        },
+        {
+          "trades": 255,
+          "total_pnl": -1301.25,
+          "expectancy": -5.1,
+          "win_rate": 0.3451,
+          "profit_factor": 0.7031,
+          "max_drawdown": 1659.25
+        },
+        {
+          "trades": 258,
+          "total_pnl": -1944.5,
+          "expectancy": -7.54,
+          "win_rate": 0.2946,
+          "profit_factor": 0.606,
+          "max_drawdown": 2006.75
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.0,
+        "stop_ticks": 40
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 258,
+          "total_pnl": -2417.0,
+          "expectancy": -9.37,
+          "win_rate": 0.3876,
+          "profit_factor": 0.6635,
+          "max_drawdown": 2488.0
+        },
+        {
+          "trades": 255,
+          "total_pnl": -1071.25,
+          "expectancy": -4.2,
+          "win_rate": 0.4275,
+          "profit_factor": 0.7642,
+          "max_drawdown": 1587.25
+        },
+        {
+          "trades": 258,
+          "total_pnl": -1918.25,
+          "expectancy": -7.44,
+          "win_rate": 0.376,
+          "profit_factor": 0.6608,
+          "max_drawdown": 2120.0
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.0005,
+        "stop_ticks": 20
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 229,
+          "total_pnl": -1723.5,
+          "expectancy": -7.53,
+          "win_rate": 0.2882,
+          "profit_factor": 0.6447,
+          "max_drawdown": 1936.75
+        },
+        {
+          "trades": 205,
+          "total_pnl": -1421.25,
+          "expectancy": -6.93,
+          "win_rate": 0.3317,
+          "profit_factor": 0.6104,
+          "max_drawdown": 1503.75
+        },
+        {
+          "trades": 201,
+          "total_pnl": -1597.75,
+          "expectancy": -7.95,
+          "win_rate": 0.2886,
+          "profit_factor": 0.5998,
+          "max_drawdown": 1743.25
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.0005,
+        "stop_ticks": 40
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 229,
+          "total_pnl": -2058.5,
+          "expectancy": -8.99,
+          "win_rate": 0.4017,
+          "profit_factor": 0.6692,
+          "max_drawdown": 2080.0
+        },
+        {
+          "trades": 205,
+          "total_pnl": -1336.25,
+          "expectancy": -6.52,
+          "win_rate": 0.4098,
+          "profit_factor": 0.654,
+          "max_drawdown": 1473.75
+        },
+        {
+          "trades": 201,
+          "total_pnl": -1470.25,
+          "expectancy": -7.31,
+          "win_rate": 0.3731,
+          "profit_factor": 0.6764,
+          "max_drawdown": 1705.75
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.001,
+        "stop_ticks": 20
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 209,
+          "total_pnl": -1491.0,
+          "expectancy": -7.13,
+          "win_rate": 0.2919,
+          "profit_factor": 0.6595,
+          "max_drawdown": 1903.75
+        },
+        {
+          "trades": 165,
+          "total_pnl": -1205.0,
+          "expectancy": -7.3,
+          "win_rate": 0.3273,
+          "profit_factor": 0.5917,
+          "max_drawdown": 1237.25
+        },
+        {
+          "trades": 146,
+          "total_pnl": -1395.25,
+          "expectancy": -9.56,
+          "win_rate": 0.2671,
+          "profit_factor": 0.5523,
+          "max_drawdown": 1526.25
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.001,
+        "stop_ticks": 40
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 209,
+          "total_pnl": -1802.25,
+          "expectancy": -8.62,
+          "win_rate": 0.4019,
+          "profit_factor": 0.6781,
+          "max_drawdown": 2177.0
+        },
+        {
+          "trades": 165,
+          "total_pnl": -995.0,
+          "expectancy": -6.03,
+          "win_rate": 0.4121,
+          "profit_factor": 0.6692,
+          "max_drawdown": 1094.25
+        },
+        {
+          "trades": 146,
+          "total_pnl": -1240.25,
+          "expectancy": -8.49,
+          "win_rate": 0.363,
+          "profit_factor": 0.6529,
+          "max_drawdown": 1407.75
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.002,
+        "stop_ticks": 20
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 169,
+          "total_pnl": -1278.5,
+          "expectancy": -7.57,
+          "win_rate": 0.2781,
+          "profit_factor": 0.6432,
+          "max_drawdown": 1486.25
+        },
+        {
+          "trades": 92,
+          "total_pnl": -1049.25,
+          "expectancy": -11.4,
+          "win_rate": 0.2717,
+          "profit_factor": 0.4111,
+          "max_drawdown": 1080.25
+        },
+        {
+          "trades": 70,
+          "total_pnl": -297.5,
+          "expectancy": -4.25,
+          "win_rate": 0.3286,
+          "profit_factor": 0.7837,
+          "max_drawdown": 473.75
+        }
+      ]
+    },
+    {
+      "config": {
+        "opening_threshold_pct": 0.002,
+        "stop_ticks": 40
+      },
+      "passed": false,
+      "regimes": [
+        {
+          "trades": 169,
+          "total_pnl": -1319.75,
+          "expectancy": -7.81,
+          "win_rate": 0.4083,
+          "profit_factor": 0.7053,
+          "max_drawdown": 1524.75
+        },
+        {
+          "trades": 92,
+          "total_pnl": -938.0,
+          "expectancy": -10.2,
+          "win_rate": 0.3478,
+          "profit_factor": 0.485,
+          "max_drawdown": 969.0
+        },
+        {
+          "trades": 70,
+          "total_pnl": -328.75,
+          "expectancy": -4.7,
+          "win_rate": 0.3857,
+          "profit_factor": 0.8007,
+          "max_drawdown": 646.0
+        }
+      ]
+    }
+  ],
+  "all_selection_results": []
+}

@@ -1,0 +1,28 @@
+{
+  "dataset": "examples\\mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "config": {
+    "opening_threshold_pct": 0.001,
+    "stop_ticks": 40,
+    "direction": "reversal"
+  },
+  "selection_sessions": 166,
+  "final_test_sessions_reserved": 167,
+  "selection": {
+    "trades": 113,
+    "total_pnl": -474.5,
+    "expectancy": -4.2,
+    "win_rate": 0.4071,
+    "profit_factor": 0.8322,
+    "max_drawdown": 736.5
+  },
+  "selection_double_costs": {
+    "trades": 113,
+    "total_pnl": -1209.0,
+    "expectancy": -10.7,
+    "win_rate": 0.3628,
+    "profit_factor": 0.6312,
+    "max_drawdown": 1295.5
+  },
+  "selection_passed": false,
+  "final_test_evaluated": false
+}

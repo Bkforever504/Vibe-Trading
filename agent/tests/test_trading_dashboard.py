@@ -15,6 +15,8 @@ from strategies.trading_dashboard import (
     momentum_shadow_context,
     momentum_shadow_panel,
     option_group_summaries,
+    operations_control_room_context,
+    operations_control_room_panel,
     portfolio_guard_context,
     portfolio_guard_panel,
     polymarket_fed_whale_context,
@@ -404,6 +406,109 @@ def test_bot_status_includes_momentum_rotation_shadow() -> None:
     assert momentum["mode"] == "shadow"
     assert momentum["live_enabled"] is False
     assert momentum["execution"] == "weekly-shadow-only"
+
+
+def test_operations_control_room_renders_reports_and_flip_post_config(tmp_path) -> None:
+    grades = tmp_path / "grades.json"
+    grades.write_text(
+        """
+        {
+          "date": "2026-07-04",
+          "item_count": 2,
+          "promotion_ready_count": 0,
+          "by_grade": {"B": 1, "F": 1},
+          "items": [
+            {
+              "name": "Market Force Score",
+              "category": "context_scanner",
+              "grade": "B",
+              "ops_grade": "A",
+              "score": 82,
+              "freshness": "fresh",
+              "sample_count": 12,
+              "warnings": ["context_only"]
+            },
+            {
+              "name": "Flip Bot",
+              "category": "alpaca_options_execution",
+              "grade": "F",
+              "ops_grade": "B",
+              "score": 44,
+              "sample_count": 8,
+              "total_pnl": -8702,
+              "post_config": {
+                "sample_count": 7,
+                "total_pnl": 2855.5,
+                "win_rate": 1.0,
+                "grade": "B"
+              }
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    health = tmp_path / "health.json"
+    health.write_text(
+        """
+        {
+          "summary": {"ok": 20, "stale": 15, "error": 2, "missing": 0},
+          "items": [
+            {
+              "name": "Opening Range",
+              "health": "error",
+              "kind": "morning",
+              "latest_date": "2026-07-03",
+              "row_count": 6,
+              "warnings": ["SPY: No Alpaca intraday bars for SPY"]
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    audit = tmp_path / "audit.json"
+    audit.write_text('{"passed": true, "registered_signal_count": 72, "issue_count": 0, "warning_count": 1}', encoding="utf-8")
+    review = tmp_path / "review.json"
+    review.write_text(
+        """
+        {
+          "queue_count": 1,
+          "by_reason": {"contracts_above_limit": 1},
+          "items": [
+            {
+              "date": "2026-06-27",
+              "bot": "kalshi",
+              "symbol": "KXHIGHNY",
+              "reason": "contracts_above_limit",
+              "verdict": "likely_good_rejection",
+              "next_action": "Keep cap unchanged."
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    schedule = tmp_path / "schedule.json"
+    schedule.write_text('{"passed": true, "task_count": 42, "aligned_count": 42, "issue_count": 0}', encoding="utf-8")
+
+    context = operations_control_room_context(
+        grades_path=grades,
+        health_path=health,
+        audit_path=audit,
+        review_path=review,
+        schedule_path=schedule,
+    )
+    html = operations_control_room_panel(context)
+
+    assert context["registered_signal_count"] == 72
+    assert context["health_summary"]["error"] == 2
+    assert "Operations Control Room" in html
+    assert "Bot Evidence Split" in html
+    assert "Flip Bot" in html
+    assert "$2,855.50" in html
+    assert "Opening Range" in html
+    assert "contracts_above_limit" in html
 
 
 def test_portfolio_guard_panel_renders_active_kill_and_thresholds(tmp_path, monkeypatch) -> None:

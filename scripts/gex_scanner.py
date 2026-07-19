@@ -99,11 +99,9 @@ def _get_option_chain(symbol: str) -> list[dict]:
         except Exception:
             continue
 
-        # Open interest: use volume as proxy if OI not available
-        latest_quote = getattr(snap, "latest_quote", None)
+        # Displayed quote size is not open interest and must not stand in for it.
         oi = getattr(snap, "open_interest", None) or 0
-        volume = getattr(latest_quote, "ask_size", 0) or 0
-        size = oi if oi > 0 else volume
+        size = oi if oi > 0 else 0
 
         contracts.append({
             "occ": occ_symbol,
@@ -114,20 +112,47 @@ def _get_option_chain(symbol: str) -> list[dict]:
             "delta": float(delta) if delta is not None else None,
             "open_interest": int(oi),
             "size_used": int(size),
+            "size_source": "open_interest" if oi > 0 else "missing",
         })
 
     return contracts
 
 
-def compute_gex(contracts: list[dict]) -> dict:
-    """Compute GEX levels from options chain contracts."""
+def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_coverage: float = 0.60) -> dict:
+    """Compute a 0DTE gamma/open-interest proxy with explicit provenance."""
     if not contracts:
-        return {"error": "no contracts", "strikes": [], "gex_wall": None, "net_gex": 0.0}
+        return {"status": "unavailable", "error": "no contracts", "gex_wall": None, "net_gex": 0.0}
 
-    # Filter to 0DTE only for intraday GEX wall
-    today = date.today().isoformat()
+    today = (as_of or date.today()).isoformat()
     zero_dte = [c for c in contracts if c["expiry"] == today]
-    use = zero_dte if zero_dte else contracts  # fall back to all if no 0DTE
+    if not zero_dte:
+        return {
+            "status": "unavailable",
+            "error": "no 0dte contracts",
+            "expiry_filter": "0dte_required",
+            "contract_count": 0,
+            "gex_wall": None,
+            "net_gex": 0.0,
+            "dealer_positioning_observed": False,
+        }
+    use = [
+        contract for contract in zero_dte
+        if contract.get("size_source") == "open_interest" and contract.get("size_used", 0) > 0
+    ]
+    oi_coverage = len(use) / len(zero_dte)
+    if not use or oi_coverage < min_oi_coverage:
+        return {
+            "status": "unavailable",
+            "error": "insufficient open interest coverage",
+            "expiry_filter": "0dte",
+            "contract_count": len(zero_dte),
+            "open_interest_contract_count": len(use),
+            "open_interest_coverage": round(oi_coverage, 4),
+            "minimum_open_interest_coverage": min_oi_coverage,
+            "gex_wall": None,
+            "net_gex": 0.0,
+            "dealer_positioning_observed": False,
+        }
 
     # Aggregate GEX by strike
     strike_gex: dict[float, float] = {}
@@ -139,7 +164,7 @@ def compute_gex(contracts: list[dict]) -> dict:
             strike_gex[c["strike"]] = strike_gex.get(c["strike"], 0.0) - gex
 
     if not strike_gex:
-        return {"error": "no strike data", "strikes": [], "gex_wall": None, "net_gex": 0.0}
+        return {"status": "unavailable", "error": "no strike data", "gex_wall": None, "net_gex": 0.0}
 
     sorted_strikes = sorted(strike_gex.items(), key=lambda x: x[0])
     net_gex = sum(strike_gex.values())
@@ -156,14 +181,23 @@ def compute_gex(contracts: list[dict]) -> dict:
     )[:5]
 
     return {
-        "expiry_filter": "0dte" if zero_dte else "all",
+        "status": "ok",
+        "mode": "shadow_only_context",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+        "expiry_filter": "0dte",
         "contract_count": len(use),
+        "zero_dte_contract_count": len(zero_dte),
+        "open_interest_coverage": round(oi_coverage, 4),
+        "size_source": "open_interest",
+        "dealer_positioning_observed": False,
+        "sign_assumption": "calls_positive_puts_negative",
         "net_gex": round(net_gex, 2),
         "net_gex_regime": "positive" if net_gex > 0 else "negative",
         "net_gex_interpretation": (
-            "Dealers long gamma → range-bound, buy dips sell rips"
+            "Positive call-minus-put gamma/OI proxy; test range damping in shadow"
             if net_gex > 0
-            else "Dealers short gamma → trend/volatile, moves amplified"
+            else "Negative call-minus-put gamma/OI proxy; test trend amplification in shadow"
         ),
         "gex_wall": {
             "strike": gex_wall_strike,
@@ -178,7 +212,7 @@ def scan_symbol(symbol: str) -> dict:
     try:
         contracts = _get_option_chain(symbol)
         gex = compute_gex(contracts)
-        return {"symbol": symbol, "status": "ok", **gex}
+        return {"symbol": symbol, **gex}
     except Exception as exc:
         return {"symbol": symbol, "status": "error", "error": str(exc)[:200]}
 
@@ -195,8 +229,8 @@ def print_report(results: list[dict]) -> None:
     print("=" * 62)
     for r in results:
         sym = r["symbol"]
-        if r.get("status") == "error":
-            print(f"\n{sym}: ERROR — {r.get('error')}")
+        if r.get("status") != "ok":
+            print(f"\n{sym}: UNAVAILABLE - {r.get('error')}")
             continue
         wall = r.get("gex_wall") or {}
         net = r.get("net_gex", 0)

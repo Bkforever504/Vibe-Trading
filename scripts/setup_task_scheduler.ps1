@@ -58,7 +58,7 @@ Register-ScheduledTask `
     -Principal $Principal `
     -Description "Vibe-Trading: MNQ first-pullback shadow signal scanner. Paper/shadow only." | Out-Null
 
-$MomentumScriptArgs = "run --no-project --with yfinance python scripts/momentum_shadow_logger.py"
+$MomentumScriptArgs = "run --no-project --with alpaca-py --with pandas --with yfinance python scripts/momentum_shadow_logger.py"
 $MomentumAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$WorkingDir`" && `"$UvPath`" $MomentumScriptArgs >> `"$LogDir\momentum-shadow.log`" 2>&1"
 $MomentumTrigger = New-ScheduledTaskTrigger -Weekly `
     -DaysOfWeek Monday `
@@ -91,4 +91,4 @@ Write-Host "  Get-Content '$LogDir\shadow-scanner.log' -Tail 50"
 Write-Host ""
 Write-Host "View signals:"
 Write-Host "  uv run --no-project --with yfinance python scripts/view_shadow_signals.py"
-Write-Host "  uv run --no-project --with yfinance python scripts/momentum_shadow_logger.py"
+Write-Host "  uv run --no-project --with alpaca-py --with pandas --with yfinance python scripts/momentum_shadow_logger.py"

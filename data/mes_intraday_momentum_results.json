@@ -1,0 +1,9 @@
+{
+  "dataset": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\examples\\es_1h_730d_fresh.csv",
+  "daily_rows": 585,
+  "development_rows": 468,
+  "locked_holdout_rows": 117,
+  "development_survivors": 0,
+  "robust_finalists": [],
+  "all_finalists": []
+}

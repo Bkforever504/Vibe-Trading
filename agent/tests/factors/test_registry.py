@@ -88,7 +88,12 @@ def mini_zoo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # monkey-patching sys.path to include tmp_path, then creating an `src`
     # alias that points to `factors/`-as-`src.factors`.
     src_alias = tmp_path / "src"
-    src_alias.symlink_to(tmp_path)
+    if sys.platform == "win32":
+        import subprocess
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(src_alias), str(tmp_path)],
+                       check=True, capture_output=True)
+    else:
+        src_alias.symlink_to(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
     # Reset any cached modules from previous test
     for mod_name in list(sys.modules):

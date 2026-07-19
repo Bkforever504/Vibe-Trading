@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.market_data import fetch_ohlcv, data_source, fetch_vix_context
 from scripts.shadow_alerts import maybe_send_shadow_alert
+from research.volume_overlay_lab import volume_features
 
 RSI2_STRATEGY_PATH = ROOT / "research" / "pine_strategy_lab" / "examples" / "rsi2_mean_reversion_python.py"
 
@@ -128,6 +129,11 @@ def _features(ohlcv: pd.DataFrame) -> dict:
     rsi2 = rsi2_strategy._rsi(close, window=2)
     ema200 = rsi2_strategy._ema(close, span=200)
     sma5 = close.rolling(5).mean()
+    volume_row = volume_features(ohlcv).iloc[-1]
+    rvol20 = _finite_float(volume_row["rvol20"])
+    volume_z20 = _finite_float(volume_row["volume_z20"])
+    volume_osc = _finite_float(volume_row["volume_osc_5_20"])
+    mavd = _finite_float(volume_row["mavd_5_20"])
     return {
         "close": round(float(close.iloc[-1]), 4),
         "prior_high": round(float(high.iloc[-2]), 4),
@@ -137,7 +143,28 @@ def _features(ohlcv: pd.DataFrame) -> dict:
         "above_ema200": bool(close.iloc[-1] > ema200.iloc[-1]),
         "above_prior_high": bool(close.iloc[-1] > high.iloc[-2]),
         "above_sma5": bool(close.iloc[-1] > sma5.iloc[-1]),
+        "volume_research": {
+            "telemetry_only": True,
+            "rvol20": rvol20,
+            "volume_z20": volume_z20,
+            "volume_osc_5_20": volume_osc,
+            "mavd_5_20": mavd,
+            "candidate_flags": {
+                "rvol_ge_1": bool(rvol20 is not None and rvol20 >= 1.0),
+                "rvol_ge_1_25": bool(rvol20 is not None and rvol20 >= 1.25),
+                "volume_z_ge_1": bool(volume_z20 is not None and volume_z20 >= 1.0),
+                "volume_osc_positive": bool(volume_osc is not None and volume_osc > 0),
+                "mavd_positive": bool(mavd is not None and mavd > 0),
+            },
+            "changes_signal": False,
+        },
     }
+
+
+def _finite_float(value: object) -> float | None:
+    if pd.isna(value):
+        return None
+    return round(float(value), 6)
 
 
 def _last_date(df: pd.DataFrame) -> str:

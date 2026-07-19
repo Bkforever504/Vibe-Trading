@@ -126,8 +126,10 @@ class KalshiHistoryClient:
 
 def fill_to_trade_row(fill: dict[str, Any]) -> dict[str, Any]:
     ticker = str(fill.get("ticker") or fill.get("market_ticker") or fill.get("market") or "")
-    count = abs(_safe_float(fill.get("count") or fill.get("contracts") or fill.get("quantity")))
-    price = _cent_price(fill.get("yes_price") or fill.get("no_price") or fill.get("price"))
+    count = abs(_safe_float(fill.get("count_fp") or fill.get("count") or fill.get("contracts") or fill.get("quantity")))
+    dollar_price = fill.get("yes_price_dollars") or fill.get("no_price_dollars")
+    price = _safe_float(dollar_price) if dollar_price not in (None, "") else _cent_price(fill.get("yes_price") or fill.get("no_price") or fill.get("price"))
+    fee = _safe_float(fill.get("fee_cost")) if fill.get("fee_cost") not in (None, "") else _money_from_cents(fill, "fee_cents", "fees_cents")
     return {
         "date": _date(fill.get("created_time") or fill.get("created_at") or fill.get("trade_time")),
         "market": ticker,
@@ -137,7 +139,7 @@ def fill_to_trade_row(fill: dict[str, Any]) -> dict[str, Any]:
         "contracts": count,
         "notional": round(count * price, 6),
         "profit_loss": _money_from_cents(fill, "realized_pnl_cents", "profit_loss_cents", "pnl_cents"),
-        "fee": _money_from_cents(fill, "fee_cents", "fees_cents"),
+        "fee": round(fee, 6),
     }
 
 

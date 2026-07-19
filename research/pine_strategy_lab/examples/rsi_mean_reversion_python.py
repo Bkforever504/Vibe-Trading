@@ -9,9 +9,12 @@ import pandas as pd
 
 
 PARAM_GRID = [
-    {"window": 14, "entry": 30, "exit": 50},
-    {"window": 14, "entry": 35, "exit": 55},
-    {"window": 21, "entry": 35, "exit": 55},
+    {"window": 14, "entry": 35, "exit": 45},
+    {"window": 14, "entry": 35, "exit": 50},
+    {"window": 21, "entry": 35, "exit": 45},
+    {"window": 21, "entry": 35, "exit": 50},
+    {"window": 14, "entry": 40, "exit": 50},
+    {"window": 21, "entry": 40, "exit": 55},
 ]
 
 
@@ -20,8 +23,8 @@ def strategy(ohlcv: pd.DataFrame, window: int = 14, entry: int = 30, exit: int =
     delta = close.diff()
     gain = delta.clip(lower=0).rolling(window).mean()
     loss = (-delta.clip(upper=0)).rolling(window).mean()
-    rs = gain / loss.replace(0, pd.NA)
-    rsi = 100 - (100 / (1 + rs))
+    rs = gain / loss.replace(0, float("nan"))
+    rsi = (100 - (100 / (1 + rs))).fillna(100.0)  # all-gain bars → RSI=100
 
     signals = pd.Series(0, index=ohlcv.index, dtype=int)
     in_trade = False

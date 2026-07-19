@@ -1,0 +1,23 @@
+{
+  "firm": "Tradeify",
+  "account_type": "Conservative placeholder",
+  "verified_as_of": "2026-06-21",
+  "automation": {
+    "allowed": false,
+    "status": "blocked_until_official_rules_verified",
+    "requires_local_device": true,
+    "notes": "Blocked by default until exact account, automation, and audit rules are verified from current official documents."
+  },
+  "risk": {
+    "max_daily_loss": 1000,
+    "max_trailing_drawdown": 2000,
+    "max_contracts": 5
+  },
+  "consistency": {
+    "enabled": true,
+    "max_best_day_pct": 0.35,
+    "notes": "Placeholder. Replace with current official rule for the selected account."
+  },
+  "unknown_rules_block": true,
+  "sources": []
+}

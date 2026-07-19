@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "balanced_recent",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "volume indicators algorithmic trading backtest OBV CMF MFI RVOL VWAP",
+      "ranking_query": "Which volume indicators improve systematic strategies after chronological validation and trading costs?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "breakout",
+      "search_query": "relative volume breakout opening range confirmation backtest",
+      "ranking_query": "Which relative-volume and volume-spike definitions improve breakout continuation?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.9
+    },
+    {
+      "label": "trend_reversal",
+      "search_query": "OBV CMF MFI accumulation distribution volume price trend strategy",
+      "ranking_query": "Do OBV, CMF, MFI, ADL, and VPT work better as trend confirmation or reversal filters?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.8
+    },
+    {
+      "label": "order_flow",
+      "search_query": "volume delta cumulative delta order flow imbalance systematic trading",
+      "ranking_query": "Which volume-delta or order-flow signals require trade-level data and cannot be inferred from OHLCV?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.7
+    }
+  ]
+}

@@ -186,3 +186,50 @@ def test_fetch_vix_context_returns_unavailable_on_error(monkeypatch) -> None:
     assert context["available"] is False
     assert context["source"] == "cboe_vix_history"
     assert "network down" in context["error"]
+
+
+def test_fetch_vix_term_structure_context_parses_cboe_vix_and_vix3m(monkeypatch) -> None:
+    class FakeResponse:
+        def __init__(self, raw: bytes) -> None:
+            self.raw = raw
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.raw
+
+    def fake_urlopen(url: str, *args, **kwargs):
+        if "VIX3M_History" in url:
+            return FakeResponse(b"DATE,OPEN,HIGH,LOW,CLOSE\n2026-06-26,19,20,18,20.00\n")
+        return FakeResponse(b"DATE,OPEN,HIGH,LOW,CLOSE\n2026-06-26,17,18,16,24.00\n")
+
+    monkeypatch.setattr(market_data.urllib.request, "urlopen", fake_urlopen)
+
+    context = market_data.fetch_vix_term_structure_context()
+
+    assert context == {
+        "source": "cboe_vix_vix3m_history",
+        "date": "2026-06-26",
+        "vix": 24.0,
+        "vix3m": 20.0,
+        "vix_over_vix3m": 1.2,
+        "vix3m_over_vix": 0.8333,
+        "regime": "backwardation",
+    }
+
+
+def test_fetch_vix_term_structure_context_returns_unavailable_on_error(monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise OSError("cboe down")
+
+    monkeypatch.setattr(market_data.urllib.request, "urlopen", fail)
+
+    context = market_data.fetch_vix_term_structure_context()
+
+    assert context["available"] is False
+    assert context["source"] == "cboe_vix_vix3m_history"
+    assert "cboe down" in context["error"]

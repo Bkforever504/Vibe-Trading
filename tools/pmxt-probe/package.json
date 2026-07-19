@@ -1,0 +1,13 @@
+{
+  "name": "vibe-pmxt-probe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only PMXT schema probe for Vibe-Trading research.",
+  "dependencies": {
+    "pmxtjs": "2.51.4"
+  },
+  "scripts": {
+    "probe": "node pmxt_schema_probe.mjs"
+  }
+}

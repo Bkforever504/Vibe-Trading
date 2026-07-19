@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,10 @@ from src.tools.mcp import _build_token_store
 
 pytestmark = pytest.mark.unit
 
+_POSIX_PERMS = pytest.mark.skipif(sys.platform == "win32", reason="Windows ignores POSIX chmod")
 
+
+@_POSIX_PERMS
 def test_build_token_store_creates_dir_0700(tmp_path: Path) -> None:
     cache = tmp_path / "oauth"
     assert not cache.exists()
@@ -41,6 +45,7 @@ def test_build_token_store_expands_user(monkeypatch, tmp_path: Path) -> None:
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.setenv("USERPROFILE", str(fake_home))
 
     _build_token_store("~/.vibe-trading/live/robinhood/oauth")
 
@@ -48,6 +53,7 @@ def test_build_token_store_expands_user(monkeypatch, tmp_path: Path) -> None:
     assert resolved.is_dir()
 
 
+@_POSIX_PERMS
 def test_build_token_store_idempotent_on_existing_dir(tmp_path: Path) -> None:
     cache = tmp_path / "oauth"
     _build_token_store(str(cache))

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,13 +23,62 @@ MAPPING_FILE = RUNTIME_DIR / "social-arb-keyword-map.json"
 REPORT_FILE = REPORT_DIR / "social-arbitrage-watchlist.json"
 MIN_SOURCE_COUNT = 2
 MIN_SCORE_FOR_WATCH = 7.0
+CASHTAG_RE = re.compile(r"(?<![A-Z0-9])\$([A-Z][A-Z0-9]{0,5})(?:\b|$)")
+IGNORED_CASHTAGS = {"BTC", "ETH", "SOL", "DOGE", "USDT", "USDC", "XRP", "BNB"}
+INDEX_PROXY_MAP = {"SPX": "SPY", "SPXW": "SPY"}
 
 DEFAULT_KEYWORD_MAP = {
+    # Broad market / ETF context
+    "spy": {"ticker": "SPY", "theme": "broad market", "notes": "Context only; overlaps Flip Bot universe."},
+    "qqq": {"ticker": "QQQ", "theme": "mega-cap tech", "notes": "Context only; overlaps shadow logger universe."},
+    "vix": {"ticker": "VIX", "theme": "volatility regime", "notes": "Regime context only; do not route to equity option execution."},
+    "semiconductor": {"ticker": "SMH", "theme": "semiconductor basket", "notes": "Prefer ETF context over single-name chase."},
+    "ai chip": {"ticker": "NVDA", "theme": "ai demand", "notes": "High crowding risk; require non-price catalyst."},
+    "data center": {"ticker": "NVDA", "theme": "ai infrastructure", "notes": "Also map to AVGO/SMH manually when relevant."},
+
+    # Consumer/product virality
     "stanley cup": {"ticker": "SWK", "theme": "consumer trend", "notes": "Brand/product trend; verify parent exposure."},
     "prime drink": {"ticker": "CELH", "theme": "beverage momentum", "notes": "Proxy for energy drink shelf demand."},
+    "celsius drink": {"ticker": "CELH", "theme": "beverage momentum", "notes": "Check scanner against sales/channel data."},
+    "nike": {"ticker": "NKE", "theme": "consumer brand", "notes": "Large-cap trend; earnings/news context matters."},
+    "lululemon": {"ticker": "LULU", "theme": "consumer brand", "notes": "Check whether trend is product demand or backlash."},
+    "costco": {"ticker": "COST", "theme": "consumer retail", "notes": "High-quality large cap; social trends rarely enough alone."},
+    "walmart": {"ticker": "WMT", "theme": "consumer retail", "notes": "Use as retail/inflation context more than direct signal."},
+
+    # AI / software / platforms
     "nvidia ai": {"ticker": "NVDA", "theme": "ai demand", "notes": "High crowding risk; require non-price catalyst."},
+    "chatgpt": {"ticker": "MSFT", "theme": "ai platform", "notes": "Also maps to OpenAI ecosystem; public exposure is indirect."},
+    "claude ai": {"ticker": "AMZN", "theme": "ai platform", "notes": "Anthropic exposure is indirect through Amazon/Google."},
+    "palantir": {"ticker": "PLTR", "theme": "ai software", "notes": "High retail crowding risk."},
+    "roblox": {"ticker": "RBLX", "theme": "gaming/social", "notes": "Use engagement trend plus app-ranking context."},
+
+    # GLP-1 / healthcare
     "ozempic": {"ticker": "LLY", "theme": "glp-1", "notes": "Also map to NVO manually when relevant."},
     "weight loss drug": {"ticker": "LLY", "theme": "glp-1", "notes": "Needs news cross-check before trading."},
+    "zepbound": {"ticker": "LLY", "theme": "glp-1", "notes": "Verify prescription/supply data before acting."},
+    "wegovy": {"ticker": "NVO", "theme": "glp-1", "notes": "NVO ADR; watch liquidity and news timing."},
+    "regeneron": {"ticker": "REGN", "theme": "biotech sympathy", "notes": "High-priced biotech; require spread/liquidity check before any option review."},
+
+    # EV / batteries / energy
+    "tesla robotaxi": {"ticker": "TSLA", "theme": "ev autonomy", "notes": "Extremely narrative-driven; require price/volume confirmation."},
+    "tesla": {"ticker": "TSLA", "theme": "ev megacap", "notes": "High-noise ticker; social alone is weak."},
+    "solid state battery": {"ticker": "QS", "theme": "battery speculation", "notes": "High volatility; context only unless liquidity/price confirm."},
+    "quantumscape": {"ticker": "QS", "theme": "battery speculation", "notes": "High volatility; context only."},
+    "lucid": {"ticker": "LCID", "theme": "ev speculation", "notes": "High dilution/retail risk."},
+    "rivian": {"ticker": "RIVN", "theme": "ev speculation", "notes": "Check delivery/news catalyst."},
+
+    # Crypto-linked equities
+    "coinbase": {"ticker": "COIN", "theme": "crypto equity proxy", "notes": "Treat as crypto beta; watch BTC/ETH context."},
+    "bitcoin treasury": {"ticker": "MSTR", "theme": "btc proxy", "notes": "Use BTC move as primary context."},
+    "robinhood": {"ticker": "HOOD", "theme": "retail brokerage/crypto", "notes": "Can move on crypto and retail trading activity."},
+
+    # High-noise meme/speculation bucket
+    "gamestop": {"ticker": "GME", "theme": "meme/high noise", "notes": "Research-only unless independent catalyst validates."},
+    "amc": {"ticker": "AMC", "theme": "meme/high noise", "notes": "Research-only; high dilution risk."},
+    "short squeeze": {"ticker": "IWM", "theme": "small-cap squeeze basket", "notes": "Map to specific ticker manually when known."},
+    "$frmm": {"ticker": "FRMM", "theme": "social squeeze watch", "notes": "Small-cap squeeze chatter; context-only until options/liquidity/outcome validate."},
+    "frmm": {"ticker": "FRMM", "theme": "social squeeze watch", "notes": "Small-cap squeeze chatter; context-only until options/liquidity/outcome validate."},
+    "forum markets": {"ticker": "FRMM", "theme": "social squeeze watch", "notes": "Small-cap squeeze chatter; context-only until options/liquidity/outcome validate."},
 }
 
 
@@ -76,10 +126,49 @@ def load_observations(path: Path = OBSERVATIONS_FILE) -> list[dict[str, Any]]:
 
 def _matched_keyword(text: str, keyword_map: dict[str, dict[str, Any]]) -> tuple[str, dict[str, Any]] | None:
     lowered = text.lower()
-    for keyword, meta in keyword_map.items():
+    keywords = sorted(
+        keyword_map.items(),
+        key=lambda item: (
+            not str(item[0]).startswith("$"),
+            " " in str(item[0]),
+            -len(str(item[0])),
+        ),
+    )
+    for keyword, meta in keywords:
         if keyword in lowered:
             return keyword, meta
     return None
+
+
+def _explicit_tickers(row: dict[str, Any], text: str) -> list[tuple[str, dict[str, Any]]]:
+    tickers: list[str] = []
+    explicit = str(row.get("ticker") or "").upper().strip().lstrip("$")
+    if explicit:
+        tickers.append(explicit)
+    for match in CASHTAG_RE.finditer(text.upper()):
+        symbol = match.group(1).upper()
+        suffix = text[match.end(1): match.end(1) + 2].upper()
+        if suffix == ".X" or symbol in IGNORED_CASHTAGS:
+            continue
+        tickers.append(symbol)
+
+    out: list[tuple[str, dict[str, Any]]] = []
+    seen: set[str] = set()
+    for raw in tickers:
+        ticker = INDEX_PROXY_MAP.get(raw, raw)
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        notes = "Index option mention mapped to SPY proxy for equity-options context." if raw != ticker else ""
+        out.append((
+            f"${raw.lower()}",
+            {
+                "ticker": ticker,
+                "theme": "explicit social ticker",
+                "notes": notes,
+            },
+        ))
+    return out
 
 
 def _observation_weight(row: dict[str, Any]) -> float:
@@ -108,28 +197,33 @@ def score_social_arbitrage(
     })
     for row in observations:
         text = " ".join(str(row.get(key) or "") for key in ("keyword", "caption", "title", "text"))
-        match = _matched_keyword(text, mapping)
-        if not match:
+        matches = [match] if (match := _matched_keyword(text, mapping)) else []
+        matches.extend(_explicit_tickers(row, text))
+        if not matches:
             continue
-        keyword, meta = match
-        ticker = str(meta.get("ticker") or "").upper()
-        if not ticker:
-            continue
-        item = grouped[ticker]
-        item["ticker"] = ticker
-        item["theme"] = str(meta.get("theme") or "")
-        item["keywords"].add(keyword)
-        item["sources"].add(str(row.get("source") or row.get("platform") or "unknown").lower())
-        item["weight"] += _observation_weight(row)
-        if len(item["examples"]) < 3:
-            item["examples"].append({
-                "source": str(row.get("source") or row.get("platform") or "unknown"),
-                "keyword": keyword,
-                "observed_at": str(row.get("observed_at") or row.get("date") or ""),
-                "views": _safe_float(row.get("views")),
-                "url": str(row.get("url") or ""),
-            })
-
+        tickers_seen_this_row: set[str] = set()
+        for keyword, meta in matches:
+            ticker = str(meta.get("ticker") or "").upper()
+            if not ticker:
+                continue
+            item = grouped[ticker]
+            item["ticker"] = ticker
+            theme = str(meta.get("theme") or "")
+            if not item["theme"] or (item["theme"] == "explicit social ticker" and theme != "explicit social ticker"):
+                item["theme"] = theme
+            item["keywords"].add(keyword)
+            if ticker not in tickers_seen_this_row:
+                item["sources"].add(str(row.get("source") or row.get("platform") or "unknown").lower())
+                item["weight"] += _observation_weight(row)
+                tickers_seen_this_row.add(ticker)
+            if len(item["examples"]) < 3:
+                item["examples"].append({
+                    "source": str(row.get("source") or row.get("platform") or "unknown"),
+                    "keyword": keyword,
+                    "observed_at": str(row.get("observed_at") or row.get("date") or ""),
+                    "views": _safe_float(row.get("views")),
+                    "url": str(row.get("url") or ""),
+                })
     scored: list[dict[str, Any]] = []
     for item in grouped.values():
         sources = sorted(item["sources"])

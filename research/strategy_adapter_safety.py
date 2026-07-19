@@ -25,7 +25,17 @@ FORBIDDEN_CALLS = {
     "replace",
     "write_text",
     "write_bytes",
+    "system",
+    "popen",
+    "run",
+    "call",
+    "check_output",
+    "Popen",
+    "import_module",
+    "load_module",
 }
+
+FORBIDDEN_ATTRIBUTE_ROOTS = {"subprocess", "os", "sys", "importlib", "builtins", "ctypes", "socket"}
 
 
 @dataclass(frozen=True)
@@ -63,6 +73,12 @@ class _SafetyVisitor(ast.NodeVisitor):
             self._check_import(node.module)
         else:
             self.errors.append("forbidden_import.unknown")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        root = node.value
+        if isinstance(root, ast.Name) and root.id in FORBIDDEN_ATTRIBUTE_ROOTS:
+            self.errors.append(f"forbidden_attribute_access.{root.id}")
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:

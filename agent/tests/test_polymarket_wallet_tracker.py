@@ -100,6 +100,52 @@ def test_wallet_report_uses_activity_as_primary_source() -> None:
     assert wallet["realized_pnl"] == 14.5 # from activity profit_loss field
     assert wallet["raw_activity_count"] == 1
     assert wallet["closed_position_count"] == 6
+    assert wallet["data_source"] == "data-api/activity"
+    assert wallet["data_quality"] == "primary_all_activity"
+    assert wallet["closed_positions_survivorship_warning"] is False
+    assert wallet["endpoint_attempts"][0]["endpoint"] == "activity"
+
+
+class ActivityErrorClobSession:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def get(self, url, **kwargs):
+        self.calls.append({"url": url, **kwargs})
+        if "activity" in url:
+            return FakeResponse({"error": "blocked"}, status_code=500)
+        if "trades" in url:
+            return FakeResponse(
+                {
+                    "data": [
+                        {
+                            "timestamp": 1780246800,
+                            "market": "Fed cuts by September?",
+                            "outcome": "YES",
+                            "size": 100,
+                            "price": 0.4,
+                            "profit_loss": -5,
+                        }
+                    ]
+                }
+            )
+        if "closed-positions" in url:
+            return FakeResponse({"data": []})
+        raise AssertionError(f"unexpected url: {url}")
+
+
+def test_wallet_report_falls_back_to_clob_with_diagnostics() -> None:
+    client = PolymarketPublicClient(session=ActivityErrorClobSession())
+
+    report = build_wallet_report(["0xabc"], client=client)
+    wallet = report["wallets"][0]
+
+    assert wallet["trades"] == 1
+    assert wallet["realized_pnl"] == -5
+    assert wallet["data_source"] == "clob/trades"
+    assert wallet["data_quality"] == "fallback_clob_trades"
+    assert wallet["endpoint_attempts"][0]["status"] == "error"
+    assert wallet["endpoint_attempts"][1]["endpoint"] == "trades"
 
 
 def test_closed_position_total_bought_counts_as_notional() -> None:
