@@ -1,0 +1,37 @@
+{
+  "candidate": "frozen 2024 momentum rotation (10 ETF, 12m lookback, top-2, 5d rebalance)",
+  "return_series": "2015-01-01 to 2026-07-17 daily, actual candidate equity curve",
+  "mode": "research_only",
+  "base_costs": {
+    "observed_days": 2900,
+    "stress": {
+      "resamples": 2000,
+      "horizon_days": 252,
+      "block_mean_days": 21,
+      "seed": 20260719,
+      "median_annual_return_pct": 13.01,
+      "p05_annual_return_pct": -13.5,
+      "prob_losing_year": 0.212,
+      "median_max_drawdown_usd": 157.54,
+      "p95_max_drawdown_usd": 293.58,
+      "p99_max_drawdown_usd": 345.85,
+      "gate_p95_drawdown_within_300": true
+    }
+  },
+  "double_costs": {
+    "observed_days": 2900,
+    "stress": {
+      "resamples": 2000,
+      "horizon_days": 252,
+      "block_mean_days": 21,
+      "seed": 20260719,
+      "median_annual_return_pct": 11.98,
+      "p05_annual_return_pct": -14.33,
+      "prob_losing_year": 0.228,
+      "median_max_drawdown_usd": 158.46,
+      "p95_max_drawdown_usd": 296.84,
+      "p99_max_drawdown_usd": 351.35,
+      "gate_p95_drawdown_within_300": true
+    }
+  }
+}
