@@ -233,6 +233,59 @@ def fetch_vix_context() -> dict:
         }
 
 
+def fetch_vix_term_structure_context() -> dict:
+    """Fetch VIX and VIX3M directly from CBOE history CSVs.
+
+    Returns both ratio directions because premium-selling code usually thinks
+    in VIX/VIX3M terms, while directional code often logs VIX3M/VIX.
+    """
+    try:
+        vix_row = _fetch_cboe_index_last_row("VIX_History.csv")
+        vix3m_row = _fetch_cboe_index_last_row("VIX3M_History.csv")
+        vix = float(vix_row["close"])
+        vix3m = float(vix3m_row["close"])
+        vix_over_vix3m = round(vix / vix3m, 4) if vix3m > 0 else 0.0
+        vix3m_over_vix = round(vix3m / vix, 4) if vix > 0 else 0.0
+        if vix > vix3m:
+            regime = "backwardation"
+        elif vix3m_over_vix >= 1.03:
+            regime = "contango"
+        else:
+            regime = "flat"
+        return {
+            "source": "cboe_vix_vix3m_history",
+            "date": vix_row["date"],
+            "vix": round(vix, 2),
+            "vix3m": round(vix3m, 2),
+            "vix_over_vix3m": round(vix_over_vix3m, 4),
+            "vix3m_over_vix": round(vix3m_over_vix, 4),
+            "regime": regime,
+        }
+    except Exception as exc:
+        return {
+            "source": "cboe_vix_vix3m_history",
+            "available": False,
+            "error": str(exc)[:160],
+        }
+
+
+def _fetch_cboe_index_last_row(filename: str) -> dict:
+    url = f"https://cdn.cboe.com/api/global/us_indices/daily_prices/{filename}"
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+    rows = [line.strip().split(",") for line in raw.splitlines() if line.strip()]
+    if len(rows) < 2:
+        raise ValueError(f"empty CBOE history: {filename}")
+    header = [h.strip().upper() for h in rows[0]]
+    date_idx = header.index("DATE")
+    close_idx = header.index("CLOSE")
+    last = rows[-1]
+    return {
+        "date": last[date_idx],
+        "close": float(last[close_idx]),
+    }
+
+
 def _vix_regime(vix_close: float) -> str:
     if vix_close < 15:
         return "low_vol"

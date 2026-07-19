@@ -136,11 +136,29 @@ class PolymarketPublicClient:
     def __init__(self, *, session: Any | None = None, timeout: int = DEFAULT_TIMEOUT_SECONDS):
         self.session = session or requests.Session()
         self.timeout = timeout
+        self.request_log: list[dict[str, Any]] = []
 
     def _get(self, url: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-        response = self.session.get(url, params=params, timeout=self.timeout)
-        response.raise_for_status()
-        return _coerce_rows(response.json())
+        endpoint = url.rsplit("/", 1)[-1]
+        try:
+            response = self.session.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            rows = _coerce_rows(response.json())
+            self.request_log.append({
+                "endpoint": endpoint,
+                "url": url,
+                "status": "ok",
+                "row_count": len(rows),
+            })
+            return rows
+        except Exception as exc:
+            self.request_log.append({
+                "endpoint": endpoint,
+                "url": url,
+                "status": "error",
+                "error": str(exc)[:240],
+            })
+            raise
 
     def fetch_wallet_activity(self, address: str, *, limit: int = 500) -> list[dict[str, Any]]:
         return self._get(f"{DATA_API_BASE}/activity", {"user": address, "limit": limit})
@@ -152,13 +170,38 @@ class PolymarketPublicClient:
         return self._get(f"{CLOB_API_BASE}/trades", {"maker_address": address, "limit": limit})
 
     def fetch_wallet_trades(self, address: str, *, limit: int = 500) -> list[dict[str, Any]]:
+        return self.fetch_wallet_trades_with_diagnostics(address, limit=limit)["rows"]
+
+    def fetch_wallet_trades_with_diagnostics(self, address: str, *, limit: int = 500) -> dict[str, Any]:
+        before = len(self.request_log)
         try:
             activity = self.fetch_wallet_activity(address, limit=limit)
             if activity:
-                return activity
+                return {
+                    "rows": activity,
+                    "source_endpoint": "data-api/activity",
+                    "source_quality": "primary_all_activity",
+                    "endpoint_attempts": self.request_log[before:],
+                }
         except Exception:
-            pass
-        return self.fetch_clob_trades(address, limit=limit)
+            activity = []
+        try:
+            clob = self.fetch_clob_trades(address, limit=limit)
+            if clob:
+                return {
+                    "rows": clob,
+                    "source_endpoint": "clob/trades",
+                    "source_quality": "fallback_clob_trades",
+                    "endpoint_attempts": self.request_log[before:],
+                }
+        except Exception:
+            clob = []
+        return {
+            "rows": [],
+            "source_endpoint": "none",
+            "source_quality": "no_trade_rows",
+            "endpoint_attempts": self.request_log[before:],
+        }
 
 
 def fetch_wallet_trades(
@@ -210,7 +253,8 @@ def wallet_profile_dict(
     limit: int = 500,
 ) -> dict[str, Any]:
     active_client = client or PolymarketPublicClient()
-    activity = active_client.fetch_wallet_trades(address, limit=limit)
+    trade_fetch = active_client.fetch_wallet_trades_with_diagnostics(address, limit=limit)
+    activity = trade_fetch["rows"]
     try:
         closed_positions = active_client.fetch_closed_positions(address, limit=limit)
     except Exception:
@@ -223,6 +267,10 @@ def wallet_profile_dict(
         "source": "public_wallet",
         "category": "prediction_market",
         "verified": True,
+        "data_source": trade_fetch["source_endpoint"],
+        "data_quality": trade_fetch["source_quality"],
+        "endpoint_attempts": trade_fetch["endpoint_attempts"],
+        "closed_positions_survivorship_warning": bool(closed_positions and not activity),
         **metrics,
     }
     scored = score_trader(profile_from_dict(profile))
@@ -252,6 +300,7 @@ def build_wallet_report(
             "Read-only: public Polymarket endpoints only.",
             "No private keys, signatures, approvals, or copy-trading execution are used.",
             "Promote to paper_watch only after verified history passes copy-trader scoring.",
+            "Activity/CLOB rows are preferred over closed-positions because closed-positions can be survivorship-biased.",
         ],
     }
 

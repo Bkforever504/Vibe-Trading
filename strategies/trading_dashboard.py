@@ -39,6 +39,12 @@ POLYMARKET_WALLET_REPORT_FILE = REPORT_DIR / "polymarket-wallet-tracker.json"
 POLYMARKET_FED_WHALE_REPORT_FILE = REPORT_DIR / "polymarket-fed-whale-watch.json"
 SOCIAL_ARBITRAGE_REPORT_FILE = REPORT_DIR / "social-arbitrage-watchlist.json"
 STRATEGY_INTAKE_REPORT_FILE = REPORT_DIR / "strategy-intake-report.json"
+SIGNAL_STACK_GRADES_FILE = REPORT_DIR / "signal-stack-grades.json"
+SIGNAL_STACK_LEADERBOARD_FILE = REPORT_DIR / "signal-stack-leaderboard.json"
+SIGNAL_STACK_HEALTH_FILE = REPORT_DIR / "signal-stack-health.json"
+EXECUTION_GATE_AUDIT_FILE = REPORT_DIR / "execution-gate-audit.json"
+NEEDS_REVIEW_QUEUE_FILE = REPORT_DIR / "needs-review-queue.json"
+MARKET_SCHEDULE_ALIGNMENT_FILE = REPORT_DIR / "market-schedule-alignment.json"
 MOMENTUM_SHADOW_LOG_FILE = ROOT / "data" / "momentum_shadow_log.jsonl"
 RSI2_SHADOW_LOG_FILE = ROOT / "data" / "rsi2_shadow_log.jsonl"
 KAMA_SHADOW_LOG_FILE = ROOT / "data" / "kama_shadow_log.jsonl"
@@ -1063,6 +1069,220 @@ def strategy_intake_panel(context: dict) -> str:
     </div>"""
 
 
+def operations_control_room_context(
+    grades_path: Path = SIGNAL_STACK_GRADES_FILE,
+    health_path: Path = SIGNAL_STACK_HEALTH_FILE,
+    audit_path: Path = EXECUTION_GATE_AUDIT_FILE,
+    review_path: Path = NEEDS_REVIEW_QUEUE_FILE,
+    schedule_path: Path = MARKET_SCHEDULE_ALIGNMENT_FILE,
+) -> dict:
+    grades = load_json(grades_path, {})
+    health = load_json(health_path, {})
+    audit = load_json(audit_path, {})
+    review = load_json(review_path, {})
+    schedule = load_json(schedule_path, {})
+
+    grade_items = grades.get("items") if isinstance(grades, dict) else []
+    if not isinstance(grade_items, list):
+        grade_items = []
+
+    top_items = sorted(
+        [item for item in grade_items if isinstance(item, dict)],
+        key=lambda item: (_safe_float(item.get("score")), _safe_float(item.get("sample_count"))),
+        reverse=True,
+    )[:8]
+    flip_item = next((item for item in grade_items if isinstance(item, dict) and item.get("name") == "Flip Bot"), {})
+    iwm_item = next((item for item in grade_items if isinstance(item, dict) and item.get("name") == "IWM Options Bot"), {})
+
+    health_items = health.get("items") if isinstance(health, dict) else []
+    if not isinstance(health_items, list):
+        health_items = []
+    problem_items = [
+        item for item in health_items
+        if isinstance(item, dict) and str(item.get("health", "")).lower() in {"error", "stale", "missing"}
+    ][:8]
+
+    review_items = review.get("items") if isinstance(review, dict) else []
+    if not isinstance(review_items, list):
+        review_items = []
+
+    return {
+        "grades_date": str(grades.get("date", "")) if isinstance(grades, dict) else "",
+        "item_count": int(_safe_float(grades.get("item_count") if isinstance(grades, dict) else 0)),
+        "promotion_ready_count": int(_safe_float(grades.get("promotion_ready_count") if isinstance(grades, dict) else 0)),
+        "by_grade": grades.get("by_grade", {}) if isinstance(grades, dict) and isinstance(grades.get("by_grade"), dict) else {},
+        "by_ops_grade": grades.get("by_ops_grade", {}) if isinstance(grades, dict) and isinstance(grades.get("by_ops_grade"), dict) else {},
+        "top_items": top_items,
+        "flip_item": flip_item if isinstance(flip_item, dict) else {},
+        "iwm_item": iwm_item if isinstance(iwm_item, dict) else {},
+        "health_date": str(health.get("date", "")) if isinstance(health, dict) else "",
+        "health_summary": health.get("summary", {}) if isinstance(health, dict) and isinstance(health.get("summary"), dict) else {},
+        "health_problems": problem_items,
+        "audit_passed": bool(audit.get("passed")) if isinstance(audit, dict) else False,
+        "registered_signal_count": int(_safe_float(audit.get("registered_signal_count") if isinstance(audit, dict) else 0)),
+        "audit_issue_count": int(_safe_float(audit.get("issue_count") if isinstance(audit, dict) else 0)),
+        "audit_warning_count": int(_safe_float(audit.get("warning_count") if isinstance(audit, dict) else 0)),
+        "review_date": str(review.get("date", "")) if isinstance(review, dict) else "",
+        "review_queue_count": int(_safe_float(review.get("queue_count") if isinstance(review, dict) else 0)),
+        "review_by_reason": review.get("by_reason", {}) if isinstance(review, dict) and isinstance(review.get("by_reason"), dict) else {},
+        "review_items": review_items[:5],
+        "schedule_passed": bool(schedule.get("passed")) if isinstance(schedule, dict) else False,
+        "schedule_task_count": int(_safe_float(schedule.get("task_count") if isinstance(schedule, dict) else 0)),
+        "schedule_aligned_count": int(_safe_float(schedule.get("aligned_count") if isinstance(schedule, dict) else 0)),
+        "schedule_issue_count": int(_safe_float(schedule.get("issue_count") if isinstance(schedule, dict) else 0)),
+    }
+
+
+def _grade_counts_text(counts: dict) -> str:
+    parts = [f"{key}: {counts[key]}" for key in sorted(counts) if _safe_float(counts.get(key)) > 0]
+    return ", ".join(parts) if parts else "none"
+
+
+def _grade_cls(value: object) -> str:
+    grade = str(value or "").upper()
+    if grade in {"A", "B"}:
+        return "good"
+    if grade in {"C", "D"}:
+        return "warn"
+    return "bad"
+
+
+def operations_control_room_panel(context: dict) -> str:
+    health_summary = context.get("health_summary") if isinstance(context.get("health_summary"), dict) else {}
+    flip = context.get("flip_item") if isinstance(context.get("flip_item"), dict) else {}
+    iwm = context.get("iwm_item") if isinstance(context.get("iwm_item"), dict) else {}
+    flip_post = flip.get("post_config") if isinstance(flip.get("post_config"), dict) else {}
+    audit_cls = "good" if context.get("audit_passed") and int(_safe_float(context.get("audit_issue_count"))) == 0 else "bad"
+    schedule_cls = "good" if context.get("schedule_issue_count") == 0 else "warn"
+
+    metric_cards = f"""
+      <div class="panel metric"><span>Execution Audit</span><strong class="{audit_cls}">{'PASS' if context.get('audit_passed') else 'CHECK'}</strong><p>{int(_safe_float(context.get('registered_signal_count')))} signals, {int(_safe_float(context.get('audit_issue_count')))} issues, {int(_safe_float(context.get('audit_warning_count')))} warnings</p></div>
+      <div class="panel metric"><span>Scanner Health</span><strong>{int(_safe_float(health_summary.get('ok')))} OK</strong><p>{int(_safe_float(health_summary.get('stale')))} stale, {int(_safe_float(health_summary.get('error')))} error, {int(_safe_float(health_summary.get('missing')))} missing</p></div>
+      <div class="panel metric"><span>Evidence Stack</span><strong>{int(_safe_float(context.get('item_count')))} items</strong><p>Grades: {html.escape(_grade_counts_text(context.get('by_grade', {})))}</p></div>
+      <div class="panel metric"><span>Promotion Ready</span><strong>{int(_safe_float(context.get('promotion_ready_count')))}</strong><p>Promotions still require manual rules review.</p></div>
+      <div class="panel metric"><span>Review Queue</span><strong>{int(_safe_float(context.get('review_queue_count')))}</strong><p>{html.escape(_grade_counts_text(context.get('review_by_reason', {})))}</p></div>
+      <div class="panel metric"><span>Schedule</span><strong class="{schedule_cls}">{int(_safe_float(context.get('schedule_aligned_count')))}/{int(_safe_float(context.get('schedule_task_count')))}</strong><p>{int(_safe_float(context.get('schedule_issue_count')))} task issues</p></div>
+    """
+
+    bot_rows = []
+    if flip:
+        bot_rows.append(
+            "<tr>"
+            "<td><strong>Flip Bot</strong></td>"
+            f"<td class=\"{_grade_cls(flip.get('grade'))}\">{html.escape(str(flip.get('grade') or ''))}</td>"
+            f"<td>{int(_safe_float(flip.get('sample_count')))}</td>"
+            f"<td class=\"{'good' if _safe_float(flip.get('total_pnl')) >= 0 else 'bad'}\">{_money(_safe_float(flip.get('total_pnl')))}</td>"
+            f"<td class=\"{_grade_cls(flip_post.get('grade'))}\">{html.escape(str(flip_post.get('grade') or 'n/a'))}</td>"
+            f"<td class=\"{'good' if _safe_float(flip_post.get('total_pnl')) >= 0 else 'bad'}\">{_money(_safe_float(flip_post.get('total_pnl')))}</td>"
+            f"<td>{_pct(_safe_float(flip_post.get('win_rate')) * 100)}</td>"
+            "</tr>"
+        )
+    if iwm:
+        bot_rows.append(
+            "<tr>"
+            "<td><strong>IWM Options Bot</strong></td>"
+            f"<td class=\"{_grade_cls(iwm.get('grade'))}\">{html.escape(str(iwm.get('grade') or ''))}</td>"
+            f"<td>{int(_safe_float(iwm.get('sample_count')))}</td>"
+            f"<td>{'n/a' if iwm.get('total_pnl') is None else _money(_safe_float(iwm.get('total_pnl')))}</td>"
+            "<td>n/a</td><td>n/a</td><td>n/a</td>"
+            "</tr>"
+        )
+    bot_body = "".join(bot_rows) or '<tr><td colspan="7">No bot grade report loaded yet.</td></tr>'
+
+    grade_rows = []
+    for item in context.get("top_items", []):
+        if not isinstance(item, dict):
+            continue
+        warnings = item.get("warnings") if isinstance(item.get("warnings"), list) else []
+        grade_rows.append(
+            "<tr>"
+            f"<td><strong>{html.escape(str(item.get('name') or ''))}</strong></td>"
+            f"<td>{html.escape(str(item.get('category') or ''))}</td>"
+            f"<td class=\"{_grade_cls(item.get('ops_grade'))}\">{html.escape(str(item.get('ops_grade') or ''))}</td>"
+            f"<td class=\"{_grade_cls(item.get('grade'))}\">{html.escape(str(item.get('grade') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('freshness') or ''))}</td>"
+            f"<td>{int(_safe_float(item.get('sample_count')))}</td>"
+            f"<td>{html.escape(', '.join(str(w) for w in warnings[:2]))}</td>"
+            "</tr>"
+        )
+    grade_body = "".join(grade_rows) or '<tr><td colspan="7">No grade items loaded yet.</td></tr>'
+
+    health_rows = []
+    for item in context.get("health_problems", []):
+        if not isinstance(item, dict):
+            continue
+        warnings = item.get("warnings") if isinstance(item.get("warnings"), list) else []
+        health = str(item.get("health") or "")
+        cls = "bad" if health == "error" else "warn"
+        health_rows.append(
+            "<tr>"
+            f"<td><strong>{html.escape(str(item.get('name') or ''))}</strong></td>"
+            f"<td class=\"{cls}\">{html.escape(health)}</td>"
+            f"<td>{html.escape(str(item.get('kind') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('latest_date') or ''))}</td>"
+            f"<td>{int(_safe_float(item.get('row_count')))}</td>"
+            f"<td>{html.escape('; '.join(str(w) for w in warnings[:2]))}</td>"
+            "</tr>"
+        )
+    health_body = "".join(health_rows) or '<tr><td colspan="6">No scanner health problems reported.</td></tr>'
+
+    review_rows = []
+    for item in context.get("review_items", []):
+        if not isinstance(item, dict):
+            continue
+        review_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(item.get('date') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('bot') or ''))}</td>"
+            f"<td><strong>{html.escape(str(item.get('symbol') or item.get('market_ticker') or ''))}</strong></td>"
+            f"<td>{html.escape(str(item.get('reason') or ''))}</td>"
+            f"<td class=\"warn\">{html.escape(str(item.get('verdict') or ''))}</td>"
+            f"<td>{html.escape(str(item.get('next_action') or ''))}</td>"
+            "</tr>"
+        )
+    review_body = "".join(review_rows) or '<tr><td colspan="6">No manual review items queued.</td></tr>'
+
+    return f"""
+    <div class="control-room">
+      <h2>Operations Control Room</h2>
+      <p class="footer">Read-only snapshot from ~/.vibe-trading/reports. This section surfaces bot health, scanner freshness, evidence quality, and review work without adding execution controls.</p>
+      <div class="grid metrics">{metric_cards}</div>
+      <div class="grid two" style="margin-top: 14px;">
+        <div class="panel">
+          <h2>Bot Evidence Split</h2>
+          <table>
+            <thead><tr><th>Bot</th><th>All-time</th><th>Samples</th><th>All-time P&L</th><th>Post-config</th><th>Post-config P&L</th><th>Post-config Win</th></tr></thead>
+            <tbody>{bot_body}</tbody>
+          </table>
+          <p class="footer">Flip Bot post-config starts after the risk fix; all-time still includes the old sizing artifact.</p>
+        </div>
+        <div class="panel">
+          <h2>Scanner Problems</h2>
+          <table>
+            <thead><tr><th>Name</th><th>Health</th><th>Kind</th><th>Latest</th><th>Rows</th><th>Warnings</th></tr></thead>
+            <tbody>{health_body}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="grid two" style="margin-top: 14px;">
+        <div class="panel">
+          <h2>Top Evidence Items</h2>
+          <table>
+            <thead><tr><th>Name</th><th>Category</th><th>Ops</th><th>Evidence</th><th>Fresh</th><th>Rows</th><th>Warnings</th></tr></thead>
+            <tbody>{grade_body}</tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h2>Needs Review</h2>
+          <table>
+            <thead><tr><th>Date</th><th>Bot</th><th>Symbol</th><th>Reason</th><th>Verdict</th><th>Next Action</th></tr></thead>
+            <tbody>{review_body}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>"""
+
+
 def momentum_shadow_panel(context: dict) -> str:
     warnings = context.get("warnings") if isinstance(context.get("warnings"), list) else []
     warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
@@ -1507,6 +1727,7 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
     fed_whale_context = polymarket_fed_whale_context()
     social_context = social_arbitrage_context()
     intake_context = strategy_intake_context()
+    control_room_context = operations_control_room_context()
     momentum_context = momentum_shadow_context()
     rsi2_context = daily_shadow_context(RSI2_SHADOW_LOG_FILE, "RSI-2 QQQ Shadow")
     kama_context = daily_shadow_context(KAMA_SHADOW_LOG_FILE, "KAMA QQQ Shadow")
@@ -1634,6 +1855,10 @@ def render(account: dict, positions: list[dict], events: list[dict], flips: list
 
   <section class="grid" style="margin-top: 14px;">
     {strategy_intake_panel(intake_context)}
+  </section>
+
+  <section class="grid" style="margin-top: 14px;">
+    {operations_control_room_panel(control_room_context)}
   </section>
 
   <section class="grid" style="margin-top: 14px;">

@@ -1,0 +1,26 @@
+{
+  "firm": "Topstep",
+  "account_type": "TopstepX API / evaluation-style profile",
+  "verified_as_of": "2026-06-21",
+  "automation": {
+    "allowed": true,
+    "status": "allowed_with_conditions",
+    "requires_local_device": true,
+    "notes": "TopstepX API Access describes automated strategy support. The same help page says trading activity must originate from a personal device and VPS/VPN/remote servers are prohibited."
+  },
+  "risk": {
+    "max_daily_loss": 1000,
+    "max_trailing_drawdown": 2000,
+    "max_contracts": 5
+  },
+  "consistency": {
+    "enabled": true,
+    "max_best_day_pct": 0.5,
+    "notes": "Use a conservative consistency cap until the exact account rule is confirmed."
+  },
+  "unknown_rules_block": true,
+  "sources": [
+    "https://help.topstep.com/en/articles/11187768-topstepx-api-access",
+    "https://www.topstep.com/express-funded-account-rules"
+  ]
+}

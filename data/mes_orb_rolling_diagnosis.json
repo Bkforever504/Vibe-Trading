@@ -1,0 +1,286 @@
+{
+  "dataset": "examples\\mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "candidate": {
+    "signal_type": "orb",
+    "breakout_points": 1.0,
+    "reward_risk": 2.0,
+    "stop_ticks": 40,
+    "tolerance_ticks": 4,
+    "exit_model": "full_target_stop",
+    "filter_name": "gap",
+    "range_minutes": 5
+  },
+  "window_sessions": 126,
+  "windows": [
+    {
+      "window": 1,
+      "start": "2022-01-03",
+      "end": "2022-06-30",
+      "sessions": 126,
+      "base": {
+        "trades": 12,
+        "total_pnl": 252.0,
+        "daily_average": 2.0,
+        "expectancy": 21.0,
+        "win_rate": 0.5,
+        "profit_factor": 1.7778,
+        "max_drawdown": 162.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 12,
+        "total_pnl": 204.0,
+        "daily_average": 1.619,
+        "expectancy": 17.0,
+        "win_rate": 0.5,
+        "profit_factor": 1.5862,
+        "max_drawdown": 174.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 2,
+      "start": "2022-07-01",
+      "end": "2022-12-28",
+      "sessions": 126,
+      "base": {
+        "trades": 11,
+        "total_pnl": 6.0,
+        "daily_average": 0.0476,
+        "expectancy": 0.55,
+        "win_rate": 0.3636,
+        "profit_factor": 1.0159,
+        "max_drawdown": 108.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 11,
+        "total_pnl": -38.0,
+        "daily_average": -0.3016,
+        "expectancy": -3.45,
+        "win_rate": 0.3636,
+        "profit_factor": 0.9064,
+        "max_drawdown": 116.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 3,
+      "start": "2022-12-29",
+      "end": "2023-06-28",
+      "sessions": 126,
+      "base": {
+        "trades": 5,
+        "total_pnl": -120.0,
+        "daily_average": -0.9524,
+        "expectancy": -24.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.4444,
+        "max_drawdown": 162.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 5,
+        "total_pnl": -140.0,
+        "daily_average": -1.1111,
+        "expectancy": -28.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.3966,
+        "max_drawdown": 174.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 4,
+      "start": "2023-06-29",
+      "end": "2023-12-26",
+      "sessions": 126,
+      "base": {
+        "trades": 6,
+        "total_pnl": -24.0,
+        "daily_average": -0.1905,
+        "expectancy": -4.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.8889,
+        "max_drawdown": 162.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 6,
+        "total_pnl": -48.0,
+        "daily_average": -0.381,
+        "expectancy": -8.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.7931,
+        "max_drawdown": 174.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 5,
+      "start": "2023-12-27",
+      "end": "2024-06-25",
+      "sessions": 126,
+      "base": {
+        "trades": 4,
+        "total_pnl": 84.0,
+        "daily_average": 0.6667,
+        "expectancy": 21.0,
+        "win_rate": 0.5,
+        "profit_factor": 1.7778,
+        "max_drawdown": 54.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 4,
+        "total_pnl": 68.0,
+        "daily_average": 0.5397,
+        "expectancy": 17.0,
+        "win_rate": 0.5,
+        "profit_factor": 1.5862,
+        "max_drawdown": 58.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 6,
+      "start": "2024-06-26",
+      "end": "2024-12-20",
+      "sessions": 126,
+      "base": {
+        "trades": 6,
+        "total_pnl": 276.0,
+        "daily_average": 2.1905,
+        "expectancy": 46.0,
+        "win_rate": 0.6667,
+        "profit_factor": 3.5556,
+        "max_drawdown": 54.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 6,
+        "total_pnl": 252.0,
+        "daily_average": 2.0,
+        "expectancy": 42.0,
+        "win_rate": 0.6667,
+        "profit_factor": 3.1724,
+        "max_drawdown": 58.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 7,
+      "start": "2024-12-23",
+      "end": "2025-06-24",
+      "sessions": 126,
+      "base": {
+        "trades": 6,
+        "total_pnl": 276.0,
+        "daily_average": 2.1905,
+        "expectancy": 46.0,
+        "win_rate": 0.6667,
+        "profit_factor": 3.5556,
+        "max_drawdown": 108.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 6,
+        "total_pnl": 252.0,
+        "daily_average": 2.0,
+        "expectancy": 42.0,
+        "win_rate": 0.6667,
+        "profit_factor": 3.1724,
+        "max_drawdown": 116.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 8,
+      "start": "2025-06-25",
+      "end": "2025-12-24",
+      "sessions": 126,
+      "base": {
+        "trades": 12,
+        "total_pnl": -48.0,
+        "daily_average": -0.381,
+        "expectancy": -4.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.8889,
+        "max_drawdown": 174.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 12,
+        "total_pnl": -96.0,
+        "daily_average": -0.7619,
+        "expectancy": -8.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.7931,
+        "max_drawdown": 198.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 9,
+      "start": "2025-12-26",
+      "end": "2026-06-29",
+      "sessions": 126,
+      "base": {
+        "trades": 14,
+        "total_pnl": -6.0,
+        "daily_average": -0.0476,
+        "expectancy": -0.43,
+        "win_rate": 0.3571,
+        "profit_factor": 0.9877,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 14,
+        "total_pnl": -62.0,
+        "daily_average": -0.4921,
+        "expectancy": -4.43,
+        "win_rate": 0.3571,
+        "profit_factor": 0.8812,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    },
+    {
+      "window": 10,
+      "start": "2026-06-30",
+      "end": "2026-07-17",
+      "sessions": 14,
+      "base": {
+        "trades": 3,
+        "total_pnl": -12.0,
+        "daily_average": -0.8571,
+        "expectancy": -4.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.8889,
+        "max_drawdown": 108.0,
+        "violations": 0
+      },
+      "double_costs": {
+        "trades": 3,
+        "total_pnl": -24.0,
+        "daily_average": -1.7143,
+        "expectancy": -8.0,
+        "win_rate": 0.3333,
+        "profit_factor": 0.7931,
+        "max_drawdown": 116.0,
+        "violations": 0
+      }
+    }
+  ],
+  "summary": {
+    "window_count": 10,
+    "traded_window_count": 10,
+    "profitable_base_windows": 5,
+    "profitable_double_cost_windows": 4,
+    "aggregate_pnl": 684.0,
+    "aggregate_double_cost_pnl": 368.0,
+    "worst_window_drawdown": 270.0,
+    "worst_double_cost_drawdown": 290.0
+  }
+}

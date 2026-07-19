@@ -1,0 +1,1642 @@
+{
+  "dataset": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\examples\\es_1h_730d_fresh.csv",
+  "trading_dates": 597,
+  "development_dates": 477,
+  "locked_holdout_dates": 120,
+  "grid_candidates": 1600,
+  "executable_only": true,
+  "max_stop_ticks": 40,
+  "development_survivors": 22,
+  "holdout_robust_finalists": 0,
+  "robust_finalists": [],
+  "all_finalists": [
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 7.2121,
+      "development_regimes": [
+        {
+          "trades": 8,
+          "total_pnl": 58.0,
+          "daily_average": 0.3648,
+          "expectancy": 7.25,
+          "win_rate": 0.625,
+          "profit_factor": 1.358,
+          "max_drawdown": 82.0,
+          "violations": 2
+        },
+        {
+          "trades": 13,
+          "total_pnl": 104.25,
+          "daily_average": 0.6557,
+          "expectancy": 8.02,
+          "win_rate": 0.5385,
+          "profit_factor": 1.3374,
+          "max_drawdown": 172.75,
+          "violations": 8
+        },
+        {
+          "trades": 11,
+          "total_pnl": 198.5,
+          "daily_average": 1.2484,
+          "expectancy": 18.05,
+          "win_rate": 0.6364,
+          "profit_factor": 2.1868,
+          "max_drawdown": 108.0,
+          "violations": 3
+        }
+      ],
+      "development": {
+        "trades": 30,
+        "total_pnl": 293.75,
+        "daily_average": 0.6158,
+        "expectancy": 9.79,
+        "win_rate": 0.6,
+        "profit_factor": 1.5028,
+        "max_drawdown": 175.25,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 10,
+        "total_pnl": -297.5,
+        "daily_average": -2.4792,
+        "expectancy": -29.75,
+        "win_rate": 0.2,
+        "profit_factor": 0.3113,
+        "max_drawdown": 378.0,
+        "violations": 1
+      },
+      "holdout_double_costs": {
+        "trades": 10,
+        "total_pnl": -340.0,
+        "daily_average": -2.8333,
+        "expectancy": -34.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.2672,
+        "max_drawdown": 406.0,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 6.8384,
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 227.0,
+          "daily_average": 1.4277,
+          "expectancy": 18.92,
+          "win_rate": 0.5833,
+          "profit_factor": 1.966,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 16,
+          "total_pnl": 117.25,
+          "daily_average": 0.7374,
+          "expectancy": 7.33,
+          "win_rate": 0.5,
+          "profit_factor": 1.2812,
+          "max_drawdown": 172.75,
+          "violations": 8
+        },
+        {
+          "trades": 18,
+          "total_pnl": 108.0,
+          "daily_average": 0.6792,
+          "expectancy": 6.0,
+          "win_rate": 0.5,
+          "profit_factor": 1.2581,
+          "max_drawdown": 190.0,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 452.25,
+        "daily_average": 0.9481,
+        "expectancy": 9.83,
+        "win_rate": 0.5217,
+        "profit_factor": 1.4225,
+        "max_drawdown": 190.0,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 16,
+        "total_pnl": -566.5,
+        "daily_average": -4.7208,
+        "expectancy": -35.41,
+        "win_rate": 0.1875,
+        "profit_factor": 0.193,
+        "max_drawdown": 610.0,
+        "violations": 4
+      },
+      "holdout_double_costs": {
+        "trades": 16,
+        "total_pnl": -634.25,
+        "daily_average": -5.2854,
+        "expectancy": -39.64,
+        "win_rate": 0.125,
+        "profit_factor": 0.1635,
+        "max_drawdown": 672.5,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 5.6009,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 372.25,
+          "daily_average": 2.3412,
+          "expectancy": 17.73,
+          "win_rate": 0.5714,
+          "profit_factor": 1.8465,
+          "max_drawdown": 108.0,
+          "violations": 5
+        },
+        {
+          "trades": 25,
+          "total_pnl": 122.5,
+          "daily_average": 0.7704,
+          "expectancy": 4.9,
+          "win_rate": 0.48,
+          "profit_factor": 1.1861,
+          "max_drawdown": 241.25,
+          "violations": 5
+        },
+        {
+          "trades": 26,
+          "total_pnl": 114.75,
+          "daily_average": 0.7217,
+          "expectancy": 4.41,
+          "win_rate": 0.4231,
+          "profit_factor": 1.2004,
+          "max_drawdown": 209.5,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 72,
+        "total_pnl": 609.5,
+        "daily_average": 1.2778,
+        "expectancy": 8.47,
+        "win_rate": 0.4861,
+        "profit_factor": 1.3649,
+        "max_drawdown": 268.75,
+        "violations": 5
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -412.75,
+        "daily_average": -3.4396,
+        "expectancy": -19.65,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4904,
+        "max_drawdown": 523.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -501.75,
+        "daily_average": -4.1813,
+        "expectancy": -23.89,
+        "win_rate": 0.2381,
+        "profit_factor": 0.4261,
+        "max_drawdown": 599.0,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 1.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 5.2251,
+      "development_regimes": [
+        {
+          "trades": 13,
+          "total_pnl": 134.25,
+          "daily_average": 0.8443,
+          "expectancy": 10.33,
+          "win_rate": 0.6154,
+          "profit_factor": 1.4972,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 18,
+          "total_pnl": 116.75,
+          "daily_average": 0.7343,
+          "expectancy": 6.49,
+          "win_rate": 0.5556,
+          "profit_factor": 1.28,
+          "max_drawdown": 172.75,
+          "violations": 0
+        },
+        {
+          "trades": 18,
+          "total_pnl": 80.5,
+          "daily_average": 0.5063,
+          "expectancy": 4.47,
+          "win_rate": 0.5,
+          "profit_factor": 1.2599,
+          "max_drawdown": 142.5,
+          "violations": 1
+        }
+      ],
+      "development": {
+        "trades": 45,
+        "total_pnl": 271.25,
+        "daily_average": 0.5687,
+        "expectancy": 6.03,
+        "win_rate": 0.5556,
+        "profit_factor": 1.2964,
+        "max_drawdown": 181.25,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 13,
+        "total_pnl": -202.0,
+        "daily_average": -1.6833,
+        "expectancy": -15.54,
+        "win_rate": 0.3077,
+        "profit_factor": 0.5844,
+        "max_drawdown": 290.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 13,
+        "total_pnl": -254.0,
+        "daily_average": -2.1167,
+        "expectancy": -19.54,
+        "win_rate": 0.3077,
+        "profit_factor": 0.5134,
+        "max_drawdown": 330.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "none"
+      },
+      "development_score": 5.108,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 272.25,
+          "daily_average": 1.7123,
+          "expectancy": 12.96,
+          "win_rate": 0.5714,
+          "profit_factor": 1.6191,
+          "max_drawdown": 108.0,
+          "violations": 2
+        },
+        {
+          "trades": 27,
+          "total_pnl": 118.25,
+          "daily_average": 0.7437,
+          "expectancy": 4.38,
+          "win_rate": 0.4815,
+          "profit_factor": 1.166,
+          "max_drawdown": 210.0,
+          "violations": 0
+        },
+        {
+          "trades": 27,
+          "total_pnl": 110.75,
+          "daily_average": 0.6965,
+          "expectancy": 4.1,
+          "win_rate": 0.4444,
+          "profit_factor": 1.1934,
+          "max_drawdown": 263.5,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 75,
+        "total_pnl": 501.25,
+        "daily_average": 1.0508,
+        "expectancy": 6.68,
+        "win_rate": 0.4933,
+        "profit_factor": 1.2907,
+        "max_drawdown": 263.5,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -457.75,
+        "daily_average": -3.8146,
+        "expectancy": -21.8,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4349,
+        "max_drawdown": 543.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -545.5,
+        "daily_average": -4.5458,
+        "expectancy": -25.98,
+        "win_rate": 0.2381,
+        "profit_factor": 0.376,
+        "max_drawdown": 617.75,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "live_vwap"
+      },
+      "development_score": 5.048,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 272.25,
+          "daily_average": 1.7123,
+          "expectancy": 12.96,
+          "win_rate": 0.5714,
+          "profit_factor": 1.6191,
+          "max_drawdown": 108.0,
+          "violations": 2
+        },
+        {
+          "trades": 25,
+          "total_pnl": 143.75,
+          "daily_average": 0.9041,
+          "expectancy": 5.75,
+          "win_rate": 0.48,
+          "profit_factor": 1.2184,
+          "max_drawdown": 210.0,
+          "violations": 0
+        },
+        {
+          "trades": 27,
+          "total_pnl": 110.75,
+          "daily_average": 0.6965,
+          "expectancy": 4.1,
+          "win_rate": 0.4444,
+          "profit_factor": 1.1934,
+          "max_drawdown": 263.5,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 73,
+        "total_pnl": 526.75,
+        "daily_average": 1.1043,
+        "expectancy": 7.22,
+        "win_rate": 0.4932,
+        "profit_factor": 1.3153,
+        "max_drawdown": 263.5,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -457.75,
+        "daily_average": -3.8146,
+        "expectancy": -21.8,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4349,
+        "max_drawdown": 543.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -545.5,
+        "daily_average": -4.5458,
+        "expectancy": -25.98,
+        "win_rate": 0.2381,
+        "profit_factor": 0.376,
+        "max_drawdown": 617.75,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 4.9321,
+      "development_regimes": [
+        {
+          "trades": 13,
+          "total_pnl": 58.0,
+          "daily_average": 0.3648,
+          "expectancy": 4.46,
+          "win_rate": 0.6154,
+          "profit_factor": 1.2148,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 18,
+          "total_pnl": 189.25,
+          "daily_average": 1.1903,
+          "expectancy": 10.51,
+          "win_rate": 0.5556,
+          "profit_factor": 1.4538,
+          "max_drawdown": 172.75,
+          "violations": 0
+        },
+        {
+          "trades": 18,
+          "total_pnl": 141.75,
+          "daily_average": 0.8915,
+          "expectancy": 7.88,
+          "win_rate": 0.5,
+          "profit_factor": 1.4576,
+          "max_drawdown": 142.5,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 45,
+        "total_pnl": 278.75,
+        "daily_average": 0.5844,
+        "expectancy": 6.19,
+        "win_rate": 0.5556,
+        "profit_factor": 1.3046,
+        "max_drawdown": 201.25,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 13,
+        "total_pnl": -154.5,
+        "daily_average": -1.2875,
+        "expectancy": -11.88,
+        "win_rate": 0.3077,
+        "profit_factor": 0.6821,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 13,
+        "total_pnl": -207.75,
+        "daily_average": -1.7312,
+        "expectancy": -15.98,
+        "win_rate": 0.3077,
+        "profit_factor": 0.602,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 4.9321,
+      "development_regimes": [
+        {
+          "trades": 13,
+          "total_pnl": 58.0,
+          "daily_average": 0.3648,
+          "expectancy": 4.46,
+          "win_rate": 0.6154,
+          "profit_factor": 1.2148,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 18,
+          "total_pnl": 266.75,
+          "daily_average": 1.6777,
+          "expectancy": 14.82,
+          "win_rate": 0.5556,
+          "profit_factor": 1.6397,
+          "max_drawdown": 172.75,
+          "violations": 0
+        },
+        {
+          "trades": 18,
+          "total_pnl": 216.75,
+          "daily_average": 1.3632,
+          "expectancy": 12.04,
+          "win_rate": 0.5,
+          "profit_factor": 1.6998,
+          "max_drawdown": 142.5,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 45,
+        "total_pnl": 381.25,
+        "daily_average": 0.7993,
+        "expectancy": 8.47,
+        "win_rate": 0.5556,
+        "profit_factor": 1.4167,
+        "max_drawdown": 201.25,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 13,
+        "total_pnl": -109.5,
+        "daily_average": -0.9125,
+        "expectancy": -8.42,
+        "win_rate": 0.3077,
+        "profit_factor": 0.7747,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 13,
+        "total_pnl": -164.0,
+        "daily_average": -1.3667,
+        "expectancy": -12.62,
+        "win_rate": 0.3077,
+        "profit_factor": 0.6858,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 4.0849,
+      "development_regimes": [
+        {
+          "trades": 8,
+          "total_pnl": 58.0,
+          "daily_average": 0.3648,
+          "expectancy": 7.25,
+          "win_rate": 0.625,
+          "profit_factor": 1.358,
+          "max_drawdown": 82.0,
+          "violations": 2
+        },
+        {
+          "trades": 13,
+          "total_pnl": 54.25,
+          "daily_average": 0.3412,
+          "expectancy": 4.17,
+          "win_rate": 0.5385,
+          "profit_factor": 1.1756,
+          "max_drawdown": 172.75,
+          "violations": 6
+        },
+        {
+          "trades": 11,
+          "total_pnl": 148.5,
+          "daily_average": 0.934,
+          "expectancy": 13.5,
+          "win_rate": 0.6364,
+          "profit_factor": 1.8879,
+          "max_drawdown": 108.0,
+          "violations": 3
+        }
+      ],
+      "development": {
+        "trades": 30,
+        "total_pnl": 218.75,
+        "daily_average": 0.4586,
+        "expectancy": 7.29,
+        "win_rate": 0.6,
+        "profit_factor": 1.3744,
+        "max_drawdown": 175.25,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 10,
+        "total_pnl": -292.5,
+        "daily_average": -2.4375,
+        "expectancy": -29.25,
+        "win_rate": 0.2,
+        "profit_factor": 0.3229,
+        "max_drawdown": 378.0,
+        "violations": 1
+      },
+      "holdout_double_costs": {
+        "trades": 10,
+        "total_pnl": -333.75,
+        "daily_average": -2.7812,
+        "expectancy": -33.38,
+        "win_rate": 0.2,
+        "profit_factor": 0.2807,
+        "max_drawdown": 406.0,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 4.0692,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 272.25,
+          "daily_average": 1.7123,
+          "expectancy": 12.96,
+          "win_rate": 0.5714,
+          "profit_factor": 1.6191,
+          "max_drawdown": 108.0,
+          "violations": 2
+        },
+        {
+          "trades": 25,
+          "total_pnl": 76.25,
+          "daily_average": 0.4796,
+          "expectancy": 3.05,
+          "win_rate": 0.48,
+          "profit_factor": 1.1158,
+          "max_drawdown": 210.0,
+          "violations": 5
+        },
+        {
+          "trades": 26,
+          "total_pnl": 164.75,
+          "daily_average": 1.0362,
+          "expectancy": 6.34,
+          "win_rate": 0.4615,
+          "profit_factor": 1.3177,
+          "max_drawdown": 209.5,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 72,
+        "total_pnl": 513.25,
+        "daily_average": 1.076,
+        "expectancy": 7.13,
+        "win_rate": 0.5,
+        "profit_factor": 1.3175,
+        "max_drawdown": 253.5,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -457.75,
+        "daily_average": -3.8146,
+        "expectancy": -21.8,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4349,
+        "max_drawdown": 543.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -545.5,
+        "daily_average": -4.5458,
+        "expectancy": -25.98,
+        "win_rate": 0.2381,
+        "profit_factor": 0.376,
+        "max_drawdown": 617.75,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 3.9816,
+      "development_regimes": [
+        {
+          "trades": 8,
+          "total_pnl": 115.5,
+          "daily_average": 0.7264,
+          "expectancy": 14.44,
+          "win_rate": 0.75,
+          "profit_factor": 2.0694,
+          "max_drawdown": 54.0,
+          "violations": 2
+        },
+        {
+          "trades": 10,
+          "total_pnl": 73.75,
+          "daily_average": 0.4638,
+          "expectancy": 7.38,
+          "win_rate": 0.5,
+          "profit_factor": 1.2731,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 10,
+          "total_pnl": 37.5,
+          "daily_average": 0.2358,
+          "expectancy": 3.75,
+          "win_rate": 0.6,
+          "profit_factor": 1.1976,
+          "max_drawdown": 81.75,
+          "violations": 7
+        }
+      ],
+      "development": {
+        "trades": 27,
+        "total_pnl": 254.5,
+        "daily_average": 0.5335,
+        "expectancy": 9.43,
+        "win_rate": 0.6296,
+        "profit_factor": 1.4713,
+        "max_drawdown": 162.0,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 11,
+        "total_pnl": -1.5,
+        "daily_average": -0.0125,
+        "expectancy": -0.14,
+        "win_rate": 0.3636,
+        "profit_factor": 0.996,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 11,
+        "total_pnl": -48.0,
+        "daily_average": -0.4,
+        "expectancy": -4.36,
+        "win_rate": 0.3636,
+        "profit_factor": 0.8818,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "none"
+      },
+      "development_score": 3.5508,
+      "development_regimes": [
+        {
+          "trades": 14,
+          "total_pnl": 287.75,
+          "daily_average": 1.8097,
+          "expectancy": 20.55,
+          "win_rate": 0.6429,
+          "profit_factor": 2.286,
+          "max_drawdown": 96.75,
+          "violations": 2
+        },
+        {
+          "trades": 17,
+          "total_pnl": 83.25,
+          "daily_average": 0.5236,
+          "expectancy": 4.9,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1821,
+          "max_drawdown": 162.0,
+          "violations": 4
+        },
+        {
+          "trades": 13,
+          "total_pnl": 43.0,
+          "daily_average": 0.2704,
+          "expectancy": 3.31,
+          "win_rate": 0.5385,
+          "profit_factor": 1.1685,
+          "max_drawdown": 108.0,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 44,
+        "total_pnl": 414.0,
+        "daily_average": 0.8679,
+        "expectancy": 9.41,
+        "win_rate": 0.5455,
+        "profit_factor": 1.4422,
+        "max_drawdown": 243.75,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 18,
+        "total_pnl": -295.75,
+        "daily_average": -2.4646,
+        "expectancy": -16.43,
+        "win_rate": 0.3333,
+        "profit_factor": 0.5436,
+        "max_drawdown": 381.25,
+        "violations": 7
+      },
+      "holdout_double_costs": {
+        "trades": 18,
+        "total_pnl": -371.5,
+        "daily_average": -3.0958,
+        "expectancy": -20.64,
+        "win_rate": 0.2778,
+        "profit_factor": 0.4695,
+        "max_drawdown": 443.75,
+        "violations": 7
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 3.5508,
+      "development_regimes": [
+        {
+          "trades": 14,
+          "total_pnl": 287.75,
+          "daily_average": 1.8097,
+          "expectancy": 20.55,
+          "win_rate": 0.6429,
+          "profit_factor": 2.286,
+          "max_drawdown": 96.75,
+          "violations": 2
+        },
+        {
+          "trades": 17,
+          "total_pnl": 83.25,
+          "daily_average": 0.5236,
+          "expectancy": 4.9,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1821,
+          "max_drawdown": 162.0,
+          "violations": 4
+        },
+        {
+          "trades": 13,
+          "total_pnl": 43.0,
+          "daily_average": 0.2704,
+          "expectancy": 3.31,
+          "win_rate": 0.5385,
+          "profit_factor": 1.1685,
+          "max_drawdown": 108.0,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 44,
+        "total_pnl": 414.0,
+        "daily_average": 0.8679,
+        "expectancy": 9.41,
+        "win_rate": 0.5455,
+        "profit_factor": 1.4422,
+        "max_drawdown": 243.75,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 18,
+        "total_pnl": -295.75,
+        "daily_average": -2.4646,
+        "expectancy": -16.43,
+        "win_rate": 0.3333,
+        "profit_factor": 0.5436,
+        "max_drawdown": 381.25,
+        "violations": 7
+      },
+      "holdout_double_costs": {
+        "trades": 18,
+        "total_pnl": -371.5,
+        "daily_average": -3.0958,
+        "expectancy": -20.64,
+        "win_rate": 0.2778,
+        "profit_factor": 0.4695,
+        "max_drawdown": 443.75,
+        "violations": 7
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "live_vwap"
+      },
+      "development_score": 3.5508,
+      "development_regimes": [
+        {
+          "trades": 14,
+          "total_pnl": 287.75,
+          "daily_average": 1.8097,
+          "expectancy": 20.55,
+          "win_rate": 0.6429,
+          "profit_factor": 2.286,
+          "max_drawdown": 96.75,
+          "violations": 2
+        },
+        {
+          "trades": 17,
+          "total_pnl": 83.25,
+          "daily_average": 0.5236,
+          "expectancy": 4.9,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1821,
+          "max_drawdown": 162.0,
+          "violations": 4
+        },
+        {
+          "trades": 13,
+          "total_pnl": 43.0,
+          "daily_average": 0.2704,
+          "expectancy": 3.31,
+          "win_rate": 0.5385,
+          "profit_factor": 1.1685,
+          "max_drawdown": 108.0,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 44,
+        "total_pnl": 414.0,
+        "daily_average": 0.8679,
+        "expectancy": 9.41,
+        "win_rate": 0.5455,
+        "profit_factor": 1.4422,
+        "max_drawdown": 243.75,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 18,
+        "total_pnl": -295.75,
+        "daily_average": -2.4646,
+        "expectancy": -16.43,
+        "win_rate": 0.3333,
+        "profit_factor": 0.5436,
+        "max_drawdown": 381.25,
+        "violations": 7
+      },
+      "holdout_double_costs": {
+        "trades": 18,
+        "total_pnl": -371.5,
+        "daily_average": -3.0958,
+        "expectancy": -20.64,
+        "win_rate": 0.2778,
+        "profit_factor": 0.4695,
+        "max_drawdown": 443.75,
+        "violations": 7
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 2.6514,
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 177.0,
+          "daily_average": 1.1132,
+          "expectancy": 14.75,
+          "win_rate": 0.5833,
+          "profit_factor": 1.7532,
+          "max_drawdown": 108.0,
+          "violations": 1
+        },
+        {
+          "trades": 16,
+          "total_pnl": 42.25,
+          "daily_average": 0.2657,
+          "expectancy": 2.64,
+          "win_rate": 0.5,
+          "profit_factor": 1.1013,
+          "max_drawdown": 172.75,
+          "violations": 6
+        },
+        {
+          "trades": 18,
+          "total_pnl": 183.0,
+          "daily_average": 1.1509,
+          "expectancy": 10.17,
+          "win_rate": 0.5556,
+          "profit_factor": 1.5021,
+          "max_drawdown": 190.0,
+          "violations": 2
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 402.25,
+        "daily_average": 0.8433,
+        "expectancy": 8.74,
+        "win_rate": 0.5435,
+        "profit_factor": 1.3957,
+        "max_drawdown": 192.5,
+        "violations": 1
+      },
+      "holdout": {
+        "trades": 16,
+        "total_pnl": -561.5,
+        "daily_average": -4.6792,
+        "expectancy": -35.09,
+        "win_rate": 0.1875,
+        "profit_factor": 0.2001,
+        "max_drawdown": 605.0,
+        "violations": 4
+      },
+      "holdout_double_costs": {
+        "trades": 16,
+        "total_pnl": -628.0,
+        "daily_average": -5.2333,
+        "expectancy": -39.25,
+        "win_rate": 0.125,
+        "profit_factor": 0.1718,
+        "max_drawdown": 666.25,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "none"
+      },
+      "development_score": 2.6292,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 372.25,
+          "daily_average": 2.3412,
+          "expectancy": 17.73,
+          "win_rate": 0.5714,
+          "profit_factor": 1.8465,
+          "max_drawdown": 108.0,
+          "violations": 5
+        },
+        {
+          "trades": 27,
+          "total_pnl": 189.5,
+          "daily_average": 1.1918,
+          "expectancy": 7.02,
+          "win_rate": 0.4815,
+          "profit_factor": 1.2661,
+          "max_drawdown": 241.25,
+          "violations": 0
+        },
+        {
+          "trades": 27,
+          "total_pnl": 60.75,
+          "daily_average": 0.3821,
+          "expectancy": 2.25,
+          "win_rate": 0.4074,
+          "profit_factor": 1.097,
+          "max_drawdown": 263.5,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 75,
+        "total_pnl": 622.5,
+        "daily_average": 1.305,
+        "expectancy": 8.3,
+        "win_rate": 0.48,
+        "profit_factor": 1.35,
+        "max_drawdown": 268.75,
+        "violations": 5
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -412.75,
+        "daily_average": -3.4396,
+        "expectancy": -19.65,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4904,
+        "max_drawdown": 523.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -501.75,
+        "daily_average": -4.1813,
+        "expectancy": -23.89,
+        "win_rate": 0.2381,
+        "profit_factor": 0.4261,
+        "max_drawdown": 599.0,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "live_vwap"
+      },
+      "development_score": 2.5692,
+      "development_regimes": [
+        {
+          "trades": 21,
+          "total_pnl": 372.25,
+          "daily_average": 2.3412,
+          "expectancy": 17.73,
+          "win_rate": 0.5714,
+          "profit_factor": 1.8465,
+          "max_drawdown": 108.0,
+          "violations": 5
+        },
+        {
+          "trades": 25,
+          "total_pnl": 215.0,
+          "daily_average": 1.3522,
+          "expectancy": 8.6,
+          "win_rate": 0.48,
+          "profit_factor": 1.3266,
+          "max_drawdown": 241.25,
+          "violations": 0
+        },
+        {
+          "trades": 27,
+          "total_pnl": 60.75,
+          "daily_average": 0.3821,
+          "expectancy": 2.25,
+          "win_rate": 0.4074,
+          "profit_factor": 1.097,
+          "max_drawdown": 263.5,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 73,
+        "total_pnl": 648.0,
+        "daily_average": 1.3585,
+        "expectancy": 8.88,
+        "win_rate": 0.4795,
+        "profit_factor": 1.3758,
+        "max_drawdown": 268.75,
+        "violations": 5
+      },
+      "holdout": {
+        "trades": 21,
+        "total_pnl": -412.75,
+        "daily_average": -3.4396,
+        "expectancy": -19.65,
+        "win_rate": 0.2857,
+        "profit_factor": 0.4904,
+        "max_drawdown": 523.25,
+        "violations": 8
+      },
+      "holdout_double_costs": {
+        "trades": 21,
+        "total_pnl": -501.75,
+        "daily_average": -4.1813,
+        "expectancy": -23.89,
+        "win_rate": 0.2381,
+        "profit_factor": 0.4261,
+        "max_drawdown": 599.0,
+        "violations": 8
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "none"
+      },
+      "development_score": 2.5192,
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 227.0,
+          "daily_average": 1.4277,
+          "expectancy": 18.92,
+          "win_rate": 0.5833,
+          "profit_factor": 1.966,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 17,
+          "total_pnl": 63.25,
+          "daily_average": 0.3978,
+          "expectancy": 3.72,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1343,
+          "max_drawdown": 172.75,
+          "violations": 8
+        },
+        {
+          "trades": 19,
+          "total_pnl": 54.0,
+          "daily_average": 0.3396,
+          "expectancy": 2.84,
+          "win_rate": 0.4737,
+          "profit_factor": 1.1143,
+          "max_drawdown": 244.0,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 48,
+        "total_pnl": 344.25,
+        "daily_average": 0.7217,
+        "expectancy": 7.17,
+        "win_rate": 0.5,
+        "profit_factor": 1.2921,
+        "max_drawdown": 244.0,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 16,
+        "total_pnl": -566.5,
+        "daily_average": -4.7208,
+        "expectancy": -35.41,
+        "win_rate": 0.1875,
+        "profit_factor": 0.193,
+        "max_drawdown": 610.0,
+        "violations": 4
+      },
+      "holdout_double_costs": {
+        "trades": 16,
+        "total_pnl": -634.25,
+        "daily_average": -5.2854,
+        "expectancy": -39.64,
+        "win_rate": 0.125,
+        "profit_factor": 0.1635,
+        "max_drawdown": 672.5,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "live_vwap"
+      },
+      "development_score": 2.4592,
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 227.0,
+          "daily_average": 1.4277,
+          "expectancy": 18.92,
+          "win_rate": 0.5833,
+          "profit_factor": 1.966,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 15,
+          "total_pnl": 88.75,
+          "daily_average": 0.5582,
+          "expectancy": 5.92,
+          "win_rate": 0.4667,
+          "profit_factor": 1.2128,
+          "max_drawdown": 172.75,
+          "violations": 7
+        },
+        {
+          "trades": 19,
+          "total_pnl": 54.0,
+          "daily_average": 0.3396,
+          "expectancy": 2.84,
+          "win_rate": 0.4737,
+          "profit_factor": 1.1143,
+          "max_drawdown": 244.0,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 369.75,
+        "daily_average": 0.7752,
+        "expectancy": 8.04,
+        "win_rate": 0.5,
+        "profit_factor": 1.3288,
+        "max_drawdown": 244.0,
+        "violations": 3
+      },
+      "holdout": {
+        "trades": 16,
+        "total_pnl": -566.5,
+        "daily_average": -4.7208,
+        "expectancy": -35.41,
+        "win_rate": 0.1875,
+        "profit_factor": 0.193,
+        "max_drawdown": 610.0,
+        "violations": 4
+      },
+      "holdout_double_costs": {
+        "trades": 16,
+        "total_pnl": -634.25,
+        "daily_average": -5.2854,
+        "expectancy": -39.64,
+        "win_rate": 0.125,
+        "profit_factor": 0.1635,
+        "max_drawdown": 672.5,
+        "violations": 1
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 1.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 2.0719,
+      "development_regimes": [
+        {
+          "trades": 8,
+          "total_pnl": 134.25,
+          "daily_average": 0.8443,
+          "expectancy": 16.78,
+          "win_rate": 0.625,
+          "profit_factor": 1.8287,
+          "max_drawdown": 54.0,
+          "violations": 2
+        },
+        {
+          "trades": 13,
+          "total_pnl": 31.75,
+          "daily_average": 0.1997,
+          "expectancy": 2.44,
+          "win_rate": 0.5385,
+          "profit_factor": 1.1028,
+          "max_drawdown": 172.75,
+          "violations": 1
+        },
+        {
+          "trades": 11,
+          "total_pnl": 112.25,
+          "daily_average": 0.706,
+          "expectancy": 10.2,
+          "win_rate": 0.6364,
+          "profit_factor": 1.6712,
+          "max_drawdown": 108.0,
+          "violations": 1
+        }
+      ],
+      "development": {
+        "trades": 30,
+        "total_pnl": 261.25,
+        "daily_average": 0.5477,
+        "expectancy": 8.71,
+        "win_rate": 0.6,
+        "profit_factor": 1.4472,
+        "max_drawdown": 172.75,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 10,
+        "total_pnl": -290.0,
+        "daily_average": -2.4167,
+        "expectancy": -29.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.3287,
+        "max_drawdown": 378.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 10,
+        "total_pnl": -330.0,
+        "daily_average": -2.75,
+        "expectancy": -33.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.2888,
+        "max_drawdown": 406.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 5.0,
+        "reward_risk": 1.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 16,
+        "exit_model": "full_target_stop",
+        "filter_name": "ema20"
+      },
+      "development_score": 1.2456,
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 87.0,
+          "daily_average": 0.5472,
+          "expectancy": 7.25,
+          "win_rate": 0.5833,
+          "profit_factor": 1.3702,
+          "max_drawdown": 108.0,
+          "violations": 0
+        },
+        {
+          "trades": 16,
+          "total_pnl": 23.5,
+          "daily_average": 0.1478,
+          "expectancy": 1.47,
+          "win_rate": 0.5625,
+          "profit_factor": 1.0647,
+          "max_drawdown": 136.5,
+          "violations": 0
+        },
+        {
+          "trades": 18,
+          "total_pnl": 121.75,
+          "daily_average": 0.7657,
+          "expectancy": 6.76,
+          "win_rate": 0.6111,
+          "profit_factor": 1.3698,
+          "max_drawdown": 190.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 232.25,
+        "daily_average": 0.4869,
+        "expectancy": 5.05,
+        "win_rate": 0.587,
+        "profit_factor": 1.2505,
+        "max_drawdown": 190.0,
+        "violations": 0
+      },
+      "holdout": {
+        "trades": 16,
+        "total_pnl": -564.0,
+        "daily_average": -4.7,
+        "expectancy": -35.25,
+        "win_rate": 0.1875,
+        "profit_factor": 0.1966,
+        "max_drawdown": 610.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 16,
+        "total_pnl": -628.0,
+        "daily_average": -5.2333,
+        "expectancy": -39.25,
+        "win_rate": 0.1875,
+        "profit_factor": 0.1671,
+        "max_drawdown": 670.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 3.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20"
+      },
+      "development_score": 1.1672,
+      "development_regimes": [
+        {
+          "trades": 8,
+          "total_pnl": 115.5,
+          "daily_average": 0.7264,
+          "expectancy": 14.44,
+          "win_rate": 0.75,
+          "profit_factor": 2.0694,
+          "max_drawdown": 54.0,
+          "violations": 2
+        },
+        {
+          "trades": 10,
+          "total_pnl": 46.25,
+          "daily_average": 0.2909,
+          "expectancy": 4.62,
+          "win_rate": 0.5,
+          "profit_factor": 1.1713,
+          "max_drawdown": 108.0,
+          "violations": 3
+        },
+        {
+          "trades": 10,
+          "total_pnl": 12.5,
+          "daily_average": 0.0786,
+          "expectancy": 1.25,
+          "win_rate": 0.6,
+          "profit_factor": 1.0659,
+          "max_drawdown": 81.75,
+          "violations": 6
+        }
+      ],
+      "development": {
+        "trades": 27,
+        "total_pnl": 202.0,
+        "daily_average": 0.4235,
+        "expectancy": 7.48,
+        "win_rate": 0.6296,
+        "profit_factor": 1.3741,
+        "max_drawdown": 162.0,
+        "violations": 2
+      },
+      "holdout": {
+        "trades": 11,
+        "total_pnl": -46.5,
+        "daily_average": -0.3875,
+        "expectancy": -4.23,
+        "win_rate": 0.3636,
+        "profit_factor": 0.877,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "holdout_double_costs": {
+        "trades": 11,
+        "total_pnl": -91.75,
+        "daily_average": -0.7646,
+        "expectancy": -8.34,
+        "win_rate": 0.3636,
+        "profit_factor": 0.774,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    }
+  ]
+}

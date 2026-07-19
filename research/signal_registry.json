@@ -1,0 +1,2061 @@
+{
+    "version":  "2026-07-14",
+    "policy":  {
+                   "default_state":  "context_only",
+                   "promotion_gate":  "30 trading days, 10 relevant samples, improved outcome metrics, no overtrading, dual Codex/Claude review",
+                   "execution_change_rule":  "Any change that can submit orders, alter guard thresholds, or change live flags requires explicit user approval.",
+                   "known_order_capable_scripts":  [
+                                                       "strategies/flip_bot.py",
+                                                       "strategies/iwm_options_bot.py"
+                                                   ],
+                   "known_read_only_order_history_scripts":  [
+                                                                 "strategies/pnl_tracker.py",
+                                                                 "strategies/trading_dashboard.py"
+                                                             ]
+               },
+    "signals":  [
+                    {
+                        "id":  "pnl_tracker",
+                        "name":  "P\u0026L Tracker",
+                        "script":  "strategies/pnl_tracker.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "can_read_order_history":  true,
+                        "broker_or_venue":  "alpaca_read_only",
+                        "feeds":  [
+                                      "manual_review"
+                                  ],
+                        "evidence_gate":  "Read-only order history only.",
+                        "notes":  "Reads Alpaca closed orders. Must not submit orders."
+                    },
+                    {
+                        "id":  "trading_dashboard",
+                        "name":  "Trading Dashboard",
+                        "script":  "strategies/trading_dashboard.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "can_read_order_history":  true,
+                        "broker_or_venue":  "alpaca_read_only",
+                        "feeds":  [
+                                      "manual_review"
+                                  ],
+                        "evidence_gate":  "Dashboard only.",
+                        "notes":  "Reads orders/reports and renders dashboard. Must not submit orders."
+                    },
+                    {
+                        "id":  "execution_gate_audit",
+                        "name":  "Execution Gate Audit",
+                        "script":  "scripts/execution_gate_audit.py",
+                        "runner":  "scripts/run_execution_gate_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/execution_gate_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "governance"
+                                  ],
+                        "evidence_gate":  "Governance only.",
+                        "notes":  "Scans source code for order patterns. Contains pattern strings by design."
+                    },
+                    {
+                        "id":  "flip_bot",
+                        "name":  "Flip Bot",
+                        "script":  "strategies/flip_bot.py",
+                        "runner":  "scripts/run_flip_bot_entry.ps1",
+                        "scheduled_tasks":  [
+                                                "Flip-Bot-Entry",
+                                                "Flip-Bot-Trend-Entry",
+                                                "Flip-Bot-Monitor"
+                                            ],
+                        "log_path":  "~/.vibe-trading/flip-trades.json",
+                        "config_change_date":  "2026-06-26",
+                        "post_config_start_date":  "2026-06-29",
+                        "post_config_label":  "post_risk_fix",
+                        "config_change_notes":  "Pre-fix 2026-06-23 loss used 25pct risk and 69 contracts. Post-fix evaluation starts with capped 5-contract trades after MAX_RISK_PCT=2pct and MAX_CONTRACTS=5.",
+                        "status":  "execution_capable_paper",
+                        "execution_enabled":  true,
+                        "can_submit_orders":  true,
+                        "broker_or_venue":  "alpaca",
+                        "feeds":  [
+                                      "alpaca_options_execution",
+                                      "daily_outcome_reviewer",
+                                      "closed_trade_postmortem"
+                                  ],
+                        "evidence_gate":  "Already order-capable in guarded paper mode. Live requires FLIP_LIVE_EXECUTION_ENABLED, explicit Kenny approval, execution_gate_audit, strategy_leak_audit, and postmortem evidence. Stop conditions include shared execution_guard, kill switch/manual reset, 2pct MAX_RISK_PCT, MAX_CONTRACTS=5, -50pct stop loss, +75pct target, and profit-protect ratchet.",
+                        "notes":  "Known execution bot. Non-goals: no autonomous live promotion, no self-approval, no bypass of guardrails. Forbidden actions: no broker wiring or risk-threshold changes without explicit approval. Separate verifier: execution_gate_audit plus closed_trade_postmortem.",
+                        "config_change_note":  "MAX_RISK_PCT reduced from 0.25 to 0.02 (2%). MAX_CONTRACTS capped at 5. Prior to this date, one 69-contract blowup caused -$11,557 loss dominating total PnL. Post-fix sample window: 2026-06-26 onward. Evidence grades and total PnL before this date reflect misconfiguration, not strategy quality. Post-fix win rate: 7/7 wins, every trade 2026-06-29 onward hit profit target or profit protect."
+                    },
+                    {
+                        "id":  "iwm_options_bot",
+                        "name":  "IWM Options Bot",
+                        "script":  "strategies/iwm_options_bot.py",
+                        "runner":  "scripts/run_iwm_bot_entry.ps1",
+                        "scheduled_tasks":  [
+                                                "IWM-Bot-Entry",
+                                                "IWM-Bot-Monitor"
+                                            ],
+                        "log_path":  "~/.vibe-trading/options-trades.json",
+                        "status":  "execution_capable_paper",
+                        "execution_enabled":  true,
+                        "can_submit_orders":  true,
+                        "broker_or_venue":  "alpaca",
+                        "feeds":  [
+                                      "alpaca_options_execution",
+                                      "daily_outcome_reviewer",
+                                      "closed_trade_postmortem"
+                                  ],
+                        "evidence_gate":  "Already order-capable in guarded paper mode. Live requires OPTIONS_LIVE_EXECUTION_ENABLED, ALPACA_PAPER=false, explicit Kenny approval, execution_gate_audit, strategy_leak_audit, and postmortem evidence. Stop conditions include shared execution_guard, kill switch/manual reset, MAX_CONTRACTS_PER_ORDER=5, MAX_DAILY_LOSS_PCT kill switch, spread stop loss, max trades per day, and grouped state recovery.",
+                        "notes":  "Known execution bot. Non-goals: no autonomous live promotion, no self-approval, no bypass of guardrails. Forbidden actions: no broker wiring or risk-threshold changes without explicit approval. Separate verifier: execution_gate_audit plus closed_trade_postmortem."
+                    },
+                    {
+                        "id":  "portfolio_monitor",
+                        "name":  "Portfolio Monitor",
+                        "script":  "strategies/portfolio_monitor.py",
+                        "runner":  "scripts/run_portfolio_monitor.ps1",
+                        "scheduled_tasks":  [
+                                                "VibeTrading-Portfolio-Monitor"
+                                            ],
+                        "log_path":  "~/.vibe-trading/logs/portfolio-monitor-task.log",
+                        "status":  "risk_guard",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca",
+                        "feeds":  [
+                                      "portfolio_kill_switch"
+                                  ],
+                        "evidence_gate":  "Risk control only.",
+                        "notes":  "Can write kill-switch block files but must not submit orders."
+                    },
+                    {
+                        "id":  "mnq_shadow_scanner",
+                        "name":  "MNQ Shadow Scanner",
+                        "script":  "strategies/shadow_pullback_signal.py",
+                        "runner":  "scripts/setup_task_scheduler.ps1",
+                        "scheduled_tasks":  [
+                                                "VibeTradingShadowScanner"
+                                            ],
+                        "log_path":  "data/shadow_signals.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "mnq_forward_test"
+                                  ],
+                        "evidence_gate":  "30+ shadow signals and prop-rule review before any execution path.",
+                        "notes":  "No orders. MNQ validation only."
+                    },
+                    {
+                        "id":  "rsi2_shadow",
+                        "name":  "RSI-2 QQQ Shadow Logger",
+                        "script":  "scripts/rsi2_shadow_logger.py",
+                        "runner":  "scripts/run_rsi2_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "RSI2ShadowLogger"
+                                            ],
+                        "log_path":  "data/rsi2_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 days and 10 entry signals before promotion review.",
+                        "notes":  "Mean-reversion shadow candidate."
+                    },
+                    {
+                        "id":  "kama_shadow",
+                        "name":  "KAMA QQQ Shadow Logger",
+                        "script":  "scripts/kama_shadow_logger.py",
+                        "runner":  "scripts/run_kama_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "KAMAShadowLogger"
+                                            ],
+                        "log_path":  "data/kama_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 days and 10 entry signals before promotion review.",
+                        "notes":  "Trend-following shadow candidate."
+                    },
+                    {
+                        "id":  "williams_r_shadow",
+                        "name":  "Williams %R Shadow Logger",
+                        "script":  "scripts/williams_r_shadow_logger.py",
+                        "runner":  "scripts/run_williams_r_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "WilliamsRShadowLogger"
+                                            ],
+                        "log_path":  "data/williams_r_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "overlap_reports"
+                                  ],
+                        "evidence_gate":  "30 days and 10 entry signals before promotion review.",
+                        "notes":  "Orthogonal to RSI-2 based on initial overlap report."
+                    },
+                    {
+                        "id":  "momentum_rotation",
+                        "name":  "Momentum Rotation Shadow Logger",
+                        "script":  "scripts/momentum_shadow_logger.py",
+                        "runner":  "scripts/setup_task_scheduler.ps1",
+                        "scheduled_tasks":  [
+                                                "MomentumShadowLogger"
+                                            ],
+                        "log_path":  "data/momentum_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "overlap_reports"
+                                  ],
+                        "evidence_gate":  "30 days and 10 signals before promotion review.",
+                        "notes":  "Validated paper candidate, still shadow-only."
+                    },
+                    {
+                        "id":  "qqq_gld_rotation",
+                        "name":  "QQQ/GLD Rotation Shadow Logger",
+                        "script":  "scripts/qqq_gld_shadow_logger.py",
+                        "runner":  "scripts/run_qqq_gld_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "QQQGLDShadowLogger"
+                                            ],
+                        "log_path":  "data/qqq_gld_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "overlap_reports"
+                                  ],
+                        "evidence_gate":  "30 days and 10 signals before promotion review.",
+                        "notes":  "Rotation candidate, no orders."
+                    },
+                    {
+                        "id":  "ttm_squeeze",
+                        "name":  "TTM Squeeze Shadow Logger",
+                        "script":  "scripts/ttm_squeeze_shadow_logger.py",
+                        "runner":  "scripts/run_ttm_squeeze_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "TTMSqueezeShadowLogger"
+                                            ],
+                        "log_path":  "data/ttm_squeeze_shadow_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "flip_bot_context"
+                                  ],
+                        "evidence_gate":  "30 days before any gate. Currently context only.",
+                        "notes":  "Flip Bot logs squeeze state but does not gate on it."
+                    },
+                    {
+                        "id":  "wavetrend",
+                        "name":  "WaveTrend Shadow Logger",
+                        "script":  "scripts/wavetrend_shadow_logger.py",
+                        "runner":  "scripts/run_wavetrend_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "WaveTrendShadowLogger"
+                                            ],
+                        "log_path":  "data/wavetrend_shadow_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "market_force_score"
+                                  ],
+                        "evidence_gate":  "30 days before any gate. Currently context only.",
+                        "notes":  "Market Cipher style momentum context."
+                    },
+                    {
+                        "id":  "smc",
+                        "name":  "SMC Shadow Logger",
+                        "script":  "scripts/smc_shadow_logger.py",
+                        "runner":  "scripts/run_smc_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "SMCShadowLogger"
+                                            ],
+                        "log_path":  "data/smc_shadow_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "market_force_score"
+                                  ],
+                        "evidence_gate":  "30 days before any gate. Currently context only.",
+                        "notes":  "Fallback SMC approximation unless external package works."
+                    },
+                    {
+                        "id":  "gex_scanner",
+                        "name":  "GEX Scanner",
+                        "script":  "scripts/gex_scanner.py",
+                        "runner":  "scripts/run_gex_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "GEXScanner"
+                                            ],
+                        "log_path":  "data/gex_scan_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Only provenance-qualified 0DTE rows with at least 60% open-interest coverage may feed the read-only market-force report. Thirty forward days plus OOS proof and explicit approval are required before any execution discussion.",
+                        "notes":  "Call-minus-put gamma/open-interest proxy only. Dealer inventory and trade direction are not observed. Displayed quote size is never substituted for open interest, and all-expiration fallback is forbidden."
+                    },
+                    {
+                        "id":  "ivr_scanner",
+                        "name":  "IVR Scanner",
+                        "script":  "scripts/ivr_scanner.py",
+                        "runner":  "scripts/run_ivr_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "IVRScanner"
+                                            ],
+                        "log_path":  "data/iv_history_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "iwm_options_context"
+                                  ],
+                        "evidence_gate":  "30 days before tightening IVR gates.",
+                        "notes":  "IWM bot may read IVR context, but this scanner does not submit orders."
+                    },
+                    {
+                        "id":  "ivr_quality_report",
+                        "name":  "IVR Quality Report",
+                        "script":  "scripts/ivr_quality_report.py",
+                        "runner":  "scripts/run_ivr_quality_report.ps1",
+                        "scheduled_tasks":  [
+                                                "IVRQualityReport"
+                                            ],
+                        "log_path":  "data/ivr_quality_report_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_activity_csv",
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_health_report"
+                                  ],
+                        "evidence_gate":  "Review only. IVR gate changes still require 30 days of usable readings.",
+                        "notes":  "Grades whether Alpaca ATM IV readings are present and mature enough for true IVR."
+                    },
+                    {
+                        "id":  "rv_iv_regime",
+                        "name":  "RV/IV Regime Scanner",
+                        "script":  "scripts/realized_implied_vol_scanner.py",
+                        "runner":  "scripts/run_realized_implied_vol_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "RVIVRegimeScanner"
+                                            ],
+                        "log_path":  "data/rv_iv_regime_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 days before any strategy-family gate.",
+                        "notes":  "Compares realized volatility to ATM implied volatility to label momentum vs premium/mean-reversion context."
+                    },
+                    {
+                        "id":  "hurst_regime",
+                        "name":  "Hurst Regime Scanner",
+                        "script":  "scripts/hurst_regime_scanner.py",
+                        "runner":  "scripts/run_hurst_regime_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "HurstRegimeScanner"
+                                            ],
+                        "log_path":  "data/hurst_regime_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 days before any strategy-family gate.",
+                        "notes":  "Estimates Hurst exponent to label trend persistence vs mean-reversion context. It is not bullish/bearish direction."
+                    },
+                    {
+                        "id":  "opening_range_breadth",
+                        "name":  "Opening Range Breadth Scanner",
+                        "script":  "scripts/opening_range_breadth_scanner.py",
+                        "runner":  "scripts/run_opening_range_breadth_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "OpeningRangeBreadthScanner"
+                                            ],
+                        "log_path":  "data/opening_range_breadth_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score"
+                                  ],
+                        "evidence_gate":  "30 days before any gate.",
+                        "notes":  "Trend breadth context."
+                    },
+                    {
+                        "id":  "relative_volume",
+                        "name":  "Relative Volume Scanner",
+                        "script":  "scripts/relative_volume_scanner.py",
+                        "runner":  "scripts/run_relative_volume_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "RelativeVolumeScanner"
+                                            ],
+                        "log_path":  "data/relative_volume_scan_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 days before any gate.",
+                        "notes":  "Volume participation context."
+                    },
+                    {
+                        "id":  "sec_insider_buying",
+                        "name":  "SEC Insider Buying Scanner",
+                        "script":  "scripts/sec_insider_buying_scanner.py",
+                        "runner":  "scripts/run_sec_insider_buying_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "SECInsiderBuyingScanner"
+                                            ],
+                        "log_path":  "data/sec_insider_buying_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "sec_public",
+                        "feeds":  [
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Research context only.",
+                        "notes":  "No broker calls."
+                    },
+                    {
+                        "id":  "distribution_day",
+                        "name":  "Distribution Day Scanner",
+                        "script":  "scripts/distribution_day_scanner.py",
+                        "runner":  "scripts/run_distribution_day_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "DistributionDayScanner"
+                                            ],
+                        "log_path":  "data/distribution_day_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "regime_memory"
+                                  ],
+                        "evidence_gate":  "30 days before any posture gate.",
+                        "notes":  "Institutional selling context."
+                    },
+                    {
+                        "id":  "market_breadth",
+                        "name":  "Market Breadth Uptrend Scanner",
+                        "script":  "scripts/market_breadth_uptrend_scanner.py",
+                        "runner":  "scripts/run_market_breadth_uptrend_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "MarketBreadthUptrendScanner"
+                                            ],
+                        "log_path":  "data/market_breadth_uptrend_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "public_csv",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "regime_memory"
+                                  ],
+                        "evidence_gate":  "30 days before any posture gate.",
+                        "notes":  "Breadth/uptrend context."
+                    },
+                    {
+                        "id":  "sector_rotation",
+                        "name":  "Sector Rotation Ranker",
+                        "script":  "scripts/sector_rotation_ranker.py",
+                        "runner":  "scripts/run_sector_rotation_ranker.ps1",
+                        "scheduled_tasks":  [
+                                                "SectorRotationRanker"
+                                            ],
+                        "log_path":  "data/sector_rotation_rank_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "market_data",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "regime_memory"
+                                  ],
+                        "evidence_gate":  "30 days before any posture gate.",
+                        "notes":  "Daily sector leadership context."
+                    },
+                    {
+                        "id":  "social_trending",
+                        "name":  "Social Trending Symbols Scanner",
+                        "script":  "scripts/social_trending_symbols_scanner.py",
+                        "runner":  "scripts/run_social_trending_symbols_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "SocialTrendingSymbolsScanner"
+                                            ],
+                        "log_path":  "data/social_trending_symbols_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "stocktwits_public",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "social_persistence"
+                                  ],
+                        "evidence_gate":  "2+ weeks of persistence/outcome review before any scoring change.",
+                        "notes":  "Social context only."
+                    },
+                    {
+                        "id":  "public_social_intake",
+                        "name":  "Public Social Intake Scanner",
+                        "script":  "scripts/public_social_intake_scanner.py",
+                        "runner":  "scripts/run_public_social_intake_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\PublicSocialIntake"
+                                            ],
+                        "log_path":  "data/public_social_intake_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "reddit_public_rss",
+                        "feeds":  [
+                                      "social_arbitrage_watchlist",
+                                      "weekly_hot_instruments",
+                                      "daily_activity_csv",
+                                      "signal_stack_health_report"
+                                  ],
+                        "evidence_gate":  "2+ weeks of public-source persistence review before any scoring change. No symbol promotion without 30 trading days and 10 completed shadow samples.",
+                        "notes":  "Autonomously collects public Reddit RSS cashtag observations into ~/.vibe-trading/social-arb-observations.json. No logged-in scraping and no orders."
+                    },
+                    {
+                        "id":  "deep_liquid_universe_scanner",
+                        "name":  "Deep Liquid Universe Scanner",
+                        "script":  "scripts/deep_liquid_universe_scanner.py",
+                        "runner":  "scripts/run_deep_liquid_universe_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\DeepLiquidUniverseScanner"
+                                            ],
+                        "log_path":  "data/deep_liquid_universe_scan_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data",
+                        "feeds":  [
+                                      "weekly_hot_instruments",
+                                      "daily_activity_csv",
+                                      "signal_stack_health_report",
+                                      "shadow_universe_review"
+                                  ],
+                        "evidence_gate":  "30 trading days and 10 completed shadow samples before adding any symbol to an execution universe.",
+                        "notes":  "Ranks a broad liquid stocks/ETF universe by dollar volume, relative volume, momentum, and social persistence. Designed to discover AAPL-style misses without trading thin names."
+                    },
+                    {
+                        "id":  "social_persistence",
+                        "name":  "Social Trending Persistence Report",
+                        "script":  "scripts/social_trending_persistence_report.py",
+                        "runner":  "scripts/run_social_trending_persistence_report.ps1",
+                        "scheduled_tasks":  [
+                                                "SocialTrendingPersistenceReport"
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/social-trending-persistence.json",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_review"
+                                  ],
+                        "evidence_gate":  "2+ weeks before conclusions.",
+                        "notes":  "Analyzes persistence, no orders."
+                    },
+                    {
+                        "id":  "preopen_sentiment",
+                        "name":  "PreOpen Sentiment Logger",
+                        "script":  "scripts/preopen_sentiment_logger.py",
+                        "runner":  "scripts/run_preopen_sentiment_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "PreOpenSentimentLogger"
+                                            ],
+                        "log_path":  "data/preopen_sentiment_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "stocktwits_public",
+                        "feeds":  [
+                                      "market_force_score"
+                                  ],
+                        "evidence_gate":  "30 days before any gate.",
+                        "notes":  "SPY/QQQ pre-open sentiment context."
+                    },
+                    {
+                        "id":  "limitless_market",
+                        "name":  "Limitless Market Scanner",
+                        "script":  "scripts/limitless_market_scanner.py",
+                        "runner":  "scripts/run_limitless_market_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "LimitlessMarketScanner"
+                                            ],
+                        "log_path":  "data/limitless_market_scan_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "limitless_public",
+                        "feeds":  [
+                                      "prediction_market_context"
+                                  ],
+                        "evidence_gate":  "Read-only venue scan until strategy evidence exists.",
+                        "notes":  "No keys, no wallet."
+                    },
+                    {
+                        "id":  "moondev_liquidation_context",
+                        "name":  "MoonDev Liquidation Context",
+                        "script":  "scripts/moondev_liquidation_context_scanner.py",
+                        "runner":  "scripts/run_moondev_liquidation_context_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "MoonDevLiquidationContext"
+                                            ],
+                        "log_path":  "data/moondev_liquidation_context_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "moondev_api_read_only",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "daily_activity_csv",
+                                      "market_force_review"
+                                  ],
+                        "evidence_gate":  "30 days before using crypto liquidation context as any equity/options gate.",
+                        "notes":  "Optional MOONDEV_API_KEY. Logs multi-exchange liquidations, HLP sentiment, near-liquidation snapshots, and Polymarket whale context. No orders."
+                    },
+                    {
+                        "id":  "pmxt_probe",
+                        "name":  "PMXT Schema Probe",
+                        "script":  "scripts/pmxt_market_schema_probe.py",
+                        "runner":  "scripts/run_pmxt_market_schema_probe.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/pmxt_market_schema_probe_log.jsonl",
+                        "status":  "manual_probe",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "pmxt_public_or_sidecar",
+                        "feeds":  [
+                                      "prediction_market_context"
+                                  ],
+                        "evidence_gate":  "Manual read-only only. Not scheduled.",
+                        "notes":  "PMXT is not ready as free backbone; keep isolated."
+                    },
+                    {
+                        "id":  "polymarket_wallet_tracker",
+                        "name":  "Polymarket Wallet Tracker",
+                        "script":  "strategies/polymarket_wallet_tracker.py",
+                        "runner":  "scripts/polymarket_wallet_tracker_report.py",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/polymarket-wallet-tracker.json",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "polymarket_public",
+                        "feeds":  [
+                                      "copy_trader_watchlist"
+                                  ],
+                        "evidence_gate":  "Wallet must pass copy-trader scoring before paper_watch.",
+                        "notes":  "Endpoint provenance and survivorship warnings are logged."
+                    },
+                    {
+                        "id":  "polymarket_fed_whale_watch",
+                        "name":  "Polymarket Fed Whale Watch",
+                        "script":  "strategies/polymarket_fed_whale_watch.py",
+                        "runner":  "scripts/polymarket_fed_whale_watch_report.py",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/polymarket-fed-whale-watch.json",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "polymarket_public",
+                        "feeds":  [
+                                      "prediction_market_context"
+                                  ],
+                        "evidence_gate":  "Observation only.",
+                        "notes":  "No signatures or orders."
+                    },
+                    {
+                        "id":  "polymarket_weather_bot",
+                        "name":  "Polymarket Weather Paper Bot",
+                        "script":  "strategies/polymarket_weather_bot.py",
+                        "runner":  "scripts/run_polymarket_weather_bot.ps1",
+                        "scheduled_tasks":  [
+                                                "PolymarketWeatherBot"
+                                            ],
+                        "log_path":  "data/polymarket_weather_log.jsonl",
+                        "status":  "paper_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "polymarket_public_gamma_clob",
+                        "feeds":  [
+                                      "polymarket_gamma_public",
+                                      "polymarket_clob_public_books",
+                                      "open_meteo_ensemble"
+                                  ],
+                        "evidence_gate":  "No live wallet or order capability. Any future promotion requires at least 200 promotion-grade completed paper positions across 30 calendar days, positive bid/ask-and-fee-adjusted expectancy, station and resolution audits, drawdown limits, execution audit, and explicit human approval.",
+                        "notes":  "Discovers daily-high events, verifies resolution station and units, converts ensemble member highs to bucket probabilities, and maintains capped paper positions. Unknown or stale metadata fails closed."
+                    },
+                    {
+                        "id":  "kalshi_prediction_bot",
+                        "name":  "Kalshi Prediction Bot",
+                        "script":  "strategies/kalshi_prediction_bot.py",
+                        "runner":  "scripts/kalshi_prediction_report.py",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/kalshi-prediction-report.json",
+                        "status":  "paper_or_dry_run",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "kalshi",
+                        "feeds":  [
+                                      "prediction_market_context"
+                                  ],
+                        "evidence_gate":  "No live order submission is implemented here.",
+                        "notes":  "Report-only prediction market bot."
+                    },
+                    {
+                        "id":  "kalshi_history_fetcher",
+                        "name":  "Kalshi History Fetcher",
+                        "script":  "strategies/kalshi_history_fetcher.py",
+                        "runner":  "scripts/kalshi_history_fetcher_report.py",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/kalshi-history-fetcher.json",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "kalshi",
+                        "feeds":  [
+                                      "copy_trader_watchlist"
+                                  ],
+                        "evidence_gate":  "Read-only history import only.",
+                        "notes":  "No Kalshi orders."
+                    },
+                    {
+                        "id":  "market_force_score",
+                        "name":  "Market Force Score",
+                        "script":  "scripts/market_force_score.py",
+                        "runner":  "scripts/run_market_force_score.ps1",
+                        "scheduled_tasks":  [
+                                                "MarketForceScore"
+                                            ],
+                        "log_path":  "data/market_force_score_log.jsonl",
+                        "status":  "context_aggregate",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_outcome_reviewer",
+                                      "exposure_coach"
+                                  ],
+                        "evidence_gate":  "30 days before any gate; currently observability only.",
+                        "notes":  "8-signal aggregate."
+                    },
+                    {
+                        "id":  "exposure_coach",
+                        "name":  "Exposure Coach",
+                        "script":  "scripts/exposure_coach.py",
+                        "runner":  "scripts/run_exposure_coach.ps1",
+                        "scheduled_tasks":  [
+                                                "ExposureCoach"
+                                            ],
+                        "log_path":  "data/exposure_coach_log.jsonl",
+                        "status":  "advisory",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_outcome_reviewer",
+                                      "bot_status_snapshot"
+                                  ],
+                        "evidence_gate":  "Advisory only until proven.",
+                        "notes":  "Does not modify settings."
+                    },
+                    {
+                        "id":  "portfolio_concentration",
+                        "name":  "Portfolio Concentration Monitor",
+                        "script":  "scripts/portfolio_concentration_monitor.py",
+                        "runner":  "scripts/run_portfolio_concentration_monitor.ps1",
+                        "scheduled_tasks":  [
+                                                "PortfolioConcentrationMonitor"
+                                            ],
+                        "log_path":  "data/portfolio_concentration_log.jsonl",
+                        "status":  "risk_context",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_read_only",
+                        "feeds":  [
+                                      "bot_status_snapshot",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Risk visibility only.",
+                        "notes":  "Uses TradingClient read-only; no orders."
+                    },
+                    {
+                        "id":  "bot_status_snapshot",
+                        "name":  "Bot Status Snapshot",
+                        "script":  "scripts/bot_status_snapshot.py",
+                        "runner":  "scripts/run_bot_status_snapshot.ps1",
+                        "scheduled_tasks":  [
+                                                "BotStatusSnapshot"
+                                            ],
+                        "log_path":  "data/bot_status_snapshot_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_review"
+                                  ],
+                        "evidence_gate":  "Status only.",
+                        "notes":  "Reads local reports only."
+                    },
+                    {
+                        "id":  "closed_trade_postmortem",
+                        "name":  "Closed Trade Postmortem",
+                        "script":  "scripts/closed_trade_postmortem.py",
+                        "runner":  "scripts/run_closed_trade_postmortem.ps1",
+                        "scheduled_tasks":  [
+                                                "ClosedTradePostmortem"
+                                            ],
+                        "log_path":  "data/closed_trade_postmortem_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_activity_csv",
+                                      "regime_memory"
+                                  ],
+                        "evidence_gate":  "Review only.",
+                        "notes":  "No orders."
+                    },
+                    {
+                        "id":  "daily_outcome_reviewer",
+                        "name":  "Daily Outcome Reviewer",
+                        "script":  "scripts/daily_outcome_reviewer.py",
+                        "runner":  "scripts/run_daily_outcome_reviewer.ps1",
+                        "scheduled_tasks":  [
+                                                "DailyOutcomeReviewer"
+                                            ],
+                        "log_path":  "data/daily_outcome_review_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "regime_memory",
+                                      "bot_status_snapshot"
+                                  ],
+                        "evidence_gate":  "Review only.",
+                        "notes":  "Compares posture vs outcomes."
+                    },
+                    {
+                        "id":  "regime_memory",
+                        "name":  "Regime Memory",
+                        "script":  "scripts/regime_memory_report.py",
+                        "runner":  "scripts/run_regime_memory_report.ps1",
+                        "scheduled_tasks":  [
+                                                "RegimeMemoryReport"
+                                            ],
+                        "log_path":  "data/regime_memory_log.jsonl",
+                        "status":  "review_log_building",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "governance"
+                                  ],
+                        "evidence_gate":  "30+ days before any conclusions.",
+                        "notes":  "Currently log-building."
+                    },
+                    {
+                        "id":  "rejected_trade_intelligence",
+                        "name":  "Rejected Trade Intelligence",
+                        "script":  "scripts/rejected_trade_intelligence.py",
+                        "runner":  "scripts/run_rejected_trade_intelligence.ps1",
+                        "scheduled_tasks":  [
+                                                "RejectedTradeIntelligence"
+                                            ],
+                        "log_path":  "data/rejected_trade_intelligence_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "governance",
+                                      "needs_review_queue"
+                                  ],
+                        "evidence_gate":  "Review only. Possibly-too-strict is not permission to loosen gates.",
+                        "notes":  "Classifies guard blocks."
+                    },
+                    {
+                        "id":  "needs_review_queue",
+                        "name":  "Needs Review Queue",
+                        "script":  "scripts/needs_review_queue.py",
+                        "runner":  "scripts/run_needs_review_queue.ps1",
+                        "scheduled_tasks":  [
+                                                "NeedsReviewQueue"
+                                            ],
+                        "log_path":  "data/needs_review_queue_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "governance",
+                                      "daily_activity_csv",
+                                      "signal_stack_leaderboard"
+                                  ],
+                        "evidence_gate":  "Review only. Queued items are not permission to loosen guards.",
+                        "notes":  "Turns rejected-trade intelligence into a small manual-review queue."
+                    },
+                    {
+                        "id":  "signal_stack_grades",
+                        "name":  "Signal Stack Grades",
+                        "script":  "scripts/signal_stack_grades.py",
+                        "runner":  "scripts/run_signal_stack_grades.ps1",
+                        "scheduled_tasks":  [
+                                                "SignalStackGrades"
+                                            ],
+                        "log_path":  "data/signal_stack_grades_log.jsonl",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_activity_csv",
+                                      "manual_review"
+                                  ],
+                        "evidence_gate":  "Review only. Grades are not execution approval.",
+                        "notes":  "Daily A-F/0-100 report card for bots, shadow loggers, and read-only scanners."
+                    },
+                    {
+                        "id":  "daily_eod_summary",
+                        "name":  "Daily EOD Summary",
+                        "script":  "scripts/daily_eod_summary.py",
+                        "runner":  "scripts/run_daily_eod_summary.ps1",
+                        "scheduled_tasks":  [
+                                                "DailyEODSummary"
+                                            ],
+                        "log_path":  "data/daily_eod_summary_log.jsonl",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "manual_review",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Review only. EOD summary is not execution approval.",
+                        "notes":  "Plain-English daily verdict combining health, grades, audit, activity, and review queue."
+                    },
+                    {
+                        "id":  "nightly_research_loop",
+                        "name":  "Nightly Research Loop",
+                        "script":  "scripts/nightly_research_loop.py",
+                        "runner":  "scripts/run_nightly_research_loop.ps1",
+                        "scheduled_tasks":  [
+                                                "NightlyResearchLoop"
+                                            ],
+                        "log_path":  "data/nightly_research_queue_log.jsonl",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "manual_review",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Read-only handoff only. Max one active task. No live/risk/gate changes.",
+                        "notes":  "Writes STATUS.md and a capped nightly queue after EOD summary. It is not an autonomous executor."
+                    },
+                    {
+                        "id":  "nightly_alpha_factory",
+                        "name":  "Nightly Alpha Factory",
+                        "script":  "scripts/nightly_alpha_factory.py",
+                        "runner":  "scripts/run_nightly_alpha_factory.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/nightly_alpha_factory_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "cheap_asymmetry_scanner",
+                                      "creator_watchlist_runner_scanner",
+                                      "flip_bot_learning_report",
+                                      "crowded_positioning_scanner",
+                                      "execution_gate_audit",
+                                      "nightly_research_loop"
+                                  ],
+                        "evidence_gate":  "Read-only morning alpha factory. Separates idea builder, validator, regime reviewer, and governance chair. No promotion without signal_promotion_rules.md and explicit approval.",
+                        "notes":  "Builds the six-stage agent-swarm style research report and Claude Code handoff. It cannot approve its own ideas, submit orders, or change execution settings."
+                    },
+                    {
+                        "id":  "loop_readiness_audit",
+                        "name":  "Loop Readiness Audit",
+                        "script":  "scripts/loop_readiness_audit.py",
+                        "runner":  "scripts/run_loop_readiness_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/loop_readiness_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_registry",
+                                      "nightly_alpha_factory",
+                                      "execution_gate_audit"
+                                  ],
+                        "evidence_gate":  "Read-only loop-engineering governance. Scores L0/L1/L2/L3 readiness and requires maker/checker split plus explicit approval before any assisted or execution-impacting loop.",
+                        "notes":  "Writes LOOP.md, loop-readiness-audit.json, and Claude Code handoff. It cannot approve its own findings, submit orders, schedule tasks, or change execution settings."
+                    },
+                    {
+                        "id":  "mahoraga_repo_intake_audit",
+                        "name":  "MAHORAGA Repo Intake Audit",
+                        "script":  "scripts/mahoraga_repo_intake_audit.py",
+                        "runner":  "scripts/run_mahoraga_repo_intake_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/mahoraga_repo_intake_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "external_repo_intake",
+                                      "nightly_alpha_factory",
+                                      "loop_readiness_audit"
+                                  ],
+                        "evidence_gate":  "Read-only architecture intake. MAHORAGA ideas may become local reports only after tests, execution audit, and explicit approval. No external code import, Worker deploy, broker endpoint copy, or social-to-order routing.",
+                        "notes":  "Mines ygwyg/MAHORAGA for staleness exits, pluggable strategy contracts, social gatherer schema, policy-wrapper design, and dashboard observability. Explicitly rejects Alpaca execution worker and 25pct cash sizing."
+                    },
+                    {
+                        "id":  "openalice_repo_intake_audit",
+                        "name":  "OpenAlice Repo Intake Audit",
+                        "script":  "scripts/openalice_repo_intake_audit.py",
+                        "runner":  "scripts/run_openalice_repo_intake_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/openalice_repo_intake_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "external_repo_intake",
+                                      "nightly_alpha_factory",
+                                      "loop_readiness_audit"
+                                  ],
+                        "evidence_gate":  "Read-only architecture intake. OpenAlice ideas may become local reports/docs only after tests, execution audit, and explicit approval. No AGPL code import, broker connection, Trading-as-Git execution copy, or autonomous agent CLI scheduler.",
+                        "notes":  "Mines TraderAlice/OpenAlice for markdown issue board, tracked entity memory graph, inbox delivery, workspace automation metadata, market tool index, and approval-gated trade proposal patterns. Explicitly rejects unified trading account and unattended agent schedulers."
+                    },
+                    {
+                        "id":  "market_schedule_alignment",
+                        "name":  "Market Schedule Alignment",
+                        "script":  "scripts/market_schedule_alignment.py",
+                        "runner":  "scripts/run_market_schedule_alignment.ps1",
+                        "scheduled_tasks":  [
+                                                "MarketScheduleAlignment"
+                                            ],
+                        "log_path":  "data/market_schedule_alignment_log.jsonl",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_health",
+                                      "daily_eod_summary"
+                                  ],
+                        "evidence_gate":  "Ops only. Schedule alignment is not execution approval.",
+                        "notes":  "Checks Windows Task Scheduler against intended Central-time market open, close, and EOD sequence."
+                    },
+                    {
+                        "id":  "signal_stack_health",
+                        "name":  "Signal Stack Health Report",
+                        "script":  "scripts/signal_stack_health_report.py",
+                        "runner":  "scripts/run_signal_stack_health_report.ps1",
+                        "scheduled_tasks":  [
+                                                "SignalStackHealthReport"
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/signal-stack-health.json",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "bot_status_snapshot"
+                                  ],
+                        "evidence_gate":  "Ops only.",
+                        "notes":  "Checks tasks/log freshness."
+                    },
+                    {
+                        "id":  "signal_stack_leaderboard",
+                        "name":  "Signal Stack Leaderboard",
+                        "script":  "scripts/signal_stack_leaderboard.py",
+                        "runner":  "scripts/run_signal_stack_leaderboard.ps1",
+                        "scheduled_tasks":  [
+                                                "SignalStackLeaderboard"
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/signal-stack-leaderboard.json",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_review"
+                                  ],
+                        "evidence_gate":  "Leaderboard only.",
+                        "notes":  "Observability layer."
+                    },
+                    {
+                        "id":  "daily_activity_csv",
+                        "name":  "Daily Bot Activity CSV",
+                        "script":  "scripts/export_daily_bot_activity_csv.py",
+                        "runner":  "scripts/run_daily_bot_activity_export.ps1",
+                        "scheduled_tasks":  [
+                                                "DailyBotActivityExport"
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/daily-bot-activity-YYYY-MM-DD.csv",
+                        "status":  "ops_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_review"
+                                  ],
+                        "evidence_gate":  "Ledger only.",
+                        "notes":  "CSV export."
+                    },
+                    {
+                        "id":  "worldquant_alpha_lab",
+                        "name":  "WorldQuant Alpha Lab",
+                        "script":  "scripts/worldquant_alpha_lab_report.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "research/worldquant_alpha_lab/report.md",
+                        "status":  "manual_research",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "strategy_research"
+                                  ],
+                        "evidence_gate":  "Research report only. Any alpha must become a shadow logger and pass 30 days / 10 samples before promotion review.",
+                        "notes":  "Cross-sectional ETF factor lab inspired by WorldQuant Alpha101. Current initial run rejected all tested factors."
+                    },
+                    {
+                        "id":  "daily_activity_viewer",
+                        "name":  "Daily Activity D-Tale Viewer",
+                        "script":  "scripts/launch_daily_activity_viewer.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/daily-bot-activity-YYYY-MM-DD.csv",
+                        "status":  "manual_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "manual_review"
+                                  ],
+                        "evidence_gate":  "Viewer only.",
+                        "notes":  "Optional local browser viewer for daily CSV inspection. Requires dtale installed in the one-off uv run environment."
+                    },
+                    {
+                        "id":  "premarket_ema_retest_shadow",
+                        "name":  "Premarket EMA Retest Shadow",
+                        "script":  "scripts/premarket_ema_retest_shadow_logger.py",
+                        "runner":  "scripts/run_premarket_ema_retest_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\PremarketEMARetestShadow"
+                                            ],
+                        "log_path":  "data/premarket_ema_retest_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_read_only_market_data",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "market_force_review"
+                                  ],
+                        "evidence_gate":  "30 trading days, 10 actionable signals, forward outcome improvement, dual review before any gate.",
+                        "notes":  "Account-flip style premarket high/low + 13/48/200 EMA retest scanner. Shadow-only."
+                    },
+                    {
+                        "id":  "prediction_market_microstructure",
+                        "name":  "Prediction Market Microstructure",
+                        "script":  "scripts/prediction_market_microstructure_scanner.py",
+                        "runner":  "scripts/run_prediction_market_microstructure_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\PredictionMarketMicrostructure"
+                                            ],
+                        "log_path":  "data/prediction_market_microstructure_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "limitless_public_api_read_only",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "prediction_market_watchlist"
+                                  ],
+                        "evidence_gate":  "Read-only for 30 days minimum. No prediction-market execution is wired.",
+                        "notes":  "Short-horizon Up/Down market flow, spread, and imbalance context inspired by microstructure bot claims."
+                    },
+                    {
+                        "id":  "flip_shadow_candidates",
+                        "name":  "Flip Shadow Candidates",
+                        "script":  "scripts/flip_shadow_candidates_report.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+                                                "Flip-Bot-Entry",
+                                                "Flip-Bot-Trend-Entry"
+                                            ],
+                        "log_path":  "data/flip_shadow_candidates_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data_read_only",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 trading days before review. QQQ and IWM require 10 confirmed setup matches with SPY before any promotion discussion. NVDA/TSLA/AAPL/META require independent validation.",
+                        "notes":  "QQQ/IWM/NVDA/TSLA/AAPL/META 0DTE candidates logged from Flip Bot scan path. Shadow-only; entries do not flow into broker submission."
+                    },
+                    {
+                        "id":  "flip_shadow_pnl_evaluator",
+                        "name":  "Flip Shadow P\u0026L Evaluator",
+                        "script":  "scripts/flip_shadow_pnl_evaluator.py",
+                        "runner":  "scripts/run_flip_shadow_pnl_evaluator.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\FlipShadowPnLEvaluator"
+                                            ],
+                        "log_path":  "data/flip_shadow_pnl_evaluation_log.jsonl",
+                        "status":  "shadow_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_health_report",
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 trading days and at least 10 completed samples per symbol before any promotion discussion. Uses logged estimates only.",
+                        "notes":  "Scores hypothetical returns for QQQ/IWM/NVDA/TSLA shadow 0DTE candidates so viral account-flip setups can be reviewed with evidence instead of screenshots."
+                    },
+                    {
+                        "id":  "cheap_asymmetry_scanner",
+                        "name":  "Cheap Asymmetry Scanner",
+                        "script":  "scripts/cheap_asymmetry_scanner.py",
+                        "runner":  "scripts/run_cheap_asymmetry_scanner.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/cheap_asymmetry_scan_log.jsonl",
+                        "status":  "shadow_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_shadow_pnl_evaluator",
+                                      "missed_banger_review",
+                                      "dashboard"
+                                  ],
+                        "evidence_gate":  "Read-only ranking only. Requires repeated samples, liquidity review, and signal governance before any execution wiring.",
+                        "notes":  "Ranks small-premium option candidates that match the account-flip target profile: roughly $10-$50 cost, 3x+ upside, tight spread, and 5x+ captured return for true goal matches."
+                    },
+                    {
+                        "id":  "creator_watchlist_runner_scanner",
+                        "name":  "Creator Watchlist Runner Scanner",
+                        "script":  "scripts/creator_watchlist_runner_scanner.py",
+                        "runner":  "scripts/run_creator_watchlist_runner_scanner.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/creator_watchlist_runner_log.jsonl",
+                        "status":  "shadow_review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "creator_watchlist_observations",
+                                      "social_arb_observations",
+                                      "flip_shadow_pnl_evaluator",
+                                      "cheap_asymmetry_scanner",
+                                      "small_account_bot_learning"
+                                  ],
+                        "evidence_gate":  "Read-only creator/watchlist validation. No ticker can influence execution without 30 trading days, 10 completed shadow samples, liquidity proof, dual review, and explicit user approval.",
+                        "notes":  "Scores X/manual creator watchlist tickers like HIMS/RDDT/AAPL/SPX against independent Flip shadow PnL and cheap-asymmetry evidence. Screenshots are discovery prompts only, not trade signals."
+                    },
+                    {
+                        "id":  "crowded_positioning_scanner",
+                        "name":  "Crowded Positioning Scanner",
+                        "script":  "scripts/crowded_positioning_scanner.py",
+                        "runner":  "scripts/run_crowded_positioning_scanner.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/crowded_positioning_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "moondev_liquidation_context",
+                                      "prediction_market_microstructure",
+                                      "weekly_hot_instruments",
+                                      "flip_bot_learning_report"
+                                  ],
+                        "evidence_gate":  "Read-only crowded-positioning context. Requires 30 trading days of outcome review before any use as an entry or exit gate.",
+                        "notes":  "Aggregates liquidation pressure, HLP sentiment, position snapshot distance, prediction-market flow, and crypto proxy watchlist context into cautious/normal Flip Bot posture hints. No orders and no settings changes."
+                    },
+                    {
+                        "id":  "candlestick_context_scanner",
+                        "name":  "Candlestick Context Scanner",
+                        "script":  "scripts/candlestick_context_scanner.py",
+                        "runner":  "scripts/run_candlestick_context_scanner.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\CandlestickContextScanner"
+                                            ],
+                        "log_path":  "data/candlestick_context_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "shadow_consensus_gate",
+                                      "generate_dashboard",
+                                      "flip_bot_learning_report"
+                                  ],
+                        "evidence_gate":  "Read-only candlestick context. No pattern can route to execution without 30 trading days, 10 relevant samples, liquidity proof, dual review, and explicit user approval.",
+                        "notes":  "Detects bullish/bearish engulfing, VWAP reclaim/failure, liquidity grabs, and indecision context for SPY/QQQ/IWM and high-attention names. It only advises playbook selection and review."
+                    },
+                    {
+                        "id":  "higher_timeframe_market_map",
+                        "name":  "Higher Timeframe Market Map",
+                        "script":  "scripts/higher_timeframe_market_map.py",
+                        "runner":  "scripts/run_higher_timeframe_market_map.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\HigherTimeframeMarketMap"
+                                            ],
+                        "log_path":  "data/higher_timeframe_market_map_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "shadow_consensus_gate",
+                                      "adaptive_options_shadow_playbook",
+                                      "generate_dashboard"
+                                  ],
+                        "evidence_gate":  "Read-only higher-timeframe map. Blocks mixed-timeframe confidence from being treated as execution evidence until forward-tested.",
+                        "notes":  "Maps weekly, daily, and intraday trend alignment into bullish/bearish/mixed context. Helps avoid forcing calls into downtrends or premium-selling into catalyst trend days."
+                    },
+                    {
+                        "id":  "market_catalyst_calendar",
+                        "name":  "Market Catalyst Calendar",
+                        "script":  "scripts/market_catalyst_calendar.py",
+                        "runner":  "scripts/run_market_catalyst_calendar.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\MarketCatalystCalendar"
+                                            ],
+                        "log_path":  "data/market_catalyst_calendar_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "shadow_consensus_gate",
+                                      "adaptive_options_shadow_playbook",
+                                      "generate_dashboard"
+                                  ],
+                        "evidence_gate":  "Read-only catalyst veto context. High-impact news can only reduce risk, force review, or block short-premium ideas; it cannot approve trades.",
+                        "notes":  "Tracks CPI, PPI, FOMC, jobs, GDP/PCE, Fed minutes, and Treasury auction windows so the bots avoid rookie mistakes around known volatility catalysts."
+                    },
+                    {
+                        "id":  "daily_edge_orchestrator",
+                        "name":  "Daily Edge Orchestrator",
+                        "script":  "scripts/daily_edge_orchestrator.py",
+                        "runner":  "scripts/run_daily_edge_orchestrator.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\DailyEdgeOrchestrator"
+                                            ],
+                        "log_path":  "data/daily_edge_orchestrator_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "candlestick_context_scanner",
+                                      "higher_timeframe_market_map",
+                                      "market_catalyst_calendar",
+                                      "shadow_consensus_gate",
+                                      "loop_closure_report",
+                                      "flip_bot_learning_report"
+                                  ],
+                        "evidence_gate":  "Read-only daily operating view. Can recommend watchlists, vetoes, review reasons, and scanner leadership only. No execution wiring without forward evidence and explicit Kenny approval.",
+                        "notes":  "Combines morning targets, intraday runner detection, no-trade explanations, exit accountability, and scanner leadership so the bots learn from missed runners without chasing screenshots."
+                    },
+                    {
+                        "id":  "weekly_hot_instruments",
+                        "name":  "Weekly Hot Instrument Report",
+                        "script":  "scripts/weekly_hot_instrument_report.py",
+                        "runner":  "scripts/run_weekly_hot_instrument_report.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\WeeklyHotInstrumentReport"
+                                            ],
+                        "log_path":  "data/weekly_hot_instrument_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_health_report",
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "Read-only rolling 7-day social/liquidity review. No symbol promotion without 30 trading days and at least 10 completed shadow samples.",
+                        "notes":  "Ranks hot tickers from social persistence, manual X/social observations, and Flip shadow P\u0026L. Designed to catch weekly attention names while keeping high-noise squeeze tickers research-only."
+                    },
+                    {
+                        "id":  "challenge_account_simulator",
+                        "name":  "Challenge Account Simulator",
+                        "script":  "scripts/challenge_account_simulator.py",
+                        "runner":  "scripts/run_challenge_account_simulator.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\ChallengeAccountSimulator"
+                                            ],
+                        "log_path":  "data/challenge_account_simulator_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "daily_eod_summary"
+                                  ],
+                        "evidence_gate":  "Read-only account-size simulation. Cannot approve leverage or live trading without forward-tested drawdown review.",
+                        "notes":  "Replays closed Flip Bot trade returns on a configurable small account using fixed fractional risk."
+                    },
+                    {
+                        "id":  "position_sizing_sanity_report",
+                        "name":  "Position Sizing Sanity Report",
+                        "script":  "scripts/position_sizing_sanity_report.py",
+                        "runner":  "scripts/run_position_sizing_sanity_report.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/position_sizing_sanity_log.jsonl",
+                        "status":  "review",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "challenge_account_simulator",
+                                      "signal_stack_grades",
+                                      "daily_eod_summary"
+                                  ],
+                        "evidence_gate":  "Read-only sizing and tail-risk sanity check. Cannot loosen risk limits or approve live trading.",
+                        "notes":  "Checks Flip Bot 2pct risk and 5-contract caps, separates pre-fix contract artifact from post-risk-fix samples, and reports Markov/Chebyshev/Chernoff-style tail-loss bounds."
+                    },
+                    {
+                        "id":  "mfi_shadow",
+                        "name":  "MFI Shadow Logger",
+                        "script":  "scripts/mfi_shadow_logger.py",
+                        "runner":  "scripts/run_mfi_shadow_logger.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\MFIShadowLogger"
+                                            ],
+                        "log_path":  "data/mfi_shadow_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_stack_leaderboard",
+                                      "signal_stack_grades",
+                                      "daily_activity_csv"
+                                  ],
+                        "evidence_gate":  "30 trading days and 10 actionable signals before any gate review. MFI oversold+rising must correlate with positive Flip Bot outcomes.",
+                        "notes":  "Money Flow Index period=14 on SPY+QQQ daily. MoonDev sma_variations showed MFI filter raised Sharpe 1.51-\u003e2.37 on same SMA crossover pattern Flip Bot uses."
+                    },
+                    {
+                        "id":  "options_liquidity_gate",
+                        "name":  "Options Liquidity Feasibility Gate",
+                        "script":  "scripts/options_liquidity_feasibility.py",
+                        "runner":  "scripts/run_options_liquidity_feasibility.ps1",
+                        "scheduled_tasks":  [
+                                                "\\VibeTrade\\OptionsLiquidityFeasibility"
+                                            ],
+                        "log_path":  "data/options_liquidity_feasibility_log.jsonl",
+                        "status":  "operational",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "weekly_hot_instrument_log",
+                                      "deep_liquid_universe_scan_log"
+                                  ],
+                        "evidence_gate":  "Gate only — scores 0-5 per symbol. Score \u003e= 4 required before adding any symbol to SHADOW_CANDIDATES in flip_bot.py.",
+                        "notes":  "Criteria: 0DTE available, weekly available, ATM OI \u003e= 500, bid-ask spread \u003c= 15pct of mid, ATM price \u003c= $5/share ($500/contract). Read-only. No yfinance live data in tests — fully mocked. IMPORTANT: gate failure does NOT mean remove from SHADOW_CANDIDATES. Shadow logging is evidence gathering — it runs regardless of gate status. Gate only blocks promotion to live execution. META/TSLA fail price criterion (options \u003e $500/contract) — too expensive for small-account challenge sizing. They remain in SHADOW_CANDIDATES for evidence accumulation on the main $90k account."
+                    },
+                    {
+                        "id":  "strategy_leak_audit",
+                        "name":  "Strategy Leak / Look-Ahead Audit",
+                        "script":  "scripts/strategy_leak_audit.py",
+                        "runner":  "scripts/run_strategy_leak_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/strategy_leak_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "strategy_intake_report",
+                                      "pine_strategy_lab_report"
+                                  ],
+                        "evidence_gate":  "Required before any new external strategy can become paper_candidate. Critical findings reject until fixed.",
+                        "notes":  "Scans for future shift, Pine lookahead, centered rolling, global min/max normalization, same-bar high/low assumptions, and unshifted signals."
+                    },
+                    {
+                        "id":  "hmm_regime_scanner",
+                        "name":  "HMM Regime Scanner",
+                        "script":  "scripts/hmm_regime_scanner.py",
+                        "runner":  "scripts/run_hmm_regime_scanner.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/hmm_regime_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "market_force_score",
+                                      "agent_trade_debate_report"
+                                  ],
+                        "evidence_gate":  "30 trading days of forward regime labels before this can route or gate strategy families.",
+                        "notes":  "Deterministic Gaussian-state approximation classifies trend/chop/panic from return and volatility features. Context only."
+                    },
+                    {
+                        "id":  "pca_market_forces",
+                        "name":  "PCA Market Forces",
+                        "script":  "scripts/pca_market_forces.py",
+                        "runner":  "scripts/run_pca_market_forces.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/pca_market_forces_log.jsonl",
+                        "status":  "shadow",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "deep_liquid_universe_scan_log",
+                                      "agent_trade_debate_report"
+                                  ],
+                        "evidence_gate":  "30 trading days before any use as a symbol-selection filter.",
+                        "notes":  "Compresses liquid equity universe into principal forces and idiosyncratic residual scores. Prevents confusing beta echoes with ticker-specific edge."
+                    },
+                    {
+                        "id":  "prediction_market_slow_news_watch",
+                        "name":  "Prediction Market Slow-News Watch",
+                        "script":  "scripts/prediction_market_slow_news_watch.py",
+                        "runner":  "scripts/run_prediction_market_slow_news_watch.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/prediction_market_slow_news_log.jsonl",
+                        "status":  "context_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "limitless_public_api_read_only",
+                        "feeds":  [
+                                      "prediction_market_microstructure_scanner",
+                                      "limitless_market_scanner"
+                                  ],
+                        "evidence_gate":  "Only observe event-resolution windows. No wallet, key, order, or live trade discussion without separate approval.",
+                        "notes":  "Finds macro/CPI/FOMC/jobs/earnings-style public markets where slow-news mispricing might be measurable."
+                    },
+                    {
+                        "id":  "agent_trade_debate_report",
+                        "name":  "Agent Trade Debate Report",
+                        "script":  "scripts/agent_trade_debate_report.py",
+                        "runner":  "scripts/run_agent_trade_debate_report.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/agent_trade_debate_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "daily_eod_summary",
+                                      "market_force_score"
+                                  ],
+                        "evidence_gate":  "Report only. Risk-manager veto remains informational here; actual blocking stays in guards.",
+                        "notes":  "Deterministic bull vs bear vs risk-manager debate. Final verdict is always observe_only."
+                    },
+                    {
+                        "id":  "trading_skills_intake_audit",
+                        "name":  "Trading Skills Intake Audit",
+                        "script":  "scripts/trading_skills_intake_audit.py",
+                        "runner":  "scripts/run_trading_skills_intake_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/trading_skills_intake_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "nightly_research_loop",
+                                      "daily_eod_summary",
+                                      "strategy_intake_report"
+                                  ],
+                        "evidence_gate":  "Ideas only. No adoption without local implementation, tests, execution audit, and forward evidence where applicable.",
+                        "notes":  "Read-only intake of selected agiprolabs claude-trading-skills ideas: walk-forward-validation, position-sizing, options-pricing, and trade-journal. Risk-management intentionally excluded for this pass."
+                    },
+                    {
+                        "id":  "missed_banger_review",
+                        "name":  "Missed Banger Review",
+                        "script":  "scripts/missed_banger_review.py",
+                        "runner":  "scripts/run_missed_banger_review.ps1",
+                        "log_path":  "data/missed_banger_review_log.jsonl",
+                        "status":  "operational",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "social_arb_observations",
+                                      "deep_liquid_universe_scan_log",
+                                      "options_liquidity_feasibility_log",
+                                      "flip_shadow_candidates_log"
+                                  ],
+                        "evidence_gate":  "Read-only review tool. No promotion gate. Surfaces universe gaps and setup misses for human review.",
+                        "notes":  "Cross-references social observations against deep scan universe, liquidity gate, and flip shadow log. Verdicts: universe_gap / liquidity_gate_blocked / setup_not_triggered / bot_covered / not_a_banger."
+                    },
+                    {
+                        "id":  "adaptive_options_shadow_playbook",
+                        "name":  "Adaptive Options Shadow Playbook",
+                        "script":  "scripts/adaptive_options_shadow_playbook.py",
+                        "runner":  "scripts/run_adaptive_options_shadow_playbook.ps1",
+                        "scheduled_tasks":  [
+                                                "AdaptiveOptionsShadowPlaybook"
+                                            ],
+                        "log_path":  "data/adaptive_options_shadow_playbook_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_bot",
+                                      "options_liquidity_feasibility",
+                                      "market_force_score",
+                                      "premarket_ema_retest_shadow_logger"
+                                  ],
+                        "evidence_gate":  "Shadow-only until 30 trading days, 10+ relevant directional samples per playbook, and postmortem evidence shows improvement without overtrading.",
+                        "notes":  "Selects the market-appropriate options playbook: long put, long call, put credit spread, call credit spread, iron condor, or stand aside. It logs adaptation reasoning only and cannot place orders."
+                    },
+                    {
+                        "id":  "agent_incentive_safety_audit",
+                        "name":  "Agent Incentive Safety Audit",
+                        "script":  "scripts/agent_incentive_safety_audit.py",
+                        "runner":  "scripts/run_agent_incentive_safety_audit.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/agent_incentive_safety_audit_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "signal_registry",
+                                      "nightly_alpha_factory",
+                                      "loop_readiness_audit"
+                                  ],
+                        "evidence_gate":  "Governance only. Blocks promotion review when autonomous loops lack objective, non-goal, forbidden-action, stop-condition, evidence, or independent-verifier metadata.",
+                        "notes":  "Read-only audit inspired by Agents of Chaos. It checks incentive design, self-approval risk, and unbounded autonomy language. Must not change execution flags, risk thresholds, or broker wiring."
+                    },
+                    {
+                        "id":  "loop_closure_report",
+                        "name":  "Loop Closure Report",
+                        "script":  "scripts/loop_closure_report.py",
+                        "runner":  "scripts/run_loop_closure_report.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/loop_closure_report_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_bot",
+                                      "iwm_options_bot",
+                                      "closed_trade_postmortem",
+                                      "cheap_asymmetry_scanner",
+                                      "signal_stack_grades"
+                                  ],
+                        "evidence_gate":  "Read-only loop closure only. No promotion or rule change without tests, execution audit, dual review, and explicit Kenny approval.",
+                        "notes":  "Normalizes scanner -> decision -> trade/no-trade -> exit quality -> P/L explanation -> lesson -> next-day gate. Does not call brokers or change bot settings."
+                    },
+                    {
+                        "id":  "options_surface_intelligence",
+                        "name":  "Options Surface Intelligence",
+                        "script":  "scripts/options_surface_intelligence.py",
+                        "runner":  "scripts/run_options_surface_intelligence.ps1",
+                        "scheduled_tasks":  [
+                                                "OptionsSurfaceIntelligence"
+                                            ],
+                        "log_path":  "data/options_surface_intelligence_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "options_liquidity_feasibility",
+                                      "weekly_hot_instrument_report",
+                                      "daily_options_universe_ranker"
+                                  ],
+                        "evidence_gate":  "Public option-chain snapshots are unsigned context only. No smart-money classification or behavior change without classified OPRA evidence, forward outcomes, OOS validation, and explicit approval.",
+                        "notes":  "Computes IV level, skew, term structure, implied move, spreads, open interest, unsigned volume/OI anomalies, and cheap-option lottery-risk flags. It cannot submit orders or select execution symbols."
+                    },
+                    {
+                        "id":  "flip_feature_ablation_report",
+                        "name":  "Flip Feature Ablation Report",
+                        "script":  "scripts/flip_feature_ablation_report.py",
+                        "runner":  "scripts/run_flip_feature_ablation_report.ps1",
+                        "scheduled_tasks":  [
+                                                "FlipFeatureAblationReport"
+                                            ],
+                        "log_path":  "data/flip_feature_ablation_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_bot",
+                                      "flip_exit_quality_report",
+                                      "edge_trial_ledger"
+                                  ],
+                        "evidence_gate":  "Review eligibility requires 30 known telemetry trades, 10 per comparison group, positive lift, and Bonferroni significance. Any behavior change still requires a separately recorded OOS trial and explicit approval.",
+                        "notes":  "Read-only descriptive feature/outcome comparisons. It does not claim causality, impute legacy telemetry, promote features, change thresholds, or submit orders."
+                    },
+                    {
+                        "id":  "edge_trial_ledger",
+                        "name":  "Edge Trial Ledger",
+                        "script":  "scripts/edge_trial_ledger.py",
+                        "runner":  "scripts/run_edge_trial_ledger_report.ps1",
+                        "scheduled_tasks":  [
+                                                "EdgeTrialLedgerReport"
+                                            ],
+                        "log_path":  "data/edge_trial_ledger_report_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "options_backtest",
+                                      "flip_feature_ablation_report",
+                                      "self_improving_strategy_verifier"
+                                  ],
+                        "evidence_gate":  "Every attempted variant, including failures, must be recorded. Promotion review requires OOS or forward stage, Bonferroni significance, 30 OOS trades, positive expectancy, profit factor above one, and drawdown coverage.",
+                        "notes":  "Append-only experiment accounting with deterministic IDs and family-wide multiple-testing correction. It can flag candidates for review but cannot promote signals or submit orders."
+                    },
+                    {
+                        "id":  "flip_equity_curve_report",
+                        "name":  "Flip Equity Curve Report",
+                        "script":  "scripts/flip_equity_curve_report.py",
+                        "runner":  "scripts/run_flip_equity_curve_report.ps1",
+                        "scheduled_tasks":  [
+                                                "FlipEquityCurveReport"
+                                            ],
+                        "log_path":  "data/flip_equity_curve_log.jsonl",
+                        "status":  "governance",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_bot",
+                                      "flip_bot_learning_report",
+                                      "elite_bot_readiness_scorecard"
+                                  ],
+                        "evidence_gate":  "Realized-PnL analytics only. Profitability cannot score 10 without at least 200 post-hardening trades, 120 calendar days, and durable drawdown evidence.",
+                        "notes":  "Deduplicated post-hardening realized-PnL curve and peak-to-trough drawdown. Percentage drawdown is relative to peak cumulative realized profit, not total account equity."
+                    },
+                    {
+                        "id":  "point_in_time_option_quotes",
+                        "name":  "Point-in-Time Option Quote Telemetry",
+                        "script":  "scripts/point_in_time_quotes.py",
+                        "runner":  "",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/logs/option-quote-samples.jsonl",
+                        "status":  "telemetry",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data_read_only",
+                        "feeds":  [
+                                      "flip_bot",
+                                      "options_surface_intelligence",
+                                      "flip_feature_ablation_report"
+                                  ],
+                        "evidence_gate":  "Free Alpaca indicative quotes are provenance telemetry only, not OPRA NBBO or classified flow. Missing fields remain null; no signal or behavior change is allowed from this source without OOS validation and explicit approval.",
+                        "notes":  "Event-driven signal/fill/monitor/exit capture keyed by trade, order, contract, and leg role. Uses free indicative options data and IEX underlying trades on nonblocking durable worker threads."
+                    },
+                    {
+                        "id":  "zero_dte_expected_move_context",
+                        "name":  "0DTE Expected Move Context",
+                        "script":  "scripts/zero_dte_expected_move_context.py",
+                        "runner":  "scripts/run_zero_dte_expected_move_context.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "data/zero_dte_expected_move_context_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "iv_history_log",
+                                      "opening_range_breadth_log",
+                                      "adaptive_options_shadow_playbook",
+                                      "edge_trial_ledger"
+                                  ],
+                        "evidence_gate":  "Context-only until expected-move bins have forward outcomes across at least 30 trading days and 30 OOS trades, pass multiple-testing controls, and receive explicit approval for any behavior change.",
+                        "notes":  "Normalizes ORB width, midpoint displacement, and breakout overshoot by spot times ATM IV divided by sqrt(252). It labels shadow observations only and cannot select trades, size positions, change gates, or submit orders."
+                    },
+                    {
+                        "id":  "zero_dte_entry_feature_edge_report",
+                        "name":  "0DTE Entry Feature Edge Report",
+                        "script":  "scripts/zero_dte_entry_feature_edge_report.py",
+                        "runner":  "scripts/run_zero_dte_entry_feature_edge_report.ps1",
+                        "scheduled_tasks":  [
+
+                                            ],
+                        "log_path":  "~/.vibe-trading/reports/zero-dte-entry-feature-edge.json",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "flip_shadow_candidates_log",
+                                      "flip_shadow_pnl_evaluator",
+                                      "zero_dte_expected_move_context"
+                                  ],
+                        "evidence_gate":  "No bucket can influence execution before at least 30 completed forward lifecycles across 10 trading days, chronological holdout and multiple-testing review, and explicit approval.",
+                        "notes":  "Read-only preregistered comparison of entry time, breakout ATR, ORB/expected-move fraction, expected-move consumption, and recorded regime labels. Missing point-in-time fields remain unavailable and are never reconstructed."
+                    },
+                    {
+                        "id":  "kronos_market_forecaster",
+                        "name":  "Kronos Market Forecaster",
+                        "script":  "scripts/kronos_market_forecaster.py",
+                        "runner":  "scripts/run_kronos_market_forecaster.ps1",
+                        "scheduled_tasks":  [
+                                                "KronosMarketForecaster"
+                                            ],
+                        "log_path":  "data/kronos_market_forecast_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "none",
+                        "feeds":  [
+                                      "candlestick_context_scanner",
+                                      "higher_timeframe_market_map",
+                                      "shadow_consensus_gate",
+                                      "daily_edge_orchestrator"
+                                  ],
+                        "evidence_gate":  "Shadow-only until Kronos forecast rows have 30 trading days of forward outcomes, conflict/confirm rates are measured by symbol and regime, and Kenny explicitly approves any promotion.",
+                        "notes":  "Optional adapter for shiyu-coder/Kronos foundation K-line forecasts. Uses KRONOS_REPO_PATH/model config when installed; otherwise reports setup_required. It can add forecast context or conflict blockers, but cannot approve trades or submit orders."
+                    },
+                    {
+                        "id":  "polymarket_weather_near_miss_cohort",
+                        "name":  "Polymarket Weather Near-Miss Cohort",
+                        "script":  "strategies/polymarket_weather_bot.py",
+                        "runner":  "scripts/run_polymarket_weather_bot.ps1",
+                        "scheduled_tasks":  [
+                                                "PolymarketWeatherBot"
+                                            ],
+                        "log_path":  "data/polymarket_weather_near_miss_log.jsonl",
+                        "status":  "research_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "polymarket_public_data_only",
+                        "feeds":  [
+                                      "polymarket_weather_bot",
+                                      "polymarket_weather_performance_report"
+                                  ],
+                        "evidence_gate":  "The preregistered fee-adjusted edge band is 5.0% inclusive to 10.0% exclusive, with all three model families at 5%+ edge and no more than 20 points disagreement. Threshold review requires at least 30 resolved observations across 14 calendar days; no automatic threshold change is permitted.",
+                        "notes":  "One forward observation per market is tracked through explicit settlement using a hypothetical $1 executable-ask entry. The cohort is research-only and cannot create paper or live positions."
+                    },
+                    {
+                        "id":  "flip_15m_orb_retest_shadow_challenger",
+                        "name":  "Flip 15-Minute ORB Retest Shadow Challenger",
+                        "script":  "strategies/flip_shadow_setup_challengers.py",
+                        "runner":  "scripts/run_flip_bot_monitor.ps1",
+                        "scheduled_tasks":  [
+                                                "Flip-Bot-Monitor"
+                                            ],
+                        "log_path":  "data/flip_shadow_candidates_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data_read_only",
+                        "feeds":  [
+                                      "flip_shadow_pnl_evaluator",
+                                      "flip_shadow_time_bucket_report"
+                                  ],
+                        "evidence_gate":  "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
+                        "notes":  "Independent 15-minute opening range, completed-candle breakout, bounded retest, hold, and prior-day-high/low alignment. Isolated from primary symbol promotion and live selector rankings."
+                    },
+                    {
+                        "id":  "flip_level_sweep_reversal_shadow_challenger",
+                        "name":  "Flip Prior-Level Sweep Reversal Shadow Challenger",
+                        "script":  "strategies/flip_shadow_setup_challengers.py",
+                        "runner":  "scripts/run_flip_bot_monitor.ps1",
+                        "scheduled_tasks":  [
+                                                "Flip-Bot-Monitor"
+                                            ],
+                        "log_path":  "data/flip_shadow_candidates_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data_read_only",
+                        "feeds":  [
+                                      "flip_shadow_pnl_evaluator",
+                                      "flip_shadow_time_bucket_report"
+                                  ],
+                        "evidence_gate":  "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
+                        "notes":  "First-90-minute failed break of prior-day or prior-week levels with close-back-inside and next-bar confirmation. The social-media 70% reversal claim is explicitly unverified and grants no execution authority."
+                    },
+                    {
+                        "id":  "flip_orb_extension_reversal_shadow_challenger",
+                        "name":  "Flip 5-Minute ORB Extension Reversal Shadow Challenger",
+                        "script":  "strategies/flip_shadow_setup_challengers.py",
+                        "runner":  "scripts/run_flip_bot_monitor.ps1",
+                        "scheduled_tasks":  [
+                                                "Flip-Bot-Monitor"
+                                            ],
+                        "log_path":  "data/flip_shadow_candidates_log.jsonl",
+                        "status":  "shadow_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "alpaca_market_data_read_only",
+                        "feeds":  [
+                                      "flip_shadow_pnl_evaluator",
+                                      "flip_shadow_time_bucket_report"
+                                  ],
+                        "evidence_gate":  "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
+                        "notes":  "After price extends at least one full 5-minute opening-range width, records the first confirmed lower-high/lower-low PUT reversal or higher-low/higher-high CALL reversal. Research-only counterfactual for learning reversal timing; it cannot submit orders."
+                    },
+                    {
+                        "id":  "flip_decision_missed_banger_review",
+                        "name":  "Flip Decision Missed-Banger Review",
+                        "script":  "scripts/flip_decision_missed_banger_review.py",
+                        "runner":  "scripts/run_flip_decision_missed_banger_review.ps1",
+                        "scheduled_tasks":  [
+                                                "FlipDecisionMissedBangerReview"
+                                            ],
+                        "log_path":  "data/flip_decision_missed_banger_review_log.jsonl",
+                        "status":  "research_only",
+                        "execution_enabled":  false,
+                        "can_submit_orders":  false,
+                        "broker_or_venue":  "yfinance_market_data_read_only",
+                        "feeds":  [
+                                      "flip-decisions.jsonl",
+                                      "shadow_consensus_blocker_audit"
+                                  ],
+                        "evidence_gate":  "The preregistered proxy is a 0.50% directionally favorable SPY underlying move within 60 minutes. Review requires at least 20 trading days and 50 directionally scoreable decisions; underlying moves are not option fills and cannot change a gate without explicit approval and option-level validation.",
+                        "notes":  "Read-only reason and blocker attribution. Repeated intraday decisions are labeled correlated, and historical rows with unavailable direction remain unscored."
+                    }
+                ]
+}

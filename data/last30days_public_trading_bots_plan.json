@@ -1,0 +1,35 @@
+{
+  "intent": "recommendations",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "transparent_bots",
+      "search_query": "open source trading bot verified live results strategy rules drawdown",
+      "ranking_query": "Which public bots disclose reproducible rules, full results including losses, realistic costs, and live or chronological out-of-sample evidence?",
+      "sources": ["reddit", "x", "youtube", "github"],
+      "weight": 1.0
+    },
+    {
+      "label": "options_and_equities",
+      "search_query": "systematic SPY QQQ options bot backtest live results open source",
+      "ranking_query": "Which options or liquid-equity bots publish enough detail to reproduce entries, exits, sizing, costs, and losing regimes?",
+      "sources": ["reddit", "x", "youtube", "github"],
+      "weight": 0.95
+    },
+    {
+      "label": "momentum_trend",
+      "search_query": "open source dual momentum trend following trading bot out of sample",
+      "ranking_query": "Which public momentum or trend systems have durable academic support and code that can be independently retested?",
+      "sources": ["reddit", "youtube", "github"],
+      "weight": 0.9
+    },
+    {
+      "label": "failure_modes",
+      "search_query": "trading bot failed live lookahead overfit slippage postmortem",
+      "ranking_query": "What recent bot failures reveal lookahead, overfitting, fill, latency, regime, or survivorship-bias problems we must test?",
+      "sources": ["reddit", "x", "youtube", "github"],
+      "weight": 0.9
+    }
+  ]
+}

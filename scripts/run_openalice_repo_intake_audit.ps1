@@ -1,0 +1,6 @@
+$ErrorActionPreference = "Stop"
+
+$repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
+Set-Location $repo
+
+python scripts\openalice_repo_intake_audit.py --print

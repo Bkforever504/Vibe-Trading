@@ -27,7 +27,42 @@ SYMBOLS = ["SPY", "QQQ", "GLD", "XLE", "TLT", "IWM", "XLK", "XLV", "XLF", "XLI"]
 LOOKBACK_MONTHS = 12
 LOOKBACK_DAYS = 252
 TOP_N = 2
+MICRO_ACCOUNT_SIZE = 1000.0
+MICRO_DEPLOYMENT_FRACTION = 0.50
 LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "momentum_shadow_log.jsonl"
+
+
+def micro_account_plan(
+    holdings: list[str],
+    close_prices: dict[str, float],
+    *,
+    account_size: float = MICRO_ACCOUNT_SIZE,
+    deployment_fraction: float = MICRO_DEPLOYMENT_FRACTION,
+) -> dict:
+    """Build a fractional-share allocation plan without placing an order."""
+    account = max(0.0, float(account_size))
+    deployment = min(1.0, max(0.0, float(deployment_fraction)))
+    valid = [symbol for symbol in holdings if float(close_prices.get(symbol) or 0.0) > 0]
+    deployed = account * deployment if valid else 0.0
+    per_holding = deployed / len(valid) if valid else 0.0
+    allocations = {}
+    for symbol in valid:
+        price = float(close_prices[symbol])
+        allocations[symbol] = {
+            "target_notional": round(per_holding, 2),
+            "reference_price": round(price, 4),
+            "fractional_shares": round(per_holding / price, 6),
+        }
+    return {
+        "account_size": round(account, 2),
+        "deployment_fraction": round(deployment, 4),
+        "target_gross_exposure": round(deployed, 2),
+        "cash_reserve": round(account - deployed, 2),
+        "allocations": allocations,
+        "execution_mode": "shadow_only",
+        "can_submit_orders": False,
+        "rationale": "Half deployment reduces observed strategy drawdown while preserving exact fractional-share sizing for a small account.",
+    }
 
 
 def compute_current_signal(
@@ -57,11 +92,13 @@ def compute_current_signal(
     weight = round(1.0 / len(selected), 6) if selected else 0.0
     weights = {sym: weight for sym in selected}
 
+    close_prices = {sym: round(float(price), 6) for sym, price in current_close.items()}
     return {
         "date": today.isoformat(),
+        "signal_asof": pd.Timestamp(universe.index[-1]).date().isoformat(),
         "holdings": selected,
         "weights": weights,
-        "close_prices": {sym: round(float(price), 6) for sym, price in current_close.items()},
+        "close_prices": close_prices,
         "momentum_12m": {sym: round(ret, 6) for sym, ret in momentum_12m.items()},
         "ranked": [(sym, round(ret, 6)) for sym, ret in ranked],
         "in_cash": len(selected) == 0,
@@ -71,6 +108,7 @@ def compute_current_signal(
         "execution_mode": "shadow_only",
         "data_source": data_source(),
         "vix_context": fetch_vix_context(),
+        "micro_account_plan": micro_account_plan(selected, close_prices),
     }
 
 
@@ -143,6 +181,17 @@ def print_report(entry: dict, prev: dict | None) -> None:
     else:
         parts = [f"{sym} ({w * 100:.0f}%)" for sym, w in entry["weights"].items()]
         print(f"Target: {', '.join(parts)}")
+
+    micro = entry.get("micro_account_plan") or {}
+    if micro:
+        allocation_text = ", ".join(
+            f"{symbol} ${row['target_notional']:.0f} ({row['fractional_shares']:.4f} sh)"
+            for symbol, row in (micro.get("allocations") or {}).items()
+        ) or "cash"
+        print(
+            f"$1,000 shadow plan: {allocation_text}; "
+            f"cash reserve ${micro.get('cash_reserve', 0):.0f}"
+        )
 
     if prev is not None:
         prev_set = set(prev.get("holdings", []))

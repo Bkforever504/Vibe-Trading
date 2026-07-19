@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "balanced_recent",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "SPY trading edge opening range breakout VWAP options",
+      "ranking_query": "Which SPY intraday and options edges have reproducible rules, realistic costs, and evidence beyond screenshots?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "orb_filters",
+      "search_query": "SPY ORB VWAP gap relative volume backtest",
+      "ranking_query": "Which VWAP, gap, volume, volatility, and regime filters improve SPY opening-range breakout results without lookahead?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.9
+    },
+    {
+      "label": "options_execution",
+      "search_query": "SPY 0DTE options systematic backtest spread delta IV",
+      "ranking_query": "What systematic SPY option-entry and contract-selection rules survive bid-ask spread, slippage, IV, and theta?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.8
+    },
+    {
+      "label": "failure_modes",
+      "search_query": "SPY intraday strategy lookahead overfit failed backtest",
+      "ranking_query": "What implementation errors, regime failures, and overfitting traps invalidate apparently profitable SPY strategies?",
+      "sources": ["reddit", "youtube", "hackernews"],
+      "weight": 0.7
+    }
+  ]
+}

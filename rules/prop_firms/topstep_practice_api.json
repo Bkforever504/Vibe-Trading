@@ -1,0 +1,31 @@
+{
+  "firm": "Topstep",
+  "account_type": "Topstep Practice Account via ProjectX API",
+  "verified_as_of": "2026-07-19",
+  "automation": {
+    "allowed": true,
+    "status": "practice_only_with_local_device_and_explicit_account_allowlist",
+    "requires_local_device": true,
+    "notes": "Adapter requires an API-returned PRACTICE name, exact account ID allowlist, and cannot route to a Combine, XFA, or LFA."
+  },
+  "risk": {
+    "max_daily_loss": 100,
+    "max_trailing_drawdown": 2000,
+    "max_contracts": 1,
+    "notes": "Self-imposed pilot limits model the eventual 50K Combine rather than the larger 150K Practice account."
+  },
+  "consistency": {
+    "enabled": true,
+    "max_best_day_pct": 0.5,
+    "notes": "Conservative mirror of the current 50K Trading Combine consistency objective."
+  },
+  "unknown_rules_block": true,
+  "sources": [
+    "https://gateway.docs.projectx.com/docs/getting-started/authenticate/authenticate-api-key/",
+    "https://gateway.docs.projectx.com/docs/getting-started/connection-urls/",
+    "https://gateway.docs.projectx.com/docs/api-reference/order/order-place/",
+    "https://help.topstep.com/en/articles/11187768-topstepx-api-access",
+    "https://help.topstep.com/en/articles/8284134-practice-account",
+    "https://help.topstep.com/en/articles/8284197-trading-combine-parameters"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "options trade recap calls puts entry exit thesis",
+      "ranking_query": "Which recent call and put trades include enough timestamped entry, exit, market context, and reasoning to reconstruct the underlying edge?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "momentum_reversal",
+      "search_query": "SPY QQQ IWM NVDA TSLA options VWAP breakout reversal trade recap",
+      "ranking_query": "Which momentum, breakout, VWAP, liquidity-sweep, and failed-break setups produced calls or puts, and what conditions distinguished winners from failures?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram"],
+      "weight": 0.9
+    },
+    {
+      "label": "systematic_evidence",
+      "search_query": "systematic options strategy backtest calls puts liquid ETF stocks",
+      "ranking_query": "Which options strategies across liquid ETFs and large-cap stocks publish reproducible rules, realistic fills, losing periods, and out-of-sample results?",
+      "sources": ["reddit", "youtube", "hackernews", "x"],
+      "weight": 0.85
+    },
+    {
+      "label": "failure_analysis",
+      "search_query": "options trading loss review failed calls puts slippage theta chop",
+      "ranking_query": "What recurring conditions make otherwise plausible call and put trades fail after spreads, theta, volatility changes, and regime shifts?",
+      "sources": ["reddit", "x", "youtube", "tiktok"],
+      "weight": 0.8
+    }
+  ]
+}

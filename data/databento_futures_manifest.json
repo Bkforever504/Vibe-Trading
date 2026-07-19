@@ -1,0 +1,201 @@
+{
+  "mode": "downloaded",
+  "dataset": "GLBX.MDP3",
+  "schema": "ohlcv-1m",
+  "estimates": [
+    {
+      "symbol": "MES.v.0",
+      "cost_usd": 5.869037657976
+    }
+  ],
+  "total_cost_usd": 5.869037657976,
+  "results": [
+    {
+      "spec": {
+        "product": "MES",
+        "start": "2022-01-01",
+        "end": "2026-07-19"
+      },
+      "symbol": "MES.v.0",
+      "cache": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\data\\databento\\mes_v0_1m_2022-01-01_2026-07-19.dbn.zst",
+      "cache_reused": true,
+      "csv": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\examples\\mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+      "rows": 440638,
+      "sessions": 1148,
+      "first_bar": "2022-01-03T09:30:00",
+      "last_bar": "2026-07-17T15:59:00",
+      "roll_sessions_excluded": [
+        "2022-03-14",
+        "2022-06-13",
+        "2022-09-14",
+        "2022-12-14",
+        "2023-03-15",
+        "2023-06-14",
+        "2023-09-13",
+        "2023-12-13",
+        "2024-03-13",
+        "2024-06-19",
+        "2024-09-18",
+        "2024-12-18",
+        "2025-03-19",
+        "2025-06-18",
+        "2025-09-18",
+        "2025-12-17",
+        "2026-03-18",
+        "2026-06-17"
+      ],
+      "roll_transitions": [
+        {
+          "timestamp": "2022-03-13T20:00:00-04:00",
+          "old_instrument_id": 11355,
+          "new_instrument_id": 13615,
+          "excluded_session": "2022-03-14"
+        },
+        {
+          "timestamp": "2022-06-12T20:00:00-04:00",
+          "old_instrument_id": 13615,
+          "new_instrument_id": 10039,
+          "excluded_session": "2022-06-13"
+        },
+        {
+          "timestamp": "2022-09-13T20:00:00-04:00",
+          "old_instrument_id": 10039,
+          "new_instrument_id": 10299,
+          "excluded_session": "2022-09-14"
+        },
+        {
+          "timestamp": "2022-12-13T19:00:00-05:00",
+          "old_instrument_id": 10299,
+          "new_instrument_id": 2080,
+          "excluded_session": "2022-12-14"
+        },
+        {
+          "timestamp": "2023-03-14T20:00:00-04:00",
+          "old_instrument_id": 2080,
+          "new_instrument_id": 9270,
+          "excluded_session": "2023-03-15"
+        },
+        {
+          "timestamp": "2023-06-13T20:00:00-04:00",
+          "old_instrument_id": 9270,
+          "new_instrument_id": 2922,
+          "excluded_session": "2023-06-14"
+        },
+        {
+          "timestamp": "2023-09-12T20:00:00-04:00",
+          "old_instrument_id": 2922,
+          "new_instrument_id": 24925,
+          "excluded_session": "2023-09-13"
+        },
+        {
+          "timestamp": "2023-12-12T19:00:00-05:00",
+          "old_instrument_id": 24925,
+          "new_instrument_id": 763,
+          "excluded_session": "2023-12-13"
+        },
+        {
+          "timestamp": "2024-03-12T20:00:00-04:00",
+          "old_instrument_id": 763,
+          "new_instrument_id": 13804,
+          "excluded_session": "2024-03-13"
+        },
+        {
+          "timestamp": "2024-06-18T20:00:00-04:00",
+          "old_instrument_id": 13804,
+          "new_instrument_id": 7114,
+          "excluded_session": "2024-06-19"
+        },
+        {
+          "timestamp": "2024-09-17T20:00:00-04:00",
+          "old_instrument_id": 7114,
+          "new_instrument_id": 42034014,
+          "excluded_session": "2024-09-18"
+        },
+        {
+          "timestamp": "2024-12-17T19:00:00-05:00",
+          "old_instrument_id": 42034014,
+          "new_instrument_id": 42005347,
+          "excluded_session": "2024-12-18"
+        },
+        {
+          "timestamp": "2025-03-18T20:00:00-04:00",
+          "old_instrument_id": 42005347,
+          "new_instrument_id": 42003627,
+          "excluded_session": "2025-03-19"
+        },
+        {
+          "timestamp": "2025-06-17T20:00:00-04:00",
+          "old_instrument_id": 42003627,
+          "new_instrument_id": 42002651,
+          "excluded_session": "2025-06-18"
+        },
+        {
+          "timestamp": "2025-09-16T20:00:00-04:00",
+          "old_instrument_id": 42002651,
+          "new_instrument_id": 42004164,
+          "excluded_session": "2025-09-18"
+        },
+        {
+          "timestamp": "2025-12-16T19:00:00-05:00",
+          "old_instrument_id": 42004164,
+          "new_instrument_id": 42003800,
+          "excluded_session": "2025-12-17"
+        },
+        {
+          "timestamp": "2026-03-17T20:00:00-04:00",
+          "old_instrument_id": 42003800,
+          "new_instrument_id": 42005163,
+          "excluded_session": "2026-03-18"
+        },
+        {
+          "timestamp": "2026-06-16T20:00:00-04:00",
+          "old_instrument_id": 42005163,
+          "new_instrument_id": 42003239,
+          "excluded_session": "2026-06-17"
+        }
+      ],
+      "session_audit": {
+        "max_missing_bars": 5,
+        "sessions_audited": 1148,
+        "sessions_excluded": [],
+        "incomplete_sessions_kept": [
+          {
+            "date": "2023-07-04",
+            "bars": 209,
+            "expected": 210,
+            "missing": 1
+          },
+          {
+            "date": "2023-11-23",
+            "bars": 209,
+            "expected": 210,
+            "missing": 1
+          }
+        ]
+      },
+      "dataset_condition_dates_excluded": {
+        "2022-01-02": "degraded",
+        "2025-09-17": "degraded",
+        "2025-09-24": "degraded",
+        "2025-11-28": "degraded",
+        "2026-02-14": "missing",
+        "2026-02-21": "missing",
+        "2026-02-28": "missing",
+        "2026-03-07": "missing",
+        "2026-03-14": "missing",
+        "2026-03-15": "degraded",
+        "2026-03-16": "degraded",
+        "2026-03-21": "missing",
+        "2026-03-28": "missing",
+        "2026-04-04": "missing",
+        "2026-04-10": "degraded",
+        "2026-04-11": "missing",
+        "2026-04-18": "missing",
+        "2026-04-25": "missing",
+        "2026-05-02": "missing",
+        "2026-05-09": "missing",
+        "2026-05-24": "degraded"
+      }
+    }
+  ]
+}

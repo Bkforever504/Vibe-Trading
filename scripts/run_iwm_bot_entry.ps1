@@ -2,5 +2,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 $env:PYTHONPATH = $repo
+$env:ENABLE_SHADOW_CONSENSUS_GATE = "true"
 Set-Location $repo
-uv run --no-project --with alpaca-py --with yfinance --with pandas --with numpy --with python-dotenv --with requests python strategies\iwm_options_bot.py --strategy both
+python strategies\iwm_options_bot.py --strategy both

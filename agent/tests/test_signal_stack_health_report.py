@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,3 +60,65 @@ def test_build_report_flags_missing_stale_error_and_ok(monkeypatch, tmp_path: Pa
     assert built["summary"] == {"ok": 1, "stale": 1, "missing": 1, "error": 1}
     statuses = {item["name"]: item["health"] for item in built["items"]}
     assert statuses == {"OK": "ok", "Stale": "stale", "Missing": "missing", "Error": "error"}
+
+
+def test_build_report_treats_pre_scheduled_today_run_as_pending_ok(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "morning.jsonl"
+    log.write_text('{"date":"2026-07-03"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{"name": "Morning", "task": "morning-task", "log": log, "kind": "morning"}],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda task: {"available": True, "status": "Ready", "next_run_time": "7/6/2026 8:35:00 AM"},
+    )
+
+    built = report.build_report(today=date(2026, 7, 6), now=datetime(2026, 7, 6, 6, 15))
+
+    assert built["summary"] == {"ok": 1, "stale": 0, "missing": 0, "error": 0}
+    assert built["items"][0]["health"] == "ok"
+    assert built["items"][0]["warnings"] == ["pending_today latest_date=2026-07-03"]
+
+
+def test_market_mastery_signals_are_registered_for_health() -> None:
+    names = {signal["name"]: signal for signal in report.SIGNALS}
+
+    assert names["Candlestick Context"]["log"].name == "candlestick_context_log.jsonl"
+    assert names["Higher Timeframe Map"]["log"].name == "higher_timeframe_market_map_log.jsonl"
+    assert names["Market Catalyst Calendar"]["log"].name == "market_catalyst_calendar_log.jsonl"
+    assert names["Daily Edge Orchestrator"]["log"].name == "daily_edge_orchestrator_log.jsonl"
+    assert names["Kronos Market Forecaster"]["log"].name == "kronos_market_forecast_log.jsonl"
+    assert names["Options Surface Intelligence"]["log"].name == "options_surface_intelligence_log.jsonl"
+    assert names["Flip Feature Ablation"]["log"].name == "flip_feature_ablation_log.jsonl"
+    assert names["Edge Trial Ledger"]["log"].name == "edge_trial_ledger_report_log.jsonl"
+    assert names["Flip Equity Curve"]["log"].name == "flip_equity_curve_log.jsonl"
+
+
+def test_signal_health_registry_has_unique_names() -> None:
+    names = [signal["name"] for signal in report.SIGNALS]
+
+    assert len(names) == len(set(names))
+
+
+def test_strategy_staleness_alerts_after_threshold(tmp_path: Path) -> None:
+    trades = tmp_path / "flip-trades.json"
+    trades.write_text(json.dumps([
+        {
+            "strategy": "0dte", "orb_entry_pattern": "breakout_retest",
+            "entry_date": "2026-07-01", "exit_date": "2026-07-01", "status": "closed",
+        }
+    ]), encoding="utf-8")
+    shadow = tmp_path / "shadow.jsonl"
+    shadow.write_text("", encoding="utf-8")
+
+    result = report.build_strategy_staleness(
+        today=date(2026, 7, 17), trades_path=trades, shadow_path=shadow
+    )
+
+    assert result["orb_continuation"]["alert"] is True
+    assert result["orb_continuation"]["days_since_last_entry"] > 5
+    assert result["orb_extension_reversal"]["alert"] is False
+    assert result["orb_extension_reversal"]["note"] == "no_observations_yet"
