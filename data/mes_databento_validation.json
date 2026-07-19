@@ -1,0 +1,486 @@
+{
+  "dataset": "examples\\mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "trading_dates": 1148,
+  "development_dates": 803,
+  "selection_dates": 172,
+  "untouched_final_test_dates": 173,
+  "grid_candidates": 4800,
+  "executable_only": true,
+  "max_stop_ticks": 40,
+  "development_survivors": 5,
+  "selection_survivors": 1,
+  "robust_finalists": [
+    {
+      "candidate": {
+        "signal_type": "orb",
+        "breakout_points": 1.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 4,
+        "exit_model": "full_target_stop",
+        "filter_name": "gap",
+        "range_minutes": 5
+      },
+      "development_score": 3.1496,
+      "development_regimes": [
+        {
+          "trades": 24,
+          "total_pnl": 204.0,
+          "daily_average": 0.764,
+          "expectancy": 8.5,
+          "win_rate": 0.4167,
+          "profit_factor": 1.2698,
+          "max_drawdown": 162.0,
+          "violations": 0
+        },
+        {
+          "trades": 13,
+          "total_pnl": 48.0,
+          "daily_average": 0.1798,
+          "expectancy": 3.69,
+          "win_rate": 0.3846,
+          "profit_factor": 1.1111,
+          "max_drawdown": 228.0,
+          "violations": 0
+        },
+        {
+          "trades": 9,
+          "total_pnl": 264.0,
+          "daily_average": 0.9814,
+          "expectancy": 29.33,
+          "win_rate": 0.5556,
+          "profit_factor": 2.2222,
+          "max_drawdown": 54.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 516.0,
+        "daily_average": 0.6426,
+        "expectancy": 11.22,
+        "win_rate": 0.4348,
+        "profit_factor": 1.3675,
+        "max_drawdown": 294.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 11,
+        "total_pnl": 156.0,
+        "daily_average": 0.907,
+        "expectancy": 14.18,
+        "win_rate": 0.4545,
+        "profit_factor": 1.4815,
+        "max_drawdown": 120.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 11,
+        "total_pnl": 112.0,
+        "daily_average": 0.6512,
+        "expectancy": 10.18,
+        "win_rate": 0.4545,
+        "profit_factor": 1.3218,
+        "max_drawdown": 140.0,
+        "violations": 0
+      },
+      "final_test": {
+        "trades": 22,
+        "total_pnl": 12.0,
+        "daily_average": 0.0694,
+        "expectancy": 0.55,
+        "win_rate": 0.3636,
+        "profit_factor": 1.0159,
+        "max_drawdown": 336.0,
+        "violations": 0
+      },
+      "final_test_double_costs": {
+        "trades": 22,
+        "total_pnl": -76.0,
+        "daily_average": -0.4393,
+        "expectancy": -3.45,
+        "win_rate": 0.3636,
+        "profit_factor": 0.9064,
+        "max_drawdown": 372.0,
+        "violations": 0
+      }
+    }
+  ],
+  "all_finalists": [
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 1.0,
+        "reward_risk": 1.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "gap_vix",
+        "range_minutes": 30
+      },
+      "development_score": 13.0512,
+      "development_regimes": [
+        {
+          "trades": 9,
+          "total_pnl": 139.0,
+          "daily_average": 0.5206,
+          "expectancy": 15.44,
+          "win_rate": 0.5556,
+          "profit_factor": 1.6435,
+          "max_drawdown": 108.0,
+          "violations": 0
+        },
+        {
+          "trades": 8,
+          "total_pnl": 193.0,
+          "daily_average": 0.7228,
+          "expectancy": 24.12,
+          "win_rate": 0.625,
+          "profit_factor": 2.1914,
+          "max_drawdown": 108.0,
+          "violations": 0
+        },
+        {
+          "trades": 15,
+          "total_pnl": 190.0,
+          "daily_average": 0.7063,
+          "expectancy": 12.67,
+          "win_rate": 0.5333,
+          "profit_factor": 1.5026,
+          "max_drawdown": 162.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 32,
+        "total_pnl": 522.0,
+        "daily_average": 0.6501,
+        "expectancy": 16.31,
+        "win_rate": 0.5625,
+        "profit_factor": 1.6905,
+        "max_drawdown": 162.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 10,
+        "total_pnl": -165.0,
+        "daily_average": -0.9593,
+        "expectancy": -16.5,
+        "win_rate": 0.3,
+        "profit_factor": 0.5635,
+        "max_drawdown": 253.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 10,
+        "total_pnl": -205.0,
+        "daily_average": -1.1919,
+        "expectancy": -20.5,
+        "win_rate": 0.3,
+        "profit_factor": 0.4951,
+        "max_drawdown": 281.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 1.0,
+        "reward_risk": 2.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "gap_vix",
+        "range_minutes": 30
+      },
+      "development_score": 4.1532,
+      "development_regimes": [
+        {
+          "trades": 9,
+          "total_pnl": 214.0,
+          "daily_average": 0.8015,
+          "expectancy": 23.78,
+          "win_rate": 0.4444,
+          "profit_factor": 1.7926,
+          "max_drawdown": 162.0,
+          "violations": 0
+        },
+        {
+          "trades": 8,
+          "total_pnl": 443.0,
+          "daily_average": 1.6592,
+          "expectancy": 55.38,
+          "win_rate": 0.625,
+          "profit_factor": 3.7346,
+          "max_drawdown": 108.0,
+          "violations": 0
+        },
+        {
+          "trades": 15,
+          "total_pnl": 65.0,
+          "daily_average": 0.2416,
+          "expectancy": 4.33,
+          "win_rate": 0.3333,
+          "profit_factor": 1.1204,
+          "max_drawdown": 162.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 32,
+        "total_pnl": 722.0,
+        "daily_average": 0.8991,
+        "expectancy": 22.56,
+        "win_rate": 0.4375,
+        "profit_factor": 1.7428,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 10,
+        "total_pnl": -190.0,
+        "daily_average": -1.1047,
+        "expectancy": -19.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.5602,
+        "max_drawdown": 270.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 10,
+        "total_pnl": -230.0,
+        "daily_average": -1.3372,
+        "expectancy": -23.0,
+        "win_rate": 0.2,
+        "profit_factor": 0.5043,
+        "max_drawdown": 290.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 1.0,
+        "reward_risk": 1.5,
+        "stop_ticks": 40,
+        "tolerance_ticks": 4,
+        "exit_model": "full_target_stop",
+        "filter_name": "volume12",
+        "range_minutes": 30
+      },
+      "development_score": 4.0168,
+      "development_regimes": [
+        {
+          "trades": 17,
+          "total_pnl": 82.0,
+          "daily_average": 0.3071,
+          "expectancy": 4.82,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1687,
+          "max_drawdown": 253.0,
+          "violations": 0
+        },
+        {
+          "trades": 17,
+          "total_pnl": 77.0,
+          "daily_average": 0.2884,
+          "expectancy": 4.53,
+          "win_rate": 0.4706,
+          "profit_factor": 1.1756,
+          "max_drawdown": 150.0,
+          "violations": 0
+        },
+        {
+          "trades": 14,
+          "total_pnl": 119.0,
+          "daily_average": 0.4424,
+          "expectancy": 8.5,
+          "win_rate": 0.5,
+          "profit_factor": 1.3148,
+          "max_drawdown": 162.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 48,
+        "total_pnl": 278.0,
+        "daily_average": 0.3462,
+        "expectancy": 5.79,
+        "win_rate": 0.4792,
+        "profit_factor": 1.2134,
+        "max_drawdown": 253.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 6,
+        "total_pnl": 51.0,
+        "daily_average": 0.2965,
+        "expectancy": 8.5,
+        "win_rate": 0.5,
+        "profit_factor": 1.3148,
+        "max_drawdown": 54.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 6,
+        "total_pnl": 27.0,
+        "daily_average": 0.157,
+        "expectancy": 4.5,
+        "win_rate": 0.5,
+        "profit_factor": 1.1552,
+        "max_drawdown": 58.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "orb",
+        "breakout_points": 1.0,
+        "reward_risk": 2.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 4,
+        "exit_model": "full_target_stop",
+        "filter_name": "gap",
+        "range_minutes": 5
+      },
+      "development_score": 3.1496,
+      "development_regimes": [
+        {
+          "trades": 24,
+          "total_pnl": 204.0,
+          "daily_average": 0.764,
+          "expectancy": 8.5,
+          "win_rate": 0.4167,
+          "profit_factor": 1.2698,
+          "max_drawdown": 162.0,
+          "violations": 0
+        },
+        {
+          "trades": 13,
+          "total_pnl": 48.0,
+          "daily_average": 0.1798,
+          "expectancy": 3.69,
+          "win_rate": 0.3846,
+          "profit_factor": 1.1111,
+          "max_drawdown": 228.0,
+          "violations": 0
+        },
+        {
+          "trades": 9,
+          "total_pnl": 264.0,
+          "daily_average": 0.9814,
+          "expectancy": 29.33,
+          "win_rate": 0.5556,
+          "profit_factor": 2.2222,
+          "max_drawdown": 54.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 46,
+        "total_pnl": 516.0,
+        "daily_average": 0.6426,
+        "expectancy": 11.22,
+        "win_rate": 0.4348,
+        "profit_factor": 1.3675,
+        "max_drawdown": 294.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 11,
+        "total_pnl": 156.0,
+        "daily_average": 0.907,
+        "expectancy": 14.18,
+        "win_rate": 0.4545,
+        "profit_factor": 1.4815,
+        "max_drawdown": 120.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 11,
+        "total_pnl": 112.0,
+        "daily_average": 0.6512,
+        "expectancy": 10.18,
+        "win_rate": 0.4545,
+        "profit_factor": 1.3218,
+        "max_drawdown": 140.0,
+        "violations": 0
+      }
+    },
+    {
+      "candidate": {
+        "signal_type": "pullback",
+        "breakout_points": 1.0,
+        "reward_risk": 1.0,
+        "stop_ticks": 40,
+        "tolerance_ticks": 8,
+        "exit_model": "full_target_stop",
+        "filter_name": "trend20",
+        "range_minutes": 30
+      },
+      "development_score": 2.3812,
+      "development_regimes": [
+        {
+          "trades": 17,
+          "total_pnl": 182.0,
+          "daily_average": 0.6816,
+          "expectancy": 10.71,
+          "win_rate": 0.6471,
+          "profit_factor": 1.5617,
+          "max_drawdown": 170.0,
+          "violations": 0
+        },
+        {
+          "trades": 13,
+          "total_pnl": 198.0,
+          "daily_average": 0.7416,
+          "expectancy": 15.23,
+          "win_rate": 0.6923,
+          "profit_factor": 1.9167,
+          "max_drawdown": 124.0,
+          "violations": 0
+        },
+        {
+          "trades": 23,
+          "total_pnl": 58.0,
+          "daily_average": 0.2156,
+          "expectancy": 2.52,
+          "win_rate": 0.5652,
+          "profit_factor": 1.1074,
+          "max_drawdown": 216.0,
+          "violations": 0
+        }
+      ],
+      "development": {
+        "trades": 53,
+        "total_pnl": 438.0,
+        "daily_average": 0.5455,
+        "expectancy": 8.26,
+        "win_rate": 0.6226,
+        "profit_factor": 1.4056,
+        "max_drawdown": 216.0,
+        "violations": 0
+      },
+      "selection": {
+        "trades": 10,
+        "total_pnl": -140.0,
+        "daily_average": -0.814,
+        "expectancy": -14.0,
+        "win_rate": 0.4,
+        "profit_factor": 0.5679,
+        "max_drawdown": 162.0,
+        "violations": 0
+      },
+      "selection_double_costs": {
+        "trades": 10,
+        "total_pnl": -180.0,
+        "daily_average": -1.0465,
+        "expectancy": -18.0,
+        "win_rate": 0.4,
+        "profit_factor": 0.4828,
+        "max_drawdown": 180.0,
+        "violations": 0
+      }
+    }
+  ]
+}
