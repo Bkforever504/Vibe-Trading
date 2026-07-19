@@ -1,0 +1,110 @@
+{
+  "preregistration": "research/OVERNIGHT_DRIFT_PREREGISTRATION_2026-07-19.md",
+  "SPY": {
+    "development_regimes": [
+      {
+        "window": [
+          "2000-01-01",
+          "2005-12-31"
+        ],
+        "trades": 1508,
+        "total_return_pct": -4.02,
+        "mean_per_trade_pct": -0.00087,
+        "win_rate": 0.5146,
+        "profit_factor": 0.9957,
+        "max_drawdown_pct": -38.93,
+        "final_equity_on_1000": 959.83
+      },
+      {
+        "window": [
+          "2006-01-01",
+          "2010-12-31"
+        ],
+        "trades": 1259,
+        "total_return_pct": -1.38,
+        "mean_per_trade_pct": 0.00258,
+        "win_rate": 0.529,
+        "profit_factor": 1.0096,
+        "max_drawdown_pct": -27.59,
+        "final_equity_on_1000": 986.23
+      },
+      {
+        "window": [
+          "2011-01-01",
+          "2015-12-31"
+        ],
+        "trades": 1258,
+        "total_return_pct": 9.48,
+        "mean_per_trade_pct": 0.00902,
+        "win_rate": 0.5207,
+        "profit_factor": 1.0462,
+        "max_drawdown_pct": -14.16,
+        "final_equity_on_1000": 1094.85
+      }
+    ],
+    "development_pass": false
+  },
+  "QQQ": {
+    "development_regimes": [
+      {
+        "window": [
+          "2000-01-01",
+          "2005-12-31"
+        ],
+        "trades": 1508,
+        "total_return_pct": 40.72,
+        "mean_per_trade_pct": 0.02939,
+        "win_rate": 0.5265,
+        "profit_factor": 1.0791,
+        "max_drawdown_pct": -39.0,
+        "final_equity_on_1000": 1407.17
+      },
+      {
+        "window": [
+          "2006-01-01",
+          "2010-12-31"
+        ],
+        "trades": 1259,
+        "total_return_pct": 12.2,
+        "mean_per_trade_pct": 0.01244,
+        "win_rate": 0.5377,
+        "profit_factor": 1.0471,
+        "max_drawdown_pct": -29.03,
+        "final_equity_on_1000": 1121.96
+      },
+      {
+        "window": [
+          "2011-01-01",
+          "2015-12-31"
+        ],
+        "trades": 1258,
+        "total_return_pct": 38.21,
+        "mean_per_trade_pct": 0.02793,
+        "win_rate": 0.5413,
+        "profit_factor": 1.1371,
+        "max_drawdown_pct": -14.24,
+        "final_equity_on_1000": 1382.07
+      }
+    ],
+    "development_pass": true,
+    "selection": {
+      "trades": 1259,
+      "total_return_pct": 60.41,
+      "mean_per_trade_pct": 0.04147,
+      "win_rate": 0.5703,
+      "profit_factor": 1.1694,
+      "max_drawdown_pct": -27.8,
+      "final_equity_on_1000": 1604.12
+    },
+    "selection_2x_costs": {
+      "trades": 1259,
+      "total_return_pct": 24.71,
+      "mean_per_trade_pct": 0.02147,
+      "win_rate": 0.5552,
+      "profit_factor": 1.0847,
+      "max_drawdown_pct": -28.16,
+      "final_equity_on_1000": 1247.12
+    },
+    "selection_pass": false
+  }
+}
