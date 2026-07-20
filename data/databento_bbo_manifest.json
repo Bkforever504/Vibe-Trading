@@ -1,0 +1,11 @@
+{
+  "schema": "bbo-1s",
+  "dataset": "GLBX.MDP3",
+  "symbol": "MES.v.0",
+  "start": "2024-01-01",
+  "end": "2026-07-19",
+  "estimated_cost_usd": 66.32,
+  "cache": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\data\\databento\\mes_v0_bbo1s_2024-01-01_2026-07-19.dbn.zst",
+  "bytes": 1289300259,
+  "sha256": "5506B3A73F180A18E2AC710C5CB49CE9AEF2EDD5D83CD774F8B84C14A163517C"
+}
