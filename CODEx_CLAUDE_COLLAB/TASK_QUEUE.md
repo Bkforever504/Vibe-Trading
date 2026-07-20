@@ -304,6 +304,36 @@ Do not rerun sweeps on this consumed dataset.
 
 ---
 
+## P1: Polymarket Wallet Replication Lane (started 2026-07-19)
+
+The only "find and replicate profitable traders" path with unfakeable data:
+on-chain Polymarket wallets. Built so far:
+
+- `strategies/polymarket_wallet_discovery.py` - pulls the public profit
+  leaderboard (`data-api.polymarket.com/v1/leaderboard`), keeps wallets
+  persistent across windows, scores them through the existing
+  `polymarket_wallet_tracker.py` pipeline. Read-only, no keys, no orders.
+- First live run: 50 wallets discovered, 8 scored.
+
+Known data-quality issues before any status is trusted:
+
+1. Closed-positions endpoint only returns winners - wallets scored from it
+   show fake 100% win rates ("paper_watch confidence 10" = survivorship
+   artifact, NOT a real signal).
+2. Activity rows carry no realized PnL - wallets scored from them show
+   fake 0% win rates (false rejects).
+3. Leaderboard window parameter needs verification (month == all-time in
+   the first run).
+
+Next steps (Codex or Claude):
+
+1. Build FIFO realized-PnL reconstruction from raw activity buy/sell rows
+   so scoring uses true per-position outcomes, losses included.
+2. Verify leaderboard window values; only then does the persistence filter
+   mean anything.
+3. Re-score; anything genuinely passing copy-trader gates goes to
+   paper_watch shadow logging only. No real-money copying without Kenny.
+
 ## P2: Polygon.io Data Unlock (Kenny decision)
 
 Cost: $29/month
