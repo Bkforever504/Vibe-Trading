@@ -145,6 +145,35 @@ today-selected universe, crude reaction-day surprise proxy, overlapping
 event exposure. Per the preregistration, this pass justifies acquiring
 deeper earnings data and forward paper-tracking only - not deployment.
 
+## 8. MES Quote-Flow Edges on bbo-1s (rejected)
+
+Preregistrations: `research/MES_ORDERFLOW_PREREGISTRATION_2026-07-19.md`
+(part 1, frozen before opening the data) and
+`research/MES_ORDERFLOW_PREREGISTRATION_PART2_2026-07-19.md`
+(distribution-calibrated thresholds, frozen before any outcome analysis).
+Script: `research/mes_orderflow_lab.py`
+Results: `data/mes_orderflow_results.json` (part 1, zero-signal),
+`data/mes_orderflow_results_part2.json`.
+Data: purchased bbo-1s 1-second MES quotes 2024-2026 ($66.32 credits),
+618 usable sessions after roll/condition/coverage exclusions.
+
+- Part 1 thresholds proved unreachable in RTH (deep balanced book; the
+  300s mean absolute imbalance tops out at 0.40, p99 0.136). Recorded as
+  zero-signal.
+- Part 2, H1 imbalance drift at p97/p99 thresholds: rejected at
+  development. 422 trades at 0.10: expectancy -$4.37, PF 0.54. 69 trades
+  at 0.14: -$3.59, PF 0.56. The signal cannot overcome spread plus
+  commission.
+- Part 2, H3 opening pressure: still zero signals - the MES opening book
+  is too balanced for a 0.10 five-minute mean imbalance to occur.
+- H2 diagnostic (quote conditions vs ORB trades) deferred; requires a
+  per-trade ORB export.
+
+Verdict: no edge in top-of-book 1-second quote imbalance under realistic
+costs. This kills the cheapest order-flow hypothesis class. It does not
+rule out trade-level (aggressor/delta) or depth (mbp-10) edges - those
+need the larger data purchases listed in TASK_QUEUE and are not approved.
+
 ## Ranking After These Tests
 
 1. Momentum rotation: continue accumulating forward trades toward the

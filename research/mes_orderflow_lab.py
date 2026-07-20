@@ -17,16 +17,16 @@ ROOT = Path(__file__).resolve().parent.parent
 DBN = ROOT / "data" / "databento" / "mes_v0_bbo1s_2024-01-01_2026-07-19.dbn.zst"
 PARQUET = ROOT / "data" / "databento" / "mes_v0_bbo1s_rth.parquet"
 OHLC_MANIFEST = ROOT / "data" / "databento_futures_manifest.json"
-OUT = ROOT / "data" / "mes_orderflow_results.json"
+OUT = ROOT / "data" / "mes_orderflow_results_part2.json"
 NY = "America/New_York"
 
 TICK = 0.25
 POINT_USD = 5.0
 COMMISSION = 1.24
 H1_WINDOW = 300
-H1_THRESHOLDS = (0.35, 0.50)
+H1_THRESHOLDS = (0.10, 0.14)
 H1_MAX_TRADES_DAY = 3
-H3_MIN_IMBALANCE = 0.25
+H3_MIN_IMBALANCE = 0.10
 H3_STOP_TICKS = 40
 H3_RRS = (1.5, 2.0)
 
@@ -138,7 +138,7 @@ def h3_session(session: pd.DataFrame, rr: float) -> float | None:
     session = session.sort_values("sec")
     sec = session["sec"].to_numpy()
     open_mask = (sec >= 9 * 3600 + 30 * 60) & (sec < 9 * 3600 + 35 * 60)
-    if open_mask.sum() < 200:
+    if open_mask.sum() < 60:
         return None
     open_imb = float(session["imb"].to_numpy()[open_mask].mean())
     if abs(open_imb) < H3_MIN_IMBALANCE:
