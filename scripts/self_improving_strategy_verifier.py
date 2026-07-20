@@ -28,6 +28,8 @@ HOT_INSTRUMENT_PATH = REPORT_DIR / "weekly-hot-instruments.json"
 LOOP_READINESS_PATH = REPORT_DIR / "loop-readiness-audit.json"
 INCENTIVE_SAFETY_PATH = REPORT_DIR / "agent-incentive-safety-audit.json"
 KRONOS_FORECAST_PATH = REPORT_DIR / "kronos-market-forecast.json"
+ADVERSARIAL_AUDIT_PATH = REPORT_DIR / "adversarial-strategy-audit.json"
+SELF_LEARNING_PATH = REPORT_DIR / "self-learning-edge-loop.json"
 
 MIN_COMPLETED_TRADES = 10
 MIN_TRADING_DAYS = 30
@@ -124,17 +126,30 @@ def _kronos_by_symbol(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return normalized
 
 
-def _governance_summary(loop_report: dict[str, Any], safety_report: dict[str, Any]) -> dict[str, Any]:
+def _audit_by_subject(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = report.get("by_subject")
+    if not isinstance(rows, dict):
+        return {}
+    return {_normalize_symbol(key): value for key, value in rows.items() if isinstance(value, dict)}
+
+
+def _governance_summary(
+    loop_report: dict[str, Any], safety_report: dict[str, Any], learning_report: dict[str, Any]
+) -> dict[str, Any]:
     loop_pass = not bool(loop_report.get("summary", {}).get("unattended_ready_count"))
     safety_pass = bool(safety_report.get("passed", True))
     execution_capable = _safe_int(loop_report.get("summary", {}).get("execution_capable_count"))
     high_risk = _safe_int(safety_report.get("summary", {}).get("high_risk_count"))
+    learning_operational = learning_report.get("provider") == "self_learning_edge_loop"
+    repeated_high_risk = _safe_int(learning_report.get("summary", {}).get("critical_unresolved_pattern_count"))
     return {
         "loop_governance_passed": loop_pass,
         "incentive_safety_passed": safety_pass,
         "execution_capable_count": execution_capable,
         "high_risk_count": high_risk,
-        "overall_passed": loop_pass and safety_pass and high_risk == 0,
+        "self_learning_loop_operational": learning_operational,
+        "repeated_high_risk_mistake_count": repeated_high_risk,
+        "overall_passed": loop_pass and safety_pass and high_risk == 0 and learning_operational and repeated_high_risk == 0,
     }
 
 
@@ -143,6 +158,7 @@ def _instrument_evidence(
     shadow: dict[str, Any],
     hot: dict[str, Any] | None,
     kronos: dict[str, Any] | None,
+    adversarial_audit: dict[str, Any] | None,
     governance: dict[str, Any],
 ) -> dict[str, Any]:
     completed = _safe_int(shadow.get("completed_count"))
@@ -225,6 +241,17 @@ def _instrument_evidence(
     if not governance.get("overall_passed"):
         blockers.append("governance_or_incentive_safety_not_clean")
 
+    if not adversarial_audit:
+        blockers.append("adversarial_audit_missing_for_subject")
+        memory_lessons.append("A builder's evidence cannot promote itself; require the independent adversarial manifest audit.")
+    elif not adversarial_audit.get("passed"):
+        blockers.append("adversarial_audit_failed")
+        for failed_check in adversarial_audit.get("failed_checks") or []:
+            blockers.append(f"adversarial_{failed_check}")
+        memory_lessons.append("Repair failed robustness checks in shadow, then rerun the independent audit.")
+    else:
+        reasons.append("independent adversarial audit passed")
+
     if hot and str(hot.get("action") or "") == "research_only":
         blockers.append("instrument_research_only")
         memory_lessons.append("Social attention cannot override explicit liquidity, affordability, or noise vetoes.")
@@ -267,6 +294,7 @@ def _instrument_evidence(
         "executable_quote_coverage_rate": round(executable_quote_coverage, 3),
         "hot_instrument_action": (hot or {}).get("action"),
         "kronos_regime": (kronos or {}).get("regime") or (kronos or {}).get("direction"),
+        "adversarial_audit_score": (adversarial_audit or {}).get("score_out_of_10"),
         "score_components": {
             "sample": round(sample_score, 2),
             "trading_days": round(day_score, 2),
@@ -291,6 +319,8 @@ def build_report(
     loop_readiness_path: Path = LOOP_READINESS_PATH,
     incentive_safety_path: Path = INCENTIVE_SAFETY_PATH,
     kronos_forecast_path: Path = KRONOS_FORECAST_PATH,
+    adversarial_audit_path: Path = ADVERSARIAL_AUDIT_PATH,
+    self_learning_path: Path = SELF_LEARNING_PATH,
     today: str | None = None,
 ) -> dict[str, Any]:
     today = today or date.today().isoformat()
@@ -299,15 +329,20 @@ def build_report(
     loop_report = _read_json(loop_readiness_path)
     safety_report = _read_json(incentive_safety_path)
     kronos_report = _read_json(kronos_forecast_path)
+    adversarial_report = _read_json(adversarial_audit_path)
+    learning_report = _read_json(self_learning_path)
 
     shadow = _shadow_by_symbol(shadow_report)
     hot = _hot_by_symbol(hot_report)
     kronos = _kronos_by_symbol(kronos_report)
-    governance = _governance_summary(loop_report, safety_report)
+    adversarial = _audit_by_subject(adversarial_report)
+    governance = _governance_summary(loop_report, safety_report, learning_report)
     symbols = sorted(set(shadow) | set(hot))
 
     instruments = [
-        _instrument_evidence(symbol, shadow.get(symbol, {}), hot.get(symbol), kronos.get(symbol), governance)
+        _instrument_evidence(
+            symbol, shadow.get(symbol, {}), hot.get(symbol), kronos.get(symbol), adversarial.get(symbol), governance
+        )
         for symbol in symbols
         if shadow.get(symbol) or hot.get(symbol)
     ]
@@ -329,6 +364,7 @@ def build_report(
             "evaluate": "Flip shadow P&L evaluator supplies path-aware simulated exits.",
             "select": "This verifier scores evidence and blocks self-approval.",
             "memory": "Failures and blockers are converted into reusable memory lessons.",
+            "attack": "An independent adversarial manifest must pass before human promotion review.",
         },
         "thresholds": {
             "min_completed_trades": MIN_COMPLETED_TRADES,
