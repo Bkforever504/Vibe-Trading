@@ -1,0 +1,29 @@
+{
+  "preregistration": "research/PEAD_PREREGISTRATION_2026-07-19.md",
+  "total_events": 1970,
+  "first_event": "2018-01-02",
+  "last_event": "2026-05-14",
+  "development": {
+    "events": 1182,
+    "mean_return_pct": 7.354,
+    "win_rate": 0.8088,
+    "profit_factor": 14.2267,
+    "total_return_pct_sum": 8692.0
+  },
+  "test": {
+    "events": 788,
+    "mean_return_pct": 5.976,
+    "win_rate": 0.7817,
+    "profit_factor": 6.1915,
+    "total_return_pct_sum": 4709.44
+  },
+  "development_pass": true,
+  "test_2x_costs": {
+    "events": 788,
+    "mean_return_pct": 5.936,
+    "win_rate": 0.7817,
+    "profit_factor": 6.1179,
+    "total_return_pct_sum": 4677.92
+  },
+  "test_pass": true
+}
