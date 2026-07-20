@@ -1,2 +1,5 @@
 {"ts": "2026-07-19T22:18:03-04:00", "lane": "momentum", "action": "entry", "symbol": "XLE", "price": 57.68}
 {"ts": "2026-07-19T22:18:03-04:00", "lane": "momentum", "action": "entry", "symbol": "XLK", "price": 175.59}
+{"ts": "2026-07-20T19:03:03-04:00", "lane": "momentum", "action": "invalidated", "symbol": "XLE", "entry_date": "2026-07-17", "entry_price": 57.68, "reason": "tracker_rebalance_phase_did_not_match_frozen_backtest"}
+{"ts": "2026-07-20T19:03:03-04:00", "lane": "momentum", "action": "invalidated", "symbol": "XLK", "entry_date": "2026-07-17", "entry_price": 175.59, "reason": "tracker_rebalance_phase_did_not_match_frozen_backtest"}
+{"ts": "2026-07-20T19:03:03-04:00", "lane": "momentum", "action": "entry", "symbols": ["XLK", "IWM"], "prices": {"XLK": 175.71, "IWM": 292.31}, "eligible_for_gate": false}

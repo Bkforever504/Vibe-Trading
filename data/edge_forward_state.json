@@ -1,16 +1,20 @@
 {
   "momentum": {
-    "holdings": {
-      "XLE": {
-        "date": "2026-07-17",
-        "price": 57.68
+    "strategy_version": "momentum-12m-5d-top2-canonical-phase-v2",
+    "position": {
+      "symbols": [
+        "XLK",
+        "IWM"
+      ],
+      "date": "2026-07-20",
+      "prices": {
+        "XLK": 175.71,
+        "IWM": 292.31
       },
-      "XLK": {
-        "date": "2026-07-17",
-        "price": 175.59
-      }
+      "eligible_for_gate": false
     },
-    "last_rebalance": "2026-07-17"
+    "signal_date": "2026-07-20",
+    "last_rebalance": "2026-07-14"
   },
   "tom": {
     "open": null

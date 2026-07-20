@@ -8,6 +8,7 @@ Research only - never places orders.
 from __future__ import annotations
 
 import json
+import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,11 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from research.momentum_rotation_backtest import _momentum_signal, _normalize_position
+
 STATE_PATH = ROOT / "data" / "edge_forward_state.json"
 LOG_PATH = ROOT / "data" / "edge_forward_log.jsonl"
 NY = ZoneInfo("America/New_York")
@@ -24,6 +30,8 @@ MOMENTUM_SYMBOLS = ["SPY", "QQQ", "GLD", "XLE", "TLT", "IWM", "XLK", "XLV", "XLF
 MOMENTUM_LOOKBACK_DAYS = 12 * 21
 MOMENTUM_TOP_N = 2
 MOMENTUM_REBALANCE_DAYS = 5
+MOMENTUM_DATA_START = "2015-01-01"
+MOMENTUM_STRATEGY_VERSION = "momentum-12m-5d-top2-canonical-phase-v2"
 PEAD_UNIVERSE = (
     "AAPL MSFT NVDA AMZN GOOGL META TSLA AVGO JPM V UNH XOM WMT JNJ PG MA HD "
     "COST ORCL BAC KO PEP MRK ADBE CRM AMD NFLX DIS CSCO INTC"
@@ -46,7 +54,11 @@ def log_event(event: dict) -> None:
 def load_state() -> dict:
     if STATE_PATH.exists():
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    return {"momentum": {"holdings": {}, "last_rebalance": None}, "tom": {"open": None}, "pead": {"open": []}}
+    return {
+        "momentum": {"strategy_version": MOMENTUM_STRATEGY_VERSION, "position": None},
+        "tom": {"open": None},
+        "pead": {"open": []},
+    }
 
 
 def save_state(state: dict) -> None:
@@ -66,30 +78,84 @@ def fetch_closes(symbols: list[str], start: str) -> pd.DataFrame:
     return pd.DataFrame(frames).dropna()
 
 
+def momentum_snapshot(closes: pd.DataFrame) -> tuple[tuple[str, ...], str]:
+    """Return the exact frozen signal and its most recent scheduled rebalance date."""
+    signal = _momentum_signal(
+        closes,
+        lookback_days=MOMENTUM_LOOKBACK_DAYS,
+        rebalance_days=MOMENTUM_REBALANCE_DAYS,
+        top_n=MOMENTUM_TOP_N,
+    )
+    target = _normalize_position(signal.iloc[-1]) or ()
+    last_index = MOMENTUM_LOOKBACK_DAYS + (
+        (len(closes) - 1 - MOMENTUM_LOOKBACK_DAYS) // MOMENTUM_REBALANCE_DAYS
+    ) * MOMENTUM_REBALANCE_DAYS
+    return target, str(closes.index[last_index].date())
+
+
+def _migrate_momentum_lane(lane: dict) -> None:
+    if lane.get("strategy_version") == MOMENTUM_STRATEGY_VERSION and "position" in lane:
+        return
+    for symbol, entry in lane.get("holdings", {}).items():
+        log_event({
+            "lane": "momentum",
+            "action": "invalidated",
+            "symbol": symbol,
+            "entry_date": entry.get("date"),
+            "entry_price": entry.get("price"),
+            "reason": "tracker_rebalance_phase_did_not_match_frozen_backtest",
+        })
+    lane.clear()
+    lane.update({"strategy_version": MOMENTUM_STRATEGY_VERSION, "position": None})
+
+
 def run_momentum(state: dict) -> None:
-    closes = fetch_closes(MOMENTUM_SYMBOLS, "2024-01-01")
+    # Starting in 2015 preserves the exact rebalance phase used by frozen validation.
+    closes = fetch_closes(MOMENTUM_SYMBOLS, MOMENTUM_DATA_START)
     lane = state["momentum"]
+    _migrate_momentum_lane(lane)
+    target, rebalance_date = momentum_snapshot(closes)
     today = str(closes.index[-1].date())
-    if lane["last_rebalance"]:
-        elapsed = closes.index.searchsorted(pd.Timestamp(today)) - closes.index.searchsorted(pd.Timestamp(lane["last_rebalance"]))
-        if elapsed < MOMENTUM_REBALANCE_DAYS:
-            return
-    momentum = closes.iloc[-1] / closes.iloc[-1 - MOMENTUM_LOOKBACK_DAYS] - 1.0
-    target = [s for s in momentum.sort_values(ascending=False).index[:MOMENTUM_TOP_N] if momentum[s] > 0]
     prices = closes.iloc[-1]
-    for symbol, entry in list(lane["holdings"].items()):
-        if symbol not in target:
-            pnl = float(prices[symbol] / entry["price"] - 1.0) * 100.0
-            log_event({"lane": "momentum", "action": "exit", "symbol": symbol,
-                       "entry_date": entry["date"], "entry_price": entry["price"],
-                       "exit_price": round(float(prices[symbol]), 2), "pnl_pct": round(pnl, 3)})
-            del lane["holdings"][symbol]
-    for symbol in target:
-        if symbol not in lane["holdings"]:
-            lane["holdings"][symbol] = {"date": today, "price": round(float(prices[symbol]), 2)}
-            log_event({"lane": "momentum", "action": "entry", "symbol": symbol,
-                       "price": lane["holdings"][symbol]["price"]})
-    lane["last_rebalance"] = today
+    current = lane.get("position")
+    current_symbols = tuple(current["symbols"]) if current else ()
+    lane_was_initialized = bool(lane.get("signal_date"))
+
+    if current_symbols != target:
+        if current:
+            leg_pnl = [
+                float(prices[symbol] / current["prices"][symbol] - 1.0) * 100.0
+                for symbol in current_symbols
+            ]
+            log_event({
+                "lane": "momentum",
+                "action": "exit",
+                "symbols": list(current_symbols),
+                "entry_date": current["date"],
+                "entry_prices": current["prices"],
+                "exit_prices": {s: round(float(prices[s]), 2) for s in current_symbols},
+                "pnl_pct": round(sum(leg_pnl) / len(leg_pnl), 3),
+                "eligible_for_gate": current.get("eligible_for_gate", True),
+            })
+        if target:
+            lane["position"] = {
+                "symbols": list(target),
+                "date": today,
+                "prices": {s: round(float(prices[s]), 2) for s in target},
+                # A migration starts mid-holding-period, so its first outcome is diagnostic only.
+                "eligible_for_gate": current is not None or lane_was_initialized,
+            }
+            log_event({
+                "lane": "momentum",
+                "action": "entry",
+                "symbols": list(target),
+                "prices": lane["position"]["prices"],
+                "eligible_for_gate": lane["position"]["eligible_for_gate"],
+            })
+        else:
+            lane["position"] = None
+    lane["signal_date"] = today
+    lane["last_rebalance"] = rebalance_date
 
 
 def tom_calendar(today: pd.Timestamp) -> tuple[bool, bool]:
@@ -178,13 +244,16 @@ def summary() -> None:
     events = [json.loads(line) for line in LOG_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
     print("--- forward evidence summary ---")
     for lane in ("momentum", "tom", "pead"):
-        exits = [e for e in events if e["lane"] == lane and e["action"] == "exit"]
+        exits = [
+            e for e in events
+            if e["lane"] == lane and e["action"] == "exit" and e.get("eligible_for_gate", True)
+        ]
         pnl = [e["pnl_pct"] for e in exits]
         wins = sum(1 for p in pnl if p > 0)
         print(json.dumps({"lane": lane, "resolved_trades": len(exits),
                           "progress_to_30": f"{len(exits)}/30",
                           "win_rate": round(wins / len(pnl), 3) if pnl else None,
-                          "sum_pnl_pct": round(sum(pnl), 2) if pnl else 0}))
+                          "sum_trade_pnl_pct": round(sum(pnl), 2) if pnl else 0}))
 
 
 def main() -> None:
