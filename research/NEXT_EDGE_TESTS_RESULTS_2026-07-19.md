@@ -115,6 +115,36 @@ On the $1,000 model it contributes roughly $40-50/year at the recent pace.
 Its value is as an uncorrelated overlay that leaves the account in cash
 two-thirds of the time, potentially stackable with the momentum lane.
 
+## 6. Pre-FOMC Announcement Drift (rejected at final)
+
+Preregistration: `research/FOMC_DRIFT_PREREGISTRATION_2026-07-19.md`
+Script: `research/fomc_drift_lab.py` | Results: `data/fomc_drift_results.json`
+Event source: 224 FOMC statement dates 2000-2026 (vtasca dataset).
+
+Development 2000-2015 passed (+10.4%, +15.2%, +7.2% across regimes) and
+selection 2016-2020 passed (+4.6%, PF 1.20). Final 2021+ failed: -0.18%,
+PF 1.01, negative at doubled costs. The Lucca-Moench drift is dead in the
+recent period, exactly as post-2015 literature suggested. Rejected.
+
+## 7. PEAD Long-Only Proxy (passes gates, with explicit caveats)
+
+Preregistration: `research/PEAD_PREREGISTRATION_2026-07-19.md`
+Script: `research/pead_lab.py` | Results: `data/pead_results.json`
+
+1,970 events, 30 frozen megacaps, 2018-2026. Reaction-day return >= +3%,
+hold 20 days, long only.
+
+- Development (1,182 events): +7.35%/event mean, 80.9% WR, PF 14.2.
+- Test (788 events): +5.98%/event, 78.2% WR, PF 6.2; +5.94% at 2x costs.
+- Control: unconditional 20-day return for the same universe/window is
+  +1.71%, so the event excess is roughly +4.3%/event in test - real excess
+  beyond bull-market beta and survivorship (which affects both sides).
+
+Caveats: shallow free-data window (no bear-regime development period),
+today-selected universe, crude reaction-day surprise proxy, overlapping
+event exposure. Per the preregistration, this pass justifies acquiring
+deeper earnings data and forward paper-tracking only - not deployment.
+
 ## Ranking After These Tests
 
 1. Momentum rotation: continue accumulating forward trades toward the

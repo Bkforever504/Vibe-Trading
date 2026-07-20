@@ -1,0 +1,79 @@
+{
+  "preregistration": "research/FOMC_DRIFT_PREREGISTRATION_2026-07-19.md",
+  "fomc_statement_dates": 224,
+  "first_event": "2000-02-02",
+  "last_event": "2026-06-17",
+  "development_regimes": [
+    {
+      "window": [
+        "2000-01-01",
+        "2005-12-31"
+      ],
+      "days_held": 102,
+      "total_return_pct": 10.37,
+      "profit_factor": 1.2398,
+      "max_drawdown_pct": -14.59,
+      "final_equity_on_1000": 1103.69
+    },
+    {
+      "window": [
+        "2006-01-01",
+        "2010-12-31"
+      ],
+      "days_held": 88,
+      "total_return_pct": 15.16,
+      "profit_factor": 1.361,
+      "max_drawdown_pct": -15.55,
+      "final_equity_on_1000": 1151.59
+    },
+    {
+      "window": [
+        "2011-01-01",
+        "2015-12-31"
+      ],
+      "days_held": 80,
+      "total_return_pct": 7.17,
+      "profit_factor": 1.2467,
+      "max_drawdown_pct": -9.37,
+      "final_equity_on_1000": 1071.67
+    }
+  ],
+  "development_pass": true,
+  "selection": {
+    "days_held": 84,
+    "total_return_pct": 4.62,
+    "profit_factor": 1.1992,
+    "max_drawdown_pct": -9.92,
+    "final_equity_on_1000": 1046.15
+  },
+  "selection_2x_costs": {
+    "days_held": 84,
+    "total_return_pct": 2.87,
+    "profit_factor": 1.1281,
+    "max_drawdown_pct": -9.99,
+    "final_equity_on_1000": 1028.73
+  },
+  "selection_pass": true,
+  "final": {
+    "days_held": 88,
+    "total_return_pct": -0.18,
+    "profit_factor": 1.0096,
+    "max_drawdown_pct": -7.44,
+    "final_equity_on_1000": 998.18
+  },
+  "final_2x_costs": {
+    "days_held": 88,
+    "total_return_pct": -1.92,
+    "profit_factor": 0.961,
+    "max_drawdown_pct": -8.4,
+    "final_equity_on_1000": 980.76
+  },
+  "final_3x_costs": {
+    "days_held": 88,
+    "total_return_pct": -3.64,
+    "profit_factor": 0.915,
+    "max_drawdown_pct": -9.54,
+    "final_equity_on_1000": 963.64
+  },
+  "final_pass": false
+}
