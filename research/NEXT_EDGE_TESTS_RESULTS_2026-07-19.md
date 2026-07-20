@@ -87,6 +87,34 @@ Verdict: rejected. This closes the course canon - every mechanically
 testable entry concept from the top YouTube course material is now either
 tested-and-rejected, already deployed, or frozen awaiting forward data.
 
+## 5. Turn-of-Month Effect (SPY passes all historical gates; QQQ rejected)
+
+Preregistration: `research/TURN_OF_MONTH_PREREGISTRATION_2026-07-19.md`
+Script: `research/turn_of_month_lab.py`
+Results: `data/turn_of_month_results.json`
+
+One frozen rule, zero parameters searched: long SPY from the close of the
+5th-to-last trading day of the month through the close of the 3rd trading
+day of the next month; flat otherwise.
+
+- Development 2000-2015: positive in all three regimes (+34.6%, +48.9%,
+  +39.9%), including 2000-2005 when buy-and-hold lost 6.2%.
+- Selection 2016-2020: +63.6%, PF 1.40, max DD -8.8%; +61.7% at 2x costs.
+- Final 2021+: +19.3%, PF 1.12, max DD -15.6%; positive at 2x and 3x
+  costs. All final gates pass.
+- QQQ: rejected at development (2000-2005 negative).
+
+Honest caveats: the effect is weakening (final PF 1.12 vs selection 1.40);
+final-period return is well below buy-and-hold (+19.3% vs +114.1%) - this
+is a low-exposure (roughly one-third time in market) overlay, not a
+beat-the-market machine; the anomaly is widely published, so continued
+decay is the base case. Per the preregistration, this pass permits paper
+forward-testing only.
+
+On the $1,000 model it contributes roughly $40-50/year at the recent pace.
+Its value is as an uncorrelated overlay that leaves the account in cash
+two-thirds of the time, potentially stackable with the momentum lane.
+
 ## Ranking After These Tests
 
 1. Momentum rotation: continue accumulating forward trades toward the
