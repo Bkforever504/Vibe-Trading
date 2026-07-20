@@ -1,0 +1,123 @@
+{
+  "preregistration": "research/TURN_OF_MONTH_PREREGISTRATION_2026-07-19.md",
+  "SPY": {
+    "development_regimes": [
+      {
+        "window": [
+          "2000-01-01",
+          "2005-12-31"
+        ],
+        "days_held": 572,
+        "total_return_pct": 34.57,
+        "profit_factor": 1.1634,
+        "max_drawdown_pct": -18.37,
+        "final_equity_on_1000": 1345.67,
+        "buy_hold_return_pct": -6.18
+      },
+      {
+        "window": [
+          "2006-01-01",
+          "2010-12-31"
+        ],
+        "days_held": 479,
+        "total_return_pct": 48.85,
+        "profit_factor": 1.2439,
+        "max_drawdown_pct": -14.22,
+        "final_equity_on_1000": 1488.52,
+        "buy_hold_return_pct": 11.92
+      },
+      {
+        "window": [
+          "2011-01-01",
+          "2015-12-31"
+        ],
+        "days_held": 476,
+        "total_return_pct": 39.9,
+        "profit_factor": 1.2893,
+        "max_drawdown_pct": -10.35,
+        "final_equity_on_1000": 1399.0,
+        "buy_hold_return_pct": 79.62
+      }
+    ],
+    "development_pass": true,
+    "selection": {
+      "days_held": 480,
+      "total_return_pct": 63.64,
+      "profit_factor": 1.4032,
+      "max_drawdown_pct": -8.84,
+      "final_equity_on_1000": 1636.41
+    },
+    "selection_2x_costs": {
+      "days_held": 480,
+      "total_return_pct": 61.69,
+      "profit_factor": 1.3914,
+      "max_drawdown_pct": -8.86,
+      "final_equity_on_1000": 1616.93
+    },
+    "selection_pass": true,
+    "final": {
+      "days_held": 536,
+      "total_return_pct": 19.33,
+      "profit_factor": 1.1212,
+      "max_drawdown_pct": -15.63,
+      "final_equity_on_1000": 1193.26
+    },
+    "final_2x_costs": {
+      "days_held": 536,
+      "total_return_pct": 17.74,
+      "profit_factor": 1.1124,
+      "max_drawdown_pct": -15.78,
+      "final_equity_on_1000": 1177.37
+    },
+    "final_3x_costs": {
+      "days_held": 536,
+      "total_return_pct": 16.17,
+      "profit_factor": 1.1038,
+      "max_drawdown_pct": -15.92,
+      "final_equity_on_1000": 1161.69
+    },
+    "final_buy_hold_return_pct": 114.1,
+    "final_pass": true
+  },
+  "QQQ": {
+    "development_regimes": [
+      {
+        "window": [
+          "2000-01-01",
+          "2005-12-31"
+        ],
+        "days_held": 573,
+        "total_return_pct": -18.22,
+        "profit_factor": 0.9888,
+        "max_drawdown_pct": -51.35,
+        "final_equity_on_1000": 817.8,
+        "buy_hold_return_pct": -56.78
+      },
+      {
+        "window": [
+          "2006-01-01",
+          "2010-12-31"
+        ],
+        "days_held": 475,
+        "total_return_pct": 43.25,
+        "profit_factor": 1.1991,
+        "max_drawdown_pct": -22.03,
+        "final_equity_on_1000": 1432.46,
+        "buy_hold_return_pct": 38.11
+      },
+      {
+        "window": [
+          "2011-01-01",
+          "2015-12-31"
+        ],
+        "days_held": 477,
+        "total_return_pct": 63.37,
+        "profit_factor": 1.3838,
+        "max_drawdown_pct": -11.24,
+        "final_equity_on_1000": 1633.71,
+        "buy_hold_return_pct": 117.8
+      }
+    ],
+    "development_pass": false
+  }
+}
