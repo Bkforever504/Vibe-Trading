@@ -1,0 +1,158 @@
+{
+  "preregistration": "research/MES_VWAP_FADE_PREREGISTRATION_2026-07-19.md",
+  "dataset": "mes_v0_1m_2022-01-01_2026-07-19_rth.csv",
+  "sessions": 1148,
+  "development_sessions": 803,
+  "selection_sessions": 172,
+  "final_sessions": 173,
+  "configs": {
+    "band1.0_wick0": {
+      "development_regimes": [
+        {
+          "trades": 170,
+          "total_pnl": -612.9,
+          "expectancy": -3.61,
+          "win_rate": 0.5706,
+          "profit_factor": 0.5947,
+          "max_drawdown": 886.74
+        },
+        {
+          "trades": 168,
+          "total_pnl": -818.34,
+          "expectancy": -4.87,
+          "win_rate": 0.3631,
+          "profit_factor": 0.2484,
+          "max_drawdown": 822.28
+        },
+        {
+          "trades": 172,
+          "total_pnl": -1051.05,
+          "expectancy": -6.11,
+          "win_rate": 0.3837,
+          "profit_factor": 0.2526,
+          "max_drawdown": 1064.39
+        }
+      ],
+      "development": {
+        "trades": 510,
+        "total_pnl": -2482.29,
+        "expectancy": -4.87,
+        "win_rate": 0.4392,
+        "profit_factor": 0.3806,
+        "max_drawdown": 2757.53
+      },
+      "development_pass": false
+    },
+    "band1.0_wick2": {
+      "development_regimes": [
+        {
+          "trades": 168,
+          "total_pnl": -596.19,
+          "expectancy": -3.55,
+          "win_rate": 0.5774,
+          "profit_factor": 0.6072,
+          "max_drawdown": 858.07
+        },
+        {
+          "trades": 161,
+          "total_pnl": -762.04,
+          "expectancy": -4.73,
+          "win_rate": 0.3602,
+          "profit_factor": 0.2545,
+          "max_drawdown": 758.96
+        },
+        {
+          "trades": 170,
+          "total_pnl": -1018.84,
+          "expectancy": -5.99,
+          "win_rate": 0.4118,
+          "profit_factor": 0.2747,
+          "max_drawdown": 1032.19
+        }
+      ],
+      "development": {
+        "trades": 499,
+        "total_pnl": -2377.07,
+        "expectancy": -4.76,
+        "win_rate": 0.4509,
+        "profit_factor": 0.3974,
+        "max_drawdown": 2640.36
+      },
+      "development_pass": false
+    },
+    "band1.5_wick0": {
+      "development_regimes": [
+        {
+          "trades": 248,
+          "total_pnl": -1968.27,
+          "expectancy": -7.94,
+          "win_rate": 0.5363,
+          "profit_factor": 0.5553,
+          "max_drawdown": 2104.78
+        },
+        {
+          "trades": 254,
+          "total_pnl": -1286.62,
+          "expectancy": -5.07,
+          "win_rate": 0.5315,
+          "profit_factor": 0.4574,
+          "max_drawdown": 1331.68
+        },
+        {
+          "trades": 254,
+          "total_pnl": -1898.43,
+          "expectancy": -7.47,
+          "win_rate": 0.4961,
+          "profit_factor": 0.4091,
+          "max_drawdown": 1926.77
+        }
+      ],
+      "development": {
+        "trades": 756,
+        "total_pnl": -5153.32,
+        "expectancy": -6.82,
+        "win_rate": 0.5212,
+        "profit_factor": 0.4852,
+        "max_drawdown": 5220.03
+      },
+      "development_pass": false
+    },
+    "band1.5_wick2": {
+      "development_regimes": [
+        {
+          "trades": 246,
+          "total_pnl": -1682.99,
+          "expectancy": -6.84,
+          "win_rate": 0.5366,
+          "profit_factor": 0.6112,
+          "max_drawdown": 1912.34
+        },
+        {
+          "trades": 245,
+          "total_pnl": -1221.05,
+          "expectancy": -4.98,
+          "win_rate": 0.5429,
+          "profit_factor": 0.4914,
+          "max_drawdown": 1316.93
+        },
+        {
+          "trades": 249,
+          "total_pnl": -1960.82,
+          "expectancy": -7.87,
+          "win_rate": 0.5181,
+          "profit_factor": 0.4053,
+          "max_drawdown": 1997.04
+        }
+      ],
+      "development": {
+        "trades": 740,
+        "total_pnl": -4864.86,
+        "expectancy": -6.57,
+        "win_rate": 0.5324,
+        "profit_factor": 0.5148,
+        "max_drawdown": 5021.58
+      },
+      "development_pass": false
+    }
+  }
+}

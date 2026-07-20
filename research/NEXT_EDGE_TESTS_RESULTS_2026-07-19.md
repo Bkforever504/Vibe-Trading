@@ -65,6 +65,28 @@ value gaps" show no stable edge on MES under realistic costs. The social
 popularity of these concepts is not supported by this data. No filters will
 be added to rescue them.
 
+## 4. VWAP Band Fade on Classified Range Days (rejected)
+
+Preregistration: `research/MES_VWAP_FADE_PREREGISTRATION_2026-07-19.md`
+Script: `research/mes_vwap_fade_lab.py`
+Results: `data/mes_vwap_fade_results.json`
+
+The one genuinely untested candidate from the course-intelligence intake,
+also independently suggested in the Codex handoff. Four frozen configs
+(band 1.0/1.5 sigma x wick 0/2 ticks) with a causal trend-day filter,
+dynamic VWAP target, 32-tick stop, 60-minute time stop.
+
+All four failed development across all regimes: expectancy -$3.55 to
+-$7.94/trade, profit factors 0.38-0.51 on 499-756 trades. Win rates
+(44-57%) fall far short of the course's claimed 70-80%, and the structure
+is reward-starved: the VWAP target pays a fraction of the 8-point stop, so
+even the claimed hit rate would not produce positive expectancy after
+costs. Selection and final periods never touched.
+
+Verdict: rejected. This closes the course canon - every mechanically
+testable entry concept from the top YouTube course material is now either
+tested-and-rejected, already deployed, or frozen awaiting forward data.
+
 ## Ranking After These Tests
 
 1. Momentum rotation: continue accumulating forward trades toward the
