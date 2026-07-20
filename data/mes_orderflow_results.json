@@ -1,0 +1,77 @@
+{
+  "preregistration": "research/MES_ORDERFLOW_PREREGISTRATION_2026-07-19.md",
+  "sessions": 618,
+  "sessions_excluded_roll_or_condition": 39,
+  "sessions_excluded_low_coverage": 25,
+  "h2_diagnostic": "deferred - requires per-trade ORB export, queued separately",
+  "configs": {
+    "h1_imbalance_0.35": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    },
+    "h1_imbalance_0.5": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    },
+    "h3_open_pressure_rr1.5": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    },
+    "h3_open_pressure_rr2.0": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    }
+  }
+}

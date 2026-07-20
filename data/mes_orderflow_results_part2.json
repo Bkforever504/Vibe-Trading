@@ -1,0 +1,117 @@
+{
+  "preregistration": "research/MES_ORDERFLOW_PREREGISTRATION_2026-07-19.md",
+  "sessions": 618,
+  "sessions_excluded_roll_or_condition": 39,
+  "sessions_excluded_low_coverage": 25,
+  "h2_diagnostic": "deferred - requires per-trade ORB export, queued separately",
+  "configs": {
+    "h1_imbalance_0.1": {
+      "development_regimes": [
+        {
+          "trades": 236,
+          "total_pnl": -1147.78,
+          "expectancy": -4.86,
+          "win_rate": 0.3559,
+          "profit_factor": 0.4817,
+          "max_drawdown": 1212.88
+        },
+        {
+          "trades": 44,
+          "total_pnl": -25.37,
+          "expectancy": -0.58,
+          "win_rate": 0.5,
+          "profit_factor": 0.9392,
+          "max_drawdown": 165.79
+        },
+        {
+          "trades": 142,
+          "total_pnl": -672.16,
+          "expectancy": -4.73,
+          "win_rate": 0.3873,
+          "profit_factor": 0.511,
+          "max_drawdown": 740.97
+        }
+      ],
+      "development": {
+        "trades": 422,
+        "total_pnl": -1845.31,
+        "expectancy": -4.37,
+        "win_rate": 0.3815,
+        "profit_factor": 0.5394,
+        "max_drawdown": 1879.12
+      },
+      "development_pass": false
+    },
+    "h1_imbalance_0.14": {
+      "development_regimes": [
+        {
+          "trades": 49,
+          "total_pnl": -79.02,
+          "expectancy": -1.61,
+          "win_rate": 0.449,
+          "profit_factor": 0.7637,
+          "max_drawdown": 119.78
+        },
+        {
+          "trades": 3,
+          "total_pnl": -42.44,
+          "expectancy": -14.15,
+          "win_rate": 0.3333,
+          "profit_factor": 0.2614,
+          "max_drawdown": 57.46
+        },
+        {
+          "trades": 17,
+          "total_pnl": -125.91,
+          "expectancy": -7.41,
+          "win_rate": 0.3529,
+          "profit_factor": 0.2473,
+          "max_drawdown": 113.47
+        }
+      ],
+      "development": {
+        "trades": 69,
+        "total_pnl": -247.37,
+        "expectancy": -3.59,
+        "win_rate": 0.4203,
+        "profit_factor": 0.5576,
+        "max_drawdown": 281.32
+      },
+      "development_pass": false
+    },
+    "h3_open_pressure_rr1.5": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    },
+    "h3_open_pressure_rr2.0": {
+      "development_regimes": [
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        },
+        {
+          "trades": 0
+        }
+      ],
+      "development": {
+        "trades": 0
+      },
+      "development_pass": false
+    }
+  }
+}
