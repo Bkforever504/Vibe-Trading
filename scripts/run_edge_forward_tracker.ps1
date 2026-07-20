@@ -8,4 +8,6 @@ Set-Location $repo
 "=== run $(Get-Date -Format o) ===" | Out-File -Append -Encoding utf8 $log
 uv run --no-project --with yfinance --with pandas --with lxml --with pandas-market-calendars python scripts\edge_forward_tracker.py 2>&1 |
     Out-File -Append -Encoding utf8 $log
-"=== exit $LASTEXITCODE ===" | Out-File -Append -Encoding utf8 $log
+$trackerExitCode = $LASTEXITCODE
+"=== exit $trackerExitCode ===" | Out-File -Append -Encoding utf8 $log
+exit $trackerExitCode
