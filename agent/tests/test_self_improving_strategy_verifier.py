@@ -11,6 +11,21 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+def _adversarial_governance(tmp_path: Path, *symbols: str) -> tuple[Path, Path]:
+    audit = _write_json(tmp_path / "audit.json", {
+        "provider": "adversarial_strategy_audit",
+        "by_subject": {
+            symbol: {"subject_id": symbol, "passed": True, "score_out_of_10": 10.0, "failed_checks": []}
+            for symbol in symbols
+        },
+    })
+    learning = _write_json(tmp_path / "learning.json", {
+        "provider": "self_learning_edge_loop",
+        "summary": {"critical_unresolved_pattern_count": 0},
+    })
+    return audit, learning
+
+
 def test_blocks_high_win_rate_with_negative_expectancy(tmp_path: Path) -> None:
     shadow = _write_json(
         tmp_path / "shadow.json",
@@ -36,6 +51,7 @@ def test_blocks_high_win_rate_with_negative_expectancy(tmp_path: Path) -> None:
     loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0, "execution_capable_count": 0}})
     safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
     kronos = _write_json(tmp_path / "kronos.json", {"forecasts": [{"symbol": "TSLA", "confidence": 0.8, "expected_return_pct": 1.2}]})
+    audit, learning = _adversarial_governance(tmp_path, "TSLA")
 
     report = build_report(
         shadow_eval_path=shadow,
@@ -79,6 +95,7 @@ def test_requires_out_of_sample_trading_days_even_with_good_sample(tmp_path: Pat
     loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0, "execution_capable_count": 0}})
     safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
     kronos = _write_json(tmp_path / "kronos.json", {"forecasts": []})
+    audit, learning = _adversarial_governance(tmp_path, "NVDA")
 
     report = build_report(
         shadow_eval_path=shadow,
@@ -86,6 +103,8 @@ def test_requires_out_of_sample_trading_days_even_with_good_sample(tmp_path: Pat
         loop_readiness_path=loop,
         incentive_safety_path=safety,
         kronos_forecast_path=kronos,
+        adversarial_audit_path=audit,
+        self_learning_path=learning,
         today="2026-07-11",
     )
 
@@ -119,6 +138,7 @@ def test_clean_evidence_can_reach_human_review_but_not_live_execution(tmp_path: 
     loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0, "execution_capable_count": 0}})
     safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
     kronos = _write_json(tmp_path / "kronos.json", {"forecasts": [{"symbol": "SPY", "confidence": 0.9, "expected_return_pct": 1.6}]})
+    audit, learning = _adversarial_governance(tmp_path, "SPY")
 
     report = build_report(
         shadow_eval_path=shadow,
@@ -126,6 +146,8 @@ def test_clean_evidence_can_reach_human_review_but_not_live_execution(tmp_path: 
         loop_readiness_path=loop,
         incentive_safety_path=safety,
         kronos_forecast_path=kronos,
+        adversarial_audit_path=audit,
+        self_learning_path=learning,
         today="2026-07-11",
     )
 
@@ -174,6 +196,7 @@ def test_reads_real_weekly_report_shape_and_propagates_liquidity_veto(tmp_path: 
     loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0, "execution_capable_count": 0}})
     safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
     kronos = _write_json(tmp_path / "kronos.json", {"forecasts": []})
+    audit, learning = _adversarial_governance(tmp_path, "TSLA", "NVDA")
 
     built = build_report(
         shadow_eval_path=shadow,
@@ -181,6 +204,8 @@ def test_reads_real_weekly_report_shape_and_propagates_liquidity_veto(tmp_path: 
         loop_readiness_path=loop,
         incentive_safety_path=safety,
         kronos_forecast_path=kronos,
+        adversarial_audit_path=audit,
+        self_learning_path=learning,
         today="2026-07-11",
     )
 
@@ -217,6 +242,7 @@ def test_accelerated_thresholds_replace_calendar_wait_without_self_approval(tmp_
     loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0, "execution_capable_count": 0}})
     safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
     kronos = _write_json(tmp_path / "kronos.json", {"forecasts": [{"symbol": "SPY", "confidence": 0.9}]})
+    audit, learning = _adversarial_governance(tmp_path, "SPY")
 
     report = build_report(
         shadow_eval_path=shadow,
@@ -224,8 +250,36 @@ def test_accelerated_thresholds_replace_calendar_wait_without_self_approval(tmp_
         loop_readiness_path=loop,
         incentive_safety_path=safety,
         kronos_forecast_path=kronos,
+        adversarial_audit_path=audit,
+        self_learning_path=learning,
     )
     spy = report["instruments"][0]
     assert spy["promotion_blockers"] == []
     assert spy["action"] == "human_promotion_review_only"
     assert spy["live_execution_allowed"] is False
+
+
+def test_missing_adversarial_subject_blocks_promotion(tmp_path: Path) -> None:
+    shadow = _write_json(tmp_path / "shadow.json", {"by_symbol": {"SPY": {
+        "sample_count": 40, "completed_count": 40, "trading_day_count": 35,
+        "win_rate": 0.7, "target_hit_rate": 0.6, "avg_capture_efficiency": 0.8,
+        "avg_win_return_pct": 30, "avg_loss_return_pct": 15,
+        "expectancy_return_pct": 12, "payoff_ratio": 2.0,
+    }}})
+    hot = _write_json(tmp_path / "hot.json", {"candidates": [{"symbol": "SPY", "score": 10}]})
+    loop = _write_json(tmp_path / "loop.json", {"summary": {"unattended_ready_count": 0}})
+    safety = _write_json(tmp_path / "safety.json", {"passed": True, "summary": {"high_risk_count": 0}})
+    kronos = _write_json(tmp_path / "kronos.json", {"forecasts": []})
+    audit = _write_json(tmp_path / "audit.json", {"provider": "adversarial_strategy_audit", "by_subject": {}})
+    learning = _write_json(tmp_path / "learning.json", {
+        "provider": "self_learning_edge_loop", "summary": {"critical_unresolved_pattern_count": 0}
+    })
+
+    built = build_report(
+        shadow_eval_path=shadow, hot_instrument_path=hot, loop_readiness_path=loop,
+        incentive_safety_path=safety, kronos_forecast_path=kronos,
+        adversarial_audit_path=audit, self_learning_path=learning,
+    )
+
+    assert "adversarial_audit_missing_for_subject" in built["instruments"][0]["promotion_blockers"]
+    assert built["summary"]["promotion_ready_count"] == 0
