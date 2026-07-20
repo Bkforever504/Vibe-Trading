@@ -14,6 +14,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -141,6 +143,47 @@ def _pct(current: float, prior: float) -> float:
     return ((current / prior) - 1.0) * 100 if prior else 0.0
 
 
+def higher_timeframe_volume_features(df: Any) -> dict[str, Any]:
+    """Completed weekly/monthly volume context; never uses a partial HTF bar."""
+    frame = df.copy()
+    frame.index = pd.to_datetime(frame.index).tz_localize(None)
+    latest_date = frame.index[-1].normalize()
+
+    def aggregate(rule: str, average_window: int, trend_window: int) -> dict[str, Any]:
+        grouped = frame.resample(rule).agg({"close": "last", "volume": "sum"}).dropna()
+        grouped = grouped[grouped.index.normalize() <= latest_date]
+        if len(grouped) < max(average_window + 1, trend_window):
+            return {"relative_volume": None, "trend": "unknown", "periods": len(grouped)}
+        latest = grouped.iloc[-1]
+        prior_avg = float(grouped["volume"].iloc[-average_window - 1:-1].mean())
+        relative = float(latest["volume"]) / prior_avg if prior_avg > 0 else 0.0
+        trend_average = float(grouped["close"].tail(trend_window).mean())
+        close = float(latest["close"])
+        trend = "bullish" if close > trend_average else "bearish" if close < trend_average else "mixed"
+        return {
+            "relative_volume": round(relative, 3),
+            "trend": trend,
+            "close": round(close, 4),
+            "trend_average": round(trend_average, 4),
+            "period_end": str(grouped.index[-1].date()),
+            "periods": len(grouped),
+        }
+
+    weekly = aggregate("W-FRI", 20, 20)
+    monthly = aggregate("ME", 12, 10)
+    if weekly["relative_volume"] is None or monthly["relative_volume"] is None:
+        state = "insufficient_data"
+    elif weekly["relative_volume"] >= 1.25 and monthly["relative_volume"] >= 1.10:
+        state = "broad_volume_expansion"
+    elif weekly["relative_volume"] >= 1.25:
+        state = "weekly_volume_expansion"
+    elif monthly["relative_volume"] >= 1.10:
+        state = "monthly_volume_expansion"
+    else:
+        state = "normal"
+    return {"weekly": weekly, "monthly": monthly, "state": state}
+
+
 def score_symbol(symbol: str, df: Any, social_context: dict[str, Any] | None = None) -> dict[str, Any]:
     social_context = social_context or {}
     symbol = symbol.upper()
@@ -159,6 +202,7 @@ def score_symbol(symbol: str, df: Any, social_context: dict[str, Any] | None = N
     twenty_day_pct = _pct(close, float(df.iloc[-21]["close"]))
     sixty_day_pct = _pct(close, float(df.iloc[-61]["close"]))
     range_pct = ((float(latest["high"]) - float(latest["low"])) / close) * 100 if close else 0.0
+    htf_volume = higher_timeframe_volume_features(df)
 
     risk_flags: list[str] = []
     if close < MIN_PRICE:
@@ -228,6 +272,7 @@ def score_symbol(symbol: str, df: Any, social_context: dict[str, Any] | None = N
         "sixty_day_pct": round(sixty_day_pct, 3),
         "range_pct": round(range_pct, 3),
         "relative_volume": round(relative_volume, 3),
+        "higher_timeframe_volume": htf_volume,
         "avg_volume_20d": round(avg_volume_20d, 0),
         "avg_dollar_volume_20d": round(avg_dollar_volume, 0),
         "social_day_count": int(_safe_float(social_context.get("social_day_count"))),
@@ -241,7 +286,7 @@ def score_symbol(symbol: str, df: Any, social_context: dict[str, Any] | None = N
     }
 
 
-def scan_symbol(symbol: str, social_context: dict[str, Any] | None = None, lookback_days: int = 160) -> dict[str, Any]:
+def scan_symbol(symbol: str, social_context: dict[str, Any] | None = None, lookback_days: int = 800) -> dict[str, Any]:
     try:
         df = fetch_ohlcv(symbol.upper(), lookback_days=lookback_days)
         return score_symbol(symbol, df, social_context=social_context)
@@ -265,6 +310,21 @@ def build_report(
     candidates.sort(key=lambda row: float(row.get("deep_score") or 0), reverse=True)
     watch = [row for row in ok if row.get("recommendation") == "watch_context"]
     watch.sort(key=lambda row: float(row.get("deep_score") or 0), reverse=True)
+    htf_volume_candidates = [
+        row for row in ok
+        if row.get("higher_timeframe_volume", {}).get("state") not in {"normal", "insufficient_data", None}
+    ]
+    htf_volume_candidates.sort(
+        key=lambda row: max(
+            _safe_float(row.get("higher_timeframe_volume", {}).get("weekly", {}).get("relative_volume")),
+            _safe_float(row.get("higher_timeframe_volume", {}).get("monthly", {}).get("relative_volume")),
+        ),
+        reverse=True,
+    )
+    htf_state_counts: dict[str, int] = {}
+    for row in ok:
+        state = str(row.get("higher_timeframe_volume", {}).get("state") or "unknown")
+        htf_state_counts[state] = htf_state_counts.get(state, 0) + 1
 
     report = {
         "date": datetime.now(timezone.utc).date().isoformat(),
@@ -278,11 +338,14 @@ def build_report(
         "candidate_count": len(candidates),
         "top_candidates": candidates[:25],
         "watch_context": watch[:25],
+        "higher_timeframe_volume_summary": htf_state_counts,
+        "higher_timeframe_volume_candidates": htf_volume_candidates[:25],
         "scans": scans,
         "warnings": [
             "Read-only deep scanner. No broker orders are wired.",
             "A symbol must pass 30 trading days and 10 completed shadow samples before any promotion.",
             "Low-priced or thin-dollar-volume names are rejected for Flip Bot even when social attention is high.",
+            "Higher-timeframe volume is context-only because its preregistered historical variants did not pass every robustness gate.",
         ] + [
             f"{row.get('symbol')}: {row.get('warning')}"
             for row in scans
@@ -308,6 +371,14 @@ def print_report(report: dict[str, Any]) -> None:
             f"20d={row['twenty_day_pct']:+.2f}% social_slots={row['social_slot_count']} "
             f"reasons={'; '.join(row['reasons'][:3])}"
         )
+    if report["higher_timeframe_volume_candidates"]:
+        print("\nCompleted weekly/monthly volume expansion (context only)")
+        for row in report["higher_timeframe_volume_candidates"][:10]:
+            htf = row["higher_timeframe_volume"]
+            print(
+                f"{row['symbol']:<6} state={htf['state']:<26} "
+                f"weekly_rvol={htf['weekly']['relative_volume']} monthly_rvol={htf['monthly']['relative_volume']}"
+            )
     print("No orders placed.\n")
 
 

@@ -30,8 +30,8 @@ def _frame(closes: list[float], volumes: list[int] | None = None) -> pd.DataFram
 
 def test_score_symbol_prefers_liquid_momentum_with_social_persistence() -> None:
     df = _frame(
-        [100 + i for i in range(70)],
-        [8_000_000] * 49 + [10_000_000] * 20 + [35_000_000],
+        [100] * 330 + [100 + i for i in range(70)],
+        [8_000_000] * 379 + [10_000_000] * 20 + [35_000_000],
     )
 
     row = scanner.score_symbol("AAPL", df, social_context={"social_slot_count": 3, "best_social_rank": 8})
@@ -43,6 +43,16 @@ def test_score_symbol_prefers_liquid_momentum_with_social_persistence() -> None:
     assert row["social_slot_count"] == 3
     assert row["recommendation"] == "shadow_review_candidate"
     assert row["deep_score"] >= 8
+    assert "higher_timeframe_volume" in row
+    assert row["higher_timeframe_volume"]["weekly"]["relative_volume"] is not None
+
+
+def test_higher_timeframe_volume_excludes_partial_week_and_month() -> None:
+    df = _frame([100 + i for i in range(400)], [1_000_000] * 400)
+    result = scanner.higher_timeframe_volume_features(df)
+    latest = df.index[-1].normalize()
+    assert pd.Timestamp(result["weekly"]["period_end"]) <= latest
+    assert pd.Timestamp(result["monthly"]["period_end"]) <= latest
 
 
 def test_score_symbol_rejects_thin_low_price_names() -> None:
@@ -106,6 +116,8 @@ def test_build_report_is_read_only_and_ranks_candidates(monkeypatch, tmp_path: P
     assert report["execution_enabled"] is False
     assert report["top_candidates"][0]["symbol"] == "AAPL"
     assert report["top_candidates"][0]["recommendation"] == "shadow_review_candidate"
+    assert "higher_timeframe_volume_summary" in report
+    assert "higher_timeframe_volume_candidates" in report
 
 
 def test_build_report_dedupes_symbol_universe(monkeypatch, tmp_path: Path) -> None:
