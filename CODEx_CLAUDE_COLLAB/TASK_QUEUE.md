@@ -334,6 +334,34 @@ Next steps (Codex or Claude):
 3. Re-score; anything genuinely passing copy-trader gates goes to
    paper_watch shadow logging only. No real-money copying without Kenny.
 
+## P1: MES Order-Flow Edge Research (data purchased 2026-07-19)
+
+Kenny approved the bbo-1s purchase: MES.v.0 1-second best bid/offer,
+2024-01-01 to 2026-07-19, ~$66 from remaining signup credits (no card).
+Downloader: `scripts/fetch_databento_bbo.py` (cost-guarded, cache-aware).
+Manifest: `data/databento_bbo_manifest.json`.
+
+Purpose: the only edge class not yet tested is order-flow. Quote data
+enables preregisterable intraday hypotheses that could eventually support
+a Topstep-compatible strategy (the three passing lanes cannot - they hold
+multi-day and Topstep flattens daily).
+
+Rules before any test (same discipline as everything else):
+
+1. Preregister hypotheses in a dated Markdown file BEFORE analyzing the
+   data. Candidate families: bid/ask size imbalance predicting short-term
+   direction; spread-widening as volatility/regime signal; quote-pressure
+   confirmation filter for existing frozen intraday candidates.
+2. 70/15/15 chronological splits, doubled-cost stress, same promotion
+   gates. The 2024-2026 window overlaps the consumed OHLC final period -
+   treat any full-sample pass as historical evidence only; forward
+   simulation still required.
+3. No Topstep spend until an order-flow candidate passes historical gates
+   AND accumulates 30+ forward shadow signals.
+
+Estimates for future upgrades (not approved): trades 2025-2026 $206,
+mbp-1 1yr $340, mbp-10 3.5mo $163.
+
 ## P2: Polygon.io Data Unlock (Kenny decision)
 
 Cost: $29/month
