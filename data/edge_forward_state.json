@@ -1,0 +1,21 @@
+{
+  "momentum": {
+    "holdings": {
+      "XLE": {
+        "date": "2026-07-17",
+        "price": 57.68
+      },
+      "XLK": {
+        "date": "2026-07-17",
+        "price": 175.59
+      }
+    },
+    "last_rebalance": "2026-07-17"
+  },
+  "tom": {
+    "open": null
+  },
+  "pead": {
+    "open": []
+  }
+}
