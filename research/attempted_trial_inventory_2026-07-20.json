@@ -1,0 +1,25 @@
+{
+  "inventory_date": "2026-07-20",
+  "documented_minimum_attempt_count": 415,
+  "complete_individual_ledger_backfill": false,
+  "groups": [
+    {
+      "name": "daily_and_intraday_volume_indicator_matrix",
+      "attempt_count": 396,
+      "evidence": "research/VOLUME_INDICATOR_EDGE_RESEARCH_2026-07-19.md"
+    },
+    {
+      "name": "higher_timeframe_volume_screen_family",
+      "attempt_count": 6,
+      "evidence": "research/HIGHER_TIMEFRAME_VOLUME_SCREEN_RESULTS_2026-07-20.md"
+    },
+    {
+      "name": "rolling_walk_forward_strategy_families",
+      "attempt_count": 13,
+      "evidence": "Three historically passing families and ten rejected families documented before the July 20 learning-loop upgrade."
+    }
+  ],
+  "policy": "Use this documented minimum as the multiple-testing denominator until every legacy attempt has an individual immutable ledger row. Never reduce the denominator when later inventories discover additional attempts.",
+  "execution_enabled": false,
+  "can_submit_orders": false
+}

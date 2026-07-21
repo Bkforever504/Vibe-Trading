@@ -131,3 +131,20 @@ def test_non_orb_credit_loss_gets_strategy_specific_challenger() -> None:
         )
         == "require_directional_vwap_ema_alignment"
     )
+
+
+def test_active_trial_lifecycle_requires_validation_then_later_forward() -> None:
+    loop = __import__("scripts.self_learning_edge_loop", fromlist=["_active_trial_lifecycle"])
+    audit = {"by_subject": {"fresh-orb-retest-options": {
+        "score_out_of_10": 5.0,
+        "passed": False,
+        "failed_checks": ["forward_sample_sufficient"],
+        "diagnostics": {"final_trade_count": 30, "forward_trade_count": 12},
+    }}}
+
+    result = loop._active_trial_lifecycle(audit)
+
+    assert result["stage"] == "collecting_forward"
+    assert result["validation_progress"] == "30/30"
+    assert result["forward_progress"] == "12/30"
+    assert result["automatic_promotion_allowed"] is False

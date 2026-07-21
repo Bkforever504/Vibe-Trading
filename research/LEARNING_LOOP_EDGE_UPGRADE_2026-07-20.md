@@ -51,3 +51,31 @@ shadow observations.
 
 Passing permits independent adversarial review only. It does not authorize
 automatic or live promotion.
+
+## Adversarial Lifecycle Extension
+
+The active trial now produces a runtime adversarial manifest before every
+scheduled audit. Instantaneous signal fills are excluded. Returns use the first
+subsequent observed ask and the frozen exit bid.
+
+The first delayed-entry diagnostic reduced the consumed-context expectancy
+from +17.742% to +9.914%. This is still only six outcomes from one day and is
+excluded from OOS audit arrays.
+
+The audit lifecycle requires the first 30 OOS outcomes as validation and the
+next 30 as genuinely later forward evidence. Parameter-neighbor, session-regime,
+walk-forward, cost-stress, bootstrap, deflated-Sharpe, parity, and timestamp
+checks all fail closed when evidence is missing. The learning report displays
+the exact stage and blocker list rather than a generic confidence claim.
+
+The multiple-testing ledger previously contained one immutable trial while
+claiming every attempt was counted. A documented minimum inventory now records
+415 known attempts: 396 volume configurations, six higher-timeframe volume
+variants, and thirteen rolling walk-forward strategy families. Statistical
+corrections use at least 415 attempts, while readiness still reports only one
+fully backfilled immutable ledger row.
+
+The scheduled chain now refreshes this ledger governance before generating the
+active manifest. Its current Bonferroni alpha is 0.00012048 and its one-sided
+normal threshold is 3.6717. New evidence cannot bypass the historical search
+penalty simply because older attempts have not yet been individually backfilled.

@@ -20,6 +20,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 VIBE_HOME = Path.home() / ".vibe-trading"
 MANIFEST_DIR = ROOT / "research" / "adversarial_manifests"
+RUNTIME_MANIFEST_DIR = VIBE_HOME / "adversarial-manifests"
 REPORT_PATH = VIBE_HOME / "reports" / "adversarial-strategy-audit.json"
 LOG_PATH = ROOT / "data" / "adversarial_strategy_audit_log.jsonl"
 
@@ -203,15 +204,21 @@ def audit_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_report(manifest_dir: Path = MANIFEST_DIR) -> dict[str, Any]:
+def build_report(manifest_dir: Path = MANIFEST_DIR, runtime_manifest_dir: Path | None = None) -> dict[str, Any]:
     manifests = []
-    for path in sorted(manifest_dir.glob("*.json")) if manifest_dir.exists() else []:
-        try:
-            value = json.loads(path.read_text(encoding="utf-8-sig"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(value, dict):
-            manifests.append((path, value))
+    directories = [manifest_dir]
+    if runtime_manifest_dir is not None:
+        directories.append(runtime_manifest_dir)
+    elif manifest_dir == MANIFEST_DIR:
+        directories.append(RUNTIME_MANIFEST_DIR)
+    for directory in directories:
+        for path in sorted(directory.glob("*.json")) if directory.exists() else []:
+            try:
+                value = json.loads(path.read_text(encoding="utf-8-sig"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(value, dict):
+                manifests.append((path, value))
     subjects = []
     for path, manifest in manifests:
         result = audit_manifest(manifest)
@@ -253,11 +260,12 @@ def write_report(report: dict[str, Any], report_path: Path = REPORT_PATH, log_pa
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest-dir", type=Path, default=MANIFEST_DIR)
+    parser.add_argument("--runtime-manifest-dir", type=Path, default=RUNTIME_MANIFEST_DIR)
     parser.add_argument("--report-path", type=Path, default=REPORT_PATH)
     parser.add_argument("--log-path", type=Path, default=LOG_PATH)
     parser.add_argument("--print", action="store_true", dest="do_print")
     args = parser.parse_args()
-    report = build_report(args.manifest_dir)
+    report = build_report(args.manifest_dir, args.runtime_manifest_dir)
     write_report(report, args.report_path, args.log_path)
     if args.do_print:
         print(json.dumps(report, indent=2, sort_keys=True))

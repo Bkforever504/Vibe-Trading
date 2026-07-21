@@ -26,6 +26,15 @@
   },
   "cost_model": "Enter at logged ask and exit at logged bid; missing executable quotes do not count as qualified evidence.",
   "primary_metric": "date_clustered_cost_adjusted_expectancy_return_pct",
+  "audit_evidence_protocol": {
+    "entry_fill": "first subsequent observed executable ask after the signal observation",
+    "exit_fill": "frozen exit model executable bid",
+    "validation_partition": "first 30 OOS outcomes",
+    "forward_partition": "all OOS outcomes after the first 30",
+    "parameter_neighbors_maximum_retest_age_bars": [5, 8, 12, 15, 20],
+    "regimes": ["opening", "midday", "late"],
+    "trials_considered_for_deflated_sharpe": 415
+  },
   "acceptance_rules": {
     "minimum_fresh_completed_outcomes": 30,
     "minimum_distinct_fresh_trading_days": 20,

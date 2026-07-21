@@ -202,6 +202,39 @@ def _aggregate_nominations(patterns: list[dict[str, Any]]) -> list[dict[str, Any
     return sorted(nominations, key=lambda row: row["supporting_occurrences"], reverse=True)
 
 
+def _active_trial_lifecycle(audit: dict[str, Any]) -> dict[str, Any]:
+    subject = (audit.get("by_subject") or {}).get("fresh-orb-retest-options") or {}
+    diagnostics = subject.get("diagnostics") if isinstance(subject.get("diagnostics"), dict) else {}
+    validation = int(diagnostics.get("final_trade_count") or 0)
+    forward = int(diagnostics.get("forward_trade_count") or 0)
+    if not subject:
+        stage = "manifest_missing"
+        next_action = "build_fail_closed_runtime_manifest"
+    elif validation < 30:
+        stage = "collecting_validation"
+        next_action = "accumulate_first_30_oos_delayed_entry_outcomes"
+    elif forward < 30:
+        stage = "collecting_forward"
+        next_action = "freeze_validation_then_accumulate_30_later_forward_outcomes"
+    elif not subject.get("passed"):
+        stage = "adversarial_repairs_required"
+        next_action = "repair_failed_evidence_checks_without_retuning_consumed_returns"
+    else:
+        stage = "human_review_eligible"
+        next_action = "independent_human_review_no_automatic_promotion"
+    return {
+        "subject_id": "fresh-orb-retest-options",
+        "stage": stage,
+        "validation_progress": f"{validation}/30",
+        "forward_progress": f"{forward}/30",
+        "adversarial_score_out_of_10": subject.get("score_out_of_10"),
+        "adversarial_passed": subject.get("passed") is True,
+        "failed_checks": subject.get("failed_checks") or [],
+        "next_action": next_action,
+        "automatic_promotion_allowed": False,
+    }
+
+
 def _mistakes(learning: dict[str, Any], watchdog: dict[str, Any], audit: dict[str, Any]) -> list[dict[str, Any]]:
     rows = []
     for failure in learning.get("failure_memory") or []:
@@ -268,7 +301,10 @@ def build_report(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     existing = _read_jsonl(ledger_path)
     known = {row.get("event_id") for row in existing}
-    discovered = _mistakes(_read_json(learning_path), _read_json(watchdog_path), _read_json(audit_path))
+    learning = _read_json(learning_path)
+    watchdog = _read_json(watchdog_path)
+    audit = _read_json(audit_path)
+    discovered = _mistakes(learning, watchdog, audit)
     new_rows = [row for row in discovered if row["event_id"] not in known]
     # The immutable event remains unchanged, while current watchdog lifecycle
     # can downgrade a repaired issue from high to decaying in today's report.
@@ -311,6 +347,7 @@ def build_report(
     historical = [row for row in repeated if row.get("severity") in {"decaying", "resolved"}]
     nominations = _aggregate_nominations(actionable)
     retest_contrast = _orb_retest_contrast(shadow_path)
+    trial_lifecycle = _active_trial_lifecycle(audit)
     report = {
         "provider": "self_learning_edge_loop",
         "mode": "read_only_memory_and_shadow_nominations",
@@ -336,10 +373,8 @@ def build_report(
             "path": str(FRESH_RETEST_PLAN),
             "exists": FRESH_RETEST_PLAN.exists(),
         },
-        "highest_value_next_step": (
-            "accumulate_30_completed_fresh_retests_across_20_trading_days"
-            if not retest_contrast["evidence_gate_passed"] else "run_independent_adversarial_audit"
-        ),
+        "trial_lifecycle": trial_lifecycle,
+        "highest_value_next_step": trial_lifecycle["next_action"],
         "promotion_blockers": ["unresolved_repeated_high_severity_mistakes"] if critical else [],
         "learning_contract": {
             "observe": "Ingest completed actual/shadow outcomes, watchdog mismatches, and adversarial failures.",
