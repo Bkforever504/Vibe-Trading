@@ -1,0 +1,18 @@
+{
+  "mode": "credit_only_download",
+  "dataset": "GLBX.MDP3",
+  "schema": "trades",
+  "symbols": "MES.v.0",
+  "stype_in": "continuous",
+  "start": "2025-10-01",
+  "end": "2026-01-01",
+  "estimated_cost_usd": 29.33,
+  "verified_credits_usd": 52.82,
+  "estimated_remaining_credits_usd": 23.49,
+  "minimum_credit_buffer_usd": 10.0,
+  "cache": "data/databento/mes_v0_trades_2025-10-01_2026-01-01.dbn.zst",
+  "bytes": 423382606,
+  "sha256": "0C769D7E40E92608B211DBFBF827404351C17B2279C9968FC18E5B4D33F076F8",
+  "card_charge_authorized": false,
+  "discovery_only": true
+}
