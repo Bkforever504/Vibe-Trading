@@ -6,13 +6,19 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts import accelerated_bot_learning_report as accelerated
+
+
 VIBE_HOME = Path.home() / ".vibe-trading"
 REPORT_DIR = VIBE_HOME / "reports"
 LEARNING_PATH = REPORT_DIR / "accelerated-bot-learning.json"
@@ -21,6 +27,8 @@ AUDIT_PATH = REPORT_DIR / "adversarial-strategy-audit.json"
 LEDGER_PATH = ROOT / "data" / "self_learning_mistake_ledger.jsonl"
 REPORT_PATH = REPORT_DIR / "self-learning-edge-loop.json"
 LOG_PATH = ROOT / "data" / "self_learning_edge_loop_log.jsonl"
+SHADOW_PATH = ROOT / "data" / "flip_shadow_candidates_log.jsonl"
+FRESH_RETEST_PLAN = ROOT / "research" / "edge_trials" / "fresh_orb_retest_forward_plan_2026-07-20.json"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -52,6 +60,148 @@ def _stable_id(payload: dict[str, Any]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
 
 
+def _shadow_failure_context(failure: dict[str, Any]) -> dict[str, Any]:
+    features = failure.get("feature_snapshot") if isinstance(failure.get("feature_snapshot"), dict) else {}
+    if not features:
+        reasoning = failure.get("entry_reasoning") if isinstance(failure.get("entry_reasoning"), dict) else {}
+        features = reasoning.get("feature_snapshot") if isinstance(reasoning.get("feature_snapshot"), dict) else {}
+    right = str(failure.get("right") or features.get("right") or "unknown").upper()
+    bucket = str(failure.get("episode_bucket_et") or "unknown")
+    try:
+        hour, minute = (int(value) for value in bucket.split(":", 1))
+        total_minutes = hour * 60 + minute
+        session = "opening" if total_minutes < 10 * 60 + 30 else "midday" if total_minutes < 12 * 60 + 30 else "late"
+    except (TypeError, ValueError):
+        session = "unknown"
+    if right == "CALL":
+        aligned = all(features.get(name) is True for name in ("above_vwap", "above_ema50", "ema50_sloping_up"))
+    elif right == "PUT":
+        aligned = all(features.get(name) is True for name in ("below_vwap", "below_ema50", "ema50_sloping_down"))
+    else:
+        aligned = False
+    try:
+        consumed = float(features.get("expected_move_consumed_fraction"))
+        expected_move_bucket = "ge_0_70" if consumed >= 0.70 else "0_50_to_0_70" if consumed >= 0.50 else "lt_0_50"
+    except (TypeError, ValueError):
+        expected_move_bucket = "unknown"
+    try:
+        spread = float(features.get("spread_cents_at_signal") or (failure.get("entry_reasoning") or {}).get("spread_cents"))
+        spread_bucket = "wide_ge_10" if spread >= 10 else "medium_6_to_9" if spread >= 6 else "tight_le_5"
+    except (TypeError, ValueError):
+        spread_bucket = "unknown"
+    return {
+        "right": right,
+        "session": session,
+        "entry_pattern": str(features.get("orb_entry_pattern") or "unknown"),
+        "retest_status": str(features.get("orb_retest_status") or "unknown"),
+        "trend_alignment": "confirmed" if aligned else "unconfirmed",
+        "expected_move_bucket": expected_move_bucket,
+        "spread_bucket": spread_bucket,
+    }
+
+
+def _proposed_shadow_change(lesson: str, context: dict[str, Any]) -> str:
+    if "surrendered" in lesson:
+        return "compare_earlier_profit_ratchet_vs_frozen_exit"
+    if not context:
+        if "credit" in lesson:
+            return "compare_credit_spread_stop_timing_75_100_125pct"
+        if "sizing within current cap" in lesson:
+            return "require_stronger_entry_regime_confirmation"
+        return "manual_strategy_specific_review"
+    if (
+        context.get("entry_pattern") == "raw_breakout"
+        and context.get("retest_status") in {"retest_stale", "retest_missing", "unknown"}
+    ):
+        return "require_fresh_orb_retest"
+    if context.get("trend_alignment") == "unconfirmed":
+        return "require_directional_vwap_ema_alignment"
+    if context.get("expected_move_bucket") == "ge_0_70":
+        return "veto_expected_move_consumed_ge_0_70"
+    if context.get("session") == "late":
+        return "restrict_new_entries_before_12_30_et"
+    if context.get("spread_bucket") == "wide_ge_10":
+        return "require_entry_spread_below_10_cents"
+    return "require_breakout_follow_through_confirmation"
+
+
+def _cohort_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    values = [float(row.get("evidence_exit_return_pct") or 0.0) for row in rows]
+    by_date: dict[str, list[float]] = {}
+    for row, value in zip(rows, values):
+        by_date.setdefault(str(row.get("date") or "unknown"), []).append(value)
+    daily = [sum(day) / len(day) for day in by_date.values() if day]
+    return {
+        "completed_count": len(values),
+        "trading_day_count": len(daily),
+        "win_rate": round(sum(value > 0 for value in values) / len(values), 3) if values else None,
+        "expectancy_return_pct": round(sum(values) / len(values), 3) if values else None,
+        "date_clustered_expectancy_return_pct": round(sum(daily) / len(daily), 3) if daily else None,
+    }
+
+
+def _orb_retest_contrast(shadow_path: Path) -> dict[str, Any]:
+    trades = accelerated._shadow_trades(shadow_path)
+    fresh, raw = [], []
+    for trade in trades:
+        features = trade.get("feature_snapshot") if isinstance(trade.get("feature_snapshot"), dict) else {}
+        pattern = str(features.get("orb_entry_pattern") or "")
+        status = str(features.get("orb_retest_status") or "")
+        if pattern == "breakout_retest" and status == "retest_confirmed_fresh":
+            fresh.append(trade)
+        elif pattern == "raw_breakout":
+            raw.append(trade)
+    fresh_metrics = _cohort_metrics(fresh)
+    raw_metrics = _cohort_metrics(raw)
+    fresh_expectancy = fresh_metrics.get("expectancy_return_pct")
+    raw_expectancy = raw_metrics.get("expectancy_return_pct")
+    gate_passed = fresh_metrics["completed_count"] >= 30 and fresh_metrics["trading_day_count"] >= 20
+    return {
+        "metric_basis": "cost_adjusted_option_contract_return_not_account_pnl",
+        "fresh_confirmed_retest": fresh_metrics,
+        "raw_unconfirmed_breakout": raw_metrics,
+        "fresh_minus_raw_expectancy_pct": (
+            round(float(fresh_expectancy) - float(raw_expectancy), 3)
+            if fresh_expectancy is not None and raw_expectancy is not None else None
+        ),
+        "minimum_completed_required": 30,
+        "minimum_trading_days_required": 20,
+        "evidence_gate_passed": gate_passed,
+        "interpretation": (
+            "fresh_retest_forward_gate_satisfied_human_review_only"
+            if gate_passed and (fresh_expectancy or 0) > 0
+            else "fresh_retest_leading_but_sample_insufficient"
+            if (fresh_expectancy or 0) > (raw_expectancy or 0)
+            else "fresh_retest_not_leading"
+        ),
+        "production_config_mutation_allowed": False,
+    }
+
+
+def _aggregate_nominations(patterns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in patterns:
+        grouped.setdefault(str(row["proposed_shadow_change"]), []).append(row)
+    nominations = []
+    for proposed_change, rows in grouped.items():
+        rows = sorted(rows, key=lambda row: int(row.get("occurrences") or 0), reverse=True)
+        nominations.append({
+            "proposed_shadow_change": proposed_change,
+            "supporting_occurrences": sum(int(row.get("occurrences") or 0) for row in rows),
+            "supporting_cluster_count": len(rows),
+            "top_clusters": [
+                {"occurrences": row.get("occurrences"), "context": row.get("context") or {}, "lesson": row.get("lesson")}
+                for row in rows[:5]
+            ],
+            "minimum_forward_outcomes": 30,
+            "minimum_forward_trading_days": 20,
+            "preregistration_required": True,
+            "authority": "shadow_challenger_only",
+            "production_config_mutation_allowed": False,
+        })
+    return sorted(nominations, key=lambda row: row["supporting_occurrences"], reverse=True)
+
+
 def _mistakes(learning: dict[str, Any], watchdog: dict[str, Any], audit: dict[str, Any]) -> list[dict[str, Any]]:
     rows = []
     for failure in learning.get("failure_memory") or []:
@@ -64,14 +214,21 @@ def _mistakes(learning: dict[str, Any], watchdog: dict[str, Any], audit: dict[st
             "symbol": failure.get("symbol"),
         }
         lesson = str(failure.get("risk_lesson") or failure.get("diagnosis") or "unclassified_trade_failure")
+        context = (
+            _shadow_failure_context(failure)
+            if failure.get("source") == "accelerated_directional_shadow"
+            else {}
+        )
         pattern = {
             "source": failure.get("source"),
             "bot": failure.get("bot"),
             "strategy": failure.get("strategy"),
             "lesson": lesson,
+            "context": context,
         }
         rows.append({**identity, "event_id": _stable_id(identity), "pattern_id": _stable_id(pattern),
-                     "lesson": lesson, "next_action": failure.get("next_action"), "severity": "review"})
+                     "lesson": lesson, "next_action": failure.get("next_action"), "severity": "review",
+                     "context": context})
     mismatch_alert = next(
         (
             alert for alert in watchdog.get("alerts") or []
@@ -107,6 +264,7 @@ def build_report(
     watchdog_path: Path = WATCHDOG_PATH,
     audit_path: Path = AUDIT_PATH,
     ledger_path: Path = LEDGER_PATH,
+    shadow_path: Path = SHADOW_PATH,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     existing = _read_jsonl(ledger_path)
     known = {row.get("event_id") for row in existing}
@@ -115,10 +273,18 @@ def build_report(
     # The immutable event remains unchanged, while current watchdog lifecycle
     # can downgrade a repaired issue from high to decaying in today's report.
     current_by_event = {row["event_id"]: row for row in discovered}
-    effective_existing = [
-        {**row, "severity": current_by_event.get(row.get("event_id"), {}).get("severity", row.get("severity"))}
-        for row in existing
-    ]
+    effective_existing = []
+    for row in existing:
+        current = current_by_event.get(row.get("event_id"), {})
+        # The ledger stays immutable. Reporting may apply a newer classifier to
+        # the same event so repaired bugs decay and broad loss labels become
+        # useful feature/regime clusters.
+        effective_existing.append({
+            **row,
+            "severity": current.get("severity", row.get("severity")),
+            "pattern_id": current.get("pattern_id", row.get("pattern_id")),
+            "context": current.get("context", row.get("context") or {}),
+        })
     all_rows = effective_existing + new_rows
     counts = Counter(row.get("pattern_id") for row in all_rows if row.get("pattern_id"))
     latest_by_pattern = {row["pattern_id"]: row for row in all_rows if row.get("pattern_id")}
@@ -133,10 +299,18 @@ def build_report(
             "lesson": row.get("lesson"),
             "severity": row.get("severity"),
             "next_action": row.get("next_action"),
+            "context": row.get("context") or {},
+            "proposed_shadow_change": _proposed_shadow_change(str(row.get("lesson") or ""), row.get("context") or {}),
+            "minimum_forward_outcomes": 30,
+            "preregistration_required": True,
             "authority": "shadow_challenger_only",
             "production_config_mutation_allowed": False,
         })
     critical = [row for row in repeated if row.get("severity") in {"high", "critical"}]
+    actionable = [row for row in repeated if row.get("severity") not in {"decaying", "resolved"}]
+    historical = [row for row in repeated if row.get("severity") in {"decaying", "resolved"}]
+    nominations = _aggregate_nominations(actionable)
+    retest_contrast = _orb_retest_contrast(shadow_path)
     report = {
         "provider": "self_learning_edge_loop",
         "mode": "read_only_memory_and_shadow_nominations",
@@ -148,10 +322,24 @@ def build_report(
             "mistake_event_count": len(all_rows),
             "new_mistake_count": len(new_rows),
             "repeated_pattern_count": len(repeated),
+            "actionable_pattern_count": len(actionable),
+            "actionable_challenger_count": len(nominations),
+            "historical_resolved_pattern_count": len(historical),
             "critical_unresolved_pattern_count": len(critical),
         },
         "repeated_patterns": repeated,
-        "shadow_challenger_nominations": repeated,
+        "shadow_challenger_nominations": nominations,
+        "historical_resolved_patterns": historical,
+        "contrastive_evidence": {"orb_fresh_retest_vs_raw_breakout": retest_contrast},
+        "active_preregistered_trial": {
+            "plan_id": "fresh-orb-retest-forward-2026-07-20",
+            "path": str(FRESH_RETEST_PLAN),
+            "exists": FRESH_RETEST_PLAN.exists(),
+        },
+        "highest_value_next_step": (
+            "accumulate_30_completed_fresh_retests_across_20_trading_days"
+            if not retest_contrast["evidence_gate_passed"] else "run_independent_adversarial_audit"
+        ),
         "promotion_blockers": ["unresolved_repeated_high_severity_mistakes"] if critical else [],
         "learning_contract": {
             "observe": "Ingest completed actual/shadow outcomes, watchdog mismatches, and adversarial failures.",

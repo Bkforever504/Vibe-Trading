@@ -49,4 +49,85 @@ def test_decaying_watchdog_mistake_remains_memory_without_blocking(tmp_path) -> 
     report, _ = build_report(learning, watchdog, audit, tmp_path / "ledger.jsonl")
 
     assert report["repeated_patterns"][0]["severity"] == "decaying"
+    assert report["shadow_challenger_nominations"] == []
+    assert report["summary"]["historical_resolved_pattern_count"] == 1
     assert report["promotion_blockers"] == []
+
+
+def test_shadow_losses_are_clustered_by_actionable_entry_context(tmp_path) -> None:
+    failures = []
+    for pos in range(2):
+        failures.append({
+            "source": "accelerated_directional_shadow",
+            "lifecycle_id": f"loss-{pos}",
+            "date": "2026-07-20",
+            "symbol": "SPY",
+            "strategy": "0dte",
+            "right": "CALL",
+            "episode_bucket_et": "13:30",
+            "diagnosis": "Thesis failed before follow-through; test stricter entry confirmation for this feature/regime cluster.",
+            "feature_snapshot": {
+                "orb_entry_pattern": "raw_breakout",
+                "orb_retest_status": "retest_stale",
+                "expected_move_consumed_fraction": 0.8,
+                "spread_cents_at_signal": 5,
+                "above_vwap": False,
+                "above_ema50": False,
+                "ema50_sloping_up": False,
+            },
+        })
+    learning = _write(tmp_path / "learning.json", {"failure_memory": failures})
+    watchdog = _write(tmp_path / "watchdog.json", {"alerts": [], "setup_mismatch_examples": []})
+    audit = _write(tmp_path / "audit.json", {"subjects": []})
+
+    report, _ = build_report(learning, watchdog, audit, tmp_path / "ledger.jsonl")
+
+    nomination = report["shadow_challenger_nominations"][0]
+    assert nomination["supporting_occurrences"] == 2
+    assert nomination["top_clusters"][0]["context"]["session"] == "late"
+    assert nomination["top_clusters"][0]["context"]["trend_alignment"] == "unconfirmed"
+    assert nomination["proposed_shadow_change"] == "require_fresh_orb_retest"
+    assert nomination["minimum_forward_outcomes"] == 30
+
+
+def test_orb_retest_contrast_keeps_small_positive_cohort_in_shadow(tmp_path, monkeypatch) -> None:
+    trades = []
+    for pos in range(6):
+        trades.append({
+            "date": f"2026-07-{pos + 1:02d}",
+            "evidence_exit_return_pct": 10.0,
+            "feature_snapshot": {
+                "orb_entry_pattern": "breakout_retest",
+                "orb_retest_status": "retest_confirmed_fresh",
+            },
+        })
+    for pos in range(10):
+        trades.append({
+            "date": f"2026-06-{pos + 1:02d}",
+            "evidence_exit_return_pct": -5.0,
+            "feature_snapshot": {"orb_entry_pattern": "raw_breakout", "orb_retest_status": "retest_stale"},
+        })
+    monkeypatch.setattr("scripts.self_learning_edge_loop.accelerated._shadow_trades", lambda _path: trades)
+
+    result = __import__("scripts.self_learning_edge_loop", fromlist=["_orb_retest_contrast"])._orb_retest_contrast(
+        tmp_path / "shadow.jsonl"
+    )
+
+    assert result["fresh_minus_raw_expectancy_pct"] == 15.0
+    assert result["evidence_gate_passed"] is False
+    assert result["interpretation"] == "fresh_retest_leading_but_sample_insufficient"
+
+
+def test_non_orb_credit_loss_gets_strategy_specific_challenger() -> None:
+    loop = __import__("scripts.self_learning_edge_loop", fromlist=["_proposed_shadow_change"])
+    assert (
+        loop._proposed_shadow_change("stop at or inside -100% credit", {})
+        == "compare_credit_spread_stop_timing_75_100_125pct"
+    )
+    assert (
+        loop._proposed_shadow_change(
+            "Thesis failed before follow-through; test stricter entry confirmation for this feature/regime cluster.",
+            {"entry_pattern": "unknown", "retest_status": "unknown", "trend_alignment": "unconfirmed"},
+        )
+        == "require_directional_vwap_ema_alignment"
+    )

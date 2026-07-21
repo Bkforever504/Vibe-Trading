@@ -1,0 +1,52 @@
+{
+  "plan_id": "fresh-orb-retest-forward-2026-07-20",
+  "edge_id": "spy-0dte-fresh-orb-retest-vs-raw-breakout",
+  "status": "preregistered_collection_active",
+  "created_before_oos_start": true,
+  "created_at": "2026-07-20",
+  "oos_start": "2026-07-21",
+  "oos_end": "2026-10-16",
+  "hypothesis": "Fresh confirmed ORB retests have positive cost-adjusted option-contract expectancy and outperform raw or unconfirmed ORB breakouts across distinct forward trading days.",
+  "champion_or_safety_rule": {
+    "entry_pattern": "breakout_retest",
+    "orb_retest_status": "retest_confirmed_fresh",
+    "production_behavior": "already_required_for_live_candidate_path"
+  },
+  "shadow_comparator": {
+    "entry_pattern": "raw_breakout",
+    "execution_mode": "shadow_only"
+  },
+  "frozen_exit_model": {
+    "profit_target_pct": 75,
+    "stop_loss_pct": -30,
+    "ratchet_arm_pct": 40,
+    "ratchet_giveback_points": 15,
+    "horizon_minutes": 60,
+    "hard_close_et": "13:45"
+  },
+  "cost_model": "Enter at logged ask and exit at logged bid; missing executable quotes do not count as qualified evidence.",
+  "primary_metric": "date_clustered_cost_adjusted_expectancy_return_pct",
+  "acceptance_rules": {
+    "minimum_fresh_completed_outcomes": 30,
+    "minimum_distinct_fresh_trading_days": 20,
+    "fresh_expectancy_must_be_positive": true,
+    "fresh_date_clustered_expectancy_must_be_positive": true,
+    "fresh_must_outperform_raw_comparator": true,
+    "moving_block_bootstrap_lower_bound_must_be_positive": true,
+    "executable_quote_coverage_rate": 1.0,
+    "human_review_required": true
+  },
+  "current_consumed_context_not_oos": {
+    "fresh_completed": 6,
+    "fresh_trading_days": 1,
+    "fresh_win_rate": 0.667,
+    "fresh_expectancy_return_pct": 17.742,
+    "raw_completed": 71,
+    "raw_trading_days": 1,
+    "raw_win_rate": 0.268,
+    "raw_expectancy_return_pct": -18.551
+  },
+  "automatic_live_promotion": false,
+  "automatic_parameter_changes": false,
+  "failure_policy": "Preserve the result, diagnose by time bucket, direction, spread, expected-move consumption, and trend alignment, then preregister at most one new shadow challenger."
+}
