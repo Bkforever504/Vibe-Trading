@@ -121,6 +121,7 @@ MAX_RISK_PCT      = 0.02   # 2% account risk per trade (was 0.25 â€” caused
 MAX_CONTRACTS     = 5      # hard ceiling regardless of account size or option price
 MAX_ENTRY_SPREAD_CENTS = int(os.getenv("FLIP_MAX_ENTRY_SPREAD_CENTS", "10"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("FLIP_MAX_ENTRY_SLIPPAGE_PCT", "3.0"))
+MAX_ENTRY_QUOTE_AGE_SECONDS = float(os.getenv("FLIP_MAX_ENTRY_QUOTE_AGE_SECONDS", "15.0"))
 PROFIT_MULT       = 1.75   # entry * 1.75 = target (+75%)
 STOP_MULT         = 0.70   # entry * 0.70 = stop   (-30%)
 PROFIT_PROTECT_ARM_PCT = 40.0   # once a long option reaches +40%, protect the win
@@ -291,6 +292,9 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "current_ask": None,
             "max_slippage_pct": MAX_ENTRY_SLIPPAGE_PCT,
         }
+    # Force a new broker-data snapshot here. The selection quote can be several
+    # decision steps old and must not be treated as executable evidence.
+    _option_mid(setup.get("option_symbol", ""))
     quote = _selection_quote_fields(setup.get("option_symbol", ""))
     try:
         current_ask = float(quote.get("selection_ask") or 0.0)
@@ -302,6 +306,18 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "limit_price": limit_price,
             "current_ask": None,
             "max_slippage_pct": MAX_ENTRY_SLIPPAGE_PCT,
+        }
+    try:
+        quote_age = float(quote.get("quote_age_seconds"))
+    except (TypeError, ValueError):
+        quote_age = None
+    if quote_age is None or quote_age > MAX_ENTRY_QUOTE_AGE_SECONDS:
+        return {
+            "reason": "entry_quote_stale_or_unverifiable",
+            "limit_price": limit_price,
+            "current_ask": round(current_ask, 3),
+            "quote_age_seconds": quote_age,
+            "max_quote_age_seconds": MAX_ENTRY_QUOTE_AGE_SECONDS,
         }
     if current_ask > limit_price:
         return {
@@ -315,7 +331,46 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
         }
     setup["entry_limit_price"] = limit_price
     setup["entry_live_ask_at_submit"] = round(current_ask, 3)
+    setup["entry_quote_timestamp_at_submit"] = quote.get("quote_timestamp")
+    setup["entry_quote_age_seconds_at_submit"] = quote_age
     setup["entry_slippage_guard_max_pct"] = MAX_ENTRY_SLIPPAGE_PCT
+    return None
+
+
+def _entry_evidence_blocker(setup: dict) -> dict | None:
+    """Fail closed when research-only or unconfirmed ORB evidence reaches execution."""
+    if setup.get("execution_mode") == "shadow_only" or setup.get("live_execution_allowed") is False:
+        return {"reason": "research_only_setup_reached_execution"}
+
+    confidence_basis = str(setup.get("confidence_basis") or "")
+    pattern = str(setup.get("orb_entry_pattern") or "")
+    status = str(setup.get("orb_retest_status") or "")
+    if confidence_basis.endswith("shadow_only") or pattern == "raw_breakout":
+        return {
+            "reason": "unconfirmed_orb_setup_reached_execution",
+            "confidence_basis": confidence_basis or None,
+            "orb_entry_pattern": pattern or None,
+            "orb_retest_status": status or None,
+        }
+
+    if pattern != "breakout_retest":
+        setup["entry_evidence_gate"] = "passed_non_orb_strategy"
+        return None
+
+    try:
+        age_bars = int(setup.get("orb_retest_age_bars"))
+    except (TypeError, ValueError):
+        age_bars = None
+    if status != "retest_confirmed_fresh" or age_bars is None or not 0 <= age_bars <= 15:
+        return {
+            "reason": "fresh_orb_retest_evidence_required",
+            "orb_entry_pattern": pattern,
+            "orb_retest_status": status or None,
+            "orb_retest_age_bars": age_bars,
+            "maximum_retest_age_bars": 15,
+        }
+
+    setup["entry_evidence_gate"] = "passed_fresh_orb_retest"
     return None
 
 
@@ -2961,12 +3016,16 @@ def _entry_quality_snapshot(
         "selection_ask": setup.get("selection_ask"),
         "entry_limit_price": setup.get("entry_limit_price"),
         "entry_live_ask_at_submit": setup.get("entry_live_ask_at_submit"),
+        "entry_quote_timestamp_at_submit": setup.get("entry_quote_timestamp_at_submit"),
+        "entry_quote_age_seconds_at_submit": setup.get("entry_quote_age_seconds_at_submit"),
         "entry_slippage_guard_max_pct": setup.get("entry_slippage_guard_max_pct"),
         "quote_timestamp": setup.get("quote_timestamp"),
         "quote_age_seconds": setup.get("quote_age_seconds"),
         "orb_direction": setup.get("orb_direction"),
         "orb_entry_pattern": setup.get("orb_entry_pattern"),
         "orb_retest_status": setup.get("orb_retest_status"),
+        "orb_retest_age_bars": setup.get("orb_retest_age_bars"),
+        "entry_evidence_gate": setup.get("entry_evidence_gate"),
         "signal_snapshot": setup.get("signal_snapshot"),
         "feature_snapshot": _entry_feature_snapshot(setup),
     }
@@ -3441,6 +3500,61 @@ def _resolve_entry_fill(resp: dict, setup: dict) -> dict:
         "entry_fill_confirmed": fill_price_source == "broker_fill",
         "entry_partial_fill": confirmed_qty < requested_qty,
         "entry_remainder_status": str(latest_after_cancel.get("status") or status or "unknown"),
+        "broker_submitted_at": latest_after_cancel.get("submitted_at") or detail.get("submitted_at") or resp.get("submitted_at"),
+        "broker_filled_at": latest_after_cancel.get("filled_at") or detail.get("filled_at") or resp.get("filled_at"),
+    }
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _entry_execution_snapshot(setup: dict, entry_fill: dict, submitted_at: str) -> dict:
+    """Normalize broker execution evidence for chronological forward review."""
+    broker_submitted_at = entry_fill.get("broker_submitted_at") or submitted_at
+    broker_filled_at = entry_fill.get("broker_filled_at")
+    submitted_ts = _parse_timestamp(broker_submitted_at)
+    filled_ts = _parse_timestamp(broker_filled_at)
+    delay_seconds = None
+    if submitted_ts and filled_ts:
+        delay_seconds = round(max(0.0, (filled_ts - submitted_ts).total_seconds()), 3)
+
+    signal_ask = float(setup.get("selection_ask") or 0.0)
+    submit_ask = float(setup.get("entry_live_ask_at_submit") or 0.0)
+    filled_price = float(entry_fill.get("entry_price") or 0.0)
+    fill_vs_signal_ask_pct = (
+        round((filled_price - signal_ask) / signal_ask * 100.0, 3)
+        if signal_ask > 0 and filled_price > 0 else None
+    )
+    fill_vs_submit_ask_pct = (
+        round((filled_price - submit_ask) / submit_ask * 100.0, 3)
+        if submit_ask > 0 and filled_price > 0 else None
+    )
+    return {
+        "schema_version": 1,
+        "entry_evidence_gate": setup.get("entry_evidence_gate"),
+        "signal_quote_ask": signal_ask or None,
+        "submit_quote_ask": submit_ask or None,
+        "submit_quote_timestamp": setup.get("entry_quote_timestamp_at_submit"),
+        "submit_quote_age_seconds": setup.get("entry_quote_age_seconds_at_submit"),
+        "local_submitted_at": submitted_at,
+        "broker_submitted_at": broker_submitted_at,
+        "broker_filled_at": broker_filled_at,
+        "submit_to_fill_seconds": delay_seconds,
+        "filled_price": filled_price or None,
+        "fill_vs_signal_ask_pct": fill_vs_signal_ask_pct,
+        "fill_vs_submit_ask_pct": fill_vs_submit_ask_pct,
+        "orb_entry_pattern": setup.get("orb_entry_pattern"),
+        "orb_retest_status": setup.get("orb_retest_status"),
+        "orb_retest_age_bars": setup.get("orb_retest_age_bars"),
     }
 
 
@@ -3915,6 +4029,20 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 slippage_guard=slippage_block,
             )
             continue
+        evidence_block = _entry_evidence_blocker(setup)
+        if evidence_block:
+            log.error(
+                f"EXECUTION BLOCKED {setup.get('symbol')} {setup.get('strategy')}: "
+                f"{evidence_block['reason']} details={evidence_block}"
+            )
+            _decision(
+                setup_symbol,
+                setup.get("strategy", "unknown"),
+                "blocked",
+                evidence_block["reason"],
+                entry_evidence=evidence_block,
+            )
+            continue
         _capture_point_in_time(
             "signal",
             setup,
@@ -3923,8 +4051,11 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 "confidence": setup.get("confidence", setup.get("score")),
                 "entry_price_est": setup.get("entry_price_est"),
                 "spread_cents_at_signal": setup.get("spread_cents"),
+                "entry_evidence_gate": setup.get("entry_evidence_gate"),
             },
         )
+        entry_order_submitted_at = _utc_now_text()
+        setup["entry_order_submitted_at"] = entry_order_submitted_at
         if is_spread:
             resp = _submit_spread(setup, max_notional=max_notional)
         else:
@@ -3966,6 +4097,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         filled_price = float(entry_fill["entry_price"])
         fill_price_source = str(entry_fill["entry_price_source"])
         tracked_contracts = int(entry_fill["contracts"])
+        execution_evidence = _entry_execution_snapshot(setup, entry_fill, entry_order_submitted_at)
 
         trade = {
             "id":              setup["telemetry_trade_id"],
@@ -3987,6 +4119,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             "entry_fill_confirmed": bool(entry_fill.get("entry_fill_confirmed")),
             "entry_partial_fill": bool(entry_fill.get("entry_partial_fill")),
             "entry_remainder_status": entry_fill.get("entry_remainder_status"),
+            "entry_execution_evidence": execution_evidence,
             "target_price":    round(filled_price * PROFIT_MULT, 3),
             "stop_price":      round(filled_price * STOP_MULT, 3),
             "max_loss":        setup.get("max_loss"),
@@ -4023,6 +4156,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 "entry_price_est": setup.get("entry_price_est"),
                 "strategy": setup.get("strategy"),
                 "confidence": setup.get("confidence", setup.get("score")),
+                "entry_execution_evidence": execution_evidence,
             },
         )
         resting_tp_result = _submit_resting_take_profit(trade)

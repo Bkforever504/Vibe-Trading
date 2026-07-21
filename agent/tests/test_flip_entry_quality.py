@@ -112,12 +112,94 @@ def test_entry_slippage_blocker_blocks_current_ask_above_limit(monkeypatch) -> N
         "_selection_quote_fields",
         lambda _occ: {"selection_ask": 1.32, "quote_age_seconds": 0.5},
     )
+    monkeypatch.setattr(bot, "_option_mid", lambda _occ: 1.30)
 
     blocker = bot._entry_slippage_blocker(setup)
 
     assert blocker is not None
     assert blocker["reason"] == "entry_slippage_above_limit"
     assert blocker["limit_price"] == 1.30
+
+
+def test_entry_slippage_blocker_requires_fresh_submit_quote(monkeypatch) -> None:
+    setup = {
+        "option_symbol": "SPY260717C00747000",
+        "entry_price_est": 1.26,
+        "selection_ask": 1.26,
+    }
+    monkeypatch.setattr(bot, "_option_mid", lambda _occ: 1.27)
+    monkeypatch.setattr(
+        bot,
+        "_selection_quote_fields",
+        lambda _occ: {"selection_ask": 1.27, "quote_age_seconds": 45.0},
+    )
+
+    blocker = bot._entry_slippage_blocker(setup)
+
+    assert blocker is not None
+    assert blocker["reason"] == "entry_quote_stale_or_unverifiable"
+
+
+def test_entry_evidence_gate_blocks_raw_and_stale_orb_but_allows_fresh_retest() -> None:
+    raw = {
+        "strategy": "0dte",
+        "confidence_basis": "raw_orb_shadow_only",
+        "orb_entry_pattern": "raw_breakout",
+        "orb_retest_status": "awaiting_retest",
+    }
+    stale = {
+        "strategy": "0dte",
+        "confidence_basis": "fresh_orb_breakout_retest",
+        "orb_entry_pattern": "breakout_retest",
+        "orb_retest_status": "retest_stale",
+        "orb_retest_age_bars": 17,
+    }
+    fresh = {
+        "strategy": "0dte",
+        "confidence_basis": "fresh_orb_breakout_retest",
+        "orb_entry_pattern": "breakout_retest",
+        "orb_retest_status": "retest_confirmed_fresh",
+        "orb_retest_age_bars": 2,
+    }
+
+    assert bot._entry_evidence_blocker(raw)["reason"] == "unconfirmed_orb_setup_reached_execution"
+    assert bot._entry_evidence_blocker(stale)["reason"] == "fresh_orb_retest_evidence_required"
+    assert bot._entry_evidence_blocker(fresh) is None
+    assert fresh["entry_evidence_gate"] == "passed_fresh_orb_retest"
+
+
+def test_entry_evidence_gate_preserves_non_orb_strategies_and_blocks_shadow_records() -> None:
+    trend = {"strategy": "bull_trend", "orb_entry_pattern": "fresh_vwap_ema_pullback"}
+    shadow = {"strategy": "0dte", "execution_mode": "shadow_only", "live_execution_allowed": False}
+
+    assert bot._entry_evidence_blocker(trend) is None
+    assert trend["entry_evidence_gate"] == "passed_non_orb_strategy"
+    assert bot._entry_evidence_blocker(shadow)["reason"] == "research_only_setup_reached_execution"
+
+
+def test_entry_execution_snapshot_records_delay_and_executable_slippage() -> None:
+    setup = {
+        "selection_ask": 1.00,
+        "entry_live_ask_at_submit": 1.05,
+        "entry_quote_timestamp_at_submit": "2026-07-20T14:30:00Z",
+        "entry_quote_age_seconds_at_submit": 0.4,
+        "entry_evidence_gate": "passed_fresh_orb_retest",
+        "orb_entry_pattern": "breakout_retest",
+        "orb_retest_status": "retest_confirmed_fresh",
+        "orb_retest_age_bars": 1,
+    }
+    fill = {
+        "entry_price": 1.06,
+        "broker_submitted_at": "2026-07-20T14:30:01Z",
+        "broker_filled_at": "2026-07-20T14:30:03.500Z",
+    }
+
+    evidence = bot._entry_execution_snapshot(setup, fill, "2026-07-20T14:30:01Z")
+
+    assert evidence["submit_to_fill_seconds"] == 2.5
+    assert evidence["fill_vs_signal_ask_pct"] == 6.0
+    assert evidence["fill_vs_submit_ask_pct"] == 0.952
+    assert evidence["entry_evidence_gate"] == "passed_fresh_orb_retest"
 
 
 def test_fresh_vwap_ema_pullback_requires_touch_and_confirmation() -> None:
