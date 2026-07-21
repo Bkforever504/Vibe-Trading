@@ -1,0 +1,86 @@
+{
+  "protocol": "MES_SIGNED_FLOW_ABSORPTION_DISCOVERY_2026-07-21",
+  "phase": "A_outcome_blind",
+  "routing_authority": false,
+  "source": {
+    "dataset": "GLBX.MDP3",
+    "schema": "trades_joined_to_bbo-1s",
+    "symbol": "MES.v.0",
+    "start": "2025-10-01",
+    "end": "2026-01-01",
+    "excluded_sessions": [
+      "2025-11-28",
+      "2025-12-17"
+    ]
+  },
+  "coverage": {
+    "prints": 15885210,
+    "observed_sessions": 63,
+    "complete_sessions": 61,
+    "windows": 22080,
+    "quote_match_rate": 0.999968,
+    "matched_volume": 53931898,
+    "signed_volume": 53931820,
+    "signed_volume_rate": 0.999999
+  },
+  "feature_distributions": {
+    "total_aggressive_volume": {
+      "p10": 601.0,
+      "p25": 1028.0,
+      "p50": 1903.0,
+      "p75": 3269.25,
+      "p90": 4992.0,
+      "p95": 6302.05,
+      "mean": 2442.564312,
+      "stddev": 2004.992313
+    },
+    "absolute_signed_imbalance": {
+      "p10": 0.031998,
+      "p25": 0.08294,
+      "p50": 0.173462,
+      "p75": 0.290229,
+      "p90": 0.398471,
+      "p95": 0.46798,
+      "mean": 0.19931,
+      "stddev": 0.144072
+    },
+    "absolute_mid_displacement": {
+      "p10": 0.25,
+      "p25": 0.5,
+      "p50": 1.0,
+      "p75": 2.0,
+      "p90": 3.5,
+      "p95": 4.75,
+      "mean": 1.546303,
+      "stddev": 1.697852
+    },
+    "print_count": {
+      "p10": 169.0,
+      "p25": 288.0,
+      "p50": 551.0,
+      "p75": 958.0,
+      "p90": 1491.0,
+      "p95": 1900.0,
+      "mean": 719.438859,
+      "stddev": 612.999604
+    },
+    "window_quote_match_rate": {
+      "p10": 1.0,
+      "p25": 1.0,
+      "p50": 1.0,
+      "p75": 1.0,
+      "p90": 1.0,
+      "p95": 1.0,
+      "mean": 0.998676,
+      "stddev": 0.021823
+    }
+  },
+  "quality_gates": {
+    "complete_sessions": true,
+    "quote_match_rate": true,
+    "signed_volume_rate": true,
+    "excluded_sessions_removed": true,
+    "all_pass": true
+  },
+  "next_boundary": "freeze_phase_b_before_opening_strategy_results"
+}

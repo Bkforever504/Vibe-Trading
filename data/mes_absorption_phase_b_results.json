@@ -1,0 +1,24 @@
+{
+  "protocol": "MES_SIGNED_FLOW_ABSORPTION_PHASE_B_2026-07-21",
+  "routing_authority": false,
+  "parameters": {
+    "minimum_aggressive_volume": 5000,
+    "minimum_absolute_imbalance": 0.4,
+    "maximum_absolute_mid_displacement": 0.5,
+    "hold_minutes": 5,
+    "maximum_signals_per_day": 3
+  },
+  "candidate_windows": 0,
+  "development_calendar_sessions": 44,
+  "development_filled_signals": 0,
+  "development": {
+    "trades": 0
+  },
+  "development_stressed": {
+    "trades": 0
+  },
+  "development_pass": false,
+  "final_opened": false,
+  "promotion_allowed": false,
+  "verdict": "rejected_infeasible_zero_candidate_windows"
+}
