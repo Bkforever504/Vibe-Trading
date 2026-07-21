@@ -148,3 +148,30 @@ def test_active_trial_lifecycle_requires_validation_then_later_forward() -> None
     assert result["validation_progress"] == "30/30"
     assert result["forward_progress"] == "12/30"
     assert result["automatic_promotion_allowed"] is False
+
+
+def test_alpaca_execution_evidence_summarizes_real_fill_delay_and_slippage(tmp_path) -> None:
+    loop = __import__("scripts.self_learning_edge_loop", fromlist=["_alpaca_execution_evidence"])
+    state = tmp_path / "flip-trades.json"
+    state.write_text(json.dumps([
+        {
+            "entry_fill_confirmed": True,
+            "entry_execution_evidence": {
+                "entry_evidence_gate": "passed_fresh_orb_retest",
+                "submit_to_fill_seconds": 2.5,
+                "fill_vs_submit_ask_pct": 0.95,
+                "fill_vs_signal_ask_pct": 6.0,
+            },
+        },
+        {"entry_fill_confirmed": False},
+    ]), encoding="utf-8")
+
+    result = loop._alpaca_execution_evidence(state)
+
+    assert result["trade_count"] == 2
+    assert result["execution_evidence_count"] == 1
+    assert result["missing_execution_evidence_count"] == 1
+    assert result["fresh_orb_retest_fill_count"] == 1
+    assert result["average_submit_to_fill_seconds"] == 2.5
+    assert result["average_fill_vs_signal_ask_pct"] == 6.0
+    assert result["automatic_parameter_changes_allowed"] is False

@@ -28,6 +28,7 @@ LEDGER_PATH = ROOT / "data" / "self_learning_mistake_ledger.jsonl"
 REPORT_PATH = REPORT_DIR / "self-learning-edge-loop.json"
 LOG_PATH = ROOT / "data" / "self_learning_edge_loop_log.jsonl"
 SHADOW_PATH = ROOT / "data" / "flip_shadow_candidates_log.jsonl"
+FLIP_STATE_PATH = VIBE_HOME / "flip-trades.json"
 FRESH_RETEST_PLAN = ROOT / "research" / "edge_trials" / "fresh_orb_retest_forward_plan_2026-07-20.json"
 
 
@@ -53,6 +54,53 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         if isinstance(value, dict):
             rows.append(value)
     return rows
+
+
+def _alpaca_execution_evidence(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        trades: list[dict[str, Any]] = []
+    else:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            payload = []
+        trades = [row for row in payload if isinstance(row, dict)] if isinstance(payload, list) else []
+
+    evidence = [
+        row["entry_execution_evidence"]
+        for row in trades
+        if isinstance(row.get("entry_execution_evidence"), dict)
+    ]
+    delays = [
+        float(row["submit_to_fill_seconds"])
+        for row in evidence
+        if row.get("submit_to_fill_seconds") is not None
+    ]
+    submit_slippage = [
+        float(row["fill_vs_submit_ask_pct"])
+        for row in evidence
+        if row.get("fill_vs_submit_ask_pct") is not None
+    ]
+    signal_slippage = [
+        float(row["fill_vs_signal_ask_pct"])
+        for row in evidence
+        if row.get("fill_vs_signal_ask_pct") is not None
+    ]
+    fresh_retests = [row for row in evidence if row.get("entry_evidence_gate") == "passed_fresh_orb_retest"]
+    return {
+        "source": str(path),
+        "trade_count": len(trades),
+        "execution_evidence_count": len(evidence),
+        "missing_execution_evidence_count": len(trades) - len(evidence),
+        "fresh_orb_retest_fill_count": len(fresh_retests),
+        "broker_confirmed_fill_count": sum(bool(row.get("entry_fill_confirmed")) for row in trades),
+        "average_submit_to_fill_seconds": round(sum(delays) / len(delays), 3) if delays else None,
+        "average_fill_vs_submit_ask_pct": round(sum(submit_slippage) / len(submit_slippage), 3) if submit_slippage else None,
+        "average_fill_vs_signal_ask_pct": round(sum(signal_slippage) / len(signal_slippage), 3) if signal_slippage else None,
+        "fills_above_3pct_submit_slippage": sum(value > 3.0 for value in submit_slippage),
+        "authority": "observed_alpaca_execution_diagnostics_only",
+        "automatic_parameter_changes_allowed": False,
+    }
 
 
 def _stable_id(payload: dict[str, Any]) -> str:
@@ -298,6 +346,7 @@ def build_report(
     audit_path: Path = AUDIT_PATH,
     ledger_path: Path = LEDGER_PATH,
     shadow_path: Path = SHADOW_PATH,
+    flip_state_path: Path = FLIP_STATE_PATH,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     existing = _read_jsonl(ledger_path)
     known = {row.get("event_id") for row in existing}
@@ -347,6 +396,7 @@ def build_report(
     historical = [row for row in repeated if row.get("severity") in {"decaying", "resolved"}]
     nominations = _aggregate_nominations(actionable)
     retest_contrast = _orb_retest_contrast(shadow_path)
+    execution_evidence = _alpaca_execution_evidence(flip_state_path)
     trial_lifecycle = _active_trial_lifecycle(audit)
     report = {
         "provider": "self_learning_edge_loop",
@@ -368,6 +418,7 @@ def build_report(
         "shadow_challenger_nominations": nominations,
         "historical_resolved_patterns": historical,
         "contrastive_evidence": {"orb_fresh_retest_vs_raw_breakout": retest_contrast},
+        "alpaca_execution_evidence": execution_evidence,
         "active_preregistered_trial": {
             "plan_id": "fresh-orb-retest-forward-2026-07-20",
             "path": str(FRESH_RETEST_PLAN),

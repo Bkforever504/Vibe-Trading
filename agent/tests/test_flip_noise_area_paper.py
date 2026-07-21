@@ -130,8 +130,9 @@ def _prepare_entry_run(monkeypatch, tmp_path: Path) -> list[dict]:
     monkeypatch.setattr(
         flip_bot,
         "_selection_quote_fields",
-        lambda _symbol: {"selection_bid": 0.99, "selection_ask": 1.01},
+        lambda _symbol: {"selection_bid": 0.99, "selection_ask": 1.01, "quote_age_seconds": 0.5},
     )
+    monkeypatch.setattr(flip_bot, "_option_mid", lambda _symbol: 1.0)
     monkeypatch.setattr(flip_bot, "_decision", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(flip_bot, "_alert", lambda _message: None)
     monkeypatch.setattr(flip_bot.time, "sleep", lambda _seconds: None)
