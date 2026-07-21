@@ -1,0 +1,71 @@
+{
+  "provider": "mes_quote_exhaustion_lab",
+  "mode": "research_only_no_execution",
+  "preregistration": "research\\MES_QUOTE_EXHAUSTION_PREREGISTRATION_2026-07-20.md",
+  "preregistration_sha256": "F7C6E965B69A9BF3D90E3A7A82B47AB09E6A604105C1D6C39BC37C4CF2F78955",
+  "data": {
+    "source": "data\\databento\\mes_v0_bbo1s_2024-01-01_2026-07-19.dbn.zst",
+    "sessions": 618,
+    "excluded_roll_or_condition": 39,
+    "excluded_low_coverage": 25
+  },
+  "frozen_config": {
+    "threshold": 0.1,
+    "window_observations": 300,
+    "direction": "fade",
+    "stop_ticks": 20,
+    "hold_seconds": 300,
+    "max_trades_per_day": 3
+  },
+  "evaluation": {
+    "development": {
+      "session_count": 432,
+      "outcomes_opened": false,
+      "reason": "consumed_discovery_period_not_independent_evidence"
+    },
+    "selection": {
+      "trades": 52,
+      "trading_days": 38,
+      "total_pnl": -380.21,
+      "expectancy": -7.31,
+      "win_rate": 0.4038,
+      "profit_factor": 0.4077,
+      "max_drawdown": 397.77,
+      "worst_session_pnl": -63.69,
+      "best_session_pnl": 81.27,
+      "best_day_consistency_fraction": null,
+      "hard_stop_count": 15,
+      "cost_per_trade": 2.48
+    },
+    "selection_stressed": {
+      "trades": 52,
+      "trading_days": 38,
+      "total_pnl": -639.17,
+      "expectancy": -12.29,
+      "win_rate": 0.2308,
+      "profit_factor": 0.2261,
+      "max_drawdown": 646.75,
+      "worst_session_pnl": -78.63,
+      "best_session_pnl": 76.29,
+      "best_day_consistency_fraction": null,
+      "hard_stop_count": 15,
+      "cost_per_trade": 7.46
+    },
+    "selection_pass": false,
+    "selection_failed_checks": [
+      "positive_expectancy",
+      "profit_factor",
+      "positive_stressed_expectancy",
+      "drawdown",
+      "consistency"
+    ],
+    "final": {
+      "session_count": 93,
+      "outcomes_opened": false,
+      "reason": "sealed_until_selection_passes"
+    }
+  },
+  "execution_enabled": false,
+  "promotion_allowed": false,
+  "next_action": "reject_specification_keep_mes_execution_disabled"
+}
