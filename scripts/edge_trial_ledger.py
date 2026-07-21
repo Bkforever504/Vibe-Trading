@@ -20,6 +20,7 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 LEDGER_PATH = ROOT / "data" / "edge_trial_ledger.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "edge-trial-ledger.json"
 REPORT_LOG_PATH = ROOT / "data" / "edge_trial_ledger_report_log.jsonl"
+ATTEMPT_INVENTORY_PATH = ROOT / "research" / "attempted_trial_inventory_2026-07-20.json"
 
 ALPHA = 0.05
 MIN_OOS_TRADES = 30
@@ -168,12 +169,12 @@ def _p_value(metrics: dict[str, Any]) -> float | None:
     return 1 - NormalDist().cdf(t_stat)
 
 
-def _bh_pass_ids(rows: list[dict[str, Any]], alpha: float) -> set[str]:
+def _bh_pass_ids(rows: list[dict[str, Any]], alpha: float, attempt_count: int | None = None) -> set[str]:
     eligible = sorted(
         ((row["p_value"], row["trial_id"]) for row in rows if row.get("p_value") is not None),
         key=lambda item: item[0],
     )
-    count = len(rows)  # Every attempted trial counts, including trials missing a p-value.
+    count = max(len(rows), int(attempt_count or 0))
     last_rank = 0
     for rank, (p_value, _) in enumerate(eligible, 1):
         if p_value <= rank / max(1, count) * alpha:
@@ -181,10 +182,25 @@ def _bh_pass_ids(rows: list[dict[str, Any]], alpha: float) -> set[str]:
     return {trial_id for _, trial_id in eligible[:last_rank]}
 
 
-def build_report(path: Path = LEDGER_PATH, alpha: float = ALPHA) -> dict[str, Any]:
+def _declared_attempt_count(path: Path) -> int:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+    return max(0, _integer(value.get("documented_minimum_attempt_count"))) if isinstance(value, dict) else 0
+
+
+def build_report(
+    path: Path = LEDGER_PATH,
+    alpha: float = ALPHA,
+    attempt_inventory_path: Path | None = None,
+) -> dict[str, Any]:
     trials = _read_jsonl(path)
     trial_count = len(trials)
-    bonferroni_alpha = alpha / max(1, trial_count)
+    inventory_path = attempt_inventory_path or (ATTEMPT_INVENTORY_PATH if path == LEDGER_PATH else None)
+    documented_attempt_count = _declared_attempt_count(inventory_path) if inventory_path else 0
+    effective_attempt_count = max(trial_count, documented_attempt_count)
+    bonferroni_alpha = alpha / max(1, effective_attempt_count)
     bonferroni_t = NormalDist().inv_cdf(1 - bonferroni_alpha)
     rows = []
     for trial in trials:
@@ -206,7 +222,7 @@ def build_report(path: Path = LEDGER_PATH, alpha: float = ALPHA) -> dict[str, An
             "p_value": round(p_value, 8) if p_value is not None else None,
             "bonferroni_pass": p_value is not None and p_value <= bonferroni_alpha,
         })
-    bh_ids = _bh_pass_ids(rows, alpha)
+    bh_ids = _bh_pass_ids(rows, alpha, effective_attempt_count)
     promotion_review = []
     for row in rows:
         row["benjamini_hochberg_pass"] = row["trial_id"] in bh_ids
@@ -235,6 +251,8 @@ def build_report(path: Path = LEDGER_PATH, alpha: float = ALPHA) -> dict[str, An
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "ledger_path": str(path),
         "trial_count": trial_count,
+        "effective_multiple_testing_trial_count": effective_attempt_count,
+        "known_unledgered_attempt_count": max(0, effective_attempt_count - trial_count),
         "edge_count": len({row.get("edge_id") for row in rows if row.get("edge_id")}),
         "promotion_review_count": len(promotion_review),
         "multiple_testing": {
@@ -242,12 +260,14 @@ def build_report(path: Path = LEDGER_PATH, alpha: float = ALPHA) -> dict[str, An
             "bonferroni_alpha": round(bonferroni_alpha, 8),
             "one_sided_normal_t_threshold": round(bonferroni_t, 4),
             "benjamini_hochberg_pass_count": len(bh_ids),
-            "all_attempted_trials_counted": True,
+            "all_attempted_trials_counted": trial_count >= effective_attempt_count and effective_attempt_count > 0,
+            "attempt_inventory_path": str(inventory_path) if inventory_path else None,
         },
         "promotion_review": promotion_review,
         "trials": rows,
         "warnings": [
             "An empty ledger means no edge has earned statistical approval; it does not mean no tests were attempted historically.",
+            "The multiple-testing denominator includes the documented historical attempt inventory even when legacy trials lack individual ledger rows.",
             "All new experiments must be recorded, including failures, before comparing strategy variants.",
             "Statistical significance is necessary but not sufficient; costs, drawdown, regime stability, and forward replication still matter.",
             "This ledger cannot promote a signal or submit orders.",

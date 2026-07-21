@@ -91,6 +91,21 @@ def test_tiny_oos_sample_blocks_even_significant_trial(tmp_path: Path) -> None:
     assert "fewer_than_30_oos_trades" in row["promotion_blockers"]
 
 
+def test_documented_attempt_inventory_increases_penalty_without_claiming_backfill(tmp_path: Path) -> None:
+    path = tmp_path / "ledger.jsonl"
+    inventory = tmp_path / "inventory.json"
+    inventory.write_text(json.dumps({"documented_minimum_attempt_count": 100}), encoding="utf-8")
+    ledger.record_trial(_trial("edge-a", p_value=0.001), path)
+
+    report = ledger.build_report(path, attempt_inventory_path=inventory)
+
+    assert report["trial_count"] == 1
+    assert report["effective_multiple_testing_trial_count"] == 100
+    assert report["known_unledgered_attempt_count"] == 99
+    assert report["multiple_testing"]["bonferroni_alpha"] == pytest.approx(0.0005)
+    assert report["multiple_testing"]["all_attempted_trials_counted"] is False
+
+
 def test_options_backtest_builds_in_sample_trial_that_cannot_promote(tmp_path: Path) -> None:
     result = backtest.TradeResult(
         symbol="IWM", strategy="ps", entry_date="2025-01-02", exit_date="2025-01-10",

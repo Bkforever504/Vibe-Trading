@@ -54,3 +54,16 @@ def test_missing_manifests_block_promotion(tmp_path) -> None:
     report = build_report(tmp_path)
     assert report["summary"]["subject_count"] == 0
     assert report["promotion_blockers"] == ["no_adversarial_manifests"]
+
+
+def test_runtime_manifest_directory_is_audited(tmp_path) -> None:
+    static = tmp_path / "static"
+    runtime = tmp_path / "runtime"
+    static.mkdir()
+    runtime.mkdir()
+    (runtime / "candidate.json").write_text(__import__("json").dumps(strong_manifest()), encoding="utf-8")
+
+    report = build_report(static, runtime)
+
+    assert report["summary"]["subject_count"] == 1
+    assert report["subjects"][0]["subject_id"] == "SPY"
