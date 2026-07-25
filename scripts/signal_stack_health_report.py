@@ -653,7 +653,12 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
         errors = _row_has_errors(latest)
         stale_before_today = _is_before_today(latest_date, today_str)
         pending_today = stale_before_today and _pending_scheduled_run_today(task, today, now)
-        if latest is None:
+        task_disabled = task.get("status") == "Disabled"
+        if task_disabled:
+            # A deliberately disabled producer cannot be "stale"; it is not
+            # expected to emit output. Tracked separately so it stays visible.
+            health = "disabled"
+        elif latest is None:
             health = "missing"
         elif pending_today:
             health = "ok"
@@ -689,6 +694,7 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
         "stale": sum(1 for item in items if item["health"] == "stale"),
         "missing": sum(1 for item in items if item["health"] == "missing"),
         "error": sum(1 for item in items if item["health"] == "error"),
+        "disabled": sum(1 for item in items if item["health"] == "disabled"),
     }
     strategy_staleness = build_strategy_staleness(today=today)
     return {
@@ -715,7 +721,8 @@ def print_report(report: dict) -> None:
         f"OK={report['summary']['ok']}  "
         f"STALE={report['summary']['stale']}  "
         f"MISSING={report['summary']['missing']}  "
-        f"ERROR={report['summary']['error']}"
+        f"ERROR={report['summary']['error']}  "
+        f"DISABLED={report['summary'].get('disabled', 0)}"
     )
     print()
     for item in report["items"]:

@@ -57,9 +57,50 @@ def test_build_report_flags_missing_stale_error_and_ok(monkeypatch, tmp_path: Pa
 
     built = report.build_report(today=date(2026, 6, 30))
 
-    assert built["summary"] == {"ok": 1, "stale": 1, "missing": 1, "error": 1}
+    assert built["summary"] == {"ok": 1, "stale": 1, "missing": 1, "error": 1, "disabled": 0}
     statuses = {item["name"]: item["health"] for item in built["items"]}
     assert statuses == {"OK": "ok", "Stale": "stale", "Missing": "missing", "Error": "error"}
+
+
+def test_build_report_classifies_disabled_task_as_disabled_not_stale(monkeypatch, tmp_path: Path) -> None:
+    old_log = tmp_path / "disabled.jsonl"
+    old_log.write_text('{"date":"2026-07-16"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{"name": "Disabled Bot", "task": "disabled-task", "log": old_log, "kind": "intraday"}],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda task: {"available": True, "status": "Disabled", "next_run_time": "N/A", "last_run_time": ""},
+    )
+
+    built = report.build_report(today=date(2026, 7, 24))
+
+    assert built["summary"] == {"ok": 0, "stale": 0, "missing": 0, "error": 0, "disabled": 1}
+    assert built["items"][0]["health"] == "disabled"
+    assert "task_status=Disabled" in built["items"][0]["warnings"]
+
+
+def test_build_report_ready_task_with_old_log_is_still_stale(monkeypatch, tmp_path: Path) -> None:
+    old_log = tmp_path / "ready.jsonl"
+    old_log.write_text('{"date":"2026-07-16"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{"name": "Ready Bot", "task": "ready-task", "log": old_log, "kind": "intraday"}],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda task: {"available": True, "status": "Ready", "next_run_time": ""},
+    )
+
+    built = report.build_report(today=date(2026, 7, 24))
+
+    assert built["items"][0]["health"] == "stale"
+    assert built["summary"]["stale"] == 1
 
 
 def test_build_report_treats_pre_scheduled_today_run_as_pending_ok(monkeypatch, tmp_path: Path) -> None:
@@ -78,7 +119,7 @@ def test_build_report_treats_pre_scheduled_today_run_as_pending_ok(monkeypatch, 
 
     built = report.build_report(today=date(2026, 7, 6), now=datetime(2026, 7, 6, 6, 15))
 
-    assert built["summary"] == {"ok": 1, "stale": 0, "missing": 0, "error": 0}
+    assert built["summary"] == {"ok": 1, "stale": 0, "missing": 0, "error": 0, "disabled": 0}
     assert built["items"][0]["health"] == "ok"
     assert built["items"][0]["warnings"] == ["pending_today latest_date=2026-07-03"]
 

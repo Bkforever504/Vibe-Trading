@@ -25,6 +25,11 @@ LOG_PATH = ROOT / "data" / "market_schedule_alignment_log.jsonl"
 REGULAR_MARKET_OPEN_CT = "08:30"
 REGULAR_MARKET_CLOSE_CT = "15:00"
 
+# A task observed in "Running" state is healthy if it started recently. This
+# covers the alignment task observing itself mid-run and other tasks observed
+# at their own start minute, while still flagging genuinely stuck tasks.
+RUNNING_GRACE_MINUTES = 30
+
 EXPECTED_TASKS = {
     # Timing governance before the rest of the day starts.
     r"\VibeTrade\MarketScheduleAlignment": {"08:10", "19:58"},
@@ -175,10 +180,38 @@ def _task_statuses(rows: list[dict[str, str]]) -> dict[str, set[str]]:
     return statuses
 
 
-def build_report(rows: list[dict[str, str]] | None = None) -> dict[str, Any]:
+def _parse_last_run_datetime(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text or text.upper() == "N/A":
+        return None
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+        # Task Scheduler reports 11/30/1999 for never-run tasks.
+        return parsed if parsed.year >= 2000 else None
+    return None
+
+
+def _task_last_runs(rows: list[dict[str, str]]) -> dict[str, datetime]:
+    last_runs: dict[str, datetime] = {}
+    for row in rows:
+        name = _normalize_task_name(row.get("TaskName", ""))
+        if name not in EXPECTED_TASKS:
+            continue
+        parsed = _parse_last_run_datetime(row.get("Last Run Time", ""))
+        if parsed and (name not in last_runs or parsed > last_runs[name]):
+            last_runs[name] = parsed
+    return last_runs
+
+
+def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None = None) -> dict[str, Any]:
     rows = rows if rows is not None else query_scheduled_tasks()
+    now = now or datetime.now()
     actual_times = _task_times(rows)
     statuses = _task_statuses(rows)
+    last_runs = _task_last_runs(rows)
     issues: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     task_rows: list[dict[str, Any]] = []
@@ -194,14 +227,35 @@ def build_report(rows: list[dict[str, str]] | None = None) -> dict[str, Any]:
             issues.append({"task": task, "issue": "missing_expected_times", "missing": missing, "actual": sorted(actual)})
         if extra:
             warnings.append({"task": task, "issue": "extra_start_times", "extra": extra, "expected": sorted(expected)})
-        if status_values and any(status != "Ready" for status in status_values):
+        status_ok = True
+        bad_statuses = [status for status in status_values if status not in {"Ready", "Running"}]
+        if bad_statuses:
+            status_ok = False
             issues.append({"task": task, "issue": "task_not_ready", "statuses": status_values})
+        elif "Running" in status_values:
+            last_run = last_runs.get(task)
+            elapsed_minutes = (now - last_run).total_seconds() / 60 if last_run else None
+            if elapsed_minutes is not None and elapsed_minutes > RUNNING_GRACE_MINUTES:
+                status_ok = False
+                issues.append({
+                    "task": task,
+                    "issue": "task_running_too_long",
+                    "elapsed_minutes": round(elapsed_minutes, 1),
+                    "grace_minutes": RUNNING_GRACE_MINUTES,
+                    "last_run_time": last_run.isoformat(timespec="seconds"),
+                })
+            elif elapsed_minutes is None:
+                warnings.append({
+                    "task": task,
+                    "issue": "task_running_unknown_duration",
+                    "statuses": status_values,
+                })
         task_rows.append({
             "task": task,
             "expected": sorted(expected),
             "actual": sorted(actual),
             "statuses": status_values,
-            "aligned": not missing and bool(actual) and not any(status != "Ready" for status in status_values),
+            "aligned": not missing and bool(actual) and status_ok,
         })
 
     first_times = {task: min((_parse_time_to_minutes(t) for t in times), default=None) for task, times in actual_times.items()}
