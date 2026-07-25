@@ -75,6 +75,29 @@ def test_normalize_rejects_plain_language_spy_false_positive() -> None:
     assert report["result_count"] == 1
 
 
+def test_normalize_can_retain_non_spy_research_when_explicitly_requested() -> None:
+    payload = {
+        "data": [{
+            "id": "456",
+            "author_id": "8",
+            "created_at": "2026-07-24T15:00:00Z",
+            "text": "Topstep MES failed-breakdown setup with fixed risk",
+            "public_metrics": {},
+        }],
+        "meta": {"result_count": 1},
+    }
+
+    report = intake.normalize_response(
+        payload,
+        query="Topstep MES strategy",
+        required_term=None,
+        now=datetime(2026, 7, 24, 15, tzinfo=timezone.utc),
+    )
+
+    assert report["post_count"] == 1
+    assert report["required_term"] is None
+
+
 def test_request_budget_blocks_second_daily_call(tmp_path: Path) -> None:
     path = tmp_path / "budget.json"
     now = datetime(2026, 7, 24, 15, tzinfo=timezone.utc)

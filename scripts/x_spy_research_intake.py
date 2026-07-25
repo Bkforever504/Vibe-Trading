@@ -176,6 +176,7 @@ def normalize_response(
     payload: dict[str, Any],
     *,
     query: str,
+    required_term: str | None = "$SPY",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or _now_utc()
@@ -189,7 +190,7 @@ def normalize_response(
         if not isinstance(row, dict):
             continue
         text = str(row.get("text") or "")
-        if "$SPY" not in text.upper():
+        if required_term and required_term.upper() not in text.upper():
             continue
         author = users.get(str(row.get("author_id")), {})
         metrics = row.get("public_metrics") if isinstance(row.get("public_metrics"), dict) else {}
@@ -224,6 +225,7 @@ def normalize_response(
         "provider": "x_spy_research_intake",
         "source": "x_api_v2_recent_search",
         "query": query,
+        "required_term": required_term,
         "mode": "context_only",
         "execution_enabled": False,
         "post_count": len(posts),
@@ -243,6 +245,7 @@ def run_intake(
     *,
     token: str,
     query: str = DEFAULT_QUERY,
+    required_term: str | None = "$SPY",
     max_results: int = 10,
     report_path: Path = REPORT_PATH,
     log_path: Path = LOG_PATH,
@@ -268,7 +271,12 @@ def run_intake(
     # consume API capacity and must never bypass the local cost guard.
     record_request(budget_path, now)
     payload, rate_headers = fetcher(token, query=query, max_results=max_results)
-    report = normalize_response(payload, query=query, now=now)
+    report = normalize_response(
+        payload,
+        query=query,
+        required_term=required_term,
+        now=now,
+    )
     report["request_budget_before_call"] = budget
     report["rate_limit_headers"] = rate_headers
     if write:

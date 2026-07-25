@@ -1,0 +1,55 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "spy_options",
+      "search_query": "SPY 0DTE options mechanical setup entries exits risk full recap",
+      "ranking_query": "Which recent SPY and 0DTE options setups provide complete, reproducible entry, exit, risk, and losing-trade evidence?",
+      "sources": [
+        "reddit",
+        "x",
+        "youtube",
+        "tiktok",
+        "instagram",
+        "hackernews",
+        "polymarket"
+      ],
+      "weight": 1.0
+    },
+    {
+      "label": "futures_topstep",
+      "search_query": "Topstep MES MNQ ES NQ funded trader mechanical strategy automated risk",
+      "ranking_query": "Which futures and Topstep methods are mechanical enough to replay under current prop-firm rules and realistic costs?",
+      "sources": [
+        "reddit",
+        "x",
+        "youtube"
+      ],
+      "weight": 0.9
+    },
+    {
+      "label": "creators_ai",
+      "search_query": "MoonDev ihytage Claude AI trading bot strategy backtest",
+      "ranking_query": "What specific methods from MoonDev, ihytage, Claude, and AI-trading creators can be independently reproduced rather than copied as alerts?",
+      "sources": [
+        "x",
+        "youtube",
+        "reddit"
+      ],
+      "weight": 0.8
+    },
+    {
+      "label": "quant_open_source",
+      "search_query": "quant systematic trading open source GitHub walk forward volatility targeting backtest execution risk",
+      "ranking_query": "Which quantitative methods and open-source repositories provide reusable, cost-aware research, simulation, execution, or risk components with credible tests and active maintenance?",
+      "sources": [
+        "reddit",
+        "hackernews",
+        "youtube"
+      ],
+      "weight": 0.7
+    }
+  ]
+}
