@@ -1,0 +1,492 @@
+{
+  "development_near_misses": [
+    {
+      "config": {
+        "approach_minutes": 3,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 0.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 75,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.088,
+          "max_drawdown_r": 3.246,
+          "net_r": 0.704,
+          "profit_factor": 1.141,
+          "trades": 8,
+          "win_rate": 0.625
+        },
+        {
+          "expectancy_r": 0.2714,
+          "max_drawdown_r": 2.902,
+          "net_r": 3.528,
+          "profit_factor": 1.633,
+          "trades": 13,
+          "win_rate": 0.6923
+        },
+        {
+          "expectancy_r": 0.403,
+          "max_drawdown_r": 1.423,
+          "net_r": 1.612,
+          "profit_factor": 2.133,
+          "trades": 4,
+          "win_rate": 0.75
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": 0.088
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 0.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 75,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.088,
+          "max_drawdown_r": 3.246,
+          "net_r": 0.704,
+          "profit_factor": 1.141,
+          "trades": 8,
+          "win_rate": 0.625
+        },
+        {
+          "expectancy_r": 0.2714,
+          "max_drawdown_r": 2.902,
+          "net_r": 3.528,
+          "profit_factor": 1.633,
+          "trades": 13,
+          "win_rate": 0.6923
+        },
+        {
+          "expectancy_r": 0.403,
+          "max_drawdown_r": 1.423,
+          "net_r": 1.612,
+          "profit_factor": 2.133,
+          "trades": 4,
+          "win_rate": 0.75
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": 0.088
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 3.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 75,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.088,
+          "max_drawdown_r": 3.246,
+          "net_r": 0.704,
+          "profit_factor": 1.141,
+          "trades": 8,
+          "win_rate": 0.625
+        },
+        {
+          "expectancy_r": 0.2714,
+          "max_drawdown_r": 2.902,
+          "net_r": 3.528,
+          "profit_factor": 1.633,
+          "trades": 13,
+          "win_rate": 0.6923
+        },
+        {
+          "expectancy_r": 0.2785,
+          "max_drawdown_r": 1.423,
+          "net_r": 0.836,
+          "profit_factor": 1.587,
+          "trades": 3,
+          "win_rate": 0.6667
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": 0.088
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 3.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.0263,
+          "max_drawdown_r": 4.391,
+          "net_r": 0.316,
+          "profit_factor": 1.043,
+          "trades": 12,
+          "win_rate": 0.5833
+        },
+        {
+          "expectancy_r": -0.0044,
+          "max_drawdown_r": 5.285,
+          "net_r": -0.075,
+          "profit_factor": 0.993,
+          "trades": 17,
+          "win_rate": 0.5882
+        },
+        {
+          "expectancy_r": 0.1044,
+          "max_drawdown_r": 3.011,
+          "net_r": 0.522,
+          "profit_factor": 1.173,
+          "trades": 5,
+          "win_rate": 0.6
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.0044
+    },
+    {
+      "config": {
+        "approach_minutes": 3,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 0.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.0263,
+          "max_drawdown_r": 4.391,
+          "net_r": 0.316,
+          "profit_factor": 1.043,
+          "trades": 12,
+          "win_rate": 0.5833
+        },
+        {
+          "expectancy_r": -0.0655,
+          "max_drawdown_r": 5.285,
+          "net_r": -1.18,
+          "profit_factor": 0.895,
+          "trades": 18,
+          "win_rate": 0.5556
+        },
+        {
+          "expectancy_r": 0.2164,
+          "max_drawdown_r": 2.234,
+          "net_r": 1.298,
+          "profit_factor": 1.431,
+          "trades": 6,
+          "win_rate": 0.6667
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.0655
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 0.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.0263,
+          "max_drawdown_r": 4.391,
+          "net_r": 0.316,
+          "profit_factor": 1.043,
+          "trades": 12,
+          "win_rate": 0.5833
+        },
+        {
+          "expectancy_r": -0.0655,
+          "max_drawdown_r": 5.285,
+          "net_r": -1.18,
+          "profit_factor": 0.895,
+          "trades": 18,
+          "win_rate": 0.5556
+        },
+        {
+          "expectancy_r": 0.2164,
+          "max_drawdown_r": 2.234,
+          "net_r": 1.298,
+          "profit_factor": 1.431,
+          "trades": 6,
+          "win_rate": 0.6667
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.0655
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 6.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 75,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.0932,
+          "max_drawdown_r": 2.09,
+          "net_r": 0.559,
+          "profit_factor": 1.146,
+          "trades": 6,
+          "win_rate": 0.6667
+        },
+        {
+          "expectancy_r": 0.2215,
+          "max_drawdown_r": 2.902,
+          "net_r": 2.658,
+          "profit_factor": 1.477,
+          "trades": 12,
+          "win_rate": 0.6667
+        },
+        {
+          "expectancy_r": -0.0848,
+          "max_drawdown_r": 1.423,
+          "net_r": -0.17,
+          "profit_factor": 0.881,
+          "trades": 2,
+          "win_rate": 0.5
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.0848
+    },
+    {
+      "config": {
+        "approach_minutes": 3,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 3.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": -0.0634,
+          "max_drawdown_r": 3.246,
+          "net_r": -0.57,
+          "profit_factor": 0.907,
+          "trades": 9,
+          "win_rate": 0.5556
+        },
+        {
+          "expectancy_r": -0.1206,
+          "max_drawdown_r": 6.063,
+          "net_r": -2.05,
+          "profit_factor": 0.818,
+          "trades": 17,
+          "win_rate": 0.5294
+        },
+        {
+          "expectancy_r": 0.2164,
+          "max_drawdown_r": 2.234,
+          "net_r": 1.298,
+          "profit_factor": 1.431,
+          "trades": 6,
+          "win_rate": 0.6667
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.1206
+    },
+    {
+      "config": {
+        "approach_minutes": 3,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 6.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": -0.1179,
+          "max_drawdown_r": 3.246,
+          "net_r": -0.826,
+          "profit_factor": 0.834,
+          "trades": 7,
+          "win_rate": 0.5714
+        },
+        {
+          "expectancy_r": -0.118,
+          "max_drawdown_r": 5.286,
+          "net_r": -1.77,
+          "profit_factor": 0.819,
+          "trades": 15,
+          "win_rate": 0.5333
+        },
+        {
+          "expectancy_r": -0.1208,
+          "max_drawdown_r": 3.011,
+          "net_r": -0.483,
+          "profit_factor": 0.839,
+          "trades": 4,
+          "win_rate": 0.5
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.1208
+    },
+    {
+      "config": {
+        "approach_minutes": 5,
+        "cutoff": "11:15:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_risk": 1.0,
+        "min_approach_bps": 6.0,
+        "min_risk": 0.05,
+        "reward_risk": 1.5,
+        "rsi_extreme": 70,
+        "rsi_period": 14,
+        "slippage_bps_per_side": 1.0,
+        "start": "09:30:00",
+        "stop_buffer": 0.05
+      },
+      "development_regimes": [
+        {
+          "expectancy_r": 0.1459,
+          "max_drawdown_r": 3.234,
+          "net_r": 1.313,
+          "profit_factor": 1.264,
+          "trades": 9,
+          "win_rate": 0.6667
+        },
+        {
+          "expectancy_r": 0.154,
+          "max_drawdown_r": 3.68,
+          "net_r": 2.156,
+          "profit_factor": 1.306,
+          "trades": 14,
+          "win_rate": 0.6429
+        },
+        {
+          "expectancy_r": -0.1208,
+          "max_drawdown_r": 3.011,
+          "net_r": -0.483,
+          "profit_factor": 0.839,
+          "trades": 4,
+          "win_rate": 0.5
+        }
+      ],
+      "positive_regime_count": 0,
+      "worst_expectancy_r": -0.1208
+    }
+  ],
+  "development_survivor_count": 0,
+  "event_count": 1184,
+  "execution_enabled": false,
+  "experiment": "COPY-SPY-FT-01",
+  "finalist": null,
+  "instrument": "SPY underlying",
+  "mode": "research_only",
+  "options_pnl_tested": false,
+  "parameter_count": 144,
+  "periods": {
+    "development": [
+      "2022-01-03",
+      "2024-09-19",
+      682
+    ],
+    "family_specific_final": [
+      "2025-08-20",
+      "2026-07-17",
+      228
+    ],
+    "selection": [
+      "2024-09-20",
+      "2025-08-19",
+      227
+    ]
+  },
+  "schema_version": 1,
+  "selection_evaluated_count": 0,
+  "selection_pass_count": 0,
+  "selection_rows": [],
+  "session_count": 1137,
+  "warnings": [
+    "IEX minute bars are not consolidated SIP data.",
+    "Underlying R-multiples do not establish an option-pricing edge.",
+    "Stop is resolved before target on same-minute ambiguity.",
+    "Only the earliest eligible event per session is retained.",
+    "No order or execution-gate state was changed."
+  ]
+}
