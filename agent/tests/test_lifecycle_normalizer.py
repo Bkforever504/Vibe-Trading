@@ -67,7 +67,8 @@ def test_credit_spread_uses_credit_and_max_risk_semantics() -> None:
         "qty": 2,
         "net_credit": 0.50,
         "closing_filled_avg_price": 0.10,
-        "max_risk_per_contract": 1.50,
+        # Runtime state stores this field in dollars per contract.
+        "max_risk_per_contract": 150.00,
         "status": "closed",
     })
 
@@ -76,7 +77,7 @@ def test_credit_spread_uses_credit_and_max_risk_semantics() -> None:
     assert view["direction"] == "bullish"
     assert view["right"] == canon.NOT_APPLICABLE
     assert view["pnl_dollars"] == 80.0          # (0.50 - 0.10) * 100 * 2
-    assert view["risk_dollars"] == 300.0        # 1.50 * 100 * 2
+    assert view["risk_dollars"] == 300.0        # $150 * 2
     assert view["return_on_risk_pct"] == pytest.approx(26.667, abs=0.001)
     assert view["outcome_status"] == "win"
 
@@ -146,6 +147,33 @@ def test_closed_trade_without_pnl_is_quarantined_not_graded() -> None:
     assert view["outcome_status"] == canon.UNKNOWN
     assert view["quarantined"] is True
     assert "closed_without_resolvable_pnl" in view["unknown_reasons"]
+
+
+def test_missing_quantities_are_quarantined_not_defaulted() -> None:
+    flip = canon.normalize_flip_trade(_flip_put(contracts=None, pnl=None))
+    credit = canon.normalize_options_trade({
+        "strategy": "put_spread",
+        "net_credit": 0.50,
+        "closing_filled_avg_price": 0.10,
+        "max_risk_per_contract": 150.0,
+        "qty": None,
+        "status": "closed",
+    })
+    mes = canon.normalize_topstep_trade({
+        "side": "long",
+        "entry_price": 6400.0,
+        "exit_price": 6410.0,
+        "contracts": None,
+        "status": "closed",
+    })
+
+    assert flip["pnl_dollars"] is None
+    assert "missing_or_invalid_contracts" in flip["unknown_reasons"]
+    assert credit["pnl_dollars"] is None
+    assert credit["risk_dollars"] is None
+    assert "missing_or_invalid_qty" in credit["unknown_reasons"]
+    assert mes["pnl_dollars"] is None
+    assert "missing_or_invalid_contracts" in mes["unknown_reasons"]
 
 
 def test_contamination_audit_counts_and_reports_by_family(tmp_path: Path) -> None:

@@ -104,7 +104,7 @@ def test_score_flip_fast_stopout_labels_entry_regime_failure(monkeypatch) -> Non
     assert "consensus says stand_aside" in explanation["next_action"]
 
 
-def test_score_iwm_trade_rewards_confidence_and_current_stop(monkeypatch) -> None:
+def test_score_iwm_trade_excludes_close_reason_estimate(monkeypatch) -> None:
     monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
     trade = {
         "id": "i1",
@@ -124,13 +124,14 @@ def test_score_iwm_trade_rewards_confidence_and_current_stop(monkeypatch) -> Non
 
     assert result["score"] >= 8
     assert result["grade"] == "A"
-    assert result["pnl"] == 87.05
-    assert result["pnl_estimated"] is True
-    assert result["pnl_explanation"]["outcome"] == "profit"
-    assert "short premium position decayed" in result["pnl_explanation"]["primary_driver"]
+    assert result["pnl"] is None
+    assert result["pnl_estimated"] is False
+    assert result["evidence_eligible"] is False
+    assert result["pnl_explanation"]["outcome"] == "unknown"
+    assert result["pnl_explanation"]["pnl_source"] == "unresolved_close_reason_not_accepted_as_pnl"
 
 
-def test_score_iwm_trade_explains_stop_loss(monkeypatch) -> None:
+def test_score_iwm_trade_does_not_turn_stop_text_into_pnl(monkeypatch) -> None:
     monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bearish_lean"})
     trade = {
         "id": "i2",
@@ -148,9 +149,33 @@ def test_score_iwm_trade_explains_stop_loss(monkeypatch) -> None:
 
     result = post.score_iwm_trade(trade)
 
-    assert result["pnl"] == -279.01
-    assert result["pnl_explanation"]["outcome"] == "loss"
-    assert "moved against the spread" in result["pnl_explanation"]["primary_driver"]
+    assert result["pnl"] is None
+    assert result["evidence_eligible"] is False
+    assert result["pnl_explanation"]["outcome"] == "unknown"
+    assert "realized option P/L is not available" in result["pnl_explanation"]["primary_driver"]
+
+
+def test_score_iwm_trade_accepts_fill_derived_pnl(monkeypatch) -> None:
+    monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
+    trade = {
+        "id": "i3",
+        "strategy": "put_spread",
+        "underlying": "IWM",
+        "status": "closed",
+        "closed_at": "2026-06-30T20:00:00Z",
+        "closing_reason": "profit target",
+        "net_credit": 0.50,
+        "closing_filled_avg_price": 0.10,
+        "max_risk_per_contract": 150.0,
+        "qty": 2,
+        "stop_loss_pct": -1.0,
+    }
+
+    result = post.score_iwm_trade(trade)
+
+    assert result["pnl"] == 80.0
+    assert result["evidence_eligible"] is True
+    assert result["pnl_explanation"]["pnl_source"] == "realized_or_fill_derived"
 
 
 def test_build_report_reads_closed_trades(monkeypatch, tmp_path: Path) -> None:

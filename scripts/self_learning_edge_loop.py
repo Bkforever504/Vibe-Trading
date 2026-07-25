@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import accelerated_bot_learning_report as accelerated
+from scripts import lifecycle_normalizer as canon
 
 
 VIBE_HOME = Path.home() / ".vibe-trading"
@@ -121,12 +122,8 @@ def _shadow_failure_context(failure: dict[str, Any]) -> dict[str, Any]:
         session = "opening" if total_minutes < 10 * 60 + 30 else "midday" if total_minutes < 12 * 60 + 30 else "late"
     except (TypeError, ValueError):
         session = "unknown"
-    if right == "CALL":
-        aligned = all(features.get(name) is True for name in ("above_vwap", "above_ema50", "ema50_sloping_up"))
-    elif right == "PUT":
-        aligned = all(features.get(name) is True for name in ("below_vwap", "below_ema50", "ema50_sloping_down"))
-    else:
-        aligned = False
+    direction = "bullish" if right == "CALL" else "bearish" if right == "PUT" else canon.UNKNOWN
+    alignment, alignment_reason = canon.trend_alignment(direction, features)
     try:
         consumed = float(features.get("expected_move_consumed_fraction"))
         expected_move_bucket = "ge_0_70" if consumed >= 0.70 else "0_50_to_0_70" if consumed >= 0.50 else "lt_0_50"
@@ -142,7 +139,8 @@ def _shadow_failure_context(failure: dict[str, Any]) -> dict[str, Any]:
         "session": session,
         "entry_pattern": str(features.get("orb_entry_pattern") or "unknown"),
         "retest_status": str(features.get("orb_retest_status") or "unknown"),
-        "trend_alignment": "confirmed" if aligned else "unconfirmed",
+        "trend_alignment": alignment,
+        "trend_alignment_unknown_reason": alignment_reason,
         "expected_move_bucket": expected_move_bucket,
         "spread_bucket": spread_bucket,
     }
@@ -307,9 +305,15 @@ def _mistakes(learning: dict[str, Any], watchdog: dict[str, Any], audit: dict[st
             "lesson": lesson,
             "context": context,
         }
+        evidence_eligible = (
+            failure.get("evidence_eligible") is True
+            if failure.get("source") == "actual_paper_trade"
+            else failure.get("evidence_eligible", True)
+        )
         rows.append({**identity, "event_id": _stable_id(identity), "pattern_id": _stable_id(pattern),
                      "lesson": lesson, "next_action": failure.get("next_action"), "severity": "review",
-                     "context": context})
+                     "context": context, "bot_family": failure.get("bot_family"),
+                     "evidence_eligible": evidence_eligible})
     mismatch_alert = next(
         (
             alert for alert in watchdog.get("alerts") or []
@@ -369,10 +373,21 @@ def build_report(
             "severity": current.get("severity", row.get("severity")),
             "pattern_id": current.get("pattern_id", row.get("pattern_id")),
             "context": current.get("context", row.get("context") or {}),
+            "bot_family": current.get("bot_family", row.get("bot_family")),
+            "evidence_eligible": current.get(
+                "evidence_eligible",
+                row.get("evidence_eligible", False)
+                if row.get("source") == "actual_paper_trade"
+                else True,
+            ),
         })
     all_rows = effective_existing + new_rows
-    counts = Counter(row.get("pattern_id") for row in all_rows if row.get("pattern_id"))
-    latest_by_pattern = {row["pattern_id"]: row for row in all_rows if row.get("pattern_id")}
+    compatible_rows = [row for row in all_rows if row.get("evidence_eligible") is not False]
+    excluded_rows = [row for row in all_rows if row.get("evidence_eligible") is False]
+    counts = Counter(row.get("pattern_id") for row in compatible_rows if row.get("pattern_id"))
+    latest_by_pattern = {
+        row["pattern_id"]: row for row in compatible_rows if row.get("pattern_id")
+    }
     repeated = []
     for pattern_id, count in counts.most_common():
         if count < 2:
@@ -394,7 +409,15 @@ def build_report(
     critical = [row for row in repeated if row.get("severity") in {"high", "critical"}]
     actionable = [row for row in repeated if row.get("severity") not in {"decaying", "resolved"}]
     historical = [row for row in repeated if row.get("severity") in {"decaying", "resolved"}]
-    nominations = _aggregate_nominations(actionable)
+    regression_repairs = [
+        row for row in actionable
+        if row.get("next_action") == "nominate_regression_fix_and_replay"
+    ]
+    strategy_actionable = [
+        row for row in actionable
+        if row.get("next_action") != "nominate_regression_fix_and_replay"
+    ]
+    nominations = _aggregate_nominations(strategy_actionable)
     retest_contrast = _orb_retest_contrast(shadow_path)
     execution_evidence = _alpaca_execution_evidence(flip_state_path)
     trial_lifecycle = _active_trial_lifecycle(audit)
@@ -407,14 +430,18 @@ def build_report(
         "automatic_parameter_changes": False,
         "summary": {
             "mistake_event_count": len(all_rows),
+            "compatible_mistake_event_count": len(compatible_rows),
+            "excluded_incompatible_event_count": len(excluded_rows),
             "new_mistake_count": len(new_rows),
             "repeated_pattern_count": len(repeated),
             "actionable_pattern_count": len(actionable),
+            "regression_repair_count": len(regression_repairs),
             "actionable_challenger_count": len(nominations),
             "historical_resolved_pattern_count": len(historical),
             "critical_unresolved_pattern_count": len(critical),
         },
         "repeated_patterns": repeated,
+        "regression_repairs": regression_repairs,
         "shadow_challenger_nominations": nominations,
         "historical_resolved_patterns": historical,
         "contrastive_evidence": {"orb_fresh_retest_vs_raw_breakout": retest_contrast},

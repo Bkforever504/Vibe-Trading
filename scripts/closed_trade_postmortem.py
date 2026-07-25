@@ -23,6 +23,23 @@ try:
 except ModuleNotFoundError:
     from scripts.options_reporting import dedupe_options_trade_records
 
+try:
+    from lifecycle_normalizer import (
+        FLIP_FAMILY,
+        OPTIONS_FAMILY,
+        assert_rule_compatible,
+        normalize_flip_trade,
+        normalize_options_trade,
+    )
+except ModuleNotFoundError:
+    from scripts.lifecycle_normalizer import (
+        FLIP_FAMILY,
+        OPTIONS_FAMILY,
+        assert_rule_compatible,
+        normalize_flip_trade,
+        normalize_options_trade,
+    )
+
 ROOT = Path(__file__).resolve().parent.parent
 VIBE_HOME = Path.home() / ".vibe-trading"
 LOG_PATH = ROOT / "data" / "closed_trade_postmortem_log.jsonl"
@@ -226,8 +243,14 @@ def explain_flip_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dic
     }
 
 
-def explain_iwm_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dict[str, Any]:
-    pnl, estimated = _options_pnl_estimate(trade)
+def explain_iwm_pnl(
+    trade: dict[str, Any],
+    force: dict[str, Any] | None,
+    canonical: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    canonical = canonical or normalize_options_trade(trade)
+    assert_rule_compatible(OPTIONS_FAMILY, canonical)
+    pnl = _safe_float(canonical.get("pnl_dollars"))
     outcome = "unknown"
     if pnl is not None:
         outcome = "profit" if pnl > 0 else "loss" if pnl < 0 else "flat"
@@ -242,21 +265,25 @@ def explain_iwm_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dict
         f"close_reason={close_reason}",
     ]
     evidence.extend(str(reason) for reason in conf_reasons[:4])
-    if "profit" in close_reason.lower() or "near-target" in close_reason.lower():
-        primary_driver = "short premium position decayed enough to reach the profit/near-target exit"
-        next_action = "repeat only if credit/risk, liquidity, and trend gates remain strong"
-    elif "stop" in close_reason.lower():
-        primary_driver = "short premium position moved against the spread until stop criteria triggered"
-        next_action = "review whether directional filter, width, or stop timing needs tightening"
-    elif pnl is None:
+    if pnl is None:
         primary_driver = "realized option P/L is not available in the state file yet"
         next_action = "attach broker fill P/L or closing debit to the trade state"
+    elif "profit" in close_reason.lower() or "near-target" in close_reason.lower():
+        primary_driver = "fill-derived P/L and the close reason indicate a profit/near-target exit"
+        next_action = "repeat only if credit/risk, liquidity, and trend gates remain strong"
+    elif "stop" in close_reason.lower():
+        primary_driver = "fill-derived P/L and the close reason indicate a stop exit"
+        next_action = "review whether directional filter, width, or stop timing needs tightening"
     else:
         primary_driver = "closed without a classified exit driver"
         next_action = "improve close reason capture for this strategy"
     return {
         "outcome": outcome,
-        "pnl_source": "estimated_from_credit_close_reason" if estimated else "realized",
+        "pnl_source": (
+            "realized_or_fill_derived"
+            if pnl is not None
+            else "unresolved_close_reason_not_accepted_as_pnl"
+        ),
         "primary_driver": primary_driver,
         "market_context": force_class,
         "evidence": evidence,
@@ -266,20 +293,27 @@ def explain_iwm_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dict
 
 
 def score_flip_trade(trade: dict[str, Any]) -> dict[str, Any]:
+    canonical = normalize_flip_trade(trade)
+    assert_rule_compatible(FLIP_FAMILY, canonical)
     score = 5
     reasons: list[str] = []
     contracts = int(trade.get("contracts") or 0)
-    pnl = float(trade.get("pnl") or 0)
+    current_strategy_eligible = (
+        not canonical["quarantined"]
+        and _safe_float(canonical.get("pnl_dollars")) is not None
+        and 1 <= contracts <= 5
+    )
+    pnl = _safe_float(canonical.get("pnl_dollars"))
     if contracts <= 5:
         score += 1
         reasons.append("contract count within current cap")
     else:
         score -= 3
         reasons.append("oversized vs current contract cap")
-    if pnl > 0:
+    if pnl is not None and pnl > 0:
         score += 2
         reasons.append("profitable exit")
-    elif pnl < 0:
+    elif pnl is not None and pnl < 0:
         score -= 2
         reasons.append("loss trade")
     exit_reason = str(trade.get("exit_reason") or "").lower()
@@ -290,7 +324,7 @@ def score_flip_trade(trade: dict[str, Any]) -> dict[str, Any]:
         reasons.append("exited by stop")
     day = _trade_date(trade)
     force = _latest_force_for_day(day)
-    alignment_score, alignment_reason = _force_alignment(_direction(trade), force)
+    alignment_score, alignment_reason = _force_alignment(str(canonical["direction"]), force)
     score += alignment_score
     reasons.append(alignment_reason)
     return {
@@ -299,8 +333,16 @@ def score_flip_trade(trade: dict[str, Any]) -> dict[str, Any]:
         "date": day,
         "symbol": trade.get("symbol"),
         "strategy": trade.get("strategy"),
-        "direction": _direction(trade),
+        "bot_family": canonical["bot_family"],
+        "lifecycle_schema_version": canonical["lifecycle_schema_version"],
+        "direction": canonical["direction"],
         "pnl": pnl,
+        "evidence_eligible": not canonical["quarantined"] and pnl is not None,
+        "current_strategy_eligible": current_strategy_eligible,
+        "evidence_exclusion_reasons": (
+            list(canonical["unknown_reasons"])
+            + (["legacy_contracts_above_current_cap"] if contracts > 5 else [])
+        ),
         "score": max(0, min(10, score)),
         "grade": _grade(score),
         "reasons": reasons,
@@ -310,6 +352,8 @@ def score_flip_trade(trade: dict[str, Any]) -> dict[str, Any]:
 
 
 def score_iwm_trade(trade: dict[str, Any]) -> dict[str, Any]:
+    canonical = normalize_options_trade(trade)
+    assert_rule_compatible(OPTIONS_FAMILY, canonical)
     score = 5
     reasons: list[str] = []
     confidence = trade.get("candidate_confidence") if isinstance(trade.get("candidate_confidence"), dict) else {}
@@ -337,23 +381,28 @@ def score_iwm_trade(trade: dict[str, Any]) -> dict[str, Any]:
             reasons.append("closed without stop flag")
     day = _trade_date(trade)
     force = _latest_force_for_day(day)
-    alignment_score, alignment_reason = _force_alignment(_direction(trade), force)
+    alignment_score, alignment_reason = _force_alignment(str(canonical["direction"]), force)
     score += alignment_score
     reasons.append(alignment_reason)
-    pnl, estimated = _options_pnl_estimate(trade)
+    pnl = _safe_float(canonical.get("pnl_dollars"))
     return {
         "bot": "iwm_options_bot",
         "trade_id": trade.get("id"),
         "date": day,
         "symbol": trade.get("underlying"),
         "strategy": trade.get("strategy"),
-        "direction": _direction(trade),
+        "bot_family": canonical["bot_family"],
+        "lifecycle_schema_version": canonical["lifecycle_schema_version"],
+        "direction": canonical["direction"],
         "pnl": pnl,
-        "pnl_estimated": estimated,
+        "pnl_estimated": False,
+        "evidence_eligible": not canonical["quarantined"] and pnl is not None,
+        "current_strategy_eligible": not canonical["quarantined"] and pnl is not None,
+        "evidence_exclusion_reasons": canonical["unknown_reasons"],
         "score": max(0, min(10, score)),
         "grade": _grade(score),
         "reasons": reasons,
-        "pnl_explanation": explain_iwm_pnl(trade, force),
+        "pnl_explanation": explain_iwm_pnl(trade, force, canonical),
         "raw_ref": trade.get("label"),
     }
 
@@ -389,7 +438,14 @@ def collect_closed_trades(day: str | None = None) -> list[dict[str, Any]]:
 def build_report(day: str | None = None) -> dict[str, Any]:
     day = day or date.today().isoformat()
     postmortems = collect_closed_trades(day=day)
-    avg_score = round(sum(p["score"] for p in postmortems) / len(postmortems), 2) if postmortems else None
+    compatible = [
+        row for row in postmortems
+        if row.get("current_strategy_eligible") is True
+    ]
+    avg_score = (
+        round(sum(p["score"] for p in compatible) / len(compatible), 2)
+        if compatible else None
+    )
     return {
         "date": day,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -397,11 +453,14 @@ def build_report(day: str | None = None) -> dict[str, Any]:
         "mode": "read_only",
         "execution_enabled": False,
         "closed_trade_count": len(postmortems),
+        "compatible_evidence_count": len(compatible),
+        "excluded_evidence_count": len(postmortems) - len(compatible),
         "avg_score": avg_score,
         "postmortems": postmortems,
         "warnings": [
             "Read-only postmortem. No broker orders are wired.",
             "Scores are process quality hints, not a guarantee of future performance.",
+            "Quarantined or unresolved records are excluded from averages and challenger evidence.",
         ],
     }
 
