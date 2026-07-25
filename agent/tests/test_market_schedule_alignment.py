@@ -55,3 +55,63 @@ def test_build_report_flags_order_violation() -> None:
 def test_parse_time_handles_task_scheduler_format() -> None:
     assert alignment._parse_time_to_minutes("8:35:00 AM") == 8 * 60 + 35
     assert alignment._parse_time_to_minutes("1:45:00 PM") == 13 * 60 + 45
+
+
+def _override_status(
+    rows: list[dict[str, str]], task: str, status: str, last_run_time: str = ""
+) -> list[dict[str, str]]:
+    for row in rows:
+        if row["TaskName"] == task:
+            row["Status"] = status
+            row["Last Run Time"] = last_run_time
+    return rows
+
+
+def test_recently_running_task_is_not_an_issue() -> None:
+    from datetime import datetime
+
+    task = r"\VibeTrade\MarketScheduleAlignment"
+    now = datetime(2026, 7, 24, 19, 58, 30)
+    rows = _override_status(_rows_from_expected(), task, "Running", "07/24/2026 07:58:05 PM")
+
+    report = alignment.build_report(rows, now=now)
+
+    assert report["passed"] is True
+    assert not any(issue.get("task") == task for issue in report["issues"])
+    row = next(r for r in report["tasks"] if r["task"] == task)
+    assert row["aligned"] is True
+
+
+def test_long_running_task_is_flagged_as_stuck() -> None:
+    from datetime import datetime
+
+    task = r"\VibeTrade\GEXScanner"
+    now = datetime(2026, 7, 24, 12, 0, 0)
+    rows = _override_status(_rows_from_expected(), task, "Running", "07/24/2026 08:35:00 AM")
+
+    report = alignment.build_report(rows, now=now)
+
+    assert report["passed"] is False
+    assert any(
+        issue.get("task") == task and issue.get("issue") == "task_running_too_long"
+        for issue in report["issues"]
+    )
+
+
+def test_disabled_task_is_still_not_ready() -> None:
+    task = r"\VibeTrade\GEXScanner"
+    rows = _override_status(_rows_from_expected(), task, "Disabled")
+
+    report = alignment.build_report(rows)
+
+    assert report["passed"] is False
+    assert any(
+        issue.get("task") == task and issue.get("issue") == "task_not_ready"
+        for issue in report["issues"]
+    )
+
+
+def test_parse_last_run_rejects_never_run_sentinel() -> None:
+    assert alignment._parse_last_run_datetime("11/30/1999 12:00:00 AM") is None
+    assert alignment._parse_last_run_datetime("N/A") is None
+    assert alignment._parse_last_run_datetime("7/24/2026 7:58:05 PM") is not None
