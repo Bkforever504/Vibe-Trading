@@ -33,7 +33,9 @@ def test_summarize_flags_trades_only_history_as_replay_blocked() -> None:
 
     assert summary["trades"]["earliest"] == "2024-03-15"
     assert summary["quotes_default"]["dates_with_data"] == []
-    assert summary["verdict"] == "trades_or_bars_only_no_quote_history_spread_aware_replay_still_blocked"
+    assert summary["verdict"] == (
+        "trades_or_bars_only_no_historical_quote_endpoint_hybrid_replay_required"
+    )
 
 
 def test_summarize_prefers_quote_availability_verdict() -> None:
@@ -46,5 +48,5 @@ def test_summarize_reports_total_absence() -> None:
     summary = probe.summarize([_probe_row("2025-06-20")])
 
     assert summary["verdict"] == (
-        "no_free_historical_minute_option_quotes_replay_requires_data_purchase_or_forward_capture"
+        "no_historical_option_quotes_endpoint_replay_requires_other_provider_or_forward_capture"
     )

@@ -5,8 +5,9 @@ Alpaca data plan actually return?
 The research sweep's next step is "identify a no-surprise-cost source of
 historical SPY option minute NBBO". Before any purchase discussion, this
 probe measures what the already-configured free/indicative Alpaca feed
-serves: minute quotes, trades, and bars for expired SPY contracts across
-known third-Friday expiries.
+serves for expired SPY contracts and verifies whether the undocumented
+historical quote path exists. Alpaca's current SDK documents historical
+option bars and trades, but only latest option quotes.
 
 Data API only (data.alpaca.markets). No trading endpoints, no orders,
 no subscriptions, no spending.
@@ -119,8 +120,9 @@ def probe_expiry(expiry: str, headers: dict[str, str]) -> dict[str, Any]:
     occ = build_occ_symbol("SPY", expiry, "C", strike)
     result["occ_symbol"] = occ
     window = {"start": f"{expiry}T14:00:00Z", "end": f"{expiry}T20:00:00Z", "limit": 10}
-    # The trades/bars endpoints reject a feed parameter; quotes accepts feed
-    # only for plans that have it, so probe quotes with and without it.
+    # The SDK does not document historical option quotes. Probe the analogous
+    # path with and without a feed only to distinguish endpoint absence from
+    # available data; never interpret a 404 as a paid-plan entitlement result.
     checks: list[tuple[str, str, str, dict[str, Any]]] = [
         ("quotes_default", OPTION_QUOTES_URL, "quotes", {**window, "symbols": occ}),
         ("trades", OPTION_TRADES_URL, "trades", {**window, "symbols": occ}),
@@ -167,9 +169,9 @@ def summarize(probes: list[dict[str, Any]]) -> dict[str, Any]:
     if quote_dates:
         verdict = "historical_option_quotes_available_review_nbbo_semantics_and_depth"
     elif summary["trades"]["dates_with_data"] or summary["bars_1min"]["dates_with_data"]:
-        verdict = "trades_or_bars_only_no_quote_history_spread_aware_replay_still_blocked"
+        verdict = "trades_or_bars_only_no_historical_quote_endpoint_hybrid_replay_required"
     else:
-        verdict = "no_free_historical_minute_option_quotes_replay_requires_data_purchase_or_forward_capture"
+        verdict = "no_historical_option_quotes_endpoint_replay_requires_other_provider_or_forward_capture"
     summary["verdict"] = verdict
     return summary
 
@@ -191,7 +193,10 @@ def main() -> int:
         "probes": probes,
         "notes": [
             "Data API only; no trading endpoints were called.",
-            "A 403/entitlement response on feed=opra documents the paid boundary without purchasing it.",
+            "Alpaca's current SDK documents historical option bars and trades, but only latest option quotes.",
+            "A 404 from /v1beta1/options/quotes indicates endpoint absence and does not establish a paid-plan boundary.",
+            "The probe strike is chosen from the same-day closing price only to test historical availability; it is not valid point-in-time contract selection.",
+            "Ten returned rows establish existence, not full-session depth, chain completeness, or executable fill quality.",
         ],
     }
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
