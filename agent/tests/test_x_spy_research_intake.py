@@ -53,6 +53,28 @@ def test_normalize_marks_every_post_unverified_and_non_executable() -> None:
     assert report["posts"][0]["research_labels"]["execution_eligible"] is False
 
 
+def test_normalize_rejects_plain_language_spy_false_positive() -> None:
+    payload = {
+        "data": [{
+            "id": "123",
+            "author_id": "7",
+            "created_at": "2026-07-24T15:00:00Z",
+            "text": "A historical spy novel with a surprising ending",
+            "public_metrics": {},
+        }],
+        "meta": {"result_count": 1},
+    }
+
+    report = intake.normalize_response(
+        payload,
+        query=intake.DEFAULT_QUERY,
+        now=datetime(2026, 7, 24, 15, tzinfo=timezone.utc),
+    )
+
+    assert report["post_count"] == 0
+    assert report["result_count"] == 1
+
+
 def test_request_budget_blocks_second_daily_call(tmp_path: Path) -> None:
     path = tmp_path / "budget.json"
     now = datetime(2026, 7, 24, 15, tzinfo=timezone.utc)

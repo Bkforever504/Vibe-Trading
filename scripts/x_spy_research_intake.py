@@ -27,9 +27,9 @@ BUDGET_PATH = VIBE_HOME / "x-api-request-budget.json"
 
 X_RECENT_SEARCH_URL = "https://api.x.com/2/tweets/search/recent"
 DEFAULT_QUERY = (
-    '($SPY OR SPY) '
+    '$SPY '
     '(options OR calls OR puts OR gamma OR dealer OR vwap OR volume OR "order flow") '
-    "lang:en -is:retweet"
+    "lang:en -is:retweet -is:reply"
 )
 DEFAULT_DAILY_REQUEST_CAP = 1
 DEFAULT_MONTHLY_REQUEST_CAP = 20
@@ -188,6 +188,9 @@ def normalize_response(
     for row in payload.get("data") or []:
         if not isinstance(row, dict):
             continue
+        text = str(row.get("text") or "")
+        if "$SPY" not in text.upper():
+            continue
         author = users.get(str(row.get("author_id")), {})
         metrics = row.get("public_metrics") if isinstance(row.get("public_metrics"), dict) else {}
         posts.append({
@@ -199,7 +202,7 @@ def normalize_response(
             "author_followers": _safe_int(
                 (author.get("public_metrics") or {}).get("followers_count"), 0
             ),
-            "text": str(row.get("text") or "")[:1000],
+            "text": text[:1000],
             "like_count": _safe_int(metrics.get("like_count"), 0),
             "reply_count": _safe_int(metrics.get("reply_count"), 0),
             "repost_count": _safe_int(metrics.get("retweet_count"), 0),
