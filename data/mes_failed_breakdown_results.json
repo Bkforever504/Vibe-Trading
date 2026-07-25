@@ -1,0 +1,508 @@
+{
+  "dataset_sessions": 1148,
+  "development_near_misses": [
+    {
+      "aggregate_expectancy": -0.6723,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "all",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 2,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 3,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 1.41,
+          "max_drawdown": 520.59,
+          "profit_factor": 1.063,
+          "total_pnl": 176.25,
+          "trades": 125,
+          "win_rate": 0.368
+        },
+        {
+          "expectancy": 4.31,
+          "max_drawdown": 526.28,
+          "profit_factor": 1.261,
+          "total_pnl": 542.52,
+          "trades": 126,
+          "win_rate": 0.4127
+        },
+        {
+          "expectancy": -7.5,
+          "max_drawdown": 1049.05,
+          "profit_factor": 0.621,
+          "total_pnl": -974.9,
+          "trades": 130,
+          "win_rate": 0.2462
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -7.5
+    },
+    {
+      "aggregate_expectancy": 0.9602,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 1,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 1.5,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 4.75,
+          "max_drawdown": 218.52,
+          "profit_factor": 1.253,
+          "total_pnl": 199.61,
+          "trades": 42,
+          "win_rate": 0.4762
+        },
+        {
+          "expectancy": 7.16,
+          "max_drawdown": 131.76,
+          "profit_factor": 1.505,
+          "total_pnl": 272.01,
+          "trades": 38,
+          "win_rate": 0.5526
+        },
+        {
+          "expectancy": -7.81,
+          "max_drawdown": 382.95,
+          "profit_factor": 0.615,
+          "total_pnl": -351.59,
+          "trades": 45,
+          "win_rate": 0.3333
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -7.81
+    },
+    {
+      "aggregate_expectancy": -1.8069,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "opening_range",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 2,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 3,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 1.37,
+          "max_drawdown": 420.95,
+          "profit_factor": 1.062,
+          "total_pnl": 137.0,
+          "trades": 100,
+          "win_rate": 0.38
+        },
+        {
+          "expectancy": 1.29,
+          "max_drawdown": 633.9,
+          "profit_factor": 1.076,
+          "total_pnl": 139.66,
+          "trades": 108,
+          "win_rate": 0.3889
+        },
+        {
+          "expectancy": -8.08,
+          "max_drawdown": 948.22,
+          "profit_factor": 0.574,
+          "total_pnl": -840.42,
+          "trades": 104,
+          "win_rate": 0.25
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -8.08
+    },
+    {
+      "aggregate_expectancy": -0.2012,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 4,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 1.5,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 4.47,
+          "max_drawdown": 194.79,
+          "profit_factor": 1.226,
+          "total_pnl": 196.52,
+          "trades": 44,
+          "win_rate": 0.4773
+        },
+        {
+          "expectancy": 2.75,
+          "max_drawdown": 143.53,
+          "profit_factor": 1.161,
+          "total_pnl": 88.13,
+          "trades": 32,
+          "win_rate": 0.4688
+        },
+        {
+          "expectancy": -8.31,
+          "max_drawdown": 329.45,
+          "profit_factor": 0.635,
+          "total_pnl": -307.38,
+          "trades": 37,
+          "win_rate": 0.2973
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -8.31
+    },
+    {
+      "aggregate_expectancy": 1.4176,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 2,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 1.5,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 5.65,
+          "max_drawdown": 191.04,
+          "profit_factor": 1.303,
+          "total_pnl": 248.4,
+          "trades": 44,
+          "win_rate": 0.4773
+        },
+        {
+          "expectancy": 7.32,
+          "max_drawdown": 131.76,
+          "profit_factor": 1.523,
+          "total_pnl": 278.26,
+          "trades": 38,
+          "win_rate": 0.5526
+        },
+        {
+          "expectancy": -8.59,
+          "max_drawdown": 353.02,
+          "profit_factor": 0.603,
+          "total_pnl": -352.3,
+          "trades": 41,
+          "win_rate": 0.2927
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -8.59
+    },
+    {
+      "aggregate_expectancy": 0.2634,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 1,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 3,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 2.88,
+          "max_drawdown": 292.28,
+          "profit_factor": 1.128,
+          "total_pnl": 109.51,
+          "trades": 38,
+          "win_rate": 0.3684
+        },
+        {
+          "expectancy": 9.19,
+          "max_drawdown": 148.59,
+          "profit_factor": 1.622,
+          "total_pnl": 303.16,
+          "trades": 33,
+          "win_rate": 0.4848
+        },
+        {
+          "expectancy": -9.12,
+          "max_drawdown": 394.36,
+          "profit_factor": 0.594,
+          "total_pnl": -382.91,
+          "trades": 42,
+          "win_rate": 0.2619
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -9.12
+    },
+    {
+      "aggregate_expectancy": -1.03,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 1,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 3.2,
+          "max_drawdown": 214.76,
+          "profit_factor": 1.142,
+          "total_pnl": 134.59,
+          "trades": 42,
+          "win_rate": 0.381
+        },
+        {
+          "expectancy": 3.93,
+          "max_drawdown": 229.76,
+          "profit_factor": 1.223,
+          "total_pnl": 149.51,
+          "trades": 38,
+          "win_rate": 0.4474
+        },
+        {
+          "expectancy": -9.17,
+          "max_drawdown": 424.3,
+          "profit_factor": 0.595,
+          "total_pnl": -412.85,
+          "trades": 45,
+          "win_rate": 0.2667
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -9.17
+    },
+    {
+      "aggregate_expectancy": -1.2742,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 4,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 3.63,
+          "max_drawdown": 219.92,
+          "profit_factor": 1.154,
+          "total_pnl": 159.63,
+          "trades": 44,
+          "win_rate": 0.3864
+        },
+        {
+          "expectancy": 1.58,
+          "max_drawdown": 241.03,
+          "profit_factor": 1.078,
+          "total_pnl": 50.64,
+          "trades": 32,
+          "win_rate": 0.375
+        },
+        {
+          "expectancy": -9.57,
+          "max_drawdown": 423.55,
+          "profit_factor": 0.621,
+          "total_pnl": -354.26,
+          "trades": 37,
+          "win_rate": 0.2432
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -9.57
+    },
+    {
+      "aggregate_expectancy": 1.8676,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 1,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 3,
+        "reward_risk": 1.5,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 5.45,
+          "max_drawdown": 275.42,
+          "profit_factor": 1.299,
+          "total_pnl": 207.03,
+          "trades": 38,
+          "win_rate": 0.4737
+        },
+        {
+          "expectancy": 13.16,
+          "max_drawdown": 94.94,
+          "profit_factor": 2.225,
+          "total_pnl": 434.41,
+          "trades": 33,
+          "win_rate": 0.6061
+        },
+        {
+          "expectancy": -10.25,
+          "max_drawdown": 430.4,
+          "profit_factor": 0.517,
+          "total_pnl": -430.4,
+          "trades": 42,
+          "win_rate": 0.3095
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -10.25
+    },
+    {
+      "aggregate_expectancy": -0.4881,
+      "config": {
+        "acceptance_bars": 2,
+        "commission_round_trip": 2.48,
+        "entry_cutoff": "11:30:00",
+        "entry_start": "09:35:00",
+        "exit_time": "15:55:00",
+        "level_family": "prior_day",
+        "max_excursion_ticks": 40,
+        "max_risk_ticks": 60,
+        "min_excursion_ticks": 2,
+        "min_risk_ticks": 4,
+        "reclaim_window_bars": 5,
+        "reward_risk": 2.0,
+        "slippage_ticks_per_side": 1,
+        "stop_buffer_ticks": 1
+      },
+      "development_regimes": [
+        {
+          "expectancy": 4.82,
+          "max_drawdown": 176.17,
+          "profit_factor": 1.216,
+          "total_pnl": 212.13,
+          "trades": 44,
+          "win_rate": 0.3864
+        },
+        {
+          "expectancy": 4.1,
+          "max_drawdown": 229.76,
+          "profit_factor": 1.234,
+          "total_pnl": 155.76,
+          "trades": 38,
+          "win_rate": 0.4474
+        },
+        {
+          "expectancy": -10.44,
+          "max_drawdown": 427.93,
+          "profit_factor": 0.569,
+          "total_pnl": -427.93,
+          "trades": 41,
+          "win_rate": 0.2195
+        }
+      ],
+      "positive_regime_count": 2,
+      "worst_regime_expectancy": -10.44
+    }
+  ],
+  "development_survivor_count": 0,
+  "execution_enabled": false,
+  "experiment": "COPY-MES-FBD-01",
+  "finalist": null,
+  "mode": "research_only",
+  "parameter_count": 108,
+  "periods": {
+    "development": [
+      "2022-01-03",
+      "2024-09-13",
+      688
+    ],
+    "family_specific_final": [
+      "2025-08-14",
+      "2026-07-17",
+      230
+    ],
+    "selection": [
+      "2024-09-16",
+      "2025-08-13",
+      230
+    ]
+  },
+  "schema_version": 1,
+  "selection_evaluated_count": 0,
+  "selection_pass_count": 0,
+  "selection_rows": [],
+  "warnings": [
+    "The dataset was used by earlier MES research, so the final period is family-specific rather than globally pristine.",
+    "Stop is resolved before target when both are touched in one minute.",
+    "Only the earliest qualifying level trade per session is retained.",
+    "No orders or execution-gate state were changed."
+  ]
+}
