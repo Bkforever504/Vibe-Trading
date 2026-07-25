@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 
 from scripts import flip_shadow_pnl_evaluator as evaluator
 from scripts import closed_trade_postmortem as postmortem
+from scripts import lifecycle_normalizer as canon
 
 
 VIBE_HOME = Path.home() / ".vibe-trading"
@@ -89,9 +90,26 @@ def _return_summary(values: list[float]) -> dict[str, Any]:
 def _actual_flip(path: Path) -> dict[str, Any]:
     rows = _read_json(path, [])
     closed = [row for row in rows if isinstance(row, dict) and row.get("status") == "closed"]
-    pnls = [_safe_float(row.get("pnl")) for row in closed]
-    values = [value for value in pnls if value is not None]
-    return {**_return_summary(values), "metric": "realized_pnl_dollars", "source_count": len(closed)}
+    views = [canon.normalize_flip_trade(row) for row in closed]
+    lifecycle_compatible = [
+        view for view in views
+        if not view["quarantined"] and _safe_float(view.get("pnl_dollars")) is not None
+    ]
+    eligible = [
+        view for row, view in zip(closed, views)
+        if view in lifecycle_compatible
+        and 1 <= int(_safe_float(row.get("contracts")) or 0) <= 5
+    ]
+    values = [float(view["pnl_dollars"]) for view in eligible]
+    return {
+        **_return_summary(values),
+        "metric": "canonical_realized_pnl_dollars",
+        "source_count": len(closed),
+        "lifecycle_compatible_count": len(lifecycle_compatible),
+        "current_strategy_evidence_count": len(eligible),
+        "excluded_evidence_count": len(closed) - len(eligible),
+        "cohort_rule": "current_contract_cap_1_to_5",
+    }
 
 
 def _actual_options(path: Path) -> dict[str, Any]:
@@ -99,25 +117,22 @@ def _actual_options(path: Path) -> dict[str, Any]:
     rows = payload.get("trades") if isinstance(payload, dict) else []
     deduped = postmortem.dedupe_options_trade_records(rows or [])
     closed = [row for row in deduped if isinstance(row, dict) and row.get("status") == "closed"]
-    pnls: list[float] = []
-    unresolved = 0
-    for row in closed:
-        explicit = _safe_float(row.get("pnl"))
-        if explicit is not None:
-            pnls.append(explicit)
-            continue
-        credit = _safe_float(row.get("net_credit"))
-        debit = _safe_float(row.get("closing_filled_avg_price"))
-        qty = _safe_float(row.get("qty")) or 1.0
-        if credit is not None and debit is not None:
-            pnls.append((credit - debit) * qty * 100)
-        else:
-            unresolved += 1
+    views = [canon.normalize_options_trade(row) for row in closed]
+    eligible = [
+        view for view in views
+        if not view["quarantined"] and _safe_float(view.get("pnl_dollars")) is not None
+    ]
+    pnls = [float(view["pnl_dollars"]) for view in eligible]
     return {
         **_return_summary(pnls),
-        "metric": "realized_or_fill_derived_pnl_dollars",
+        "metric": "canonical_fill_derived_pnl_dollars",
         "source_count": len(closed),
-        "unresolved_pnl_count": unresolved,
+        "compatible_evidence_count": len(eligible),
+        "excluded_evidence_count": len(closed) - len(eligible),
+        "unresolved_pnl_count": sum(
+            "closed_without_resolvable_pnl" in view["unknown_reasons"] for view in views
+        ),
+        "evidence_warning": "Close-reason percentage estimates are excluded.",
     }
 
 
@@ -133,14 +148,7 @@ def _actual_trade_postmortems(flip_path: Path, options_path: Path) -> list[dict[
     for row in postmortem.dedupe_options_trade_records(options_rows or []):
         if not isinstance(row, dict) or row.get("status") != "closed":
             continue
-        normalized = dict(row)
-        if _safe_float(normalized.get("pnl")) is None:
-            credit = _safe_float(normalized.get("net_credit"))
-            debit = _safe_float(normalized.get("closing_filled_avg_price"))
-            qty = _safe_float(normalized.get("qty")) or 1.0
-            if credit is not None and debit is not None:
-                normalized["pnl"] = (credit - debit) * qty * 100
-        cases.append(postmortem.score_iwm_trade(normalized))
+        cases.append(postmortem.score_iwm_trade(row))
     return cases
 
 
@@ -232,12 +240,20 @@ def _geometric_compounding_evidence(trades: list[dict[str, Any]]) -> dict[str, A
 
 
 def _actual_failure_memory(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    failures = [case for case in cases if _safe_float(case.get("pnl")) is not None and float(case["pnl"]) < 0]
+    failures = [
+        case for case in cases
+        if case.get("evidence_eligible") is True
+        and case.get("current_strategy_eligible") is True
+        and _safe_float(case.get("pnl")) is not None
+        and float(case["pnl"]) < 0
+    ]
     failures.sort(key=lambda row: (str(row.get("date") or ""), str(row.get("trade_id") or "")), reverse=True)
     return [
         {
             "source": "actual_paper_trade",
             "bot": case.get("bot"),
+            "bot_family": case.get("bot_family"),
+            "evidence_eligible": True,
             "trade_id": case.get("trade_id"),
             "date": case.get("date"),
             "symbol": case.get("symbol"),

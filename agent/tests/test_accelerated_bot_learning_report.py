@@ -37,10 +37,15 @@ def test_joint_report_records_failures_for_both_learning_tracks(tmp_path: Path) 
         {**base, "scanned_at": "2026-07-14T15:30:00Z", "event_type": "shadow_exit", "entry_price_est": 0.7, "mark_reason": "stop_30_hit"},
     ])
     flip = tmp_path / "flip.json"
-    flip.write_text(json.dumps([{"status": "closed", "pnl": -30}]), encoding="utf-8")
+    flip.write_text(json.dumps([{
+        "id": "flip-1", "status": "closed", "strategy": "bull_trend",
+        "right": "CALL", "contracts": 1, "entry_price": 1.0, "exit_price": 0.7,
+        "pnl": -30,
+    }]), encoding="utf-8")
     options = tmp_path / "options.json"
     options.write_text(json.dumps({"trades": [{
         "status": "closed", "net_credit": 0.59, "closing_filled_avg_price": 0.39, "qty": 2,
+        "strategy": "put_spread", "max_risk_per_contract": 141.0,
     }]}), encoding="utf-8")
     edge_trials = tmp_path / "edge-trials.json"
     edge_trials.write_text(json.dumps({"trial_count": 0}), encoding="utf-8")

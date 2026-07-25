@@ -75,6 +75,14 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _positive_quantity(value: Any, field: str, quarantine: list[str]) -> float | None:
+    quantity = _safe_float(value)
+    if quantity is None or quantity <= 0:
+        quarantine.append(f"missing_or_invalid_{field}")
+        return None
+    return quantity
+
+
 def underlying_move_is_favorable(direction: str, underlying_change: float) -> bool | str:
     """Whether a signed underlying move favors the position's direction.
 
@@ -145,11 +153,15 @@ def normalize_flip_trade(trade: dict[str, Any]) -> dict[str, Any]:
 
     entry = _safe_float(trade.get("entry_price"))
     exit_price = _safe_float(trade.get("exit_price"))
-    contracts = _safe_float(trade.get("contracts")) or 0
+    contracts = _positive_quantity(trade.get("contracts"), "contracts", quarantine)
     pnl = _safe_float(trade.get("pnl"))
-    if pnl is None and entry is not None and exit_price is not None:
+    if pnl is None and entry is not None and exit_price is not None and contracts is not None:
         pnl = round((exit_price - entry) * 100 * contracts, 2)
-    debit_paid = round(entry * 100 * contracts, 2) if entry is not None else None
+    debit_paid = (
+        round(entry * 100 * contracts, 2)
+        if entry is not None and contracts is not None
+        else None
+    )
     return_on_debit_pct = (
         round(pnl / debit_paid * 100, 3) if pnl is not None and debit_paid else None
     )
@@ -201,17 +213,20 @@ def normalize_options_trade(trade: dict[str, Any]) -> dict[str, Any]:
         direction_basis = UNKNOWN
         quarantine.append(f"unclassified_credit_structure:{strategy or 'empty'}")
 
-    qty = _safe_float(trade.get("qty")) or 1
+    qty = _positive_quantity(trade.get("qty"), "qty", quarantine)
     credit = _safe_float(trade.get("net_credit"))
     closing_debit = _safe_float(trade.get("closing_filled_avg_price"))
     pnl = _safe_float(trade.get("pnl"))
-    if pnl is None and credit is not None and closing_debit is not None:
+    if pnl is None and credit is not None and closing_debit is not None and qty is not None:
         pnl = round((credit - closing_debit) * 100 * qty, 2)
 
+    # The options bot stores max_risk_per_contract in dollars, not option
+    # price points. See iwm_options_bot._sized_qty() and the trade metadata
+    # written by run_put_spread()/run_iron_condor().
     max_risk_per_contract = _safe_float(trade.get("max_risk_per_contract"))
     max_risk = (
-        round(max_risk_per_contract * 100 * qty, 2)
-        if max_risk_per_contract is not None
+        round(max_risk_per_contract * qty, 2)
+        if max_risk_per_contract is not None and qty is not None
         else None
     )
     if credit is None or credit <= 0:
@@ -241,9 +256,15 @@ def normalize_options_trade(trade: dict[str, Any]) -> dict[str, Any]:
         "pnl_dollars": pnl,
         "risk_basis": "credit_max_risk",
         "risk_dollars": max_risk,
-        "opening_credit_dollars": round(credit * 100 * qty, 2) if credit is not None else None,
+        "opening_credit_dollars": (
+            round(credit * 100 * qty, 2)
+            if credit is not None and qty is not None
+            else None
+        ),
         "closing_debit_dollars": (
-            round(closing_debit * 100 * qty, 2) if closing_debit is not None else None
+            round(closing_debit * 100 * qty, 2)
+            if closing_debit is not None and qty is not None
+            else None
         ),
         "return_on_risk_pct": return_on_max_risk_pct,
         "point_value": NOT_APPLICABLE,
@@ -273,12 +294,18 @@ def normalize_topstep_trade(trade: dict[str, Any]) -> dict[str, Any]:
         sign = 0.0
         quarantine.append(f"missing_or_invalid_side:{side or 'empty'}")
 
-    contracts = _safe_float(trade.get("contracts")) or 1
+    contracts = _positive_quantity(trade.get("contracts"), "contracts", quarantine)
     entry = _safe_float(trade.get("entry_price"))
     exit_price = _safe_float(trade.get("exit_price"))
     fees = _safe_float(trade.get("fees")) or 0.0
     pnl = _safe_float(trade.get("pnl"))
-    if pnl is None and entry is not None and exit_price is not None and sign:
+    if (
+        pnl is None
+        and entry is not None
+        and exit_price is not None
+        and sign
+        and contracts is not None
+    ):
         points = (exit_price - entry) * sign
         pnl = round(points * MES_POINT_VALUE * contracts - fees, 2)
     if pnl is None and not quarantine:

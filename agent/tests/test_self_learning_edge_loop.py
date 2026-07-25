@@ -32,7 +32,9 @@ def test_loop_deduplicates_events_and_nominates_repeated_patterns(tmp_path) -> N
     assert rerun_rows == []
     assert rerun["summary"]["repeated_pattern_count"] == 1
     assert rerun["promotion_blockers"] == ["unresolved_repeated_high_severity_mistakes"]
-    assert rerun["shadow_challenger_nominations"][0]["production_config_mutation_allowed"] is False
+    assert rerun["shadow_challenger_nominations"] == []
+    assert rerun["summary"]["regression_repair_count"] == 1
+    assert rerun["regression_repairs"][0]["production_config_mutation_allowed"] is False
 
 
 def test_decaying_watchdog_mistake_remains_memory_without_blocking(tmp_path) -> None:
