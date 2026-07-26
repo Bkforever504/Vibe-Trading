@@ -1,0 +1,43 @@
+{
+  "trial_id": "spy-1200-daily-aligned-forward-v1",
+  "registered_at": "2026-07-25",
+  "parent_trial_id": "green-day-htf-ltf-2026-07-25",
+  "parent_code_commit": "a6f4fafba67c7aabee7a346c1dd7ef179ce30fe6",
+  "decision": "create_research_only_forward_lane",
+  "reason": "Development evidence supports observation, while weakened and outlier-dependent 2025+ diagnostics prohibit promotion.",
+  "frozen_spec": {
+    "path": "research/SPY_1200_DAILY_ALIGNED_FORWARD_SPEC_2026-07-25.md",
+    "sha256": "d6ecca800ad4f6c2a63a82bd2197349c7c1fe84d3920f7c1c39f0339a92433d3"
+  },
+  "initial_implementation": {
+    "path": "scripts/spy_1200_daily_aligned_shadow.py",
+    "sha256": "436ca9ab6a64bee564675ae64d7c722cc2c924f892660b8cb2bbc9e220cb070a"
+  },
+  "instrument": "SPY",
+  "checkpoint_et": "12:00",
+  "capture_times_et": [
+    "12:03",
+    "12:08_retry",
+    "13:03",
+    "13:08_retry"
+  ],
+  "review_target_independent_dates": 30,
+  "historical_result": {
+    "development_trades": 29,
+    "development_expectancy_bps": 6.25,
+    "development_profit_factor": 1.67,
+    "development_confidence_interval_bps": [
+      0.07,
+      17.78
+    ],
+    "consumed_2025_plus_expectancy_bps": 2.49,
+    "consumed_2025_plus_trimmed_expectancy_bps": -3.48,
+    "consumed_2025_plus_ci_crosses_zero": true
+  },
+  "option_quote_scope": "indicative_modified_not_opra_nbbo",
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "automatic_promotion": false,
+  "promotion_authority": "human_only",
+  "immutable": true
+}
