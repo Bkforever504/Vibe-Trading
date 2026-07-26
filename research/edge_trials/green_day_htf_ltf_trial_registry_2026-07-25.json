@@ -1,0 +1,64 @@
+{
+  "trial_id": "green-day-htf-ltf-2026-07-25",
+  "registered_at": "2026-07-25",
+  "strategy_family": "spy_intraday_vwap_ema_htf_confluence",
+  "bot_family": "flip_directional_debit",
+  "hypothesis": "The production 9/9 VWAP/EMA recipe at fixed checkpoints gains expectancy when gated by completed higher-timeframe trend states.",
+  "preregistrations": [
+    {
+      "path": "research/GREEN_DAY_HTF_LTF_PREREGISTRATION_2026-07-25.md",
+      "sha256": "e9c6868e9a0d837ef4ec40cf9b343a4840b980ee4832dace7689ab320f2c2240"
+    },
+    {
+      "path": "research/GREEN_DAY_PER_CHECKPOINT_PREREGISTRATION_2026-07-25.md",
+      "sha256": "60613b353293d7769813366c64eb452103f7627448b0f260fdc870bdbcd8c464",
+      "note": "Robustness replication with per-checkpoint completeness; frozen before its first run."
+    }
+  ],
+  "code_commit_at_registration": "7f8f47dac37adf96db996b2355c76ab7f3195405",
+  "data_sources": [
+    "data/spy_1m_edge_lab.parquet (Alpaca IEX minute bars, 2022-01-03..2026-07-17)",
+    "data/htf_volume_screen_lab/*.parquet (daily caches, SPY through 2026-07-20)"
+  ],
+  "partitions": {
+    "development": "2022-2023",
+    "selection": "2024",
+    "final": "2025+ (already consumed by prior project work; diagnostic only)"
+  },
+  "final_period_opened": true,
+  "final_period_status": "consumed_before_this_trial_diagnostic_only",
+  "variants_examined": {
+    "checkpoints": 3,
+    "htf_variants": 6,
+    "outcome_measures": 3,
+    "completeness_modes": 2,
+    "cells": 108
+  },
+  "costs": {
+    "base_round_trip_bps": 2.0,
+    "bracket_bps": 25.0,
+    "stress_note": "underlying-only; option spread/convexity not modeled"
+  },
+  "result_artifacts": [
+    {
+      "path": "data/green_day_htf_ltf_results.json",
+      "sha256": "cd61d69f0fd52235c265fb0cfc92e197f0b937980486b7c3f9459226cb9ad5f7"
+    },
+    {
+      "path": "data/green_day_htf_ltf_results_per_checkpoint.json",
+      "sha256": "f6aa7dc43f45a1e0901cb9dfb46d4803578252273dea92fa88f4a86563b12015"
+    }
+  ],
+  "outcome": {
+    "stage_reached": "development_plus_consumed_diagnostic",
+    "verdict": "10:30 rejected (wider-sample dev expectancy +0.33 bps, PF 1.02); 12:00 daily-aligned has dev CI [+0.07,+17.78] over 29 trades but weakened 2025+ (trimmed expectancy negative); eligible only for a frozen forward shadow lane after human review.",
+    "promotion": "none"
+  },
+  "known_biases": [
+    "IEX completeness filters skew toward high-activity sessions (audited: +23% mean range, +51% median volume vs excluded).",
+    "Underlying returns are not option returns.",
+    "2025+ was consumed before this trial and cannot serve as OOS."
+  ],
+  "promotion_authority": "human_only",
+  "immutable": true
+}
