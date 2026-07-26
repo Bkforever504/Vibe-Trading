@@ -159,6 +159,12 @@ SHADOW_DEFENSIVE_EXIT_BLOCKERS = {
 PAPER = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 BASE  = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.markets"
 LIVE_EXECUTION_ENABLED = os.getenv("OPTIONS_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+OPTIONS_STRICT_SHADOW_CAUTION_GATE = os.getenv(
+    "OPTIONS_STRICT_SHADOW_CAUTION_GATE", "true"
+).lower() == "true"
+OPTIONS_STRICT_CAUTION_MIN_WARNINGS = max(
+    2, int(os.getenv("OPTIONS_STRICT_CAUTION_MIN_WARNINGS", "2"))
+)
 AUTO_CLOSE_GROUPS = os.getenv("AUTO_CLOSE_GROUPS", "true" if PAPER else "false").lower() == "true"
 TRADE_STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\options-trades.json"))
 ORDER_RETRY_ATTEMPTS = int(os.getenv("ORDER_RETRY_ATTEMPTS", "3"))
@@ -726,7 +732,7 @@ def _recover_untracked_mleg_groups(trade_client: TradingClient, state: dict) -> 
     tracked_symbols = {
         symbol
         for trade in state.get("trades", [])
-        if trade.get("status") in ("open", "closing")
+        if trade.get("status") in ("pending", "open", "closing")
         for symbol in trade.get("legs", [])
     }
     untracked_open = open_symbols - tracked_symbols
@@ -809,20 +815,135 @@ def _recover_untracked_mleg_groups(trade_client: TradingClient, state: dict) -> 
     return recovered
 
 
-def _record_trade_group(meta: dict, order_id: str) -> None:
+def _apply_entry_fill(trade: dict, order: dict) -> bool:
+    """Apply broker-confirmed entry economics to one tracked credit group."""
+    status = str(order.get("status") or "").lower()
+    try:
+        filled_qty = float(order.get("filled_qty") or 0)
+        signed_fill = float(order.get("filled_avg_price"))
+    except (TypeError, ValueError):
+        return False
+    # Accept broker-reported fill economics whenever contracts actually
+    # filled. This includes canceled/expired orders with partial fills, whose
+    # exposure is real even though the order is terminal.
+    if filled_qty <= 0:
+        return False
+    # Alpaca reports MLEG credits as negative filled_avg_price. A positive
+    # value means the group filled as a net DEBIT; abs() must never turn that
+    # into fake credit. Refuse and hold for manual review.
+    if signed_fill >= 0:
+        log.error(
+            f"{trade.get('label', 'trade')}: filled_avg_price={signed_fill} is not a "
+            "net credit; refusing to apply credit economics (manual review)"
+        )
+        trade["entry_fill_review"] = "non_credit_filled_avg_price"
+        trade["entry_filled_avg_price_signed"] = signed_fill
+        return False
+
+    tracked_legs = {str(symbol) for symbol in (trade.get("legs") or [])}
+    order_legs = {
+        str(leg.get("symbol"))
+        for leg in (order.get("legs") or [])
+        if isinstance(leg, dict) and leg.get("symbol")
+    }
+    if order_legs and tracked_legs and order_legs != tracked_legs:
+        log.error(
+            f"{trade.get('label', 'trade')}: entry fill legs do not match tracked group; "
+            "leaving order pending for manual review"
+        )
+        return False
+    trade["entry_fill_leg_verification"] = (
+        "verified" if order_legs and tracked_legs else "unavailable"
+    )
+
+    submitted_credit = float(
+        trade.get("submitted_limit_credit")
+        or trade.get("net_credit")
+        or 0.0
+    )
+    actual_credit = abs(signed_fill)
+    trade["submitted_limit_credit"] = submitted_credit
+    trade["entry_filled_avg_price"] = actual_credit
+    trade["entry_filled_avg_price_signed"] = signed_fill
+    trade["entry_fill_source"] = "alpaca_filled_avg_price"
+    trade["entry_order_status"] = status
+    trade["entry_filled_qty"] = filled_qty
+    trade["qty"] = max(1, int(filled_qty))
+    trade["net_credit"] = actual_credit
+    trade["status"] = "open"
+    trade["opened_at"] = order.get("filled_at") or trade.get("opened_at") or _utc_timestamp()
+
+    if trade.get("max_risk_per_contract") is not None and submitted_credit > 0:
+        submitted_risk = float(
+            trade.get("submitted_max_risk_per_contract")
+            or trade["max_risk_per_contract"]
+        )
+        trade["submitted_max_risk_per_contract"] = submitted_risk
+        trade["max_risk_per_contract"] = round(
+            submitted_risk + ((submitted_credit - actual_credit) * 100.0),
+            2,
+        )
+    return True
+
+
+def _refresh_entry_order_fills(state: dict) -> bool:
+    """Promote pending entries only when Alpaca reports a real fill."""
+    changed = False
+    terminal_unfilled = {"canceled", "expired", "rejected", "replaced"}
+    for trade in state.get("trades", []):
+        entry_status = str(trade.get("entry_order_status") or "").lower()
+        if trade.get("status") not in {"pending", "open"}:
+            continue
+        if (
+            trade.get("status") == "open"
+            and entry_status in {"filled", "canceled", "expired", "rejected", "replaced"}
+            and trade.get("entry_fill_source") == "alpaca_filled_avg_price"
+        ):
+            # Fill economics already applied and the order can no longer change.
+            continue
+        order = _order_snapshot(str(trade.get("order_id") or ""))
+        if not order:
+            continue
+        if _apply_entry_fill(trade, order):
+            changed = True
+            continue
+        broker_status = str(order.get("status") or "").lower()
+        try:
+            filled_qty = float(order.get("filled_qty") or 0)
+        except (TypeError, ValueError):
+            filled_qty = 0.0
+        if broker_status in terminal_unfilled and filled_qty <= 0:
+            trade["status"] = "entry_canceled"
+            trade["entry_order_status"] = broker_status
+            trade["entry_closed_at"] = order.get("canceled_at") or _utc_timestamp()
+            changed = True
+        elif broker_status and broker_status != entry_status:
+            trade["entry_order_status"] = broker_status
+            changed = True
+    return changed
+
+
+def _record_trade_group(meta: dict, order: dict) -> None:
     if not meta:
         return
     state = _load_trade_state()
     trade = {
-        "id": str(uuid4()),
-        "order_id": order_id,
-        "status": "open",
-        "opened_at": _utc_timestamp(),
         **meta,
+        "id": str(uuid4()),
+        "order_id": str(order.get("id") or "?"),
+        "status": "pending",
+        "submitted_at": order.get("submitted_at") or _utc_timestamp(),
+        "entry_order_status": str(order.get("status") or "pending").lower(),
     }
+    trade["submitted_limit_credit"] = float(meta.get("net_credit") or 0.0)
+    _apply_entry_fill(trade, order)
     state["trades"].append(trade)
     _save_trade_state(state)
-    log.info(f"Recorded trade group {trade['id']} for {trade.get('label', 'trade')}")
+    log.info(
+        f"Recorded trade group {trade['id']} for {trade.get('label', 'trade')} "
+        f"status={trade['status']} credit_source="
+        f"{trade.get('entry_fill_source', 'submitted_limit')}"
+    )
 
 
 def _sized_qty(equity: float, max_risk: float, max_qty: int, label: str) -> int:
@@ -844,7 +965,7 @@ def _open_underlying_trade_count(trade_client: TradingClient, underlying: str) -
     state = _load_trade_state()
     tracked = sum(
         1 for trade in state.get("trades", [])
-        if trade.get("status") in ("open", "closing") and trade.get("underlying") == underlying
+        if trade.get("status") in ("pending", "open", "closing") and trade.get("underlying") == underlying
     )
     try:
         untracked = {
@@ -1418,10 +1539,37 @@ def _place_mleg(
     underlying = str(trade_meta.get("underlying") or label)
     consensus = shadow_entry_advice(underlying, qty)
     if consensus.get("enabled"):
-        blockers = ", ".join(consensus.get("blockers") or []) or consensus.get("recommendation", "needs_review")
+        warning_list = sorted(
+            {str(item) for item in (consensus.get("blockers") or []) if str(item)}
+        )
+        blockers = ", ".join(warning_list) or consensus.get("recommendation", "needs_review")
         if not consensus.get("allowed"):
             log.warning(f"{label}: SHADOW CONSENSUS BLOCKED {underlying}: {blockers}")
             _alert(f"SHADOW CONSENSUS BLOCKED: **{label}**\nreason={blockers}")
+            return False
+        if (
+            OPTIONS_STRICT_SHADOW_CAUTION_GATE
+            and str(consensus.get("recommendation") or "").lower() == "stand_aside"
+            and len(warning_list) >= OPTIONS_STRICT_CAUTION_MIN_WARNINGS
+        ):
+            strategy = str(trade_meta.get("strategy") or "mleg")
+            _decision(
+                underlying,
+                strategy,
+                "skip",
+                "shadow_consensus_multi_warning_stand_aside",
+                blockers=warning_list,
+                warning_count=len(warning_list),
+                options_playbook=consensus.get("options_playbook"),
+                candidate_confidence=trade_meta.get("candidate_confidence"),
+            )
+            log.warning(
+                f"{label}: OPTIONS CAUTION GATE BLOCKED {underlying}: {blockers}"
+            )
+            _alert(
+                f"OPTIONS CAUTION GATE BLOCKED: **{label}**\n"
+                f"warnings={len(warning_list)} reason={blockers}"
+            )
             return False
         adjusted_qty = int(consensus.get("adjusted_contracts", qty) or 0)
         if 0 < adjusted_qty < qty:
@@ -1472,24 +1620,8 @@ def _place_mleg(
     oid = order.get("id", "?")
     log.info(f"{label}: submitted  order_id={oid}  credit={limit_price:.2f}  qty={qty}")
     _alert(f"ðŸ“¥ **{label}** submitted\ncredit=${limit_price:.2f}  qty={qty}  order={oid}")
-    _record_trade_group(trade_meta or {}, oid)
+    _record_trade_group(trade_meta or {}, order)
     return True
-    try:
-        resp = r.post(
-            f"{BASE}/v2/orders",
-            json=body,
-            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        oid = resp.json().get("id", "?")
-        log.info(f"{label}: submitted  order_id={oid}  credit={limit_price:.2f}  qty={qty}")
-        _alert(f"ðŸ“¥ **{label}** submitted\ncredit=${limit_price:.2f}  qty={qty}  order={oid}")
-        _record_trade_group(trade_meta or {}, oid)
-        return True
-    except Exception as exc:
-        log.error(f"{label}: submission failed â€” {exc}")
-        return False
 
 
 # â”€â”€ Profit-close monitor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1503,8 +1635,21 @@ def monitor_and_close(
         if getattr(p, "asset_class", "") == "us_option"
     ]
     state = _load_trade_state()
-    state_changed = _refresh_filled_group_closes(state)
+    state_changed = _refresh_entry_order_fills(state)
+    state_changed = _refresh_filled_group_closes(state) or state_changed
     if not positions:
+        pending = [
+            trade for trade in state.get("trades", [])
+            if trade.get("status") == "pending"
+        ]
+        if pending:
+            if state_changed:
+                _save_trade_state(state)
+            log.warning(
+                f"{len(pending)} option entry order(s) remain pending; "
+                "new entries blocked until broker status resolves"
+            )
+            return False
         active = [
             trade for trade in state.get("trades", [])
             if trade.get("status") in ("open", "closing")
