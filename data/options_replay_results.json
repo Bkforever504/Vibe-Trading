@@ -1,0 +1,2474 @@
+{
+  "provider": "options_replay_lab",
+  "mode": "read_only_preregistered_replay",
+  "execution_enabled": false,
+  "generated_at": "2026-07-26T02:51:51.457817Z",
+  "preregistration": "research/OPTIONS_REPLAY_PREREGISTRATION_2026-07-25.md",
+  "spread_calibration": {
+    "rel_spread": 0.0444,
+    "source": "forward_nbbo_p75",
+    "samples": 15
+  },
+  "commission_round_trip_dollars": 1.32,
+  "signal_count": 59,
+  "summaries": {
+    "ltf_only": {
+      "0dte": {
+        "signals": 59,
+        "filled": 59,
+        "skipped_or_unavailable": 0,
+        "mean_return_pct": -3.488,
+        "win_rate": 0.356,
+        "profit_factor": 0.871,
+        "top_one_pct_removed_mean": -6.408
+      },
+      "1dte": {
+        "signals": 59,
+        "filled": 57,
+        "skipped_or_unavailable": 2,
+        "mean_return_pct": -2.369,
+        "win_rate": 0.351,
+        "profit_factor": 0.811,
+        "top_one_pct_removed_mean": -3.694
+      },
+      "3_7dte": {
+        "signals": 59,
+        "filled": 53,
+        "skipped_or_unavailable": 6,
+        "mean_return_pct": -3.119,
+        "win_rate": 0.34,
+        "profit_factor": 0.693,
+        "top_one_pct_removed_mean": -4.559
+      }
+    },
+    "daily_aligned": {
+      "0dte": {
+        "signals": 32,
+        "filled": 32,
+        "skipped_or_unavailable": 0,
+        "mean_return_pct": -13.252,
+        "win_rate": 0.344,
+        "profit_factor": 0.588,
+        "top_one_pct_removed_mean": -19.03
+      },
+      "1dte": {
+        "signals": 32,
+        "filled": 30,
+        "skipped_or_unavailable": 2,
+        "mean_return_pct": -6.703,
+        "win_rate": 0.333,
+        "profit_factor": 0.537,
+        "top_one_pct_removed_mean": -9.06
+      },
+      "3_7dte": {
+        "signals": 32,
+        "filled": 30,
+        "skipped_or_unavailable": 2,
+        "mean_return_pct": -7.813,
+        "win_rate": 0.3,
+        "profit_factor": 0.357,
+        "top_one_pct_removed_mean": -9.427
+      }
+    }
+  },
+  "rows": [
+    {
+      "date": "2024-08-05",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -26.968,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY240805C00521000",
+        "expiry": "2024-08-05",
+        "entry_mid": 2.23,
+        "exit_mid": 1.47,
+        "buy": 2.2795,
+        "sell": 1.4374,
+        "pnl_dollars_per_contract": -85.53,
+        "return_pct": -37.523
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY240806C00521000",
+        "expiry": "2024-08-06",
+        "entry_mid": 4.27,
+        "exit_mid": 3.8,
+        "buy": 4.3648,
+        "sell": 3.7156,
+        "pnl_dollars_per_contract": -66.24,
+        "return_pct": -15.175
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY240808C00521000"
+      }
+    },
+    {
+      "date": "2024-11-08",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 1.763,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY241108C00598000",
+        "expiry": "2024-11-08",
+        "entry_mid": 0.66,
+        "exit_mid": 0.65,
+        "buy": 0.68,
+        "sell": 0.63,
+        "pnl_dollars_per_contract": -6.32,
+        "return_pct": -9.294
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY241111C00598000",
+        "expiry": "2024-11-11",
+        "entry_mid": 1.4,
+        "exit_mid": 1.44,
+        "buy": 1.4311,
+        "sell": 1.408,
+        "pnl_dollars_per_contract": -3.62,
+        "return_pct": -2.533
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY241111C00598000",
+        "expiry": "2024-11-11",
+        "entry_mid": 1.4,
+        "exit_mid": 1.44,
+        "buy": 1.4311,
+        "sell": 1.408,
+        "pnl_dollars_per_contract": -3.62,
+        "return_pct": -2.533
+      }
+    },
+    {
+      "date": "2025-01-10",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -46.817,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250110P00579000",
+        "expiry": "2025-01-10",
+        "entry_mid": 1.41,
+        "exit_mid": 0.39,
+        "buy": 1.4413,
+        "sell": 0.37,
+        "pnl_dollars_per_contract": -108.45,
+        "return_pct": -75.245
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250113P00579000",
+        "expiry": "2025-01-13",
+        "entry_mid": 2.67,
+        "exit_mid": 1.52,
+        "buy": 2.7293,
+        "sell": 1.4863,
+        "pnl_dollars_per_contract": -125.62,
+        "return_pct": -46.028
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250113P00579000",
+        "expiry": "2025-01-13",
+        "entry_mid": 2.67,
+        "exit_mid": 1.52,
+        "buy": 2.7293,
+        "sell": 1.4863,
+        "pnl_dollars_per_contract": -125.62,
+        "return_pct": -46.028
+      }
+    },
+    {
+      "date": "2025-03-11",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 48.077,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250311P00557000",
+        "expiry": "2025-03-11",
+        "entry_mid": 2.37,
+        "exit_mid": 3.78,
+        "buy": 2.4226,
+        "sell": 3.6961,
+        "pnl_dollars_per_contract": 126.03,
+        "return_pct": 52.021
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250312P00557000",
+        "expiry": "2025-03-12",
+        "entry_mid": 4.9,
+        "exit_mid": 6.22,
+        "buy": 5.0088,
+        "sell": 6.0819,
+        "pnl_dollars_per_contract": 105.99,
+        "return_pct": 21.162
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250314P00557000",
+        "expiry": "2025-03-14",
+        "entry_mid": 7.02,
+        "exit_mid": 8.31,
+        "buy": 7.1758,
+        "sell": 8.1255,
+        "pnl_dollars_per_contract": 93.65,
+        "return_pct": 13.05
+      }
+    },
+    {
+      "date": "2025-04-01",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -13.578,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250401C00561000",
+        "expiry": "2025-04-01",
+        "entry_mid": 1.78,
+        "exit_mid": 1.08,
+        "buy": 1.8195,
+        "sell": 1.056,
+        "pnl_dollars_per_contract": -77.67,
+        "return_pct": -42.687
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250402C00561000",
+        "expiry": "2025-04-02",
+        "entry_mid": 4.38,
+        "exit_mid": 3.58,
+        "buy": 4.4772,
+        "sell": 3.5005,
+        "pnl_dollars_per_contract": -98.99,
+        "return_pct": -22.11
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250404C00561000",
+        "expiry": "2025-04-04",
+        "entry_mid": 6.55,
+        "exit_mid": 5.95,
+        "buy": 6.6954,
+        "sell": 5.8179,
+        "pnl_dollars_per_contract": -89.07,
+        "return_pct": -13.303
+      }
+    },
+    {
+      "date": "2025-04-04",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 57.382,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250404P00515000",
+        "expiry": "2025-04-04",
+        "entry_mid": 3.51,
+        "exit_mid": 4.58,
+        "buy": 3.5879,
+        "sell": 4.4783,
+        "pnl_dollars_per_contract": 87.72,
+        "return_pct": 24.449
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250407P00515000",
+        "expiry": "2025-04-07",
+        "entry_mid": 7.17,
+        "exit_mid": 8.65,
+        "buy": 7.3292,
+        "sell": 8.458,
+        "pnl_dollars_per_contract": 111.56,
+        "return_pct": 15.221
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250407P00515000",
+        "expiry": "2025-04-07",
+        "entry_mid": 7.17,
+        "exit_mid": 8.65,
+        "buy": 7.3292,
+        "sell": 8.458,
+        "pnl_dollars_per_contract": 111.56,
+        "return_pct": 15.221
+      }
+    },
+    {
+      "date": "2025-04-08",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 181.409,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250408P00517000",
+        "expiry": "2025-04-08",
+        "entry_mid": 3.78,
+        "exit_mid": 10.52,
+        "buy": 3.8639,
+        "sell": 10.2865,
+        "pnl_dollars_per_contract": 640.93,
+        "return_pct": 165.877
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250409P00517000",
+        "expiry": "2025-04-09",
+        "entry_mid": 7.62,
+        "exit_mid": 12.89,
+        "buy": 7.7892,
+        "sell": 12.6038,
+        "pnl_dollars_per_contract": 480.15,
+        "return_pct": 61.643
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250411P00517000",
+        "expiry": "2025-04-11",
+        "entry_mid": 11.1,
+        "exit_mid": 16.14,
+        "buy": 11.3464,
+        "sell": 15.7817,
+        "pnl_dollars_per_contract": 442.21,
+        "return_pct": 38.973
+      }
+    },
+    {
+      "date": "2025-04-22",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 23.083,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250422C00526000",
+        "expiry": "2025-04-22",
+        "entry_mid": 1.84,
+        "exit_mid": 2.81,
+        "buy": 1.8808,
+        "sell": 2.7476,
+        "pnl_dollars_per_contract": 85.36,
+        "return_pct": 45.382
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250423C00526000",
+        "expiry": "2025-04-23",
+        "entry_mid": 4.04,
+        "exit_mid": 4.95,
+        "buy": 4.1297,
+        "sell": 4.8401,
+        "pnl_dollars_per_contract": 69.72,
+        "return_pct": 16.883
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250425C00526000",
+        "expiry": "2025-04-25",
+        "entry_mid": 6.72,
+        "exit_mid": 7.66,
+        "buy": 6.8692,
+        "sell": 7.4899,
+        "pnl_dollars_per_contract": 60.76,
+        "return_pct": 8.845
+      }
+    },
+    {
+      "date": "2025-05-22",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -23.392,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250522C00584000",
+        "expiry": "2025-05-22",
+        "entry_mid": 1.55,
+        "exit_mid": 0.91,
+        "buy": 1.5844,
+        "sell": 0.8898,
+        "pnl_dollars_per_contract": -70.78,
+        "return_pct": -44.674
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250523C00584000",
+        "expiry": "2025-05-23",
+        "entry_mid": 3.1,
+        "exit_mid": 2.5,
+        "buy": 3.1688,
+        "sell": 2.4445,
+        "pnl_dollars_per_contract": -73.75,
+        "return_pct": -23.274
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250527C00584000",
+        "expiry": "2025-05-27",
+        "entry_mid": 4.28,
+        "exit_mid": 3.67,
+        "buy": 4.375,
+        "sell": 3.5885,
+        "pnl_dollars_per_contract": -79.97,
+        "return_pct": -18.279
+      }
+    },
+    {
+      "date": "2025-05-27",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 14.639,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250527C00589000",
+        "expiry": "2025-05-27",
+        "entry_mid": 0.91,
+        "exit_mid": 1.51,
+        "buy": 0.9302,
+        "sell": 1.4765,
+        "pnl_dollars_per_contract": 53.31,
+        "return_pct": 57.308
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250528C00589000",
+        "expiry": "2025-05-28",
+        "entry_mid": 2.55,
+        "exit_mid": 3.16,
+        "buy": 2.6066,
+        "sell": 3.0898,
+        "pnl_dollars_per_contract": 47.0,
+        "return_pct": 18.033
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250530C00589000",
+        "expiry": "2025-05-30",
+        "entry_mid": 4.3,
+        "exit_mid": 4.92,
+        "buy": 4.3955,
+        "sell": 4.8108,
+        "pnl_dollars_per_contract": 40.21,
+        "return_pct": 9.148
+      }
+    },
+    {
+      "date": "2025-05-30",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 59.987,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250530P00588000",
+        "expiry": "2025-05-30",
+        "entry_mid": 1.46,
+        "exit_mid": 3.95,
+        "buy": 1.4924,
+        "sell": 3.8623,
+        "pnl_dollars_per_contract": 235.67,
+        "return_pct": 157.912
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250602P00588000",
+        "expiry": "2025-06-02",
+        "entry_mid": 2.81,
+        "exit_mid": 5.06,
+        "buy": 2.8724,
+        "sell": 4.9477,
+        "pnl_dollars_per_contract": 206.21,
+        "return_pct": 71.79
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250602P00588000",
+        "expiry": "2025-06-02",
+        "entry_mid": 2.81,
+        "exit_mid": 5.06,
+        "buy": 2.8724,
+        "sell": 4.9477,
+        "pnl_dollars_per_contract": 206.21,
+        "return_pct": 71.79
+      }
+    },
+    {
+      "date": "2025-06-05",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -66.897,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250605C00599000",
+        "expiry": "2025-06-05",
+        "entry_mid": 0.93,
+        "exit_mid": 0.11,
+        "buy": 0.9506,
+        "sell": 0.09,
+        "pnl_dollars_per_contract": -87.38,
+        "return_pct": -91.921
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250606C00599000",
+        "expiry": "2025-06-06",
+        "entry_mid": 2.63,
+        "exit_mid": 1.13,
+        "buy": 2.6884,
+        "sell": 1.1049,
+        "pnl_dollars_per_contract": -159.67,
+        "return_pct": -59.391
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250609C00599000",
+        "expiry": "2025-06-09",
+        "entry_mid": 3.36,
+        "exit_mid": 1.78,
+        "buy": 3.4346,
+        "sell": 1.7405,
+        "pnl_dollars_per_contract": -170.73,
+        "return_pct": -49.709
+      }
+    },
+    {
+      "date": "2025-07-01",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 0.269,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250701C00617000",
+        "expiry": "2025-07-01",
+        "entry_mid": 0.84,
+        "exit_mid": 0.86,
+        "buy": 0.86,
+        "sell": 0.84,
+        "pnl_dollars_per_contract": -3.32,
+        "return_pct": -3.86
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250702C00617000",
+        "expiry": "2025-07-02",
+        "entry_mid": 1.74,
+        "exit_mid": 1.78,
+        "buy": 1.7786,
+        "sell": 1.7405,
+        "pnl_dollars_per_contract": -5.13,
+        "return_pct": -2.887
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY250707C00617000"
+      }
+    },
+    {
+      "date": "2025-07-03",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -9.509,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250703C00626000",
+        "expiry": "2025-07-03",
+        "entry_mid": 0.48,
+        "exit_mid": 0.06,
+        "buy": 0.5,
+        "sell": 0.04,
+        "pnl_dollars_per_contract": -47.32,
+        "return_pct": -94.64
+      },
+      "1dte": {
+        "status": "unavailable"
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250707C00626000",
+        "expiry": "2025-07-07",
+        "entry_mid": 2.02,
+        "exit_mid": 1.71,
+        "buy": 2.0648,
+        "sell": 1.672,
+        "pnl_dollars_per_contract": -40.6,
+        "return_pct": -19.663
+      }
+    },
+    {
+      "date": "2025-07-07",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 30.965,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250707P00622000",
+        "expiry": "2025-07-07",
+        "entry_mid": 1.01,
+        "exit_mid": 2.36,
+        "buy": 1.0324,
+        "sell": 2.3076,
+        "pnl_dollars_per_contract": 126.2,
+        "return_pct": 122.235
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250708P00622000",
+        "expiry": "2025-07-08",
+        "entry_mid": 2.09,
+        "exit_mid": 3.32,
+        "buy": 2.1364,
+        "sell": 3.2463,
+        "pnl_dollars_per_contract": 109.67,
+        "return_pct": 51.334
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250710P00622000",
+        "expiry": "2025-07-10",
+        "entry_mid": 3.37,
+        "exit_mid": 4.52,
+        "buy": 3.4448,
+        "sell": 4.4197,
+        "pnl_dollars_per_contract": 96.16,
+        "return_pct": 27.916
+      }
+    },
+    {
+      "date": "2025-07-10",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -4.078,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250710C00626000",
+        "expiry": "2025-07-10",
+        "entry_mid": 0.55,
+        "exit_mid": 0.4,
+        "buy": 0.57,
+        "sell": 0.38,
+        "pnl_dollars_per_contract": -20.32,
+        "return_pct": -35.649
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250711C00626000",
+        "expiry": "2025-07-11",
+        "entry_mid": 1.54,
+        "exit_mid": 1.4,
+        "buy": 1.5742,
+        "sell": 1.3689,
+        "pnl_dollars_per_contract": -21.85,
+        "return_pct": -13.878
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250714C00626000",
+        "expiry": "2025-07-14",
+        "entry_mid": 2.23,
+        "exit_mid": 2.15,
+        "buy": 2.2795,
+        "sell": 2.1023,
+        "pnl_dollars_per_contract": -19.04,
+        "return_pct": -8.354
+      }
+    },
+    {
+      "date": "2025-08-11",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -9.917,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250811C00638000",
+        "expiry": "2025-08-11",
+        "entry_mid": 0.61,
+        "exit_mid": 0.37,
+        "buy": 0.63,
+        "sell": 0.35,
+        "pnl_dollars_per_contract": -29.32,
+        "return_pct": -46.54
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250812C00638000",
+        "expiry": "2025-08-12",
+        "entry_mid": 2.16,
+        "exit_mid": 1.86,
+        "buy": 2.208,
+        "sell": 1.8187,
+        "pnl_dollars_per_contract": -40.24,
+        "return_pct": -18.227
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250814C00638000",
+        "expiry": "2025-08-14",
+        "entry_mid": 3.21,
+        "exit_mid": 2.99,
+        "buy": 3.2813,
+        "sell": 2.9236,
+        "pnl_dollars_per_contract": -37.08,
+        "return_pct": -11.302
+      }
+    },
+    {
+      "date": "2025-09-08",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -15.475,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250908C00649000",
+        "expiry": "2025-09-08",
+        "entry_mid": 0.86,
+        "exit_mid": 0.38,
+        "buy": 0.88,
+        "sell": 0.36,
+        "pnl_dollars_per_contract": -53.32,
+        "return_pct": -60.591
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250909C00649000",
+        "expiry": "2025-09-09",
+        "entry_mid": 1.7,
+        "exit_mid": 1.23,
+        "buy": 1.7377,
+        "sell": 1.2027,
+        "pnl_dollars_per_contract": -54.82,
+        "return_pct": -31.549
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250911C00649000",
+        "expiry": "2025-09-11",
+        "entry_mid": 3.2,
+        "exit_mid": 2.59,
+        "buy": 3.271,
+        "sell": 2.5325,
+        "pnl_dollars_per_contract": -75.17,
+        "return_pct": -22.982
+      }
+    },
+    {
+      "date": "2025-09-25",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -18.769,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY250925C00659000",
+        "expiry": "2025-09-25",
+        "entry_mid": 0.95,
+        "exit_mid": 0.44,
+        "buy": 0.9711,
+        "sell": 0.42,
+        "pnl_dollars_per_contract": -56.43,
+        "return_pct": -58.109
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY250926C00659000",
+        "expiry": "2025-09-26",
+        "entry_mid": 2.11,
+        "exit_mid": 1.58,
+        "buy": 2.1568,
+        "sell": 1.5449,
+        "pnl_dollars_per_contract": -62.51,
+        "return_pct": -28.983
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY250929C00659000",
+        "expiry": "2025-09-29",
+        "entry_mid": 2.95,
+        "exit_mid": 2.38,
+        "buy": 3.0155,
+        "sell": 2.3272,
+        "pnl_dollars_per_contract": -70.15,
+        "return_pct": -23.264
+      }
+    },
+    {
+      "date": "2025-10-03",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -5.42,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251003C00672000",
+        "expiry": "2025-10-03",
+        "entry_mid": 0.95,
+        "exit_mid": 0.71,
+        "buy": 0.9711,
+        "sell": 0.69,
+        "pnl_dollars_per_contract": -29.43,
+        "return_pct": -30.305
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251006C00672000",
+        "expiry": "2025-10-06",
+        "entry_mid": 1.93,
+        "exit_mid": 1.74,
+        "buy": 1.9728,
+        "sell": 1.7014,
+        "pnl_dollars_per_contract": -28.47,
+        "return_pct": -14.43
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251006C00672000",
+        "expiry": "2025-10-06",
+        "entry_mid": 1.93,
+        "exit_mid": 1.74,
+        "buy": 1.9728,
+        "sell": 1.7014,
+        "pnl_dollars_per_contract": -28.47,
+        "return_pct": -14.43
+      }
+    },
+    {
+      "date": "2025-10-24",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -2.516,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251024C00678000",
+        "expiry": "2025-10-24",
+        "entry_mid": 0.83,
+        "exit_mid": 0.65,
+        "buy": 0.85,
+        "sell": 0.63,
+        "pnl_dollars_per_contract": -23.32,
+        "return_pct": -27.435
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251027C00678000",
+        "expiry": "2025-10-27",
+        "entry_mid": 2.07,
+        "exit_mid": 1.99,
+        "buy": 2.116,
+        "sell": 1.9458,
+        "pnl_dollars_per_contract": -18.33,
+        "return_pct": -8.664
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251027C00678000",
+        "expiry": "2025-10-27",
+        "entry_mid": 2.07,
+        "exit_mid": 1.99,
+        "buy": 2.116,
+        "sell": 1.9458,
+        "pnl_dollars_per_contract": -18.33,
+        "return_pct": -8.664
+      }
+    },
+    {
+      "date": "2025-10-29",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -9.703,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251029P00688000",
+        "expiry": "2025-10-29",
+        "entry_mid": 2.33,
+        "exit_mid": 2.09,
+        "buy": 2.3817,
+        "sell": 2.0436,
+        "pnl_dollars_per_contract": -35.13,
+        "return_pct": -14.751
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251030P00688000",
+        "expiry": "2025-10-30",
+        "entry_mid": 3.49,
+        "exit_mid": 3.25,
+        "buy": 3.5675,
+        "sell": 3.1778,
+        "pnl_dollars_per_contract": -40.28,
+        "return_pct": -11.292
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251103P00688000",
+        "expiry": "2025-11-03",
+        "entry_mid": 4.55,
+        "exit_mid": 4.32,
+        "buy": 4.651,
+        "sell": 4.2241,
+        "pnl_dollars_per_contract": -44.01,
+        "return_pct": -9.463
+      }
+    },
+    {
+      "date": "2025-10-31",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 22.776,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251031P00682000",
+        "expiry": "2025-10-31",
+        "entry_mid": 1.31,
+        "exit_mid": 2.3,
+        "buy": 1.3391,
+        "sell": 2.2489,
+        "pnl_dollars_per_contract": 89.67,
+        "return_pct": 66.961
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251103P00682000",
+        "expiry": "2025-11-03",
+        "entry_mid": 2.64,
+        "exit_mid": 3.5,
+        "buy": 2.6986,
+        "sell": 3.4223,
+        "pnl_dollars_per_contract": 71.05,
+        "return_pct": 26.328
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251103P00682000",
+        "expiry": "2025-11-03",
+        "entry_mid": 2.64,
+        "exit_mid": 3.5,
+        "buy": 2.6986,
+        "sell": 3.4223,
+        "pnl_dollars_per_contract": 71.05,
+        "return_pct": 26.328
+      }
+    },
+    {
+      "date": "2025-11-06",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -28.218,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251106P00669000",
+        "expiry": "2025-11-06",
+        "entry_mid": 1.6,
+        "exit_mid": 0.58,
+        "buy": 1.6355,
+        "sell": 0.56,
+        "pnl_dollars_per_contract": -108.87,
+        "return_pct": -66.567
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251107P00669000",
+        "expiry": "2025-11-07",
+        "entry_mid": 2.98,
+        "exit_mid": 1.96,
+        "buy": 3.0462,
+        "sell": 1.9165,
+        "pnl_dollars_per_contract": -114.29,
+        "return_pct": -37.518
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251110P00669000",
+        "expiry": "2025-11-10",
+        "entry_mid": 3.96,
+        "exit_mid": 2.91,
+        "buy": 4.0479,
+        "sell": 2.8454,
+        "pnl_dollars_per_contract": -121.57,
+        "return_pct": -30.033
+      }
+    },
+    {
+      "date": "2025-12-01",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -1.34,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251201C00682000",
+        "expiry": "2025-12-01",
+        "entry_mid": 0.87,
+        "exit_mid": 0.77,
+        "buy": 0.89,
+        "sell": 0.75,
+        "pnl_dollars_per_contract": -15.32,
+        "return_pct": -17.213
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251202C00682000",
+        "expiry": "2025-12-02",
+        "entry_mid": 2.01,
+        "exit_mid": 1.95,
+        "buy": 2.0546,
+        "sell": 1.9067,
+        "pnl_dollars_per_contract": -16.11,
+        "return_pct": -7.841
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251204C00682000",
+        "expiry": "2025-12-04",
+        "entry_mid": 3.39,
+        "exit_mid": 3.45,
+        "buy": 3.4653,
+        "sell": 3.3734,
+        "pnl_dollars_per_contract": -10.5,
+        "return_pct": -3.031
+      }
+    },
+    {
+      "date": "2025-12-08",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -15.026,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251208P00683000",
+        "expiry": "2025-12-08",
+        "entry_mid": 0.85,
+        "exit_mid": 0.38,
+        "buy": 0.87,
+        "sell": 0.36,
+        "pnl_dollars_per_contract": -52.32,
+        "return_pct": -60.138
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251209P00683000",
+        "expiry": "2025-12-09",
+        "entry_mid": 1.83,
+        "exit_mid": 1.3,
+        "buy": 1.8706,
+        "sell": 1.2711,
+        "pnl_dollars_per_contract": -61.27,
+        "return_pct": -32.753
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251211P00683000",
+        "expiry": "2025-12-11",
+        "entry_mid": 3.88,
+        "exit_mid": 3.33,
+        "buy": 3.9661,
+        "sell": 3.2561,
+        "pnl_dollars_per_contract": -72.33,
+        "return_pct": -18.236
+      }
+    },
+    {
+      "date": "2025-12-22",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 1.577,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251222C00685000",
+        "expiry": "2025-12-22",
+        "entry_mid": 0.48,
+        "exit_mid": 0.55,
+        "buy": 0.5,
+        "sell": 0.53,
+        "pnl_dollars_per_contract": 1.68,
+        "return_pct": 3.36
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251223C00685000",
+        "expiry": "2025-12-23",
+        "entry_mid": 1.35,
+        "exit_mid": 1.41,
+        "buy": 1.38,
+        "sell": 1.3787,
+        "pnl_dollars_per_contract": -1.45,
+        "return_pct": -1.049
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251226C00685000",
+        "expiry": "2025-12-26",
+        "entry_mid": 2.36,
+        "exit_mid": 2.45,
+        "buy": 2.4124,
+        "sell": 2.3956,
+        "pnl_dollars_per_contract": -3.0,
+        "return_pct": -1.243
+      }
+    },
+    {
+      "date": "2025-12-23",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -0.763,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251223C00687000",
+        "expiry": "2025-12-23",
+        "entry_mid": 0.39,
+        "exit_mid": 0.38,
+        "buy": 0.41,
+        "sell": 0.36,
+        "pnl_dollars_per_contract": -6.32,
+        "return_pct": -15.415
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY251224C00687000",
+        "expiry": "2025-12-24",
+        "entry_mid": 0.91,
+        "exit_mid": 0.9,
+        "buy": 0.9302,
+        "sell": 0.88,
+        "pnl_dollars_per_contract": -6.34,
+        "return_pct": -6.816
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251226C00687000",
+        "expiry": "2025-12-26",
+        "entry_mid": 1.56,
+        "exit_mid": 1.6,
+        "buy": 1.5946,
+        "sell": 1.5645,
+        "pnl_dollars_per_contract": -4.34,
+        "return_pct": -2.719
+      }
+    },
+    {
+      "date": "2025-12-24",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -3.593,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY251224C00690000",
+        "expiry": "2025-12-24",
+        "entry_mid": 0.54,
+        "exit_mid": 0.29,
+        "buy": 0.56,
+        "sell": 0.27,
+        "pnl_dollars_per_contract": -30.32,
+        "return_pct": -54.143
+      },
+      "1dte": {
+        "status": "unavailable"
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY251229C00690000",
+        "expiry": "2025-12-29",
+        "entry_mid": 1.95,
+        "exit_mid": 1.86,
+        "buy": 1.9933,
+        "sell": 1.8187,
+        "pnl_dollars_per_contract": -18.78,
+        "return_pct": -9.421
+      }
+    },
+    {
+      "date": "2026-01-06",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 20.265,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260106C00689000",
+        "expiry": "2026-01-06",
+        "entry_mid": 0.86,
+        "exit_mid": 2.03,
+        "buy": 0.88,
+        "sell": 1.9849,
+        "pnl_dollars_per_contract": 109.17,
+        "return_pct": 124.061
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260107C00689000",
+        "expiry": "2026-01-07",
+        "entry_mid": 1.67,
+        "exit_mid": 2.64,
+        "buy": 1.7071,
+        "sell": 2.5814,
+        "pnl_dollars_per_contract": 86.11,
+        "return_pct": 50.444
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260109C00689000",
+        "expiry": "2026-01-09",
+        "entry_mid": 3.37,
+        "exit_mid": 4.24,
+        "buy": 3.4448,
+        "sell": 4.1459,
+        "pnl_dollars_per_contract": 68.79,
+        "return_pct": 19.968
+      }
+    },
+    {
+      "date": "2026-01-07",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -9.57,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260107C00694000",
+        "expiry": "2026-01-07",
+        "entry_mid": 0.36,
+        "exit_mid": 0.16,
+        "buy": 0.38,
+        "sell": 0.14,
+        "pnl_dollars_per_contract": -25.32,
+        "return_pct": -66.632
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260108C00694000",
+        "expiry": "2026-01-08",
+        "entry_mid": 1.08,
+        "exit_mid": 0.85,
+        "buy": 1.104,
+        "sell": 0.83,
+        "pnl_dollars_per_contract": -28.72,
+        "return_pct": -26.013
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260112C00694000",
+        "expiry": "2026-01-12",
+        "entry_mid": 2.78,
+        "exit_mid": 2.53,
+        "buy": 2.8417,
+        "sell": 2.4738,
+        "pnl_dollars_per_contract": -38.11,
+        "return_pct": -13.41
+      }
+    },
+    {
+      "date": "2026-01-08",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 0.247,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260108C00690000",
+        "expiry": "2026-01-08",
+        "entry_mid": 0.81,
+        "exit_mid": 0.8,
+        "buy": 0.83,
+        "sell": 0.78,
+        "pnl_dollars_per_contract": -6.32,
+        "return_pct": -7.614
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260109C00690000",
+        "expiry": "2026-01-09",
+        "entry_mid": 2.31,
+        "exit_mid": 2.41,
+        "buy": 2.3613,
+        "sell": 2.3565,
+        "pnl_dollars_per_contract": -1.8,
+        "return_pct": -0.762
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260112C00690000",
+        "expiry": "2026-01-12",
+        "entry_mid": 2.96,
+        "exit_mid": 3.09,
+        "buy": 3.0257,
+        "sell": 3.0214,
+        "pnl_dollars_per_contract": -1.75,
+        "return_pct": -0.579
+      }
+    },
+    {
+      "date": "2026-01-15",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -16.892,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260115C00695000",
+        "expiry": "2026-01-15",
+        "entry_mid": 0.7,
+        "exit_mid": 0.28,
+        "buy": 0.72,
+        "sell": 0.26,
+        "pnl_dollars_per_contract": -47.32,
+        "return_pct": -65.722
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260116C00695000",
+        "expiry": "2026-01-16",
+        "entry_mid": 1.81,
+        "exit_mid": 1.28,
+        "buy": 1.8502,
+        "sell": 1.2516,
+        "pnl_dollars_per_contract": -61.18,
+        "return_pct": -33.067
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260120C00695000",
+        "expiry": "2026-01-20",
+        "entry_mid": 2.8,
+        "exit_mid": 2.27,
+        "buy": 2.8622,
+        "sell": 2.2196,
+        "pnl_dollars_per_contract": -65.58,
+        "return_pct": -22.911
+      }
+    },
+    {
+      "date": "2026-01-30",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 19.139,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260130P00691000",
+        "expiry": "2026-01-30",
+        "entry_mid": 1.56,
+        "exit_mid": 2.43,
+        "buy": 1.5946,
+        "sell": 2.3761,
+        "pnl_dollars_per_contract": 76.82,
+        "return_pct": 48.176
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260202P00691000",
+        "expiry": "2026-02-02",
+        "entry_mid": 3.04,
+        "exit_mid": 3.79,
+        "buy": 3.1075,
+        "sell": 3.7059,
+        "pnl_dollars_per_contract": 58.52,
+        "return_pct": 18.831
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260202P00691000",
+        "expiry": "2026-02-02",
+        "entry_mid": 3.04,
+        "exit_mid": 3.79,
+        "buy": 3.1075,
+        "sell": 3.7059,
+        "pnl_dollars_per_contract": 58.52,
+        "return_pct": 18.831
+      }
+    },
+    {
+      "date": "2026-02-02",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 7.702,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260202C00696000",
+        "expiry": "2026-02-02",
+        "entry_mid": 0.65,
+        "exit_mid": 0.88,
+        "buy": 0.67,
+        "sell": 0.86,
+        "pnl_dollars_per_contract": 17.68,
+        "return_pct": 26.388
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260203C00696000",
+        "expiry": "2026-02-03",
+        "entry_mid": 1.62,
+        "exit_mid": 1.88,
+        "buy": 1.656,
+        "sell": 1.8383,
+        "pnl_dollars_per_contract": 16.91,
+        "return_pct": 10.212
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260205C00696000",
+        "expiry": "2026-02-05",
+        "entry_mid": 3.33,
+        "exit_mid": 3.54,
+        "buy": 3.4039,
+        "sell": 3.4614,
+        "pnl_dollars_per_contract": 4.43,
+        "return_pct": 1.301
+      }
+    },
+    {
+      "date": "2026-02-03",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 40.424,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260203P00691000",
+        "expiry": "2026-02-03",
+        "entry_mid": 1.45,
+        "exit_mid": 3.6,
+        "buy": 1.4822,
+        "sell": 3.5201,
+        "pnl_dollars_per_contract": 202.47,
+        "return_pct": 136.601
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260204P00691000",
+        "expiry": "2026-02-04",
+        "entry_mid": 2.85,
+        "exit_mid": 4.75,
+        "buy": 2.9133,
+        "sell": 4.6445,
+        "pnl_dollars_per_contract": 171.81,
+        "return_pct": 58.974
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260206P00691000",
+        "expiry": "2026-02-06",
+        "entry_mid": 4.32,
+        "exit_mid": 6.14,
+        "buy": 4.4159,
+        "sell": 6.0037,
+        "pnl_dollars_per_contract": 157.46,
+        "return_pct": 35.657
+      }
+    },
+    {
+      "date": "2026-02-06",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 20.257,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260206C00687000",
+        "expiry": "2026-02-06",
+        "entry_mid": 1.48,
+        "exit_mid": 2.35,
+        "buy": 1.5129,
+        "sell": 2.2978,
+        "pnl_dollars_per_contract": 77.18,
+        "return_pct": 51.014
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260209C00687000",
+        "expiry": "2026-02-09",
+        "entry_mid": 3.01,
+        "exit_mid": 3.95,
+        "buy": 3.0768,
+        "sell": 3.8623,
+        "pnl_dollars_per_contract": 77.23,
+        "return_pct": 25.1
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260209C00687000",
+        "expiry": "2026-02-09",
+        "entry_mid": 3.01,
+        "exit_mid": 3.95,
+        "buy": 3.0768,
+        "sell": 3.8623,
+        "pnl_dollars_per_contract": 77.23,
+        "return_pct": 25.1
+      }
+    },
+    {
+      "date": "2026-02-11",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -12.982,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260211P00692000",
+        "expiry": "2026-02-11",
+        "entry_mid": 1.19,
+        "exit_mid": 0.67,
+        "buy": 1.2164,
+        "sell": 0.65,
+        "pnl_dollars_per_contract": -57.96,
+        "return_pct": -47.65
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260212P00692000",
+        "expiry": "2026-02-12",
+        "entry_mid": 2.34,
+        "exit_mid": 1.9,
+        "buy": 2.3919,
+        "sell": 1.8578,
+        "pnl_dollars_per_contract": -54.73,
+        "return_pct": -22.882
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260217P00692000",
+        "expiry": "2026-02-17",
+        "entry_mid": 4.12,
+        "exit_mid": 3.71,
+        "buy": 4.2115,
+        "sell": 3.6276,
+        "pnl_dollars_per_contract": -59.7,
+        "return_pct": -14.176
+      }
+    },
+    {
+      "date": "2026-03-10",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -0.973,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260310C00681000",
+        "expiry": "2026-03-10",
+        "entry_mid": 1.56,
+        "exit_mid": 1.42,
+        "buy": 1.5946,
+        "sell": 1.3885,
+        "pnl_dollars_per_contract": -21.94,
+        "return_pct": -13.756
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260311C00681000",
+        "expiry": "2026-03-11",
+        "entry_mid": 3.4,
+        "exit_mid": 3.39,
+        "buy": 3.4755,
+        "sell": 3.3147,
+        "pnl_dollars_per_contract": -17.39,
+        "return_pct": -5.005
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260313C00681000",
+        "expiry": "2026-03-13",
+        "entry_mid": 5.68,
+        "exit_mid": 5.73,
+        "buy": 5.8061,
+        "sell": 5.6028,
+        "pnl_dollars_per_contract": -21.65,
+        "return_pct": -3.729
+      }
+    },
+    {
+      "date": "2026-03-27",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 21.897,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260327P00640000",
+        "expiry": "2026-03-27",
+        "entry_mid": 1.53,
+        "exit_mid": 2.2,
+        "buy": 1.564,
+        "sell": 2.1512,
+        "pnl_dollars_per_contract": 57.4,
+        "return_pct": 36.701
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260330P00640000",
+        "expiry": "2026-03-30",
+        "entry_mid": 4.81,
+        "exit_mid": 5.6,
+        "buy": 4.9168,
+        "sell": 5.4757,
+        "pnl_dollars_per_contract": 54.57,
+        "return_pct": 11.099
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260330P00640000",
+        "expiry": "2026-03-30",
+        "entry_mid": 4.81,
+        "exit_mid": 5.6,
+        "buy": 4.9168,
+        "sell": 5.4757,
+        "pnl_dollars_per_contract": 54.57,
+        "return_pct": 11.099
+      }
+    },
+    {
+      "date": "2026-04-06",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -0.328,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260406C00658000",
+        "expiry": "2026-04-06",
+        "entry_mid": 1.14,
+        "exit_mid": 1.1,
+        "buy": 1.1653,
+        "sell": 1.0756,
+        "pnl_dollars_per_contract": -10.29,
+        "return_pct": -8.833
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260407C00658000",
+        "expiry": "2026-04-07",
+        "entry_mid": 3.08,
+        "exit_mid": 3.07,
+        "buy": 3.1484,
+        "sell": 3.0018,
+        "pnl_dollars_per_contract": -15.97,
+        "return_pct": -5.073
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260409C00658000",
+        "expiry": "2026-04-09",
+        "entry_mid": 5.51,
+        "exit_mid": 5.45,
+        "buy": 5.6323,
+        "sell": 5.329,
+        "pnl_dollars_per_contract": -31.65,
+        "return_pct": -5.62
+      }
+    },
+    {
+      "date": "2026-05-04",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 11.937,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260504P00718000",
+        "expiry": "2026-05-04",
+        "entry_mid": 1.62,
+        "exit_mid": 1.95,
+        "buy": 1.656,
+        "sell": 1.9067,
+        "pnl_dollars_per_contract": 23.75,
+        "return_pct": 14.345
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260505P00718000",
+        "expiry": "2026-05-05",
+        "entry_mid": 2.91,
+        "exit_mid": 3.41,
+        "buy": 2.9746,
+        "sell": 3.3343,
+        "pnl_dollars_per_contract": 34.65,
+        "return_pct": 11.648
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY260507P00718000"
+      }
+    },
+    {
+      "date": "2026-05-06",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -10.884,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260506C00732000",
+        "expiry": "2026-05-06",
+        "entry_mid": 0.69,
+        "exit_mid": 0.37,
+        "buy": 0.71,
+        "sell": 0.35,
+        "pnl_dollars_per_contract": -37.32,
+        "return_pct": -52.563
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260507C00732000",
+        "expiry": "2026-05-07",
+        "entry_mid": 1.81,
+        "exit_mid": 1.47,
+        "buy": 1.8502,
+        "sell": 1.4374,
+        "pnl_dollars_per_contract": -42.6,
+        "return_pct": -23.026
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260511C00732000",
+        "expiry": "2026-05-11",
+        "entry_mid": 3.82,
+        "exit_mid": 3.48,
+        "buy": 3.9048,
+        "sell": 3.4027,
+        "pnl_dollars_per_contract": -51.53,
+        "return_pct": -13.196
+      }
+    },
+    {
+      "date": "2026-05-07",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 24.772,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260507P00734000",
+        "expiry": "2026-05-07",
+        "entry_mid": 1.09,
+        "exit_mid": 2.3,
+        "buy": 1.1142,
+        "sell": 2.2489,
+        "pnl_dollars_per_contract": 112.15,
+        "return_pct": 100.659
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260508P00734000",
+        "expiry": "2026-05-08",
+        "entry_mid": 2.26,
+        "exit_mid": 3.41,
+        "buy": 2.3102,
+        "sell": 3.3343,
+        "pnl_dollars_per_contract": 101.09,
+        "return_pct": 43.76
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260511P00734000",
+        "expiry": "2026-05-11",
+        "entry_mid": 3.22,
+        "exit_mid": 4.34,
+        "buy": 3.2915,
+        "sell": 4.2437,
+        "pnl_dollars_per_contract": 93.9,
+        "return_pct": 28.527
+      }
+    },
+    {
+      "date": "2026-05-11",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -14.023,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260511C00740000",
+        "expiry": "2026-05-11",
+        "entry_mid": 0.85,
+        "exit_mid": 0.41,
+        "buy": 0.87,
+        "sell": 0.39,
+        "pnl_dollars_per_contract": -49.32,
+        "return_pct": -56.69
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260512C00740000",
+        "expiry": "2026-05-12",
+        "entry_mid": 2.19,
+        "exit_mid": 1.76,
+        "buy": 2.2386,
+        "sell": 1.7209,
+        "pnl_dollars_per_contract": -53.09,
+        "return_pct": -23.715
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260514C00740000",
+        "expiry": "2026-05-14",
+        "entry_mid": 3.8,
+        "exit_mid": 3.49,
+        "buy": 3.8844,
+        "sell": 3.4125,
+        "pnl_dollars_per_contract": -48.5,
+        "return_pct": -12.487
+      }
+    },
+    {
+      "date": "2026-05-12",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 3.87,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260512P00732000",
+        "expiry": "2026-05-12",
+        "entry_mid": 0.91,
+        "exit_mid": 0.91,
+        "buy": 0.9302,
+        "sell": 0.8898,
+        "pnl_dollars_per_contract": -5.36,
+        "return_pct": -5.763
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260513P00732000",
+        "expiry": "2026-05-13",
+        "entry_mid": 2.15,
+        "exit_mid": 2.26,
+        "buy": 2.1977,
+        "sell": 2.2098,
+        "pnl_dollars_per_contract": -0.11,
+        "return_pct": -0.05
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260515P00732000",
+        "expiry": "2026-05-15",
+        "entry_mid": 3.85,
+        "exit_mid": 3.9,
+        "buy": 3.9355,
+        "sell": 3.8134,
+        "pnl_dollars_per_contract": -13.53,
+        "return_pct": -3.437
+      }
+    },
+    {
+      "date": "2026-05-14",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -22.153,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260514C00749000",
+        "expiry": "2026-05-14",
+        "entry_mid": 1.07,
+        "exit_mid": 0.46,
+        "buy": 1.0938,
+        "sell": 0.44,
+        "pnl_dollars_per_contract": -66.7,
+        "return_pct": -60.978
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260515C00749000",
+        "expiry": "2026-05-15",
+        "entry_mid": 2.65,
+        "exit_mid": 1.92,
+        "buy": 2.7088,
+        "sell": 1.8774,
+        "pnl_dollars_per_contract": -84.47,
+        "return_pct": -31.182
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260518C00749000",
+        "expiry": "2026-05-18",
+        "entry_mid": 3.79,
+        "exit_mid": 3.0,
+        "buy": 3.8741,
+        "sell": 2.9334,
+        "pnl_dollars_per_contract": -95.39,
+        "return_pct": -24.623
+      }
+    },
+    {
+      "date": "2026-05-18",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -3.358,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260518P00736000",
+        "expiry": "2026-05-18",
+        "entry_mid": 1.3,
+        "exit_mid": 0.98,
+        "buy": 1.3289,
+        "sell": 0.9582,
+        "pnl_dollars_per_contract": -38.38,
+        "return_pct": -28.883
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260519P00736000",
+        "expiry": "2026-05-19",
+        "entry_mid": 2.66,
+        "exit_mid": 2.38,
+        "buy": 2.7191,
+        "sell": 2.3272,
+        "pnl_dollars_per_contract": -40.51,
+        "return_pct": -14.898
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260521P00736000",
+        "expiry": "2026-05-21",
+        "entry_mid": 4.73,
+        "exit_mid": 4.25,
+        "buy": 4.835,
+        "sell": 4.1556,
+        "pnl_dollars_per_contract": -69.26,
+        "return_pct": -14.324
+      }
+    },
+    {
+      "date": "2026-05-27",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -11.144,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260527P00749000",
+        "expiry": "2026-05-27",
+        "entry_mid": 1.06,
+        "exit_mid": 0.58,
+        "buy": 1.0835,
+        "sell": 0.56,
+        "pnl_dollars_per_contract": -53.67,
+        "return_pct": -49.535
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260528P00749000",
+        "expiry": "2026-05-28",
+        "entry_mid": 2.28,
+        "exit_mid": 1.76,
+        "buy": 2.3306,
+        "sell": 1.7209,
+        "pnl_dollars_per_contract": -62.29,
+        "return_pct": -26.726
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY260601P00749000"
+      }
+    },
+    {
+      "date": "2026-05-28",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 6.753,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260528C00754000",
+        "expiry": "2026-05-28",
+        "entry_mid": 0.91,
+        "exit_mid": 1.1,
+        "buy": 0.9302,
+        "sell": 1.0756,
+        "pnl_dollars_per_contract": 13.22,
+        "return_pct": 14.21
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260529C00754000",
+        "expiry": "2026-05-29",
+        "entry_mid": 2.25,
+        "exit_mid": 2.58,
+        "buy": 2.2999,
+        "sell": 2.5227,
+        "pnl_dollars_per_contract": 20.96,
+        "return_pct": 9.112
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY260601C00754000"
+      }
+    },
+    {
+      "date": "2026-06-01",
+      "direction": "bull",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 14.519,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260601C00757000",
+        "expiry": "2026-06-01",
+        "entry_mid": 0.71,
+        "exit_mid": 1.26,
+        "buy": 0.73,
+        "sell": 1.232,
+        "pnl_dollars_per_contract": 48.88,
+        "return_pct": 66.963
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260602C00757000",
+        "expiry": "2026-06-02",
+        "entry_mid": 1.85,
+        "exit_mid": 2.38,
+        "buy": 1.8911,
+        "sell": 2.3272,
+        "pnl_dollars_per_contract": 42.29,
+        "return_pct": 22.363
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260604C00757000",
+        "expiry": "2026-06-04",
+        "entry_mid": 3.39,
+        "exit_mid": 3.89,
+        "buy": 3.4653,
+        "sell": 3.8036,
+        "pnl_dollars_per_contract": 32.52,
+        "return_pct": 9.384
+      }
+    },
+    {
+      "date": "2026-06-03",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -0.014,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260603P00755000",
+        "expiry": "2026-06-03",
+        "entry_mid": 1.04,
+        "exit_mid": 1.04,
+        "buy": 1.0631,
+        "sell": 1.0169,
+        "pnl_dollars_per_contract": -5.94,
+        "return_pct": -5.585
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260604P00755000",
+        "expiry": "2026-06-04",
+        "entry_mid": 2.12,
+        "exit_mid": 2.22,
+        "buy": 2.1671,
+        "sell": 2.1707,
+        "pnl_dollars_per_contract": -0.95,
+        "return_pct": -0.441
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260608P00755000",
+        "expiry": "2026-06-08",
+        "entry_mid": 3.55,
+        "exit_mid": 3.73,
+        "buy": 3.6288,
+        "sell": 3.6472,
+        "pnl_dollars_per_contract": 0.52,
+        "return_pct": 0.143
+      }
+    },
+    {
+      "date": "2026-06-12",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -37.729,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260612P00739000",
+        "expiry": "2026-06-12",
+        "entry_mid": 2.52,
+        "exit_mid": 0.76,
+        "buy": 2.5759,
+        "sell": 0.74,
+        "pnl_dollars_per_contract": -184.91,
+        "return_pct": -71.785
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260615P00739000",
+        "expiry": "2026-06-15",
+        "entry_mid": 4.59,
+        "exit_mid": 2.96,
+        "buy": 4.6919,
+        "sell": 2.8943,
+        "pnl_dollars_per_contract": -181.08,
+        "return_pct": -38.594
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260615P00739000",
+        "expiry": "2026-06-15",
+        "entry_mid": 4.59,
+        "exit_mid": 2.96,
+        "buy": 4.6919,
+        "sell": 2.8943,
+        "pnl_dollars_per_contract": -181.08,
+        "return_pct": -38.594
+      }
+    },
+    {
+      "date": "2026-06-22",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -6.163,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260622P00745000",
+        "expiry": "2026-06-22",
+        "entry_mid": 1.42,
+        "exit_mid": 0.96,
+        "buy": 1.4515,
+        "sell": 0.9387,
+        "pnl_dollars_per_contract": -52.6,
+        "return_pct": -36.24
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260623P00745000",
+        "expiry": "2026-06-23",
+        "entry_mid": 2.91,
+        "exit_mid": 2.46,
+        "buy": 2.9746,
+        "sell": 2.4054,
+        "pnl_dollars_per_contract": -58.24,
+        "return_pct": -19.58
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260625P00745000",
+        "expiry": "2026-06-25",
+        "entry_mid": 4.27,
+        "exit_mid": 4.06,
+        "buy": 4.3648,
+        "sell": 3.9699,
+        "pnl_dollars_per_contract": -40.81,
+        "return_pct": -9.35
+      }
+    },
+    {
+      "date": "2026-06-25",
+      "direction": "bear",
+      "variants": [
+        "daily_aligned",
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 20.747,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260625P00734000",
+        "expiry": "2026-06-25",
+        "entry_mid": 1.67,
+        "exit_mid": 2.36,
+        "buy": 1.7071,
+        "sell": 2.3076,
+        "pnl_dollars_per_contract": 58.73,
+        "return_pct": 34.406
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260626P00734000",
+        "expiry": "2026-06-26",
+        "entry_mid": 3.27,
+        "exit_mid": 3.9,
+        "buy": 3.3426,
+        "sell": 3.8134,
+        "pnl_dollars_per_contract": 45.76,
+        "return_pct": 13.691
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260629P00734000",
+        "expiry": "2026-06-29",
+        "entry_mid": 4.47,
+        "exit_mid": 5.24,
+        "buy": 4.5692,
+        "sell": 5.1237,
+        "pnl_dollars_per_contract": 54.12,
+        "return_pct": 11.845
+      }
+    },
+    {
+      "date": "2026-06-26",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -14.511,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260626C00735000",
+        "expiry": "2026-06-26",
+        "entry_mid": 1.75,
+        "exit_mid": 0.93,
+        "buy": 1.7889,
+        "sell": 0.9094,
+        "pnl_dollars_per_contract": -89.27,
+        "return_pct": -49.903
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260629C00735000",
+        "expiry": "2026-06-29",
+        "entry_mid": 3.63,
+        "exit_mid": 3.04,
+        "buy": 3.7106,
+        "sell": 2.9725,
+        "pnl_dollars_per_contract": -75.13,
+        "return_pct": -20.247
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260629C00735000",
+        "expiry": "2026-06-29",
+        "entry_mid": 3.63,
+        "exit_mid": 3.04,
+        "buy": 3.7106,
+        "sell": 2.9725,
+        "pnl_dollars_per_contract": -75.13,
+        "return_pct": -20.247
+      }
+    },
+    {
+      "date": "2026-06-29",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -0.781,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260629C00739000",
+        "expiry": "2026-06-29",
+        "entry_mid": 0.83,
+        "exit_mid": 0.75,
+        "buy": 0.85,
+        "sell": 0.73,
+        "pnl_dollars_per_contract": -13.32,
+        "return_pct": -15.671
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260630C00739000",
+        "expiry": "2026-06-30",
+        "entry_mid": 2.56,
+        "exit_mid": 2.5,
+        "buy": 2.6168,
+        "sell": 2.4445,
+        "pnl_dollars_per_contract": -18.55,
+        "return_pct": -7.09
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260702C00739000",
+        "expiry": "2026-07-02",
+        "entry_mid": 4.72,
+        "exit_mid": 4.7,
+        "buy": 4.8248,
+        "sell": 4.5957,
+        "pnl_dollars_per_contract": -24.23,
+        "return_pct": -5.022
+      }
+    },
+    {
+      "date": "2026-07-01",
+      "direction": "bull",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": -20.028,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260701C00749000",
+        "expiry": "2026-07-01",
+        "entry_mid": 0.87,
+        "exit_mid": 0.33,
+        "buy": 0.89,
+        "sell": 0.31,
+        "pnl_dollars_per_contract": -59.32,
+        "return_pct": -66.652
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260702C00749000",
+        "expiry": "2026-07-02",
+        "entry_mid": 2.24,
+        "exit_mid": 1.65,
+        "buy": 2.2897,
+        "sell": 1.6134,
+        "pnl_dollars_per_contract": -68.96,
+        "return_pct": -30.115
+      },
+      "3_7dte": {
+        "status": "filled",
+        "occ": "SPY260706C00749000",
+        "expiry": "2026-07-06",
+        "entry_mid": 3.17,
+        "exit_mid": 2.53,
+        "buy": 3.2404,
+        "sell": 2.4738,
+        "pnl_dollars_per_contract": -77.97,
+        "return_pct": -24.063
+      }
+    },
+    {
+      "date": "2026-07-15",
+      "direction": "bear",
+      "variants": [
+        "ltf_only"
+      ],
+      "underlying_return_60m_bps": 11.884,
+      "0dte": {
+        "status": "filled",
+        "occ": "SPY260715P00753000",
+        "expiry": "2026-07-15",
+        "entry_mid": 1.1,
+        "exit_mid": 1.65,
+        "buy": 1.1244,
+        "sell": 1.6134,
+        "pnl_dollars_per_contract": 47.57,
+        "return_pct": 42.311
+      },
+      "1dte": {
+        "status": "filled",
+        "occ": "SPY260716P00753000",
+        "expiry": "2026-07-16",
+        "entry_mid": 2.17,
+        "exit_mid": 2.74,
+        "buy": 2.2182,
+        "sell": 2.6792,
+        "pnl_dollars_per_contract": 44.78,
+        "return_pct": 20.188
+      },
+      "3_7dte": {
+        "status": "skipped_missing_bars",
+        "occ": "SPY260720P00753000"
+      }
+    }
+  ],
+  "warnings": [
+    "2024-03+ dates were consumed by the parent trial; diagnostic only.",
+    "Bar open/close are trade-derived prices; spread stress is calibrated, not observed NBBO.",
+    "No promotion or production change may result directly from this run."
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "trial_id": "spy-1200-options-replay-2026-07-25",
+  "registered_at": "2026-07-25",
+  "parent_trial": "green-day-htf-ltf-2026-07-25",
+  "strategy_family": "spy_intraday_vwap_ema_htf_confluence_option_execution",
+  "bot_family": "flip_directional_debit",
+  "hypothesis": "The 12:00 SPY daily-aligned underlying lead survives real option premiums, calibrated spreads, and commissions on actual expired contracts.",
+  "preregistration": {
+    "path": "research/OPTIONS_REPLAY_PREREGISTRATION_2026-07-25.md",
+    "sha256": "cd588a2fd675baea356c88dfe28ef5246c51968154bafa53678564263a26e40a",
+    "frozen_before_first_run": true
+  },
+  "data_sources": [
+    "Alpaca expired-contract 1-minute option bars (free feed, read-only)",
+    "data/green_day_htf_ltf_results_per_checkpoint.json signal set (2024-03-01+)",
+    "~/.vibe-trading/logs/option-quote-samples.jsonl forward NBBO capture (spread calibration)"
+  ],
+  "execution_model": {
+    "spread_rel_p75": 0.0444,
+    "spread_source": "forward_nbbo_p75 (15 samples)",
+    "half_spread_floor_dollars": 0.02,
+    "commission_round_trip_dollars": 1.32,
+    "entry": "12:00 ET bar open plus half spread",
+    "exit": "last bar close in 12:45-12:59 ET minus half spread"
+  },
+  "variants_examined": {"dte_buckets": 3, "signal_variants": 2, "cells": 6},
+  "result_artifact": {
+    "path": "data/options_replay_results.json",
+    "sha256": "8ff638aa535f518283f84a59e47e5bcd219fbfce2500c536ea17bf25f7ad52d3"
+  },
+  "outcome": {
+    "stage_reached": "diagnostic_execution_replay",
+    "verdict": "REJECT option implementation. daily_aligned mean option returns: 0dte -13.25%, 1dte -6.70%, 3-7dte -7.81% (PF 0.59/0.54/0.36); ltf_only control also negative in all buckets. The few-bps underlying lead cannot pay ~4.4% relative spread plus commissions at any tested DTE.",
+    "promotion": "none",
+    "follow_up_allowed": "underlying-only shadow observation at most; any option lane for this signal is falsified at current spreads"
+  },
+  "known_limitations": [
+    "Bar prices are trade-derived; spread stress is calibrated from 15 forward NBBO samples, not historical NBBO.",
+    "Signal dates were consumed by the parent trial; diagnostic evidence only.",
+    "ATM $1-strike selection is a frozen simplification of production contract ranking."
+  ],
+  "promotion_authority": "human_only",
+  "immutable": true
+}
