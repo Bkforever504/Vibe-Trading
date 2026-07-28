@@ -157,6 +157,7 @@ def test_score_iwm_trade_does_not_turn_stop_text_into_pnl(monkeypatch) -> None:
 
 def test_score_iwm_trade_accepts_fill_derived_pnl(monkeypatch) -> None:
     monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
+    monkeypatch.setattr(post, "_garch_context_for_symbol", lambda symbol, day: {"available": False, "reason": "test_unavailable"})
     trade = {
         "id": "i3",
         "strategy": "put_spread",
@@ -176,6 +177,65 @@ def test_score_iwm_trade_accepts_fill_derived_pnl(monkeypatch) -> None:
     assert result["pnl"] == 80.0
     assert result["evidence_eligible"] is True
     assert result["pnl_explanation"]["pnl_source"] == "realized_or_fill_derived"
+
+
+def test_garch_context_marks_stale_report_date(tmp_path: Path) -> None:
+    report = {
+        "date": "2026-07-27",
+        "generated_at": "2026-07-28T03:55:00Z",
+        "symbols": [{
+            "symbol": "IWM",
+            "status": "ok",
+            "regime": "normal",
+            "position_size_multiplier": 0.807,
+            "forecast_vol_annualized_pct": 18.59,
+            "vol_percentile_1y": 55.0,
+            "risk_posture": "scale_size",
+        }],
+    }
+    path = tmp_path / "garch.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    context = post._garch_context_for_symbol("iwm", "2026-07-28", path)
+
+    assert context["available"] is True
+    assert context["symbol"] == "IWM"
+    assert context["regime"] == "normal"
+    assert context["position_size_multiplier"] == 0.807
+    assert context["stale_for_trade_day"] is True
+
+
+def test_score_iwm_trade_attaches_garch_context(monkeypatch) -> None:
+    monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
+    monkeypatch.setattr(
+        post,
+        "_garch_context_for_symbol",
+        lambda symbol, day: {
+            "available": True,
+            "symbol": symbol,
+            "regime": "storm",
+            "position_size_multiplier": 0.4,
+            "forecast_vol_annualized_pct": 30.0,
+        },
+    )
+    trade = {
+        "id": "garch-iwm",
+        "strategy": "put_spread",
+        "underlying": "IWM",
+        "status": "closed",
+        "closed_at": "2026-07-28T20:00:00Z",
+        "closing_reason": "stop loss",
+        "net_credit": 0.50,
+        "closing_filled_avg_price": 0.90,
+        "max_risk_per_contract": 150.0,
+        "qty": 1,
+        "stop_loss_pct": -1.0,
+    }
+
+    explanation = post.score_iwm_trade(trade)["pnl_explanation"]
+
+    assert explanation["garch_volatility_risk"]["regime"] == "storm"
+    assert any("garch=storm" in item for item in explanation["evidence"])
 
 
 def test_build_report_reads_closed_trades(monkeypatch, tmp_path: Path) -> None:

@@ -44,6 +44,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VIBE_HOME = Path.home() / ".vibe-trading"
 LOG_PATH = ROOT / "data" / "closed_trade_postmortem_log.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "closed-trade-postmortem.json"
+GARCH_REPORT_PATH = VIBE_HOME / "reports" / "garch-volatility-risk.json"
 
 
 def _read_json(path: Path) -> Any:
@@ -121,6 +122,43 @@ def _latest_force_for_day(day: str) -> dict[str, Any] | None:
     return rows[-1] if rows else None
 
 
+def _garch_context_for_symbol(symbol: str | None, day: str, report_path: Path = GARCH_REPORT_PATH) -> dict[str, Any]:
+    symbol = str(symbol or "").upper()
+    if not symbol:
+        return {"available": False, "reason": "symbol_missing"}
+    report = _read_json(report_path)
+    if not isinstance(report, dict):
+        return {"available": False, "reason": "garch_report_missing_or_unreadable"}
+    rows = report.get("symbols")
+    if not isinstance(rows, list):
+        return {"available": False, "reason": "garch_report_invalid"}
+    row = next(
+        (item for item in rows if isinstance(item, dict) and str(item.get("symbol") or "").upper() == symbol),
+        None,
+    )
+    if not row:
+        return {
+            "available": False,
+            "reason": "garch_symbol_missing",
+            "report_date": report.get("date"),
+            "report_generated_at": report.get("generated_at"),
+        }
+    report_date = str(report.get("date") or "")
+    return {
+        "available": True,
+        "symbol": symbol,
+        "status": row.get("status"),
+        "regime": row.get("regime"),
+        "position_size_multiplier": row.get("position_size_multiplier"),
+        "forecast_vol_annualized_pct": row.get("forecast_vol_annualized_pct"),
+        "vol_percentile_1y": row.get("vol_percentile_1y"),
+        "risk_posture": row.get("risk_posture"),
+        "report_date": report_date or None,
+        "report_generated_at": report.get("generated_at"),
+        "stale_for_trade_day": bool(day and report_date and report_date != day),
+    }
+
+
 def _force_alignment(direction: str, force: dict[str, Any] | None) -> tuple[int, str]:
     if not force:
         return 0, "market force unavailable"
@@ -195,6 +233,16 @@ def explain_flip_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dic
         )
     if catalyst:
         evidence.append(f"catalyst={catalyst}")
+    day = _trade_date(trade)
+    garch = _garch_context_for_symbol(str(trade.get("symbol") or ""), day)
+    if garch.get("available"):
+        evidence.append(
+            "garch="
+            f"{garch.get('regime')} mult={garch.get('position_size_multiplier')} "
+            f"vol={garch.get('forecast_vol_annualized_pct')}"
+        )
+    else:
+        evidence.append(f"garch={garch.get('reason')}")
     if pnl > 0 and "profit protect" in exit_reason.lower():
         primary_driver = "price moved in the option direction, then faded enough for profit-protection to close it"
         if giveback_pct is not None and giveback_pct >= 25:
@@ -232,6 +280,7 @@ def explain_flip_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dic
         ),
         "primary_driver": primary_driver,
         "market_context": force_class,
+        "garch_volatility_risk": garch,
         "evidence": evidence,
         "exit_quality": {
             **quality,
@@ -265,6 +314,16 @@ def explain_iwm_pnl(
         f"close_reason={close_reason}",
     ]
     evidence.extend(str(reason) for reason in conf_reasons[:4])
+    day = _trade_date(trade)
+    garch = _garch_context_for_symbol(str(trade.get("underlying") or ""), day)
+    if garch.get("available"):
+        evidence.append(
+            "garch="
+            f"{garch.get('regime')} mult={garch.get('position_size_multiplier')} "
+            f"vol={garch.get('forecast_vol_annualized_pct')}"
+        )
+    else:
+        evidence.append(f"garch={garch.get('reason')}")
     if pnl is None:
         primary_driver = "realized option P/L is not available in the state file yet"
         next_action = "attach broker fill P/L or closing debit to the trade state"
@@ -286,6 +345,7 @@ def explain_iwm_pnl(
         ),
         "primary_driver": primary_driver,
         "market_context": force_class,
+        "garch_volatility_risk": garch,
         "evidence": evidence,
         "risk_lesson": "stop at or inside -100% credit" if float(trade.get("stop_loss_pct") or 0) >= -1.0 else "stop wider than current standard",
         "next_action": next_action,

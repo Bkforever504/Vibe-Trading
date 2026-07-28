@@ -609,6 +609,7 @@ def atomic_save_json(path: Path | str, data: Any, *, lock_timeout: float = 10.0,
     lock = _lock_path(path)
     deadline = time.monotonic() + lock_timeout
     fd = None
+    tmp: Path | None = None
     while True:
         try:
             fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -626,13 +627,20 @@ def atomic_save_json(path: Path | str, data: Any, *, lock_timeout: float = 10.0,
             time.sleep(0.1)
     try:
         os.write(fd, str(os.getpid()).encode("ascii", "ignore"))
-        tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}")
+        # Multiple scheduler threads share a PID on Windows. A PID-only temp
+        # name lets concurrent writers overwrite or replace each other's file.
+        tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{time.time_ns()}")
         with tmp.open("w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2, sort_keys=True)
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(tmp, path)
     finally:
+        if tmp is not None:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
         try:
             os.close(fd)
         except OSError:
