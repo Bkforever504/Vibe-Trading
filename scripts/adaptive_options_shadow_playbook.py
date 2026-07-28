@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ MARKET_FORCE_LOG = ROOT / "data" / "market_force_score_log.jsonl"
 OPENING_RANGE_LOG = ROOT / "data" / "opening_range_breadth_log.jsonl"
 RV_IV_REGIME_LOG = ROOT / "data" / "rv_iv_regime_log.jsonl"
 EXPECTED_MOVE_LOG = ROOT / "data" / "zero_dte_expected_move_context_log.jsonl"
+OPTIONS_HEATMAP_LOG = ROOT / "data" / "options_liquidation_heatmap_log.jsonl"
 LOG_PATH = ROOT / "data" / "adaptive_options_shadow_playbook_log.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "adaptive-options-shadow-playbook.json"
 DEFAULT_SYMBOLS = ["SPY", "QQQ"]
@@ -119,6 +121,27 @@ def _latest_expected_move_context(symbol: str) -> dict[str, Any]:
     return {}
 
 
+def _latest_options_heatmap_context(symbol: str) -> dict[str, Any]:
+    row = _latest_jsonl_row(OPTIONS_HEATMAP_LOG)
+    results = row.get("results") if isinstance(row, dict) else []
+    if not isinstance(results, list):
+        return {}
+    for item in results:
+        if (
+            isinstance(item, dict)
+            and str(item.get("symbol") or "").upper() == symbol
+            and item.get("status") == "ok"
+        ):
+            labels = item.get("condition_labels") if isinstance(item.get("condition_labels"), list) else []
+            return {
+                "options_heat_state": str(item.get("front_heat_state") or "unknown"),
+                "options_heat_labels": [str(label) for label in labels],
+                "options_heat_pc_oi": _safe_float(item.get("front_put_call_open_interest_ratio")),
+                "options_heat_front_move_pct": _safe_float(item.get("front_implied_move_pct")),
+            }
+    return {}
+
+
 def _flip_context(symbol: str) -> dict[str, Any]:
     trades = _read_json(VIBE_HOME / "flip-trades.json")
     if not isinstance(trades, list):
@@ -176,6 +199,7 @@ def build_contexts(symbols: list[str]) -> dict[str, dict[str, Any]]:
         context["opening_range_state"] = _latest_opening_range_state(symbol)
         context["volatility_regime"] = _latest_volatility_regime(symbol)
         context.update(_latest_expected_move_context(symbol))
+        context.update(_latest_options_heatmap_context(symbol))
         if trend == "bearish":
             context.update({"below_vwap": True, "below_ema50": True, "bearish_orb": True})
         elif trend == "bullish":
@@ -196,6 +220,8 @@ def classify_market_conditions(context: dict[str, Any]) -> list[dict[str, str]]:
     flip_win_rate = _safe_float(context.get("flip_recent_win_rate"))
     opening_range_bucket = str(context.get("opening_range_bucket") or "unknown")
     expected_move_consumed = _safe_float(context.get("expected_move_consumed_fraction"), -1.0)
+    heat_state = str(context.get("options_heat_state") or "unknown")
+    heat_labels = context.get("options_heat_labels") if isinstance(context.get("options_heat_labels"), list) else []
     labels: list[dict[str, str]] = []
 
     if trend == "bearish":
@@ -246,6 +272,18 @@ def classify_market_conditions(context: dict[str, Any]) -> list[dict[str, str]]:
             "label": consumed_label,
             "evidence": f"displacement consumed {expected_move_consumed:.1%} of implied daily move",
         })
+
+    if heat_state != "unknown":
+        labels.append({
+            "label": f"options_heat_{heat_state}",
+            "evidence": f"option-chain heat state={heat_state}",
+        })
+    if "spot_inside_heat_band" in heat_labels:
+        labels.append({"label": "spot_inside_options_heat_band", "evidence": "spot is near a high OI/volume zone"})
+    if "put_oi_pressure" in heat_labels:
+        labels.append({"label": "put_oi_pressure", "evidence": "front-expiry put/call OI ratio elevated"})
+    elif "call_oi_pressure" in heat_labels:
+        labels.append({"label": "call_oi_pressure", "evidence": "front-expiry call OI pressure elevated"})
 
     labels.append(
         {"label": "liquid_options" if liquidity_ok else "options_liquidity_blocked",
@@ -393,6 +431,10 @@ def evaluate_symbol_playbook(symbol: str, context: dict[str, Any]) -> dict[str, 
             "opening_range_bucket": context.get("opening_range_bucket"),
             "expected_move_consumed_fraction": _safe_float(context.get("expected_move_consumed_fraction")),
             "breakout_overshoot_fraction": _safe_float(context.get("breakout_overshoot_fraction")),
+            "options_heat_state": context.get("options_heat_state"),
+            "options_heat_labels": context.get("options_heat_labels"),
+            "options_heat_pc_oi": _safe_float(context.get("options_heat_pc_oi")),
+            "options_heat_front_move_pct": _safe_float(context.get("options_heat_front_move_pct")),
         },
     }
 
@@ -420,14 +462,43 @@ def build_report(symbols: list[str] | None = None, contexts: dict[str, dict[str,
 
 def append_log(report: dict[str, Any], log_path: Path = LOG_PATH) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(report, separators=(",", ":")) + "\n")
+    payload = json.dumps(report, separators=(",", ":")) + "\n"
+    try:
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(payload)
+    except OSError:
+        fallback = REPORT_PATH.parent / (
+            f"{log_path.stem}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{os.getpid()}{log_path.suffix}"
+        )
+        try:
+            fallback.parent.mkdir(parents=True, exist_ok=True)
+            with fallback.open("a", encoding="utf-8") as f:
+                f.write(payload)
+        except OSError:
+            return
 
 
 def write_report(report: dict[str, Any], report_path: Path = REPORT_PATH) -> Path:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return report_path
+    payload = json.dumps(report, indent=2) + "\n"
+    temp = report_path.with_suffix(report_path.suffix + f".tmp-{os.getpid()}-{datetime.now(timezone.utc).timestamp()}")
+    try:
+        temp.write_text(payload, encoding="utf-8")
+        os.replace(temp, report_path)
+        return report_path
+    except OSError:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        fallback = report_path.with_name(
+            f"{report_path.stem}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}{report_path.suffix}"
+        )
+        try:
+            fallback.write_text(payload, encoding="utf-8")
+            return fallback
+        except OSError:
+            return report_path
 
 
 def main() -> int:

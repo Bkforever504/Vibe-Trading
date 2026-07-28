@@ -24,9 +24,11 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 _ENV_PATH = ROOT / "agent" / ".env"
+VIBE_HOME = Path.home() / ".vibe-trading"
 
 _ALPACA_KEY: str | None = None
 _ALPACA_SECRET: str | None = None
+_LAST_SOURCE: str | None = None
 
 
 def _load_env() -> None:
@@ -60,16 +62,36 @@ def _alpaca_available() -> bool:
 
 def fetch_ohlcv(symbol: str, lookback_days: int = 520) -> pd.DataFrame:
     """Fetch daily OHLCV bars. Returns df with open/high/low/close/volume columns."""
+    global _LAST_SOURCE
     if _alpaca_available():
-        return _fetch_ohlcv_alpaca(symbol, lookback_days)
-    return _fetch_ohlcv_yfinance(symbol, lookback_days)
+        try:
+            df = _fetch_ohlcv_alpaca(symbol, lookback_days)
+            _LAST_SOURCE = "alpaca"
+            df.attrs["data_source"] = "alpaca"
+            return df
+        except Exception as exc:
+            warnings.warn(f"Alpaca OHLCV unavailable for {symbol}; falling back to yfinance: {str(exc)[:160]}")
+    df = _fetch_ohlcv_yfinance(symbol, lookback_days)
+    _LAST_SOURCE = "yfinance"
+    df.attrs["data_source"] = "yfinance"
+    return df
 
 
 def fetch_close(symbols: list[str], lookback_days: int = 520) -> pd.DataFrame:
     """Fetch daily close prices for multiple symbols. Returns df with symbol columns."""
+    global _LAST_SOURCE
     if _alpaca_available():
-        return _fetch_close_alpaca(symbols, lookback_days)
-    return _fetch_close_yfinance(symbols, lookback_days)
+        try:
+            df = _fetch_close_alpaca(symbols, lookback_days)
+            _LAST_SOURCE = "alpaca"
+            df.attrs["data_source"] = "alpaca"
+            return df
+        except Exception as exc:
+            warnings.warn(f"Alpaca close data unavailable; falling back to yfinance: {str(exc)[:160]}")
+    df = _fetch_close_yfinance(symbols, lookback_days)
+    _LAST_SOURCE = "yfinance"
+    df.attrs["data_source"] = "yfinance"
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +184,7 @@ def _fetch_ohlcv_yfinance(symbol: str, lookback_days: int) -> pd.DataFrame:
         import yfinance as yf
     except ImportError as exc:
         raise ImportError("yfinance required: uv add yfinance") from exc
+    _configure_yfinance_cache(yf)
 
     today = date.today()
     start = (today - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
@@ -180,6 +203,7 @@ def _fetch_close_yfinance(symbols: list[str], lookback_days: int) -> pd.DataFram
         import yfinance as yf
     except ImportError as exc:
         raise ImportError("yfinance required: uv add yfinance") from exc
+    _configure_yfinance_cache(yf)
 
     today = date.today()
     start = (today - timedelta(days=lookback_days * 2)).strftime("%Y-%m-%d")
@@ -196,9 +220,20 @@ def _fetch_close_yfinance(symbols: list[str], lookback_days: int) -> pd.DataFram
     return pd.DataFrame(frames).dropna()
 
 
+def _configure_yfinance_cache(yf_module: object) -> None:
+    cache_dir = Path(os.getenv("YFINANCE_CACHE_DIR") or VIBE_HOME / "cache" / "yfinance")
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        setter = getattr(yf_module, "set_tz_cache_location", None)
+        if callable(setter):
+            setter(str(cache_dir))
+    except OSError:
+        return
+
+
 def data_source() -> str:
     """Return which source will be used — useful for logging."""
-    return "alpaca" if _alpaca_available() else "yfinance"
+    return _LAST_SOURCE or ("alpaca" if _alpaca_available() else "yfinance")
 
 
 def fetch_vix_context() -> dict:

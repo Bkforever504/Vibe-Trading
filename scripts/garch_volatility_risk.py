@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -177,8 +178,25 @@ def build_report(
 
 def write_report(report: dict[str, Any], path: Path = REPORT_PATH) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return path
+    temp = path.with_suffix(path.suffix + f".tmp-{os.getpid()}-{datetime.now(timezone.utc).timestamp()}")
+    try:
+        payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        temp.write_text(payload, encoding="utf-8")
+        os.replace(temp, path)
+        return path
+    except OSError:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        fallback = path.with_name(f"{path.stem}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}{path.suffix}")
+        report.setdefault("warnings", []).append(f"Primary report path was unavailable; wrote fallback {fallback}")
+        payload = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        try:
+            fallback.write_text(payload, encoding="utf-8")
+            return fallback
+        except OSError:
+            return path
 
 
 def append_log(report: dict[str, Any], path: Path = LOG_PATH) -> Path:

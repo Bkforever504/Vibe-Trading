@@ -250,15 +250,21 @@ def test_adaptive_options_labels_expected_move_context_without_changing_playbook
             "opening_range_bucket": "compressed_under_20pct",
             "expected_move_consumed_fraction": 0.42,
             "breakout_overshoot_fraction": 0.0,
+            "options_heat_state": "near_major_heat_zone",
+            "options_heat_labels": ["spot_inside_heat_band", "put_oi_pressure"],
         },
     )
 
     labels = set(row["condition_summary"]["labels"])
     assert "expected_move_compressed_under_20pct" in labels
     assert "expected_move_under_half_consumed" in labels
+    assert "options_heat_near_major_heat_zone" in labels
+    assert "spot_inside_options_heat_band" in labels
+    assert "put_oi_pressure" in labels
     assert row["selected_playbook"] == "none"
     assert row["action"] == "stand_aside"
     assert row["inputs"]["expected_move_consumed_fraction"] == 0.42
+    assert row["inputs"]["options_heat_state"] == "near_major_heat_zone"
 
 
 def test_adaptive_options_report_contains_condition_summary_and_explained_stand_aside() -> None:

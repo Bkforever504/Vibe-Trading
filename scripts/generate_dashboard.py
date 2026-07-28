@@ -50,6 +50,7 @@ REPORTS = {
     "higher_timeframe": REPORT_DIR / "higher-timeframe-market-map.json",
     "market_catalyst": REPORT_DIR / "market-catalyst-calendar.json",
     "daily_edge": REPORT_DIR / "daily-edge-orchestrator.json",
+    "options_heatmap": REPORT_DIR / "options-liquidation-heatmap.json",
     "kronos_forecast": REPORT_DIR / "kronos-market-forecast.json",
     "cheap_asymmetry": REPORT_DIR / "cheap-asymmetry-scanner.json",
     "learning": REPORT_DIR / "flip-bot-learning-report.json",
@@ -386,6 +387,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "higher_timeframe": load_json(paths["higher_timeframe"], {}),
         "market_catalyst": load_json(paths["market_catalyst"], {}),
         "daily_edge": load_json(paths["daily_edge"], {}),
+        "options_heatmap": load_json(paths["options_heatmap"], {}),
         "kronos_forecast": load_json(paths["kronos_forecast"], {}),
         "cheap_asymmetry": load_json(paths["cheap_asymmetry"], {}),
         "learning": load_json(paths["learning"], {}),
@@ -971,6 +973,56 @@ def render_shadow_consensus(model: dict[str, Any]) -> str:
     )
 
 
+def render_options_heatmap(model: dict[str, Any]) -> str:
+    data = model.get("options_heatmap") if isinstance(model.get("options_heatmap"), dict) else {}
+    if not data:
+        return section("Options Liquidation Heat Map", "<p style='color:var(--muted);padding:12px'>No report - run scripts/options_liquidation_heatmap.py first.</p>")
+    results = data.get("results") if isinstance(data.get("results"), list) else []
+    ok = [row for row in results if isinstance(row, dict) and row.get("status") == "ok"]
+    cards = (
+        stat_card("Symbols", str(safe_int(data.get("ok_count"))), f"of {safe_int(data.get('symbol_count'))} mapped")
+        + stat_card("Near Heat", str(safe_int(data.get("near_major_heat_zone_count"))), "spot near high OI/volume zone", "warn" if safe_int(data.get("near_major_heat_zone_count")) else "good")
+        + stat_card("Execution", "OFF", "read-only context", "good" if not data.get("can_submit_orders") else "bad")
+        + stat_card("Book Type", "PROXY", "public chain, not forced liquidation book", "warn")
+    )
+    rows = []
+    for row in ok[:12]:
+        above = row.get("nearest_heat_zone_above") if isinstance(row.get("nearest_heat_zone_above"), dict) else {}
+        below = row.get("nearest_heat_zone_below") if isinstance(row.get("nearest_heat_zone_below"), dict) else {}
+        top = row.get("top_heat_zones") if isinstance(row.get("top_heat_zones"), list) else []
+        gex = row.get("gex_wall") if isinstance(row.get("gex_wall"), dict) else {}
+        labels = row.get("condition_labels") if isinstance(row.get("condition_labels"), list) else []
+        rows.append(
+            "<tr>"
+            f"<td><strong>{esc(row.get('symbol'))}</strong><small>spot {money(row.get('spot'))}</small></td>"
+            f"<td class='{cls_for_health(row.get('front_heat_state'))}'>{esc(row.get('front_heat_state'))}</td>"
+            f"<td>{pct(row.get('front_implied_move_pct'))}</td>"
+            f"<td>{esc(row.get('front_put_call_open_interest_ratio'))}</td>"
+            f"<td><strong>{esc(below.get('strike', ''))}</strong><small>{esc(below.get('bias', ''))}</small></td>"
+            f"<td><strong>{esc(above.get('strike', ''))}</strong><small>{esc(above.get('bias', ''))}</small></td>"
+            f"<td>{esc(gex.get('strike', ''))}<small>{esc(gex.get('bias', ''))}</small></td>"
+            f"<td class='muted small'>{esc(', '.join(str(item) for item in labels[:4]))}</td>"
+            f"<td class='muted small'>{esc(', '.join(str(zone.get('strike')) for zone in top[:3] if isinstance(zone, dict)))}</td>"
+            "</tr>"
+        )
+    unavailable = [row for row in results if isinstance(row, dict) and row.get("status") != "ok"]
+    unavailable_html = ""
+    if unavailable:
+        unavailable_html = "<p class='muted small' style='padding:10px 0 0'>Unavailable: " + esc(
+            ", ".join(f"{row.get('symbol')}={row.get('reason')}" for row in unavailable[:5])
+        ) + "</p>"
+    body = (
+        '<div class="grid-3" style="margin-bottom:16px">' + cards + "</div>"
+        + '<div class="table-wrap"><table><thead><tr>'
+        '<th>Symbol</th><th>Heat State</th><th>Front Move</th><th>P/C OI</th><th>Below Zone</th><th>Above Zone</th><th>GEX Wall</th><th>Labels</th><th>Top Heat</th>'
+        '</tr></thead><tbody>'
+        + ("".join(rows) or "<tr><td colspan='9'>No heat-map rows available.</td></tr>")
+        + "</tbody></table></div>"
+        + unavailable_html
+    )
+    return section("Options Liquidation Heat Map", body, "Public OI/volume heat zones + optional GEX wall - context only")
+
+
 def render_grades(model: dict[str, Any]) -> str:
     grades = model["grades"] if isinstance(model["grades"], dict) else {}
     items = grades.get("items") if isinstance(grades.get("items"), list) else []
@@ -1552,6 +1604,7 @@ def render_html(model: dict[str, Any]) -> str:
         ("#positions", "Positions"),
         ("#health",    "Health"),
         ("#mastery",   "Mastery"),
+        ("#heatmap",   "Heat Map"),
         ("#kronos",    "Kronos"),
         ("#consensus", "Consensus"),
         ("#grades",    "Grades"),
@@ -1906,6 +1959,11 @@ def render_html(model: dict[str, Any]) -> str:
     <div id="mastery" class="section">
       <div class="section-label"><h2>Market Mastery</h2><p>Candlestick context, higher timeframe map, and catalyst vetoes</p></div>
       {render_market_mastery(model)}
+    </div>
+
+    <div id="heatmap" class="section">
+      <div class="section-label"><h2>Options Liquidation Heat Map</h2><p>Public option-chain heat zones, pin risk, and GEX context; read-only</p></div>
+      {render_options_heatmap(model)}
     </div>
 
     <div id="kronos" class="section">

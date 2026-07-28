@@ -344,6 +344,27 @@ def test_dashboard_html_renders_bot_trades_and_static_contract() -> None:
         "candlestick_context": {},
         "higher_timeframe": {},
         "daily_edge": {},
+        "options_heatmap": {
+            "symbol_count": 1,
+            "ok_count": 1,
+            "near_major_heat_zone_count": 1,
+            "can_submit_orders": False,
+            "results": [
+                {
+                    "symbol": "SPY",
+                    "status": "ok",
+                    "spot": 640.0,
+                    "front_heat_state": "near_major_heat_zone",
+                    "front_implied_move_pct": 0.85,
+                    "front_put_call_open_interest_ratio": 1.2,
+                    "nearest_heat_zone_below": {"strike": 638, "bias": "put_wall_support_proxy"},
+                    "nearest_heat_zone_above": {"strike": 642, "bias": "call_wall_resistance_proxy"},
+                    "gex_wall": {"strike": 640, "bias": "support"},
+                    "condition_labels": ["spot_inside_heat_band"],
+                    "top_heat_zones": [{"strike": 640}, {"strike": 642}],
+                }
+            ],
+        },
     }
 
     html = dashboard.render_html(model)
@@ -351,6 +372,8 @@ def test_dashboard_html_renders_bot_trades_and_static_contract() -> None:
     assert "Vibe Trading Control Room" in html
     assert "Daily Edge Orchestrator" in html
     assert "Market Mastery" in html
+    assert "Options Liquidation Heat Map" in html
+    assert "near_major_heat_zone" in html
     assert "No execution controls" in html
     assert "SPY260702P00747000" in html
     assert "Put Spread [IWM]" in html
