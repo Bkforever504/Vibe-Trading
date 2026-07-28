@@ -98,13 +98,13 @@ MAX_NEW_TRADES_PER_SYMBOL_PER_RUN = int(os.getenv("MAX_NEW_TRADES_PER_SYMBOL_PER
 # ETFs (IWM/SPY/QQQ): lower IV, good for IC + spreads
 # Individual stocks (NVDA/PLTR): high IV, put spreads + wheel
 SYMBOLS: dict[str, list[str]] = {
-    "IWM":  ["ic", "ps"],        # ETF, lower IV, both strategies
-    "SPY":  ["ps"],              # ETF, deep liquidity, put spread
-    "QQQ":  ["ps"],              # ETF, tech exposure, put spread
-    "TSLA": ["ic", "ps"],        # highest retail volume, very high IV
-    "NVDA": ["ps", "wheel"],     # AI stock, high IV, wheel income
-    "AAPL": ["ps", "wheel"],     # most liquid options market, stable for wheel
-    "PLTR": ["ps"],              # high IV, put spread
+    "IWM":  ["ic", "ps", "cs"],  # ETF: IC + put spread (up) + call spread (down)
+    "SPY":  ["ps", "cs"],        # ETF: put spread (up) + call spread (down)
+    "QQQ":  ["ps", "cs"],        # ETF: put spread (up) + call spread (down)
+    "TSLA": ["ic", "ps", "cs"],  # High IV: all three
+    "NVDA": ["ps", "cs", "wheel"],  # High IV: both directions + wheel
+    "AAPL": ["ps", "cs", "wheel"],  # Liquid: both directions + wheel
+    "PLTR": ["ps", "cs"],        # High IV: both directions
 }
 
 # Per-symbol put spread width override (higher-priced stocks need wider spreads)
@@ -119,7 +119,7 @@ PS_WIDTH_OVERRIDE: dict[str, float] = {
 IC_DTE_MIN          = 30
 IC_DTE_MAX          = 45
 IC_DELTA_TARGET     = 0.16    # short leg delta (~84% probability of profit)
-IC_WING_WIDTH       = 2       # $2 wings on each side
+IC_WING_WIDTH       = 3       # $3 wings on each side
 IC_PROFIT_CLOSE_PCT = 0.50    # close at 50% of max credit (82% win rate per tastytrade research)
 
 PS_DTE_MIN          = 7
@@ -135,7 +135,7 @@ WHEEL_DELTA         = 0.30    # slightly more aggressive delta for more premium
 WHEEL_CC_DELTA      = 0.30    # covered call delta after assignment
 WHEEL_PROFIT_PCT    = 0.50
 
-STOP_LOSS_PCT       = -1.0    # close if loss reaches 100% of credit received
+STOP_LOSS_PCT       = -2.0    # close if loss reaches 200% of credit (short premium needs room)
 IC_DTE_MANAGE_DAYS  = int(os.getenv("IC_DTE_MANAGE_DAYS", "21"))
 PS_DTE_MANAGE_DAYS  = int(os.getenv("PS_DTE_MANAGE_DAYS", "2"))
 CREDIT_NEAR_TARGET_CLOSE_PCT = float(os.getenv("CREDIT_NEAR_TARGET_CLOSE_PCT", "0.45"))
@@ -159,6 +159,16 @@ SHADOW_DEFENSIVE_EXIT_BLOCKERS = {
 PAPER = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 BASE  = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.markets"
 LIVE_EXECUTION_ENABLED = os.getenv("OPTIONS_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+VIBE_HOME = Path.home() / ".vibe-trading"
+GARCH_RISK_REPORT = Path(os.path.expanduser(os.getenv(
+    "GARCH_RISK_REPORT", str(VIBE_HOME / "reports" / "garch-volatility-risk.json"),
+)))
+ENABLE_GARCH_RISK_GATE = os.getenv("ENABLE_GARCH_RISK_GATE", "true").lower() == "true"
+OPTIONS_GARCH_STORM_BLOCK = os.getenv("OPTIONS_GARCH_STORM_BLOCK", "true").lower() == "true"
+OPTIONS_REQUIRE_GARCH_REPORT = os.getenv("OPTIONS_REQUIRE_GARCH_REPORT", "false").lower() == "true"
+OPTIONS_GARCH_MIN_ENTRY_MULTIPLIER = float(
+    os.getenv("OPTIONS_GARCH_MIN_ENTRY_MULTIPLIER", "0.50")
+)
 OPTIONS_STRICT_SHADOW_CAUTION_GATE = os.getenv(
     "OPTIONS_STRICT_SHADOW_CAUTION_GATE", "true"
 ).lower() == "true"
@@ -178,6 +188,76 @@ def _now_et() -> datetime:
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _garch_meta(row: dict | None, reason: str) -> dict:
+    row = row if isinstance(row, dict) else {}
+    return {
+        "enabled": ENABLE_GARCH_RISK_GATE,
+        "reason": reason,
+        "report_path": str(GARCH_RISK_REPORT),
+        "symbol": str(row.get("symbol") or "").upper() or None,
+        "status": row.get("status"),
+        "regime": row.get("regime"),
+        "position_size_multiplier": row.get("position_size_multiplier"),
+        "forecast_vol_annualized_pct": row.get("forecast_vol_annualized_pct"),
+        "vol_percentile_1y": row.get("vol_percentile_1y"),
+    }
+
+
+def _garch_symbol_row(symbol: str) -> tuple[dict | None, str]:
+    """Read one symbol's GARCH row without turning a report outage into a crash."""
+    if not ENABLE_GARCH_RISK_GATE:
+        return None, "garch_gate_disabled"
+    try:
+        with GARCH_RISK_REPORT.open("r", encoding="utf-8") as fh:
+            report = json.load(fh)
+    except FileNotFoundError:
+        return None, "garch_report_missing"
+    except (OSError, json.JSONDecodeError) as exc:
+        log.warning(f"GARCH report unreadable at {GARCH_RISK_REPORT}: {exc}")
+        return None, "garch_report_unreadable"
+    rows = report.get("symbols") if isinstance(report, dict) else None
+    if not isinstance(rows, list):
+        return None, "garch_report_invalid"
+    normalized = str(symbol or "").upper()
+    row = next(
+        (item for item in rows if isinstance(item, dict) and str(item.get("symbol") or "").upper() == normalized),
+        None,
+    )
+    return row, "garch_ok" if row else "garch_symbol_missing"
+
+
+def _garch_entry_adjustment(symbol: str, qty: int) -> tuple[int, dict, bool]:
+    """Return a non-increasing entry quantity and whether a new entry may proceed."""
+    row, reason = _garch_symbol_row(symbol)
+    meta = _garch_meta(row, reason)
+    if not ENABLE_GARCH_RISK_GATE:
+        return qty, meta, True
+    if row is None:
+        return qty, meta, not OPTIONS_REQUIRE_GARCH_REPORT
+    if str(row.get("status") or "").lower() != "ok":
+        meta["reason"] = "garch_symbol_not_ok"
+        return qty, meta, not OPTIONS_REQUIRE_GARCH_REPORT
+    if str(row.get("regime") or "").lower() == "storm" and OPTIONS_GARCH_STORM_BLOCK:
+        meta["reason"] = "garch_storm_regime"
+        return 0, meta, False
+    try:
+        multiplier = float(row.get("position_size_multiplier"))
+    except (TypeError, ValueError):
+        meta["reason"] = "garch_invalid_multiplier"
+        return qty, meta, not OPTIONS_REQUIRE_GARCH_REPORT
+    if not math.isfinite(multiplier) or multiplier <= 0:
+        meta["reason"] = "garch_invalid_multiplier"
+        return qty, meta, not OPTIONS_REQUIRE_GARCH_REPORT
+    multiplier = min(1.0, multiplier)
+    meta["position_size_multiplier"] = multiplier
+    if multiplier < OPTIONS_GARCH_MIN_ENTRY_MULTIPLIER:
+        meta["reason"] = "garch_multiplier_below_entry_floor"
+        return 0, meta, False
+    adjusted_qty = min(qty, max(1, int(qty * multiplier)))
+    meta["reason"] = "garch_size_down" if adjusted_qty < qty else "garch_normal"
+    return adjusted_qty, meta, True
 
 
 def _credit_near_target_cutoff_reached(now_et: datetime | None = None) -> bool:
@@ -668,6 +748,26 @@ def _order_snapshot(order_id: str) -> Optional[dict]:
         return None
 
 
+def _apply_closing_fill(trade: dict, order: dict) -> bool:
+    """Apply broker-confirmed close economics without inventing a P/L estimate."""
+    try:
+        filled_qty = int(float(order.get("filled_qty") or 0))
+        closing_debit = max(0.0, float(order.get("filled_avg_price") or 0.0))
+        entry_credit = float(trade.get("net_credit") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if filled_qty < 1 or entry_credit < 0:
+        return False
+    trade["closing_filled_avg_price"] = round(closing_debit, 4)
+    trade["closing_filled_qty"] = filled_qty
+    trade["realized_pnl_dollars"] = round(
+        (entry_credit - closing_debit) * filled_qty * 100.0,
+        2,
+    )
+    trade["pnl_source"] = "fill_derived"
+    return True
+
+
 def _refresh_filled_group_closes(state: dict) -> bool:
     """Retire economic groups only after their exact MLEG close is filled."""
     changed = False
@@ -699,11 +799,15 @@ def _refresh_filled_group_closes(state: dict) -> bool:
                 "match the tracked group; leaving state closing for manual review"
             )
             continue
+        if not _apply_closing_fill(trade, order):
+            log.error(
+                f"{trade.get('label', 'trade')}: close fill has invalid economics; "
+                "leaving state closing for manual review"
+            )
+            continue
         trade["status"] = "closed"
         trade["closed_at"] = order.get("filled_at") or _utc_timestamp()
         trade["closing_order_status"] = "filled"
-        trade["closing_filled_qty"] = filled_qty
-        trade["closing_filled_avg_price"] = float(order.get("filled_avg_price") or 0.0)
         trade["close_verified_by"] = "alpaca_filled_mleg_order"
         _clear_flat_observation(trade)
         log.info(
@@ -1007,6 +1111,20 @@ def _legs_liquid(label: str, legs: list[Leg]) -> bool:
             )
             return False
     return True
+
+
+def _leg_market_snapshot(leg: Leg) -> dict:
+    """Persist the entry quote used in a candidate decision for later review."""
+    return {
+        "symbol": leg.symbol,
+        "expiry": str(leg.expiry),
+        "strike": leg.strike,
+        "right": leg.right,
+        "delta": leg.delta,
+        "bid": leg.bid,
+        "ask": leg.ask,
+        "mid": leg.mid,
+    }
 
 
 def _candidate_confidence(
@@ -1537,6 +1655,15 @@ def _place_mleg(
 ) -> bool:
     trade_meta = dict(trade_meta or {})
     underlying = str(trade_meta.get("underlying") or label)
+    qty, garch_meta, garch_allowed = _garch_entry_adjustment(underlying, qty)
+    trade_meta["garch_volatility_risk"] = garch_meta
+    trade_meta["qty"] = qty
+    if not garch_allowed:
+        strategy = str(trade_meta.get("strategy") or "mleg")
+        _decision(underlying, strategy, "skip", garch_meta["reason"], garch_volatility_risk=garch_meta)
+        log.warning(f"{label}: GARCH ENTRY BLOCKED {underlying}: {garch_meta['reason']}")
+        _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
+        return False
     consensus = shadow_entry_advice(underlying, qty)
     if consensus.get("enabled"):
         warning_list = sorted(
@@ -1547,27 +1674,38 @@ def _place_mleg(
             log.warning(f"{label}: SHADOW CONSENSUS BLOCKED {underlying}: {blockers}")
             _alert(f"SHADOW CONSENSUS BLOCKED: **{label}**\nreason={blockers}")
             return False
-        if (
-            OPTIONS_STRICT_SHADOW_CAUTION_GATE
-            and str(consensus.get("recommendation") or "").lower() == "stand_aside"
-            and len(warning_list) >= OPTIONS_STRICT_CAUTION_MIN_WARNINGS
-        ):
+        bot_assist = (consensus.get("decision") or {}).get("bot_assist") or {}
+        if bot_assist.get("options_bot") is False:
             strategy = str(trade_meta.get("strategy") or "mleg")
             _decision(
                 underlying,
                 strategy,
                 "skip",
-                "shadow_consensus_multi_warning_stand_aside",
+                "shadow_options_assist_disabled",
+                blockers=warning_list,
+                candidate_confidence=trade_meta.get("candidate_confidence"),
+            )
+            log.warning(f"{label}: SHADOW OPTIONS ASSIST DISABLED {underlying}: {blockers}")
+            _alert(f"SHADOW OPTIONS ASSIST DISABLED: **{label}**\nreason={blockers}")
+            return False
+        if str(consensus.get("recommendation") or "").lower() == "stand_aside":
+            strategy = str(trade_meta.get("strategy") or "mleg")
+            _decision(
+                underlying,
+                strategy,
+                "skip",
+                "shadow_consensus_stand_aside",
                 blockers=warning_list,
                 warning_count=len(warning_list),
+                recommendation=consensus.get("recommendation"),
                 options_playbook=consensus.get("options_playbook"),
                 candidate_confidence=trade_meta.get("candidate_confidence"),
             )
             log.warning(
-                f"{label}: OPTIONS CAUTION GATE BLOCKED {underlying}: {blockers}"
+                f"{label}: SHADOW CONSENSUS STAND ASIDE {underlying}: {blockers}"
             )
             _alert(
-                f"OPTIONS CAUTION GATE BLOCKED: **{label}**\n"
+                f"SHADOW CONSENSUS STAND ASIDE: **{label}**\n"
                 f"warnings={len(warning_list)} reason={blockers}"
             )
             return False
@@ -2150,6 +2288,85 @@ def run_put_spread(
 
 
 # â”€â”€ Single-leg order (for CSP and covered call) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+# -- Strategy: Call Spread (bearish -- sell OTM call spread when below 20 SMA) --
+def run_call_spread(
+    trade_client: "TradingClient",
+    data_client: "OptionHistoricalDataClient",
+    symbol: str,
+    equity: float,
+) -> bool:
+    log.info(f"--- Call Spread scan [{symbol}] ---")
+    if _above_20sma(symbol):
+        log.info(f"CS [{symbol}]: above 20 SMA -- skipping (use put spread instead)")
+        _strategy_skip(symbol, "cs", "trend_filter_above_20sma_use_ps")
+        return False
+    calls = _fetch_chain(data_client, symbol, PS_DTE_MIN, PS_DTE_MAX, "call")
+    if not calls:
+        log.warning(f"CS [{symbol}]: no call chain data")
+        _strategy_skip(symbol, "cs", "no_chain_data", dte_min=PS_DTE_MIN, dte_max=PS_DTE_MAX)
+        return False
+    short_call = _closest_delta(calls, PS_DELTA_TARGET)
+    if not short_call:
+        _strategy_skip(symbol, "cs", "missing_short_call_delta", target_delta=PS_DELTA_TARGET)
+        return False
+    width = PS_WIDTH_OVERRIDE.get(symbol, PS_WIDTH)
+    same_exp = [l for l in calls if l.expiry == short_call.expiry]
+    long_call = _find_wing(same_exp, short_call.strike, width, "C")
+    if not long_call:
+        _strategy_skip(symbol, "cs", "missing_long_call_wing",
+                       expiry=str(short_call.expiry), short_strike=short_call.strike, width=width)
+        return False
+    if not _legs_liquid(f"CS [{symbol}]", [short_call, long_call]):
+        _strategy_skip(symbol, "cs", "illiquid_legs", legs=[short_call.symbol, long_call.symbol])
+        return False
+    net_credit = short_call.mid - long_call.mid
+    max_risk = (width - net_credit) * 100
+    if max_risk <= 0 or net_credit <= 0:
+        _strategy_skip(symbol, "cs", "invalid_credit_risk",
+                       net_credit=round(net_credit, 4), max_risk=round(max_risk, 4))
+        return False
+    if not _credit_quality_ok(f"CS [{symbol}]", net_credit, max_risk):
+        ratio = (net_credit * 100) / max_risk if max_risk else 0.0
+        reason = "net_credit_below_minimum" if net_credit < MIN_NET_CREDIT else "credit_to_risk_below_minimum"
+        _strategy_skip(symbol, "cs", reason, net_credit=round(net_credit, 4),
+                       max_risk=round(max_risk, 4), credit_to_risk=round(ratio, 4))
+        return False
+    candidate_confidence = _candidate_confidence(
+        strategy="call_spread", symbol=symbol, legs=[short_call, long_call],
+        net_credit=net_credit, max_risk=max_risk, dte=_dte(short_call.expiry), trend_ok=True,
+    )
+    if not _candidate_confidence_ok(f"CS [{symbol}]", candidate_confidence):
+        return False
+    qty = _sized_qty(equity, max_risk, 3, f"CS [{symbol}]")
+    if qty < 1:
+        _strategy_skip(symbol, "cs", "sized_quantity_below_one",
+                       max_risk=round(max_risk, 4), equity=round(equity, 2))
+        return False
+    log.info(
+        f"CS [{symbol}]: expiry={short_call.expiry}  DTE={_dte(short_call.expiry)}  "
+        f"strikes={short_call.strike:.0f}/{long_call.strike:.0f}  "
+        f"credit={net_credit:.2f}  risk={max_risk:.2f}/contract  qty={qty}"
+    )
+    return _place_mleg(
+        legs_payload=[
+            {"symbol": short_call.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+            {"symbol": long_call.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
+        ],
+        limit_price=net_credit, qty=qty, label=f"Call Spread [{symbol}]",
+        trade_meta={
+            "label": f"Call Spread [{symbol}]", "strategy": "call_spread",
+            "underlying": symbol, "legs": [short_call.symbol, long_call.symbol],
+            "net_credit": net_credit, "max_risk_per_contract": max_risk, "qty": qty,
+            "profit_close_pct": PS_PROFIT_CLOSE_PCT, "stop_loss_pct": STOP_LOSS_PCT,
+            "expiry": str(short_call.expiry), "candidate_confidence": candidate_confidence,
+            "leg_market_snapshots": [_leg_market_snapshot(short_call), _leg_market_snapshot(long_call)],
+            "vix_at_entry": _JOURNAL_VIX, "vix_term_ratio": _JOURNAL_VIX_TERM_RATIO,
+            "iv_rank_at_entry": _JOURNAL_IV_RANK.get(symbol),
+        },
+    )
+
+
 def _place_single_leg(
     occ_symbol: str,
     side: str,
@@ -2158,6 +2375,17 @@ def _place_single_leg(
     label: str,
     trade_meta: Optional[dict] = None,
 ) -> bool:
+    trade_meta = dict(trade_meta or {})
+    underlying = str(trade_meta.get("underlying") or label)
+    qty, garch_meta, garch_allowed = _garch_entry_adjustment(underlying, qty)
+    trade_meta["garch_volatility_risk"] = garch_meta
+    trade_meta["qty"] = qty
+    if not garch_allowed:
+        strategy = str(trade_meta.get("strategy") or "single_leg")
+        _decision(underlying, strategy, "skip", garch_meta["reason"], garch_volatility_risk=garch_meta)
+        log.warning(f"{label}: GARCH ENTRY BLOCKED {underlying}: {garch_meta['reason']}")
+        _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
+        return False
     if not _guard_submission(label, qty, trade_meta):
         return False
     if REQUIRE_MANUAL_APPROVAL:
@@ -2455,6 +2683,16 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             if ran_ps:
                 new_trades_this_symbol += 1
                 _decision(sym, "ps", "submitted", "candidate_passed_all_filters")
+        if (
+            strategy in ("both", "cs")
+            and "cs" in sym_strategies
+            and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
+        ):
+            ran_cs = run_call_spread(trade_client, data_client, sym, equity)
+            if ran_cs:
+                new_trades_this_symbol += 1
+                _decision(sym, "cs", "submitted", "candidate_passed_all_filters")
+
         elif strategy in ("both", "ps") and "ps" in sym_strategies:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping put spread")
             _decision(sym, "ps", "skip", "per_run_symbol_trade_cap")
@@ -2486,8 +2724,8 @@ if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="Options Bot â€” Iron Condor + Put Spread + Wheel (IWM, SPY, QQQ, NVDA, PLTR)")
     ap.add_argument(
-        "--strategy", choices=["both", "ic", "ps", "wheel"], default="both",
-        help="ic=iron condor  ps=put spread  wheel=wheel only  both=all (default)",
+        "--strategy", choices=["both", "ic", "ps", "cs", "wheel"], default="both",
+        help="ic=iron condor ps=put spread cs=call spread wheel=wheel only both=all (default)",
     )
     ap.add_argument(
         "--symbol", type=str, default=None,
