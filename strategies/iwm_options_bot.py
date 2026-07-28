@@ -62,12 +62,22 @@ DECISION_LOG_FILE = os.path.join(LOG_DIR, "options-decisions.jsonl")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 _fmt = logging.Formatter("%(asctime)s  %(levelname)-8s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-_fh  = logging.FileHandler(LOG_FILE, encoding="utf-8")
-_fh.setFormatter(_fmt)
 _sh  = logging.StreamHandler()
 _sh.setFormatter(_fmt)
 
-logging.basicConfig(level=logging.INFO, handlers=[_fh, _sh])
+_handlers: list[logging.Handler] = [_sh]
+try:
+    _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+except OSError:
+    fallback_log = os.path.join(LOG_DIR, f"options-bot-{os.getpid()}-{int(time.time())}.log")
+    try:
+        _fh = logging.FileHandler(fallback_log, encoding="utf-8")
+    except OSError:
+        _fh = logging.NullHandler()
+_fh.setFormatter(_fmt)
+_handlers.insert(0, _fh)
+
+logging.basicConfig(level=logging.INFO, handlers=_handlers)
 log = logging.getLogger("options-bot")
 
 # â”€â”€ Safety Caps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
