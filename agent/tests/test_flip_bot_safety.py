@@ -444,6 +444,7 @@ def test_flip_bot_allows_fresh_confirmed_same_day_reentry(monkeypatch, tmp_path)
             return cls(2026, 7, 6)
 
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
+    monkeypatch.setattr(flip_bot, "MAX_ENTRY_SLIPPAGE_PCT", 3.0)
     monkeypatch.setattr(flip_bot, "date", FrozenDate)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "log_shadow_0dte_candidates", lambda account: [])
@@ -590,6 +591,7 @@ def test_flip_bot_tracks_only_broker_confirmed_partial_entry_quantity(monkeypatc
         return {"id": "resting-target", "status": "new"}
 
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
+    monkeypatch.setattr(flip_bot, "MAX_ENTRY_SLIPPAGE_PCT", 3.0)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "log_shadow_0dte_candidates", lambda account: [])
     monkeypatch.setattr(flip_bot, "find_bear_trend_day", lambda account: None)

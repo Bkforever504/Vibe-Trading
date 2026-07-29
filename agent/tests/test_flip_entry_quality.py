@@ -112,6 +112,7 @@ def test_entry_slippage_blocker_blocks_current_ask_above_limit(monkeypatch) -> N
         "_selection_quote_fields",
         lambda _occ: {"selection_ask": 1.32, "quote_age_seconds": 0.5},
     )
+    monkeypatch.setattr(bot, "MAX_ENTRY_SLIPPAGE_PCT", 3.0)
     monkeypatch.setattr(bot, "_option_mid", lambda _occ: 1.30)
 
     blocker = bot._entry_slippage_blocker(setup)
