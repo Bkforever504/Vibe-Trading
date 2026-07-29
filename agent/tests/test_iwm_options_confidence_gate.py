@@ -123,7 +123,7 @@ def test_call_spread_builds_credit_mleg_when_below_sma(monkeypatch) -> None:
     from strategies import iwm_options_bot as bot
 
     expiry = date.today() + timedelta(days=10)
-    short_call = _leg("SPY260807C00620000", delta=0.25, bid=1.20, ask=1.30, expiry=expiry, strike=620.0)
+    short_call = _leg("SPY260807C00620000", delta=0.25, bid=2.00, ask=2.10, expiry=expiry, strike=620.0)
     long_call = _leg("SPY260807C00625000", delta=0.10, bid=0.30, ask=0.40, expiry=expiry, strike=625.0)
     submitted = []
     monkeypatch.setattr(bot, "_above_20sma", lambda symbol: False)
