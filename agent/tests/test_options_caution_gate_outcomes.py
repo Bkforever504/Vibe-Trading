@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -48,6 +50,15 @@ def test_forward_move_is_point_in_time_and_unresolved_until_horizon() -> None:
     assert resolved["end_date"] == "2026-07-07"
     assert resolved["move_pct"] > 0
     assert unresolved is None
+
+
+def test_daily_closes_degrades_when_parquet_engine_is_unavailable(monkeypatch, tmp_path: Path) -> None:
+    parquet = tmp_path / "aapl_sample.parquet"
+    parquet.write_text("placeholder", encoding="utf-8")
+    monkeypatch.setattr(gate, "DAILY_DIR", tmp_path)
+    monkeypatch.setattr(pd, "read_parquet", lambda _path: (_ for _ in ()).throw(ImportError("missing engine")))
+
+    assert gate._daily_closes("AAPL") == []
 
 
 def test_report_separates_blocked_and_taken_and_gates_on_30_candidates(tmp_path: Path) -> None:
