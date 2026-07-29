@@ -129,6 +129,15 @@ def test_entry_window_allows_only_best_fill_windows(monkeypatch) -> None:
     assert bot._entry_window_open(datetime(2026, 7, 29, 12, 0)) is False
 
 
+def test_strategy_iv_rank_thresholds_are_strategy_specific() -> None:
+    from strategies import iwm_options_bot as bot
+
+    assert bot._iv_rank_min_for_strategy("ic") == 50.0
+    assert bot._iv_rank_min_for_strategy("ps") == 35.0
+    assert bot._iv_rank_min_for_strategy("cs") == 35.0
+    assert bot._iv_rank_min_for_strategy("wheel") == 45.0
+
+
 def test_call_spread_builds_credit_mleg_when_below_sma(monkeypatch) -> None:
     from strategies import iwm_options_bot as bot
 
