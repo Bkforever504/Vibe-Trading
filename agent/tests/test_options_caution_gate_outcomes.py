@@ -19,9 +19,14 @@ def _closes(symbol: str) -> list[tuple[str, float]]:
 def _decisions_file(tmp_path: Path) -> Path:
     rows = [
         {"action": "skip", "reason": gate.BLOCK_REASON, "symbol": "AAPL",
-         "strategy": "ps", "ts": "2026-07-02T14:45:00Z"},
+         "strategy": "ps", "ts": "2026-07-02T14:45:00Z", "warning_count": 2,
+         "candidate_confidence": {"score": 8}},
         {"action": "skip", "reason": gate.BLOCK_REASON, "symbol": "NVDA",
-         "strategy": "ps", "ts": "2026-07-18T14:45:00Z"},  # unresolved horizon
+         "strategy": "ps", "ts": "2026-07-18T14:45:00Z", "warning_count": 3,
+         "candidate_confidence": {"score": 7}},  # unresolved horizon
+        {"action": "skip", "reason": gate.BLOCK_REASON, "symbol": "IWM",
+         "strategy": "ps", "ts": "2026-07-02T14:45:00Z", "warning_count": 1,
+         "candidate_confidence": None},  # synthetic/advisory row
         {"action": "skip", "reason": "trend_filter_below_20sma", "symbol": "PLTR",
          "strategy": "ps", "ts": "2026-07-02T14:45:00Z"},  # different reason
         {"action": "submitted", "symbol": "IWM", "strategy": "ic",

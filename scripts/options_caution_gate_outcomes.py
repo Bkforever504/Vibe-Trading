@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Blocked-versus-taken outcome tracker for the options multi-warning
-stand_aside gate (read-only).
+stand-aside gate (read-only).
 
-Compares decision rows blocked by `shadow_consensus_multi_warning_stand_aside`
+Compares scored decision rows blocked by `shadow_consensus_stand_aside`
 against entries actually submitted, using forward underlying moves from the
 local daily caches. Underlying moves are a risk proxy for short-premium
 positions, not option P&L; the report says so explicitly. Promotion review of
@@ -24,7 +24,7 @@ DECISIONS_PATH = VIBE_HOME / "logs" / "options-decisions.jsonl"
 DAILY_DIR = ROOT / "data" / "htf_volume_screen_lab"
 REPORT_PATH = VIBE_HOME / "reports" / "options-caution-gate-outcomes.json"
 
-BLOCK_REASON = "shadow_consensus_multi_warning_stand_aside"
+BLOCK_REASON = "shadow_consensus_stand_aside"
 HORIZON_TRADING_DAYS = 5
 MIN_CANDIDATES_FOR_REVIEW = 30
 
@@ -78,7 +78,14 @@ def forward_move(closes: list[tuple[str, float]], day: str, horizon: int) -> dic
 
 
 def _cohort_rows(decisions: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    blocked = [row for row in decisions if row.get("reason") == BLOCK_REASON]
+    blocked = [
+        row
+        for row in decisions
+        if row.get("reason") == BLOCK_REASON
+        and int(row.get("warning_count") or 0) >= 2
+        and isinstance(row.get("candidate_confidence"), dict)
+        and row["candidate_confidence"].get("score") is not None
+    ]
     taken = [row for row in decisions if row.get("action") == "submitted"]
     return blocked, taken
 
