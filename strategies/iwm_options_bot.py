@@ -95,7 +95,10 @@ MAX_ACCOUNT_RISK_PCT = float(os.getenv("MAX_ACCOUNT_RISK_PCT", "0.02"))  # per-t
 MAX_OPEN_TRADES      = int(os.getenv("MAX_OPEN_TRADES", "8"))             # max concurrent option positions
 MAX_TRADES_PER_DAY   = int(os.getenv("MAX_TRADES_PER_DAY", "5"))          # entries per calendar day
 MAX_CONTRACTS_PER_ORDER = int(os.getenv("MAX_CONTRACTS_PER_ORDER", "5"))  # hard order-size cap
-IV_RANK_MIN          = float(os.getenv("IV_RANK_MIN", "30.0"))            # skip new entries if vol rank below this
+IV_RANK_MIN          = float(os.getenv("IV_RANK_MIN", "30.0"))            # legacy fallback for strategy IVR floors
+IC_IV_RANK_MIN       = float(os.getenv("IC_IV_RANK_MIN", "50.0"))
+SPREAD_IV_RANK_MIN   = float(os.getenv("SPREAD_IV_RANK_MIN", "35.0"))
+WHEEL_IV_RANK_MIN    = float(os.getenv("WHEEL_IV_RANK_MIN", "45.0"))
 EARNINGS_SKIP_DAYS   = int(os.getenv("EARNINGS_SKIP_DAYS", "5"))          # skip entry if earnings within this many days
 MIN_CREDIT_TO_RISK   = float(os.getenv("MIN_CREDIT_TO_RISK", "0.33"))     # avoid tiny-credit steamroller trades
 MIN_NET_CREDIT       = float(os.getenv("MIN_NET_CREDIT", "0.10"))         # ignore pennies after bid/ask friction
@@ -423,6 +426,34 @@ def iv_rank(symbol: str) -> float:
     except Exception as exc:
         log.warning(f"IVR {symbol}: scanner failed ({exc}); falling back to HV proxy")
     return _hv_proxy_iv_rank(symbol)
+
+
+def _iv_rank_min_for_strategy(strategy: str) -> float:
+    if strategy == "ic":
+        return IC_IV_RANK_MIN
+    if strategy in {"ps", "cs"}:
+        return SPREAD_IV_RANK_MIN
+    if strategy == "wheel":
+        return WHEEL_IV_RANK_MIN
+    return IV_RANK_MIN
+
+
+def _strategy_iv_rank_ok(symbol: str, strategy: str, rank: float) -> bool:
+    minimum = _iv_rank_min_for_strategy(strategy)
+    if rank >= minimum:
+        return True
+    log.info(
+        f"{symbol}: IV Rank {rank:.1f} < {minimum:.1f} for {strategy} "
+        "- skipping strategy"
+    )
+    _strategy_skip(
+        symbol,
+        strategy,
+        "iv_rank_below_strategy_minimum",
+        iv_rank=round(rank, 2),
+        minimum_iv_rank=minimum,
+    )
+    return False
 
 # â”€â”€ Earnings check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _has_earnings_soon(symbol: str, days: int = EARNINGS_SKIP_DAYS) -> bool:
@@ -3035,9 +3066,6 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
         # IV Rank gate per symbol â€” also stored for trade journal
         rank = iv_rank(sym)
         _JOURNAL_IV_RANK[sym] = rank
-        if rank < IV_RANK_MIN:
-            log.info(f"{sym}: IV Rank {rank:.1f} < {IV_RANK_MIN} â€” skipping (low vol, bad for premium selling)")
-            continue
 
         # Earnings gate â€” skip individual stocks near earnings
         if _has_earnings_soon(sym):
@@ -3050,23 +3078,34 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
         # Per-symbol strategy runs
         ran_ic = ran_ps = ran_cs = False
         new_trades_this_symbol = 0
+        ic_iv_ok = _strategy_iv_rank_ok(sym, "ic", rank) if "ic" in sym_strategies else False
+        ps_iv_ok = _strategy_iv_rank_ok(sym, "ps", rank) if "ps" in sym_strategies else False
+        cs_iv_ok = _strategy_iv_rank_ok(sym, "cs", rank) if "cs" in sym_strategies else False
+        wheel_iv_ok = _strategy_iv_rank_ok(sym, "wheel", rank) if "wheel" in sym_strategies else False
 
-        if strategy in ("both", "ic") and "ic" in sym_strategies:
+        if (
+            strategy in ("both", "ic")
+            and "ic" in sym_strategies
+            and ic_iv_ok
+        ):
             ran_ic = run_iron_condor(trade_client, data_client, sym, equity)
             if ran_ic:
                 new_trades_this_symbol += 1
                 _decision(sym, "ic", "submitted", "candidate_passed_all_filters")
+        elif strategy in ("both", "ic") and "ic" in sym_strategies:
+            log.info(f"{sym}: iron condor skipped by strategy IV Rank gate")
 
         if (
             strategy in ("both", "ps")
             and "ps" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
+            and ps_iv_ok
         ):
             ran_ps = run_put_spread(trade_client, data_client, sym, equity)
             if ran_ps:
                 new_trades_this_symbol += 1
                 _decision(sym, "ps", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "ps") and "ps" in sym_strategies:
+        elif strategy in ("both", "ps") and "ps" in sym_strategies and ps_iv_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping put spread")
             _decision(sym, "ps", "skip", "per_run_symbol_trade_cap")
 
@@ -3074,12 +3113,13 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             strategy in ("both", "cs")
             and "cs" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
+            and cs_iv_ok
         ):
             ran_cs = run_call_spread(trade_client, data_client, sym, equity)
             if ran_cs:
                 new_trades_this_symbol += 1
                 _decision(sym, "cs", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "cs") and "cs" in sym_strategies:
+        elif strategy in ("both", "cs") and "cs" in sym_strategies and cs_iv_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping call spread")
             _decision(sym, "cs", "skip", "per_run_symbol_trade_cap")
 
@@ -3087,11 +3127,12 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             strategy in ("both", "wheel")
             and "wheel" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
+            and wheel_iv_ok
         ):
             if run_wheel(trade_client, data_client, sym, equity):
                 new_trades_this_symbol += 1
                 _decision(sym, "wheel", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "wheel") and "wheel" in sym_strategies:
+        elif strategy in ("both", "wheel") and "wheel" in sym_strategies and wheel_iv_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping wheel")
             _decision(sym, "wheel", "skip", "per_run_symbol_trade_cap")
 
