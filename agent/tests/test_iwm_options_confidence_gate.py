@@ -138,6 +138,24 @@ def test_strategy_iv_rank_thresholds_are_strategy_specific() -> None:
     assert bot._iv_rank_min_for_strategy("wheel") == 45.0
 
 
+def test_iv_over_realized_edge_requires_overpriced_iv(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    decisions = []
+    monkeypatch.setattr(bot, "ENABLE_IV_REALIZED_VOL_EDGE", True)
+    monkeypatch.setattr(bot, "IV_OVER_REALIZED_MIN_RATIO", 1.05)
+    monkeypatch.setattr(bot, "_implied_vol_pct", lambda symbol: 22.0)
+    monkeypatch.setattr(bot, "_compute_realized_vol", lambda symbol, window=30: 20.0)
+    monkeypatch.setattr(bot, "_decision", lambda *args, **kwargs: decisions.append((args, kwargs)))
+
+    assert bot._iv_over_realized_ok("IWM") is True
+    assert decisions == []
+
+    monkeypatch.setattr(bot, "_implied_vol_pct", lambda symbol: 20.5)
+    assert bot._iv_over_realized_ok("IWM") is False
+    assert decisions[-1][0] == ("IWM", "all", "skip", "iv_not_overpriced_vs_realized")
+
+
 def test_call_spread_builds_credit_mleg_when_below_sma(monkeypatch) -> None:
     from strategies import iwm_options_bot as bot
 
