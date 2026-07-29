@@ -93,3 +93,23 @@ def test_intraday_router_coerces_numeric_object_bars() -> None:
 
     assert result.day_type == "trend"
     assert "adx_over_25" in result.signals_supporting
+
+
+def test_intraday_router_handles_flat_zero_adx_intervals() -> None:
+    index = pd.date_range("2026-07-17 09:30", periods=31, freq="1min")
+    frame = pd.DataFrame({
+        "open": ["100.0"] * len(index),
+        "high": ["100.0"] * len(index),
+        "low": ["100.0"] * len(index),
+        "close": ["100.0"] * len(index),
+        "volume": ["1000"] * len(index),
+    }, index=index)
+
+    result = classify_intraday_day_type(
+        frame,
+        prior_close=100.0,
+        now_et=datetime(2026, 7, 17, 10, 0),
+    )
+
+    assert result.day_type == "unknown"
+    assert result.recommended_strategy == "observe"

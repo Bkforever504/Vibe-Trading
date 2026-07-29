@@ -167,10 +167,12 @@ def _adx(frame: pd.DataFrame, period: int = 3) -> float:
     true_range = pd.concat(
         [high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1
     ).max(axis=1)
-    atr = true_range.rolling(period).mean().replace(0, pd.NA)
+    atr = true_range.rolling(period).mean()
+    atr = atr.where(atr.ne(0))
     plus_di = 100.0 * plus_dm.rolling(period).mean() / atr
     minus_di = 100.0 * minus_dm.rolling(period).mean() / atr
-    denominator = (plus_di + minus_di).replace(0, pd.NA)
+    denominator = plus_di + minus_di
+    denominator = denominator.where(denominator.ne(0))
     dx = 100.0 * (plus_di - minus_di).abs() / denominator
     value = dx.rolling(period).mean().iloc[-1]
     return float(value) if pd.notna(value) else 0.0
@@ -215,7 +217,10 @@ def classify_intraday_day_type(
     volume = frame.get("volume")
     typical = (frame["high"] + frame["low"] + frame["close"]) / 3.0
     if volume is not None and float(volume.fillna(0).sum()) > 0:
-        vwap_series = (typical * volume).cumsum() / volume.cumsum().replace(0, pd.NA)
+        cumulative_volume = volume.cumsum()
+        vwap_series = (typical * volume).cumsum() / cumulative_volume.where(
+            cumulative_volume.ne(0)
+        )
         vwap = float(vwap_series.iloc[-1])
         opening_vwap = float(vwap_series.iloc[min(4, len(vwap_series) - 1)])
     else:
