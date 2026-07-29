@@ -196,6 +196,9 @@ def classify_intraday_day_type(
         )
     frame = bars.copy()
     frame.columns = [str(column).lower() for column in frame.columns]
+    for column in ("open", "high", "low", "close", "volume"):
+        if column in frame.columns:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame = frame.dropna(subset=["high", "low", "close"])
     if len(frame) < 6:
         return classify_day_type(

@@ -264,8 +264,17 @@ def _primary_consensus_caution_blocker(setup: dict, consensus: dict) -> str | No
     return None
 
 
-def _max_entry_limit_price(setup: dict, *, max_slippage_pct: float = MAX_ENTRY_SLIPPAGE_PCT) -> float | None:
+def _max_entry_limit_price(
+    setup: dict,
+    *,
+    max_slippage_pct: float | None = None,
+) -> float | None:
     """Return the highest acceptable entry limit for a long-option buy."""
+    max_slippage_pct = (
+        MAX_ENTRY_SLIPPAGE_PCT
+        if max_slippage_pct is None
+        else max_slippage_pct
+    )
     candidates = []
     for key in ("selection_ask", "entry_price_est"):
         try:

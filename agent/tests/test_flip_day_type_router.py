@@ -72,3 +72,24 @@ def test_intraday_router_has_mature_adx_at_1000_et() -> None:
     assert result.day_type == "trend"
     assert "adx_over_25" in result.signals_supporting
     assert result.can_submit_orders is False
+
+
+def test_intraday_router_coerces_numeric_object_bars() -> None:
+    index = pd.date_range("2026-07-17 09:30", periods=31, freq="1min")
+    closes = [100.0 + 0.10 * position for position in range(len(index))]
+    frame = pd.DataFrame({
+        "open": [str(value) for value in closes],
+        "high": [str(value + 0.10) for value in closes],
+        "low": [str(value - 0.10) for value in closes],
+        "close": [str(value) for value in closes],
+        "volume": ["1000"] * len(index),
+    }, index=index)
+
+    result = classify_intraday_day_type(
+        frame,
+        prior_close=99.0,
+        now_et=datetime(2026, 7, 17, 10, 0),
+    )
+
+    assert result.day_type == "trend"
+    assert "adx_over_25" in result.signals_supporting
