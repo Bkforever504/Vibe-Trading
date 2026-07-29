@@ -673,8 +673,12 @@ def _pcr_ok(symbol: str) -> bool:
 
 
 # â”€â”€ VIX macro filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-VIX_MIN = 15.0   # below = not enough premium to sell
-VIX_MAX = 40.0   # above = market panic, spreads can blow through
+VIX_MIN = 14.0   # broad premium-selling floor; strategy gates may be stricter
+VIX_MAX = 35.0   # broad panic ceiling; strategy gates may be stricter
+IC_VIX_MIN = float(os.getenv("IC_VIX_MIN", "16.0"))
+IC_VIX_MAX = float(os.getenv("IC_VIX_MAX", "28.0"))
+SPREAD_VIX_MIN = float(os.getenv("SPREAD_VIX_MIN", "14.0"))
+SPREAD_VIX_MAX = float(os.getenv("SPREAD_VIX_MAX", "35.0"))
 
 # Module-level journal state â€” populated once per run_entries() call, read by IC/PS trade_meta.
 _JOURNAL_VIX: float | None = None
@@ -712,6 +716,32 @@ def _vix_in_range() -> bool:
     except Exception as exc:
         log.warning(f"VIX check failed: {exc} - proceeding without filter")
         return True
+
+
+def _strategy_vix_ok(symbol: str, strategy: str) -> bool:
+    if _JOURNAL_VIX is None:
+        return True
+    if strategy == "ic":
+        lo, hi = IC_VIX_MIN, IC_VIX_MAX
+    elif strategy in {"ps", "cs", "wheel"}:
+        lo, hi = SPREAD_VIX_MIN, SPREAD_VIX_MAX
+    else:
+        lo, hi = VIX_MIN, VIX_MAX
+    if lo <= _JOURNAL_VIX <= hi:
+        return True
+    log.info(
+        f"{symbol}: VIX {_JOURNAL_VIX:.1f} outside {strategy} band "
+        f"{lo:.1f}-{hi:.1f} - skipping strategy"
+    )
+    _strategy_skip(
+        symbol,
+        strategy,
+        "vix_outside_strategy_band",
+        vix=round(_JOURNAL_VIX, 2),
+        vix_min=lo,
+        vix_max=hi,
+    )
+    return False
 
 # â”€â”€ 20-day SMA trend filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _above_20sma(symbol: str) -> bool:
@@ -3146,11 +3176,16 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
         ps_iv_ok = _strategy_iv_rank_ok(sym, "ps", rank) if "ps" in sym_strategies else False
         cs_iv_ok = _strategy_iv_rank_ok(sym, "cs", rank) if "cs" in sym_strategies else False
         wheel_iv_ok = _strategy_iv_rank_ok(sym, "wheel", rank) if "wheel" in sym_strategies else False
+        ic_vix_ok = _strategy_vix_ok(sym, "ic") if "ic" in sym_strategies else False
+        ps_vix_ok = _strategy_vix_ok(sym, "ps") if "ps" in sym_strategies else False
+        cs_vix_ok = _strategy_vix_ok(sym, "cs") if "cs" in sym_strategies else False
+        wheel_vix_ok = _strategy_vix_ok(sym, "wheel") if "wheel" in sym_strategies else False
 
         if (
             strategy in ("both", "ic")
             and "ic" in sym_strategies
             and ic_iv_ok
+            and ic_vix_ok
         ):
             ran_ic = run_iron_condor(trade_client, data_client, sym, equity)
             if ran_ic:
@@ -3164,12 +3199,13 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             and "ps" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
             and ps_iv_ok
+            and ps_vix_ok
         ):
             ran_ps = run_put_spread(trade_client, data_client, sym, equity)
             if ran_ps:
                 new_trades_this_symbol += 1
                 _decision(sym, "ps", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "ps") and "ps" in sym_strategies and ps_iv_ok:
+        elif strategy in ("both", "ps") and "ps" in sym_strategies and ps_iv_ok and ps_vix_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping put spread")
             _decision(sym, "ps", "skip", "per_run_symbol_trade_cap")
 
@@ -3178,12 +3214,13 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             and "cs" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
             and cs_iv_ok
+            and cs_vix_ok
         ):
             ran_cs = run_call_spread(trade_client, data_client, sym, equity)
             if ran_cs:
                 new_trades_this_symbol += 1
                 _decision(sym, "cs", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "cs") and "cs" in sym_strategies and cs_iv_ok:
+        elif strategy in ("both", "cs") and "cs" in sym_strategies and cs_iv_ok and cs_vix_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping call spread")
             _decision(sym, "cs", "skip", "per_run_symbol_trade_cap")
 
@@ -3192,11 +3229,12 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             and "wheel" in sym_strategies
             and new_trades_this_symbol < MAX_NEW_TRADES_PER_SYMBOL_PER_RUN
             and wheel_iv_ok
+            and wheel_vix_ok
         ):
             if run_wheel(trade_client, data_client, sym, equity):
                 new_trades_this_symbol += 1
                 _decision(sym, "wheel", "submitted", "candidate_passed_all_filters")
-        elif strategy in ("both", "wheel") and "wheel" in sym_strategies and wheel_iv_ok:
+        elif strategy in ("both", "wheel") and "wheel" in sym_strategies and wheel_iv_ok and wheel_vix_ok:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping wheel")
             _decision(sym, "wheel", "skip", "per_run_symbol_trade_cap")
 

@@ -156,6 +156,19 @@ def test_iv_over_realized_edge_requires_overpriced_iv(monkeypatch) -> None:
     assert decisions[-1][0] == ("IWM", "all", "skip", "iv_not_overpriced_vs_realized")
 
 
+def test_strategy_vix_bands_allow_spreads_when_ic_too_hot(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    decisions = []
+    monkeypatch.setattr(bot, "_JOURNAL_VIX", 29.0)
+    monkeypatch.setattr(bot, "_strategy_skip", lambda *args, **kwargs: decisions.append((args, kwargs)))
+
+    assert bot._strategy_vix_ok("IWM", "ic") is False
+    assert bot._strategy_vix_ok("IWM", "ps") is True
+    assert bot._strategy_vix_ok("IWM", "cs") is True
+    assert decisions[-1][0] == ("IWM", "ic", "vix_outside_strategy_band")
+
+
 def test_call_spread_builds_credit_mleg_when_below_sma(monkeypatch) -> None:
     from strategies import iwm_options_bot as bot
 
