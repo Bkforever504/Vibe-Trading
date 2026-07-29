@@ -1,6 +1,6 @@
 from pathlib import Path
 import types
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 
 def _fake_pos(symbol, avg_entry_price, qty, unrealized_pl):
@@ -11,6 +11,13 @@ def _fake_pos(symbol, avg_entry_price, qty, unrealized_pl):
     p.unrealized_pl = str(unrealized_pl)
     p.asset_class = "us_option"
     return p
+
+
+def test_default_credit_stop_is_one_times_credit():
+    from strategies import iwm_options_bot
+
+    assert iwm_options_bot.STOP_LOSS_PCT == -1.0
+    assert iwm_options_bot._trade_stop_loss_pct({"strategy": "put_spread"}) == -1.0
 
 
 def test_stop_loss_triggers_at_100pct_of_credit(monkeypatch, tmp_path):
@@ -177,6 +184,47 @@ def test_near_target_credit_spread_closes_after_cutoff(monkeypatch, tmp_path):
     assert closed, "near-target protection did not trigger"
     assert "near-target protection" in closed[0]
     assert state["trades"][0]["status"] == "closing"
+
+
+def test_iron_condor_21_dte_rolls_instead_of_full_close(monkeypatch, tmp_path):
+    from strategies import iwm_options_bot
+
+    expiry = date.today() + timedelta(days=21)
+    legs = ["IWM260807P00210000", "IWM260807P00207000", "IWM260807C00230000", "IWM260807C00233000"]
+    trade = {
+        "id": "ic1",
+        "status": "open",
+        "label": "Iron Condor [IWM]",
+        "strategy": "iron_condor",
+        "underlying": "IWM",
+        "legs": legs,
+        "net_credit": 1.00,
+        "qty": 1,
+        "profit_close_pct": 0.5,
+        "stop_loss_pct": -1.0,
+        "expiry": str(expiry),
+    }
+    state = {"trades": [trade]}
+    rolled = []
+    closed = []
+
+    monkeypatch.setattr(iwm_options_bot, "_load_trade_state", lambda: state)
+    monkeypatch.setattr(iwm_options_bot, "_save_trade_state", lambda s: None)
+    monkeypatch.setattr(iwm_options_bot, "_recover_untracked_mleg_groups", lambda c, s: False)
+    monkeypatch.setattr(iwm_options_bot, "_can_submit_option_close_orders", lambda: True)
+    monkeypatch.setattr(iwm_options_bot, "AUTO_CLOSE_GROUPS", True)
+    monkeypatch.setattr(iwm_options_bot, "_alert", lambda msg: None)
+    monkeypatch.setattr(iwm_options_bot, "_close_trade_group", lambda *args: closed.append(args) or True)
+    monkeypatch.setattr(iwm_options_bot, "_submit_ic_roll", lambda *args: rolled.append(args) or True)
+
+    class FakeClient:
+        def get_all_positions(self):
+            return [_fake_pos(symbol, avg_entry_price=1.00, qty=-1, unrealized_pl=0.0) for symbol in legs]
+
+    iwm_options_bot.monitor_and_close(FakeClient(), object())
+
+    assert rolled, "21-DTE iron condor did not attempt a roll"
+    assert not closed, "21-DTE iron condor should not full-close the group"
 
 
 def test_netted_group_closes_as_reversed_mleg(monkeypatch):

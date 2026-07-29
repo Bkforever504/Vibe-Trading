@@ -156,7 +156,7 @@ WHEEL_DELTA         = 0.30    # slightly more aggressive delta for more premium
 WHEEL_CC_DELTA      = 0.30    # covered call delta after assignment
 WHEEL_PROFIT_PCT    = 0.50
 
-STOP_LOSS_PCT       = -2.0    # close if loss reaches 200% of credit (short premium needs room)
+STOP_LOSS_PCT       = -1.0    # close if loss reaches 100% of credit
 IC_DTE_MANAGE_DAYS  = int(os.getenv("IC_DTE_MANAGE_DAYS", "21"))
 PS_DTE_MANAGE_DAYS  = int(os.getenv("PS_DTE_MANAGE_DAYS", "2"))
 CREDIT_NEAR_TARGET_CLOSE_PCT = float(os.getenv("CREDIT_NEAR_TARGET_CLOSE_PCT", "0.45"))
@@ -871,6 +871,59 @@ def _refresh_filled_group_closes(state: dict) -> bool:
     return changed
 
 
+def _refresh_filled_ic_rolls(state: dict) -> bool:
+    changed = False
+    for trade in state.get("trades", []):
+        if not trade.get("roll_order_id"):
+            continue
+        order = _order_snapshot(str(trade["roll_order_id"]))
+        if not order:
+            continue
+        status = str(order.get("status") or "").lower()
+        trade["roll_order_status"] = status
+        if status != "filled":
+            if status in {"canceled", "expired", "rejected"}:
+                trade["roll_failed_at"] = order.get("canceled_at") or _utc_timestamp()
+                trade.pop("roll_order_id", None)
+                changed = True
+            continue
+        order_legs = {
+            str(leg.get("symbol"))
+            for leg in (order.get("legs") or [])
+            if isinstance(leg, dict) and leg.get("symbol")
+        }
+        expected = set(trade.get("roll_close_legs") or []) | set(trade.get("roll_replacement_legs") or [])
+        if order_legs and expected and order_legs != expected:
+            log.error(
+                f"{trade.get('label', 'trade')}: filled IC roll order does not match "
+                "the planned transition; leaving state unchanged for manual review"
+            )
+            continue
+        new_legs = list(trade.get("roll_keep_legs") or []) + list(trade.get("roll_replacement_legs") or [])
+        if len(new_legs) != 4:
+            log.error(f"{trade.get('label', 'trade')}: IC roll replacement state is incomplete")
+            continue
+        trade["legs"] = new_legs
+        trade["strategy"] = "iron_condor_rolled"
+        trade["roll_filled_at"] = order.get("filled_at") or _utc_timestamp()
+        trade["roll_filled_avg_price"] = order.get("filled_avg_price")
+        trade["roll_history"] = list(trade.get("roll_history") or []) + [{
+            "order_id": trade.get("roll_order_id"),
+            "tested_side": trade.get("roll_tested_side"),
+            "close_legs": trade.get("roll_close_legs"),
+            "replacement_legs": trade.get("roll_replacement_legs"),
+            "filled_at": trade["roll_filled_at"],
+        }]
+        for key in (
+            "roll_order_id", "roll_reason", "roll_started_at", "roll_tested_side",
+            "roll_close_legs", "roll_keep_legs", "roll_replacement_legs", "roll_limit_debit",
+        ):
+            trade.pop(key, None)
+        changed = True
+        log.info(f"{trade.get('label', 'trade')}: IC roll filled; tracked legs updated")
+    return changed
+
+
 def _recover_untracked_mleg_groups(trade_client: TradingClient, state: dict) -> bool:
     """Rebuild missing trade groups only when broker orders and positions agree."""
     try:
@@ -1511,6 +1564,164 @@ def _close_trade_group(trade_client: TradingClient, trade: dict, reason: str) ->
     return ok
 
 
+def _parse_occ_contract(symbol: str, underlying: str) -> dict:
+    start = len(underlying)
+    expiry = datetime.strptime(symbol[start:start + 6], "%y%m%d").date()
+    right = symbol[start + 6]
+    strike = int(symbol[start + 7:]) / 1000
+    return {"symbol": symbol, "expiry": expiry, "right": right, "strike": strike}
+
+
+def _latest_underlying_price(symbol: str) -> float | None:
+    try:
+        hist = yf.Ticker(symbol).history(period="2d")
+        if hist.empty:
+            return None
+        price = float(hist["Close"].dropna().iloc[-1])
+        return price if math.isfinite(price) and price > 0 else None
+    except Exception as exc:
+        log.warning(f"{symbol}: underlying price unavailable for IC roll: {exc}")
+        return None
+
+
+def _ic_tested_side(trade: dict, underlying_price: float) -> str | None:
+    underlying = str(trade.get("underlying") or "")
+    parsed = [_parse_occ_contract(str(leg), underlying) for leg in trade.get("legs", [])]
+    puts = sorted([leg for leg in parsed if leg["right"] == "P"], key=lambda leg: leg["strike"], reverse=True)
+    calls = sorted([leg for leg in parsed if leg["right"] == "C"], key=lambda leg: leg["strike"])
+    if len(puts) < 2 or len(calls) < 2:
+        return None
+    short_put = puts[0]
+    short_call = calls[0]
+    if underlying_price <= short_put["strike"]:
+        return "P"
+    if underlying_price >= short_call["strike"]:
+        return "C"
+    put_distance = abs(underlying_price - short_put["strike"])
+    call_distance = abs(short_call["strike"] - underlying_price)
+    return "P" if put_distance <= call_distance else "C"
+
+
+def _ic_side_symbols(trade: dict, side: str) -> tuple[list[str], list[str]]:
+    underlying = str(trade.get("underlying") or "")
+    parsed = [_parse_occ_contract(str(leg), underlying) for leg in trade.get("legs", [])]
+    tested = [leg for leg in parsed if leg["right"] == side]
+    kept = [leg for leg in parsed if leg["right"] != side]
+    if side == "P":
+        tested = sorted(tested, key=lambda leg: leg["strike"], reverse=True)
+    else:
+        tested = sorted(tested, key=lambda leg: leg["strike"])
+    return [leg["symbol"] for leg in tested], [leg["symbol"] for leg in kept]
+
+
+def _build_ic_replacement_spread(
+    data_client: OptionHistoricalDataClient,
+    symbol: str,
+    side: str,
+    target_dte: int,
+    underlying_price: float,
+) -> tuple[list[Leg], float] | tuple[None, float]:
+    right = "put" if side == "P" else "call"
+    legs = _fetch_chain(data_client, symbol, max(1, target_dte - 3), target_dte + 3, right)
+    if not legs:
+        return None, 0.0
+    short_leg = min(legs, key=lambda leg: abs(leg.strike - underlying_price))
+    same_exp = [leg for leg in legs if leg.expiry == short_leg.expiry]
+    long_leg = _find_wing(same_exp, short_leg.strike, IC_WING_WIDTH, side)
+    if not long_leg:
+        return None, 0.0
+    net_credit = short_leg.mid - long_leg.mid
+    if net_credit <= 0 or not _legs_liquid(f"IC roll {right} [{symbol}]", [short_leg, long_leg]):
+        return None, 0.0
+    return [short_leg, long_leg], net_credit
+
+
+def _submit_ic_roll(
+    trade_client: TradingClient,
+    data_client: OptionHistoricalDataClient | None,
+    trade: dict,
+    dte: int,
+    reason: str,
+) -> bool:
+    if data_client is None:
+        log.warning(f"{trade.get('label', 'trade')}: IC roll requires option data client")
+        return False
+    if trade.get("roll_order_id"):
+        log.info(f"{trade.get('label', 'trade')}: IC roll already pending order={trade.get('roll_order_id')}")
+        return True
+    underlying = str(trade.get("underlying") or "")
+    price = _latest_underlying_price(underlying)
+    if price is None:
+        return False
+    side = _ic_tested_side(trade, price)
+    if side not in {"P", "C"}:
+        log.warning(f"{trade.get('label', 'trade')}: cannot identify tested IC side for roll")
+        return False
+    tested_symbols, kept_symbols = _ic_side_symbols(trade, side)
+    if len(tested_symbols) != 2 or len(kept_symbols) != 2:
+        log.warning(f"{trade.get('label', 'trade')}: incomplete IC side map for roll")
+        return False
+    old_quotes = _latest_option_quotes(data_client, tested_symbols)
+    if sorted(old_quotes) != sorted(tested_symbols):
+        log.warning(f"{trade.get('label', 'trade')}: missing tested-side quotes for IC roll")
+        return False
+    old_parsed = [_parse_occ_contract(symbol, underlying) for symbol in tested_symbols]
+    old_short = old_parsed[0]
+    old_long = old_parsed[1]
+    close_debit = old_quotes[old_short["symbol"]]["ask"] - old_quotes[old_long["symbol"]]["bid"]
+    if close_debit <= 0:
+        log.warning(f"{trade.get('label', 'trade')}: invalid tested-side close debit for IC roll")
+        return False
+    replacement, new_credit = _build_ic_replacement_spread(
+        data_client,
+        underlying,
+        side,
+        dte + 30,
+        price,
+    )
+    if not replacement:
+        log.warning(f"{trade.get('label', 'trade')}: no valid replacement spread for IC roll")
+        return False
+    short_new, long_new = replacement
+    net_debit = max(0.01, close_debit - new_credit)
+    close_side = "put" if side == "P" else "call"
+    legs_payload = [
+        {"symbol": old_short["symbol"], "side": "buy", "ratio_qty": "1", "position_intent": "buy_to_close"},
+        {"symbol": old_long["symbol"], "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_close"},
+        {"symbol": short_new.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+        {"symbol": long_new.symbol, "side": "buy", "ratio_qty": "1", "position_intent": "buy_to_open"},
+    ]
+    body = {
+        "type": "limit",
+        "limit_price": str(round(net_debit, 2)),
+        "time_in_force": "day",
+        "order_class": "mleg",
+        "qty": str(max(1, int(trade.get("qty") or 1))),
+        "client_order_id": f"vibe-ic-roll-{str(trade.get('id') or 'group')[:8]}-{int(time.time())}",
+        "legs": legs_payload,
+    }
+    order = _post_order_with_retry(body, f"{trade.get('label', 'trade')} IC {close_side} roll")
+    if not order:
+        return False
+    trade["roll_order_id"] = order.get("id") or order.get("client_order_id")
+    trade["roll_reason"] = reason
+    trade["roll_started_at"] = _utc_timestamp()
+    trade["roll_tested_side"] = side
+    trade["roll_close_legs"] = tested_symbols
+    trade["roll_keep_legs"] = kept_symbols
+    trade["roll_replacement_legs"] = [short_new.symbol, long_new.symbol]
+    trade["roll_limit_debit"] = round(net_debit, 2)
+    log.info(
+        f"{trade.get('label', 'trade')}: IC {close_side} roll submitted "
+        f"order={trade['roll_order_id']} old_debit={close_debit:.2f} new_credit={new_credit:.2f}"
+    )
+    _alert(
+        f"IC ROLL submitted: **{trade.get('label', 'trade')}**\n"
+        f"reason={reason}\nside={close_side} limit_debit=${net_debit:.2f}"
+    )
+    return True
+
+
 def _can_submit_option_close_orders() -> bool:
     """Return True only when Alpaca will accept option close orders."""
     return _market_is_open()
@@ -1927,6 +2138,7 @@ def monitor_and_close(
     state = _load_trade_state()
     state_changed = _refresh_entry_order_fills(state)
     state_changed = _refresh_filled_group_closes(state) or state_changed
+    state_changed = _refresh_filled_ic_rolls(state) or state_changed
     if not positions:
         pending = [
             trade for trade in state.get("trades", [])
@@ -2126,7 +2338,17 @@ def monitor_and_close(
                     dte = (datetime.strptime(expiry_text, "%Y-%m-%d").date() - date.today()).days
                     strategy_name = trade.get("strategy", "")
                     if strategy_name == "iron_condor" and dte <= IC_DTE_MANAGE_DAYS:
-                        reason = f"time exit: iron condor reached {dte} DTE"
+                        roll_reason = f"time roll: iron condor reached {dte} DTE"
+                        if AUTO_CLOSE_GROUPS and _can_submit_option_close_orders():
+                            if _submit_ic_roll(trade_client, data_client, trade, dte, roll_reason):
+                                state_changed = True
+                                continue
+                            trade["exit_pending_reason"] = f"{roll_reason}; roll evidence unavailable"
+                            trade["exit_pending_at"] = _utc_timestamp()
+                            state_changed = True
+                            integrity_ok = False
+                            continue
+                        reason = roll_reason
                     elif strategy_name == "put_spread" and dte <= PS_DTE_MANAGE_DAYS:
                         reason = f"time exit: put spread reached {dte} DTE"
 
