@@ -24,4 +24,10 @@ if ($LASTEXITCODE -ne 0) {
   Write-Warning "Adaptive options playbook refresh failed; entry gate remains strict."
 }
 
+Write-Host "Refreshing options quant risk budget..."
+python scripts\options_quant_risk_budget.py --print
+if ($LASTEXITCODE -ne 0) {
+  Write-Warning "Options quant risk budget refresh failed; options bot will use its configured missing-report behavior."
+}
+
 exit 0

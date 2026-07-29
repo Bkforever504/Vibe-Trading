@@ -51,6 +51,7 @@ REPORTS = {
     "market_catalyst": REPORT_DIR / "market-catalyst-calendar.json",
     "daily_edge": REPORT_DIR / "daily-edge-orchestrator.json",
     "options_heatmap": REPORT_DIR / "options-liquidation-heatmap.json",
+    "options_quant_risk": REPORT_DIR / "options-quant-risk-budget.json",
     "kronos_forecast": REPORT_DIR / "kronos-market-forecast.json",
     "cheap_asymmetry": REPORT_DIR / "cheap-asymmetry-scanner.json",
     "learning": REPORT_DIR / "flip-bot-learning-report.json",
@@ -388,6 +389,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "market_catalyst": load_json(paths["market_catalyst"], {}),
         "daily_edge": load_json(paths["daily_edge"], {}),
         "options_heatmap": load_json(paths["options_heatmap"], {}),
+        "options_quant_risk": load_json(paths["options_quant_risk"], {}),
         "kronos_forecast": load_json(paths["kronos_forecast"], {}),
         "cheap_asymmetry": load_json(paths["cheap_asymmetry"], {}),
         "learning": load_json(paths["learning"], {}),
@@ -1021,6 +1023,48 @@ def render_options_heatmap(model: dict[str, Any]) -> str:
         + unavailable_html
     )
     return section("Options Liquidation Heat Map", body, "Public OI/volume heat zones + optional GEX wall - context only")
+
+
+def render_options_quant_risk(model: dict[str, Any]) -> str:
+    data = model.get("options_quant_risk") if isinstance(model.get("options_quant_risk"), dict) else {}
+    if not data:
+        return section("Options Quant Risk Budget", "<p style='color:var(--muted);padding:12px'>No report - run scripts/options_quant_risk_budget.py first.</p>")
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    groups = data.get("groups") if isinstance(data.get("groups"), dict) else {}
+    cards = (
+        stat_card("Samples", str(safe_int(summary.get("closed_trade_samples"))), "closed option trades with P/L estimate")
+        + stat_card("Global Cap", pct(summary.get("global_final_risk_cap_fraction"), scale=True), str(summary.get("global_action") or ""), cls_for_health(summary.get("global_action")))
+        + stat_card("Execution", "OFF", "read-only allocator", "good" if not data.get("can_submit_orders") else "bad")
+        + stat_card("Methods", "Kelly+MC", "GARCH / heatmap / Sortino throttle", "good")
+    )
+    rows = []
+    for key in ("global", "strategy:put_spread", "strategy:call_spread", "strategy:iron_condor", "symbol:IWM", "symbol:SPY", "symbol:QQQ", "symbol:AAPL", "symbol:NVDA", "symbol:TSLA", "symbol:PLTR"):
+        row = groups.get(key)
+        if not isinstance(row, dict):
+            continue
+        mc = row.get("monte_carlo") if isinstance(row.get("monte_carlo"), dict) else {}
+        rows.append(
+            "<tr>"
+            f"<td><strong>{esc(key)}</strong><small>{esc(row.get('action'))}</small></td>"
+            f"<td>{safe_int(row.get('sample_size'))}</td>"
+            f"<td>{pct(row.get('bayesian_win_rate'), scale=True)}</td>"
+            f"<td>{pct(row.get('raw_kelly_fraction'), scale=True)}</td>"
+            f"<td>{pct(row.get('final_risk_cap_fraction'), scale=True)}</td>"
+            f"<td>{money(row.get('final_risk_cap_dollars'))}</td>"
+            f"<td>{money(mc.get('p95_drawdown_dollars'))}</td>"
+            f"<td>{esc(row.get('sortino_per_trade'))}</td>"
+            f"<td>{esc(row.get('garch_multiplier'))} / {esc(row.get('heatmap_multiplier'))}</td>"
+            "</tr>"
+        )
+    body = (
+        '<div class="grid-3" style="margin-bottom:16px">' + cards + "</div>"
+        + '<div class="table-wrap"><table><thead><tr>'
+        '<th>Group</th><th>N</th><th>Bayes WR</th><th>Kelly</th><th>Risk Cap</th><th>Cap $</th><th>MC p95 DD</th><th>Sortino</th><th>GARCH/Heat</th>'
+        '</tr></thead><tbody>'
+        + ("".join(rows) or "<tr><td colspan='9'>No quant risk groups available.</td></tr>")
+        + "</tbody></table></div>"
+    )
+    return section("Options Quant Risk Budget", body, "Fractional Kelly + Monte Carlo survival + GARCH/heat-map throttle; sizing context only")
 
 
 def render_grades(model: dict[str, Any]) -> str:
@@ -1964,6 +2008,11 @@ def render_html(model: dict[str, Any]) -> str:
     <div id="heatmap" class="section">
       <div class="section-label"><h2>Options Liquidation Heat Map</h2><p>Public option-chain heat zones, pin risk, and GEX context; read-only</p></div>
       {render_options_heatmap(model)}
+    </div>
+
+    <div id="quant-risk" class="section">
+      <div class="section-label"><h2>Options Quant Risk Budget</h2><p>Fractional Kelly, Monte Carlo, Sortino, GARCH, and heat-map sizing throttle</p></div>
+      {render_options_quant_risk(model)}
     </div>
 
     <div id="kronos" class="section">

@@ -45,6 +45,7 @@ try:
     from shadow_consensus import exit_advice as shadow_exit_advice
     import options_state
     from scripts.market_data import fetch_vix_term_structure_context
+    from scripts.options_quant_risk_budget import candidate_allocation as quant_risk_allocation
 except ModuleNotFoundError:
     from strategies.risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
     from strategies.execution_guard import evaluate_execution
@@ -52,6 +53,7 @@ except ModuleNotFoundError:
     from strategies.shadow_consensus import exit_advice as shadow_exit_advice
     from strategies import options_state
     from scripts.market_data import fetch_vix_term_structure_context
+    from scripts.options_quant_risk_budget import candidate_allocation as quant_risk_allocation
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "agent", ".env"))
 
@@ -173,7 +175,12 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 GARCH_RISK_REPORT = Path(os.path.expanduser(os.getenv(
     "GARCH_RISK_REPORT", str(VIBE_HOME / "reports" / "garch-volatility-risk.json"),
 )))
+OPTIONS_QUANT_RISK_REPORT = Path(os.path.expanduser(os.getenv(
+    "OPTIONS_QUANT_RISK_REPORT", str(VIBE_HOME / "reports" / "options-quant-risk-budget.json"),
+)))
 ENABLE_GARCH_RISK_GATE = os.getenv("ENABLE_GARCH_RISK_GATE", "true").lower() == "true"
+ENABLE_OPTIONS_QUANT_RISK_BUDGET = os.getenv("ENABLE_OPTIONS_QUANT_RISK_BUDGET", "true").lower() == "true"
+OPTIONS_REQUIRE_QUANT_RISK_REPORT = os.getenv("OPTIONS_REQUIRE_QUANT_RISK_REPORT", "false").lower() == "true"
 OPTIONS_GARCH_STORM_BLOCK = os.getenv("OPTIONS_GARCH_STORM_BLOCK", "true").lower() == "true"
 OPTIONS_REQUIRE_GARCH_REPORT = os.getenv("OPTIONS_REQUIRE_GARCH_REPORT", "false").lower() == "true"
 OPTIONS_GARCH_MIN_ENTRY_MULTIPLIER = float(
@@ -1598,6 +1605,38 @@ def _confidence_score(meta: Optional[dict]) -> float | None:
     return float(value) if value is not None else None
 
 
+def _apply_quant_risk_budget(label: str, qty: int, trade_meta: dict) -> tuple[int, dict, bool]:
+    if not ENABLE_OPTIONS_QUANT_RISK_BUDGET:
+        return qty, {"enabled": False, "reason": "quant_risk_budget_disabled"}, True
+    strategy = str(trade_meta.get("strategy") or "unknown")
+    underlying = str(trade_meta.get("underlying") or label)
+    equity = float(trade_meta.get("sizing_equity") or ACCOUNT_SIZE_OVERRIDE or 0.0)
+    if equity <= 0:
+        meta = {
+            "enabled": True,
+            "reason": "sizing_equity_missing",
+            "report_path": str(OPTIONS_QUANT_RISK_REPORT),
+        }
+        return (0 if OPTIONS_REQUIRE_QUANT_RISK_REPORT else qty), meta, not OPTIONS_REQUIRE_QUANT_RISK_REPORT
+    max_risk = float(trade_meta.get("max_risk_per_contract") or 0.0)
+    advice = quant_risk_allocation(
+        symbol=underlying,
+        strategy=strategy,
+        requested_qty=qty,
+        max_risk_per_contract=max_risk,
+        equity=equity,
+        confidence_score=_confidence_score(trade_meta),
+        report_path=OPTIONS_QUANT_RISK_REPORT,
+        require_report=OPTIONS_REQUIRE_QUANT_RISK_REPORT,
+    )
+    meta = {
+        "enabled": True,
+        **advice,
+    }
+    adjusted = int(advice.get("adjusted_qty") or 0)
+    return adjusted, meta, bool(advice.get("allowed"))
+
+
 def _broker_open_underlying_symbols() -> set[str]:
     """Fetch open positions from Alpaca broker and return underlying tickers (truth source)."""
     try:
@@ -1745,6 +1784,20 @@ def _place_mleg(
         for leg in legs_payload
         if leg.get("symbol")
     ]
+    qty, quant_meta, quant_allowed = _apply_quant_risk_budget(label, qty, trade_meta)
+    trade_meta["quant_risk_budget"] = quant_meta
+    trade_meta["qty"] = qty
+    if not quant_allowed:
+        strategy = str(trade_meta.get("strategy") or "mleg")
+        _decision(underlying, strategy, "skip", str(quant_meta.get("reason") or "quant_risk_budget_block"), quant_risk_budget=quant_meta)
+        log.warning(f"{label}: QUANT RISK BUDGET BLOCKED {underlying}: {quant_meta.get('reason')}")
+        _alert(f"QUANT RISK BUDGET BLOCKED: **{label}**\nreason={quant_meta.get('reason')}")
+        return False
+    if int(quant_meta.get("adjusted_qty") or qty) < int(quant_meta.get("requested_qty") or qty):
+        log.info(
+            f"{label}: QUANT RISK SIZE DOWN {underlying}: "
+            f"{quant_meta.get('requested_qty')} -> {qty} cap=${quant_meta.get('risk_cap_dollars')}"
+        )
     if not _guard_submission(label, qty, trade_meta):
         return False
     if REQUIRE_MANUAL_APPROVAL:
@@ -2153,6 +2206,7 @@ def run_iron_condor(
             "legs": [short_put.symbol, long_put.symbol, short_call.symbol, long_call.symbol],
             "net_credit": net_credit,
             "max_risk_per_contract": max_risk,
+            "sizing_equity": equity,
             "qty": qty,
             "profit_close_pct": IC_PROFIT_CLOSE_PCT,
             "stop_loss_pct": STOP_LOSS_PCT,
@@ -2285,6 +2339,7 @@ def run_put_spread(
             "legs": [short_put.symbol, long_put.symbol],
             "net_credit": net_credit,
             "max_risk_per_contract": max_risk,
+            "sizing_equity": equity,
             "qty": qty,
             "profit_close_pct": PS_PROFIT_CLOSE_PCT,
             "stop_loss_pct": STOP_LOSS_PCT,
@@ -2367,7 +2422,7 @@ def run_call_spread(
         trade_meta={
             "label": f"Call Spread [{symbol}]", "strategy": "call_spread",
             "underlying": symbol, "legs": [short_call.symbol, long_call.symbol],
-            "net_credit": net_credit, "max_risk_per_contract": max_risk, "qty": qty,
+            "net_credit": net_credit, "max_risk_per_contract": max_risk, "sizing_equity": equity, "qty": qty,
             "profit_close_pct": PS_PROFIT_CLOSE_PCT, "stop_loss_pct": STOP_LOSS_PCT,
             "expiry": str(short_call.expiry), "candidate_confidence": candidate_confidence,
             "leg_market_snapshots": [_leg_market_snapshot(short_call), _leg_market_snapshot(long_call)],
@@ -2396,6 +2451,20 @@ def _place_single_leg(
         log.warning(f"{label}: GARCH ENTRY BLOCKED {underlying}: {garch_meta['reason']}")
         _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
         return False
+    qty, quant_meta, quant_allowed = _apply_quant_risk_budget(label, qty, trade_meta)
+    trade_meta["quant_risk_budget"] = quant_meta
+    trade_meta["qty"] = qty
+    if not quant_allowed:
+        strategy = str(trade_meta.get("strategy") or "single_leg")
+        _decision(underlying, strategy, "skip", str(quant_meta.get("reason") or "quant_risk_budget_block"), quant_risk_budget=quant_meta)
+        log.warning(f"{label}: QUANT RISK BUDGET BLOCKED {underlying}: {quant_meta.get('reason')}")
+        _alert(f"QUANT RISK BUDGET BLOCKED: **{label}**\nreason={quant_meta.get('reason')}")
+        return False
+    if int(quant_meta.get("adjusted_qty") or qty) < int(quant_meta.get("requested_qty") or qty):
+        log.info(
+            f"{label}: QUANT RISK SIZE DOWN {underlying}: "
+            f"{quant_meta.get('requested_qty')} -> {qty} cap=${quant_meta.get('risk_cap_dollars')}"
+        )
     if not _guard_submission(label, qty, trade_meta):
         return False
     if REQUIRE_MANUAL_APPROVAL:
@@ -2501,6 +2570,7 @@ def run_cash_secured_put(
             "underlying": symbol,
             "net_credit": short_put.mid,
             "max_risk_per_contract": cash_required,
+            "sizing_equity": equity,
             "candidate_confidence": candidate_confidence,
         },
     )
@@ -2559,6 +2629,7 @@ def run_covered_call(
             "underlying": symbol,
             "net_credit": short_call.mid,
             "max_risk_per_contract": short_call.mid * 100,
+            "sizing_equity": equity,
             "candidate_confidence": candidate_confidence,
         },
     )
