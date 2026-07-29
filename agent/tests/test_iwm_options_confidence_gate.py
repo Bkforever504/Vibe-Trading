@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import sys
 from pathlib import Path
 
@@ -117,6 +117,16 @@ def test_call_spread_records_above_sma_skip(monkeypatch) -> None:
 
     assert bot.run_call_spread(None, None, "SPY", 10_000) is False
     assert decisions == [(("SPY", "cs", "skip", "trend_filter_above_20sma_use_ps"), {})]
+
+
+def test_entry_window_allows_only_best_fill_windows(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    monkeypatch.setattr(bot, "OPTIONS_ENTRY_WINDOWS_ET", "09:45-10:30,15:00-15:45")
+
+    assert bot._entry_window_open(datetime(2026, 7, 29, 9, 45)) is True
+    assert bot._entry_window_open(datetime(2026, 7, 29, 15, 30)) is True
+    assert bot._entry_window_open(datetime(2026, 7, 29, 12, 0)) is False
 
 
 def test_call_spread_builds_credit_mleg_when_below_sma(monkeypatch) -> None:

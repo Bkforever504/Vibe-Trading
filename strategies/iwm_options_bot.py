@@ -112,6 +112,7 @@ REQUIRE_MANUAL_APPROVAL = os.getenv(
 ).lower() == "true"
 MAX_OPEN_TRADES_PER_UNDERLYING = int(os.getenv("MAX_OPEN_TRADES_PER_UNDERLYING", "1"))
 MAX_NEW_TRADES_PER_SYMBOL_PER_RUN = int(os.getenv("MAX_NEW_TRADES_PER_SYMBOL_PER_RUN", "1"))
+OPTIONS_ENTRY_WINDOWS_ET = os.getenv("OPTIONS_ENTRY_WINDOWS_ET", "09:45-10:30,15:00-15:45")
 
 # â”€â”€ Multi-Symbol Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Maps symbol â†’ list of strategies to run
@@ -217,6 +218,27 @@ def _now_et() -> datetime:
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _parse_et_time(text: str):
+    return datetime.strptime(text.strip(), "%H:%M").time()
+
+
+def _entry_window_open(now_et: datetime | None = None) -> bool:
+    now_et = now_et or _now_et()
+    windows = [
+        part.strip()
+        for part in OPTIONS_ENTRY_WINDOWS_ET.split(",")
+        if part.strip()
+    ]
+    for window in windows:
+        try:
+            start_txt, end_txt = window.split("-", 1)
+            if _parse_et_time(start_txt) <= now_et.time() <= _parse_et_time(end_txt):
+                return True
+        except ValueError:
+            log.warning(f"Invalid OPTIONS_ENTRY_WINDOWS_ET segment {window!r}; ignoring")
+    return False
 
 
 def _garch_meta(row: dict | None, reason: str) -> dict:
@@ -2734,6 +2756,12 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
     # No new entries outside market hours
     if not _market_is_open():
         log.info("Market closed â€” skipping new entries")
+        return
+
+    if not _entry_window_open():
+        log.info(
+            f"Outside options entry windows ET ({OPTIONS_ENTRY_WINDOWS_ET}) â€” skipping new entries"
+        )
         return
 
     # VIX macro filter â€” one check covers all symbols
