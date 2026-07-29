@@ -42,6 +42,21 @@ def test_build_report_flags_missing_expected_time() -> None:
     assert any(issue["issue"] == "missing_expected_times" and issue["task"] == bad_task for issue in report["issues"])
 
 
+def test_build_report_flags_uncovered_options_entry_window() -> None:
+    task = r"\IWM-Bot-Entry"
+    report = alignment.build_report(_rows_from_expected({task: {"09:45"}}))
+
+    uncovered = [
+        issue for issue in report["issues"]
+        if issue.get("issue") == "entry_window_uncovered"
+    ]
+    assert report["passed"] is False
+    assert {issue["window_et"] for issue in uncovered} == {
+        "09:45-10:30",
+        "15:00-15:45",
+    }
+
+
 def test_build_report_flags_order_violation() -> None:
     report = alignment.build_report(_rows_from_expected({
         r"\VibeTrade\PreOpenSentimentLogger": {"08:50"},

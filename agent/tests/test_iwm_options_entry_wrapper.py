@@ -24,4 +24,15 @@ def test_entry_wrapper_aborts_before_bot_when_context_refresh_fails() -> None:
 
     assert '$env:OPTIONS_REQUIRE_GARCH_REPORT = "true"' in script
     assert '$env:OPTIONS_REQUIRE_QUANT_RISK_REPORT = "true"' in script
+    assert '$env:ALPACA_PAPER = "true"' in script
     assert script.index(context_call) < script.index(failure_guard) < script.index(bot_call)
+
+
+def test_entry_task_covers_both_et_fill_windows() -> None:
+    script = (ROOT / "scripts" / "register_iwm_bot_entry_task.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '$TriggerTimes = @("8:45AM", "2:00PM")' in script
+    assert "run_iwm_bot_entry.ps1" in script
+    assert "MultipleInstances IgnoreNew" in script

@@ -24,6 +24,8 @@ LOG_PATH = ROOT / "data" / "market_schedule_alignment_log.jsonl"
 
 REGULAR_MARKET_OPEN_CT = "08:30"
 REGULAR_MARKET_CLOSE_CT = "15:00"
+CENTRAL_TO_EASTERN_MINUTES = 60
+OPTIONS_ENTRY_WINDOWS_ET = (("09:45", "10:30"), ("15:00", "15:45"))
 
 # A task observed in "Running" state is healthy if it started recently. This
 # covers the alignment task observing itself mid-run and other tasks observed
@@ -55,7 +57,7 @@ EXPECTED_TASKS = {
         "09:45", "10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30",
         "11:45", "12:00", "12:15", "12:30", "12:45", "13:00", "13:15", "13:30", "13:45",
     },
-    r"\IWM-Bot-Entry": {"09:45"},
+    r"\IWM-Bot-Entry": {"08:45", "14:00"},
     r"\IWM-Bot-Monitor": {"10:00", "11:00", "12:00", "13:00", "14:00", "15:00"},
     r"\VibeTrade\PortfolioConcentrationMonitor": {"11:05"},
     # Close context after regular close.
@@ -210,6 +212,31 @@ def _task_last_runs(rows: list[dict[str, str]]) -> dict[str, datetime]:
     return last_runs
 
 
+def _entry_window_coverage_issues(actual_times: dict[str, set[str]]) -> list[dict[str, Any]]:
+    """Require an IWM entry trigger inside every configured Eastern window."""
+    task = r"\IWM-Bot-Entry"
+    actual_ct = sorted(actual_times.get(task, set()))
+    actual_et_minutes = {
+        minutes + CENTRAL_TO_EASTERN_MINUTES
+        for value in actual_ct
+        if (minutes := _parse_time_to_minutes(value)) is not None
+    }
+    issues: list[dict[str, Any]] = []
+    for start_text, end_text in OPTIONS_ENTRY_WINDOWS_ET:
+        start = _parse_time_to_minutes(start_text)
+        end = _parse_time_to_minutes(end_text)
+        if start is None or end is None:
+            continue
+        if not any(start <= value <= end for value in actual_et_minutes):
+            issues.append({
+                "task": task,
+                "issue": "entry_window_uncovered",
+                "window_et": f"{start_text}-{end_text}",
+                "actual_ct": actual_ct,
+            })
+    return issues
+
+
 def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None = None) -> dict[str, Any]:
     rows = rows if rows is not None else query_scheduled_tasks()
     now = now or datetime.now()
@@ -262,6 +289,8 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
             "aligned": not missing and bool(actual) and status_ok,
         })
 
+    issues.extend(_entry_window_coverage_issues(actual_times))
+
     first_times = {task: min((_parse_time_to_minutes(t) for t in times), default=None) for task, times in actual_times.items()}
     for name, earlier, later in ORDER_CHECKS:
         e = first_times.get(earlier)
@@ -297,6 +326,7 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
         "tasks": task_rows,
         "notes": [
             "Times are Central Time on Kenny's Windows machine.",
+            "IWM entry triggers must cover both configured Eastern fill-quality windows.",
             "This checks regular trading-day timing. Holiday/half-day handling remains a manual watch item unless an exchange calendar is added.",
             "Portfolio monitor uses a repeating 15-minute task and self-skips outside its monitor window, so it is tracked separately by health/logs.",
         ],
