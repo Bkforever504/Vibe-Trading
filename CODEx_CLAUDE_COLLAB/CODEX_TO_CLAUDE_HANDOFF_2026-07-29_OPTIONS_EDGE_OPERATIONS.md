@@ -6,7 +6,7 @@ Mode: paper trading, evidence-driven, fail-closed
 
 ## Operator Summary
 
-Codex implemented the six requested options-selling edge filters and verified the active options safety lane. The system is operationally clean, but options entries remain correctly blocked until broker reconciliation clears the unexplained IWM residual.
+Codex implemented the six requested options-selling edge filters, cleared the guarded IWM residual, repaired the entry-task timing, and hardened Flip's day-type data path. Broker reconciliation is exact and options entries are eligible only when every remaining strategy gate passes.
 
 Do not claim proven profitability from this state. The process is hardened, the guards are working, and the next edge comes from clean forward evidence.
 
@@ -18,6 +18,8 @@ Do not claim proven profitability from this state. The process is hardened, the 
 - `4071ee7` - Use strategy-specific IV rank gates
 - `b67c5f0` - Require IV premium over realized volatility
 - `8dc8292` - Apply strategy-specific VIX bands
+- `359dad9` - Align options entries with fill windows
+- `9f22533` - Harden Flip day type and runtime policy
 
 These are on top of:
 
@@ -65,29 +67,26 @@ From local ignored `agent/.env`, redacted for secrets:
 
 Do not set live execution flags. Do not bypass reconciliation.
 
-## Current Execution Blocker
+## Execution Blocker Cleared
 
 Read-only reconciler result:
 
 ```text
 Options Position Reconciler
-generated_at: 2026-07-29T06:09:01Z
-status: review_required
-entries_allowed: False
-finding: unexplained broker residual IWM260807C00315000 qty=+2
-repair plan: investigate_unexplained_residual, requires Kenny approval
+generated_at: 2026-07-29T16:02:21Z
+status: ok
+entries_allowed: True
+repair plan: none
+durable state and broker positions reconcile exactly
 ```
 
-This is the sole options-entry blocker. It is correct for the bot to refuse new options entries until the broker residual is gone and reconciliation reports `entries_allowed=True`.
+The guarded `IWM260807C00315000 +2` sell-to-close cleanup ran in paper mode at 8:32 AM Central. Later broker reconciliation confirmed the position was gone. This removed the reconciliation blocker; it did not bypass any strategy gate or create a new entry.
 
-Scheduled task:
+Residual task result:
 
 - `IWM-Residual-Clearance`
-- LastRunTime: `11/30/1999 12:00:00 AM`
-- LastTaskResult: `267011`
-- NextRunTime: `7/29/2026 8:32:00 AM`
-
-The 1999 timestamp means the one-shot task has not run yet, not that it failed after running.
+- LastRunTime: `7/29/2026 8:32:00 AM`
+- LastTaskResult: `0`
 
 ## Scheduler State
 
@@ -105,6 +104,19 @@ Main active stack is registered and `Ready`. Recent last results are `0` for cor
 - `MarketScheduleAlignment`
 - `SignalStackHealthReport`
 - `VibeTrading-Portfolio-Monitor`
+
+`IWM-Bot-Entry` timing was repaired after Codex found the former 9:45 AM Central trigger landed at 10:45 AM Eastern, outside the configured 09:45-10:30 ET entry window. The task now has two weekday triggers:
+
+- `08:45` Central / `09:45` Eastern
+- `14:00` Central / `15:00` Eastern
+
+The entry wrapper pins `ALPACA_PAPER=true`. Schedule governance now verifies that both configured Eastern entry windows have trigger coverage. Live verification after task replacement:
+
+```text
+State=Ready
+NextRunTime=7/29/2026 2:00:00 PM Central
+Triggers=08:45,14:00 Central
+```
 
 Disabled tasks observed:
 
@@ -187,12 +199,12 @@ paper_challenger: zero_entries_since_activation_9_business_days
 Readiness scorecard:
 
 ```text
-overall_score=6.0
+overall_score=6.4
 can_submit_orders=false
 execution_enabled=false
 Operational integrity=10/10
 Autonomous safety=10/10
-Risk controls=6/10
+Risk controls=10/10
 Entry quality=7/10
 Exit quality=4/10
 Counterfactual gate quality=0/10
@@ -214,30 +226,36 @@ These are encouraging but too small for durable profitability claims.
 
 ## Verification
 
-Focused options safety lane:
+Combined options, reconciliation, shadow, governance, readiness, and Flip safety lane:
 
 ```powershell
-python -m pytest agent\tests\test_iwm_options_confidence_gate.py `
-  agent\tests\test_options_state_integrity.py `
+python -m pytest -q test_iwm_options_execution_guard.py `
+  agent\tests\test_iwm_options_confidence_gate.py `
+  agent\tests\test_iwm_options_entry_wrapper.py `
+  agent\tests\test_iwm_options_quant_risk_budget.py `
   agent\tests\test_options_position_reconciler.py `
-  agent\tests\test_options_lifecycle_pnl.py `
   agent\tests\test_options_shadow_twin.py `
-  agent\tests\test_self_learning_edge_loop.py `
+  agent\tests\test_options_quant_risk_budget.py `
+  agent\tests\test_market_schedule_alignment.py `
   agent\tests\test_execution_gate_audit.py `
-  agent\tests\test_garch_volatility_risk.py `
-  test_iwm_options_execution_guard.py -q
+  agent\tests\test_signal_stack_health_report.py `
+  agent\tests\test_elite_bot_readiness_scorecard.py `
+  agent\tests\test_flip_day_type_router.py `
+  agent\tests\test_flip_entry_quality.py `
+  agent\tests\test_flip_bot_safety.py
 ```
 
 Result:
 
 ```text
-101 passed, 1 warning
+186 passed, 1 warning
 ```
 
 Compile check:
 
 ```powershell
 python -m py_compile strategies\iwm_options_bot.py strategies\flip_bot.py `
+  strategies\flip_day_type_router.py `
   scripts\options_position_reconciler.py scripts\options_shadow_twin.py `
   scripts\market_schedule_alignment.py scripts\execution_gate_audit.py `
   scripts\signal_stack_health_report.py scripts\elite_bot_readiness_scorecard.py
@@ -245,18 +263,7 @@ python -m py_compile strategies\iwm_options_bot.py strategies\flip_bot.py `
 
 Result: passed.
 
-Broader safety pack was run and is not clean:
-
-```text
-282 passed, 1 warning, 3 failed
-```
-
-The 3 failures are pre-existing `flip_bot` entry-limit rounding expectation mismatches:
-
-- expected `0.72`, actual `0.73`
-- expected `1.30`, actual `1.31`
-
-Do not represent the full broader suite as green until those are resolved or formally classified.
+The three previously reported Flip rounding/configuration failures are resolved. Their root cause was unit tests depending on the local `.env` slippage percentage plus a Python default argument that captured the environment-derived value at import time. Runtime policy is now resolved when called, and affected tests pin their intended policy.
 
 Full repo suite was also not clean before this handoff. Previously observed:
 
@@ -283,14 +290,13 @@ Preserve those unless Kenny explicitly asks to clean them.
 
 ## Next Claude Code Actions
 
-1. Wait for or inspect `IWM-Residual-Clearance` after July 29, 2026 8:32 AM Central.
-2. Re-run `python scripts\options_position_reconciler.py --print`.
-3. Require `entries_allowed=True` before letting `IWM-Bot-Entry` create any new options entry.
-4. Verify `IWM-Bot-Entry` respects the new ET entry windows and the IV/RV gate.
-5. Watch `data/options_shadow_twin_log.jsonl` after the first eligible or blocked candidate.
-6. Diagnose the 3 `flip_bot` rounding test failures separately.
-7. Do not force trades, do not enable live execution, and do not loosen thresholds to create activity.
+1. Observe the scheduled `IWM-Bot-Entry` run at 2:00 PM Central; do not start it manually.
+2. Confirm its task result and verify the log records either a gated stand-aside or a bounded paper candidate.
+3. Re-run `python scripts\options_position_reconciler.py --print` after any paper fill or exit.
+4. Watch `data/options_shadow_twin_log.jsonl` for the first IC/call-spread/put-spread candidate and executable quote coverage.
+5. Confirm the Flip log no longer emits `Day type [SPY] failed: No numeric types to aggregate`.
+6. Do not force trades, enable live execution, or loosen thresholds to create activity.
 
 ## Paste-Ready Prompt For Claude Code
 
-Read `CODEx_CLAUDE_COLLAB/CODEX_TO_CLAUDE_HANDOFF_2026-07-29_OPTIONS_EDGE_OPERATIONS.md` first. Operate read-only until the IWM residual is reconciled. Confirm scheduled-task results, run the options reconciler, verify context freshness, and preserve unrelated dirty files. Keep `ALPACA_PAPER=true`. Do not force a trade or bypass blockers. If a reproducible defect appears, fix it with focused tests and commit only the scoped files. Do not claim proven profitability from the current small sample.
+Read `CODEx_CLAUDE_COLLAB/CODEX_TO_CLAUDE_HANDOFF_2026-07-29_OPTIONS_EDGE_OPERATIONS.md` first. The IWM residual is cleared and reconciliation is exact. Observe the 2:00 PM Central `IWM-Bot-Entry` run without starting it manually, verify context freshness and post-run reconciliation, and preserve unrelated dirty files. Keep `ALPACA_PAPER=true`. Do not force a trade or bypass blockers. If a reproducible defect appears, fix it with focused tests and commit only the scoped files. Do not claim proven profitability from the current small sample.
