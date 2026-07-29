@@ -20,6 +20,7 @@ Do not claim proven profitability from this state. The process is hardened, the 
 - `8dc8292` - Apply strategy-specific VIX bands
 - `359dad9` - Align options entries with fill windows
 - `9f22533` - Harden Flip day type and runtime policy
+- `3a1a11a` - Keep Flip ADX calculations numeric
 
 These are on top of:
 
@@ -248,7 +249,7 @@ python -m pytest -q test_iwm_options_execution_guard.py `
 Result:
 
 ```text
-186 passed, 1 warning
+187 passed, 1 warning
 ```
 
 Compile check:
@@ -264,6 +265,8 @@ python -m py_compile strategies\iwm_options_bot.py strategies\flip_bot.py `
 Result: passed.
 
 The three previously reported Flip rounding/configuration failures are resolved. Their root cause was unit tests depending on the local `.env` slippage percentage plus a Python default argument that captured the environment-derived value at import time. Runtime policy is now resolved when called, and affected tests pin their intended policy.
+
+The repeated live `Day type [SPY] failed: No numeric types to aggregate` warning required two fixes: market columns are coerced to numeric, and zero-ATR/zero-DI intervals now use numeric `NaN` masks instead of `pd.NA`, preserving rolling-mean dtypes. A live read-only SPY classification after the fix completed successfully with `recommended_strategy=observe` and no exception.
 
 Full repo suite was also not clean before this handoff. Previously observed:
 
