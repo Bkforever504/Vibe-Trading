@@ -5,9 +5,18 @@ from datetime import date, timedelta
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_options_decision_log(monkeypatch, tmp_path) -> None:
+    from strategies import iwm_options_bot as bot
+
+    monkeypatch.setattr(bot, "DECISION_LOG_FILE", str(tmp_path / "options-decisions.jsonl"))
 
 
 def _leg(symbol: str, *, delta: float, bid: float, ask: float, expiry: date | None = None, strike: float = 100.0):
@@ -224,9 +233,17 @@ def test_options_caution_gate_blocks_multi_warning_stand_aside(monkeypatch, tmp_
     state_file = tmp_path / "options-trades.json"
     posted = []
     decisions = []
+    twin_decisions = []
     monkeypatch.setattr(bot, "TRADE_STATE_FILE", state_file)
     monkeypatch.setattr(bot, "REQUIRE_MANUAL_APPROVAL", False)
     monkeypatch.setattr(bot, "OPTIONS_STRICT_SHADOW_CAUTION_GATE", True)
+    monkeypatch.setattr(bot, "OPTIONS_STRICT_CAUTION_MIN_WARNINGS", 2)
+    monkeypatch.setattr(bot, "shadow_twin_record_candidate", lambda *_args, **_kwargs: "candidate-1")
+    monkeypatch.setattr(
+        bot,
+        "shadow_twin_record_decision",
+        lambda *args, **kwargs: twin_decisions.append((args, kwargs)),
+    )
     monkeypatch.setattr(bot, "_guard_submission", lambda *_args: True)
     monkeypatch.setattr(
         bot,
@@ -273,9 +290,10 @@ def test_options_caution_gate_blocks_multi_warning_stand_aside(monkeypatch, tmp_
     assert decisions
     assert decisions[0][0][3] == "shadow_consensus_stand_aside"
     assert decisions[0][1]["recommendation"] == "stand_aside"
+    assert twin_decisions[0][0][:2] == ("candidate-1", "blocked_strict_caution")
 
 
-def test_options_consensus_blocks_stand_aside_even_with_single_warning(monkeypatch, tmp_path) -> None:
+def test_options_consensus_allows_single_advisory_warning_in_paper_exploration(monkeypatch, tmp_path) -> None:
     from strategies import iwm_options_bot as bot
 
     state_file = tmp_path / "options-trades.json"
@@ -283,6 +301,9 @@ def test_options_consensus_blocks_stand_aside_even_with_single_warning(monkeypat
     monkeypatch.setattr(bot, "TRADE_STATE_FILE", state_file)
     monkeypatch.setattr(bot, "REQUIRE_MANUAL_APPROVAL", False)
     monkeypatch.setattr(bot, "OPTIONS_STRICT_SHADOW_CAUTION_GATE", True)
+    monkeypatch.setattr(bot, "OPTIONS_STRICT_CAUTION_MIN_WARNINGS", 2)
+    monkeypatch.setattr(bot, "ENABLE_OPTIONS_QUANT_RISK_BUDGET", False)
+    monkeypatch.setattr(bot, "_garch_entry_adjustment", lambda symbol, qty: (qty, {}, True))
     monkeypatch.setattr(bot, "_guard_submission", lambda *_args: True)
     monkeypatch.setattr(
         bot,
@@ -312,8 +333,8 @@ def test_options_consensus_blocks_stand_aside_even_with_single_warning(monkeypat
         qty=1,
         label="Put Spread [IWM]",
         trade_meta={"strategy": "put_spread", "underlying": "IWM", "net_credit": 0.40},
-    ) is False
-    assert posted == []
+    ) is True
+    assert len(posted) == 1
 
 
 def test_options_consensus_blocks_when_options_bot_assist_false(monkeypatch, tmp_path) -> None:
@@ -323,6 +344,7 @@ def test_options_consensus_blocks_when_options_bot_assist_false(monkeypatch, tmp
     posted = []
     monkeypatch.setattr(bot, "TRADE_STATE_FILE", state_file)
     monkeypatch.setattr(bot, "REQUIRE_MANUAL_APPROVAL", False)
+    monkeypatch.setattr(bot, "OPTIONS_BYPASS_BOT_ASSIST_DISABLE", False)
     monkeypatch.setattr(bot, "_guard_submission", lambda *_args: True)
     monkeypatch.setattr(bot, "_post_order_with_retry", lambda body, label: posted.append((body, label)) or {"id": "bad"})
     monkeypatch.setattr(bot, "_alert", lambda message: None)
@@ -352,6 +374,53 @@ def test_options_consensus_blocks_when_options_bot_assist_false(monkeypatch, tmp
         trade_meta={"strategy": "put_spread", "underlying": "NVDA", "net_credit": 0.49},
     ) is False
     assert posted == []
+
+
+def test_options_consensus_paper_bypass_allows_disabled_assist_without_hard_block(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    from strategies import iwm_options_bot as bot
+
+    posted = []
+    monkeypatch.setattr(bot, "TRADE_STATE_FILE", tmp_path / "options-trades.json")
+    monkeypatch.setattr(bot, "REQUIRE_MANUAL_APPROVAL", False)
+    monkeypatch.setattr(bot, "OPTIONS_BYPASS_BOT_ASSIST_DISABLE", True)
+    monkeypatch.setattr(bot, "ENABLE_OPTIONS_QUANT_RISK_BUDGET", False)
+    monkeypatch.setattr(bot, "_garch_entry_adjustment", lambda symbol, qty: (qty, {}, True))
+    monkeypatch.setattr(bot, "_guard_submission", lambda *_args: True)
+    monkeypatch.setattr(
+        bot,
+        "_post_order_with_retry",
+        lambda body, label: posted.append((body, label)) or {"id": "paper-order"},
+    )
+    monkeypatch.setattr(bot, "_alert", lambda message: None)
+    monkeypatch.setattr(
+        bot,
+        "shadow_entry_advice",
+        lambda *_args: {
+            "enabled": True,
+            "allowed": True,
+            "adjusted_contracts": 1,
+            "recommendation": "size_down",
+            "options_playbook": "bullish_put_spread",
+            "blockers": ["weak_shadow_pnl_evidence"],
+            "reasons": ["Options bot assist is disabled for this symbol."],
+            "decision": {"bot_assist": {"options_bot": False}},
+        },
+    )
+
+    assert bot._place_mleg(
+        legs_payload=[
+            {"symbol": "NVDA260731P00200000", "side": "sell", "ratio_qty": "1"},
+            {"symbol": "NVDA260731P00197500", "side": "buy", "ratio_qty": "1"},
+        ],
+        limit_price=0.49,
+        qty=1,
+        label="Put Spread [NVDA]",
+        trade_meta={"strategy": "put_spread", "underlying": "NVDA", "net_credit": 0.49},
+    ) is True
+    assert len(posted) == 1
 
 
 def test_garch_storm_report_blocks_mleg_entry(monkeypatch, tmp_path) -> None:

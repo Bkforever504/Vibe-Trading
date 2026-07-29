@@ -29,6 +29,7 @@ LEDGER_PATH = ROOT / "data" / "self_learning_mistake_ledger.jsonl"
 REPORT_PATH = REPORT_DIR / "self-learning-edge-loop.json"
 LOG_PATH = ROOT / "data" / "self_learning_edge_loop_log.jsonl"
 SHADOW_PATH = ROOT / "data" / "flip_shadow_candidates_log.jsonl"
+OPTIONS_SHADOW_TWIN_PATH = ROOT / "data" / "options_shadow_twin_log.jsonl"
 FLIP_STATE_PATH = VIBE_HOME / "flip-trades.json"
 FRESH_RETEST_PLAN = ROOT / "research" / "edge_trials" / "fresh_orb_retest_forward_plan_2026-07-20.json"
 
@@ -55,6 +56,13 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         if isinstance(value, dict):
             rows.append(value)
     return rows
+
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _alpaca_execution_evidence(path: Path) -> dict[str, Any]:
@@ -147,6 +155,8 @@ def _shadow_failure_context(failure: dict[str, Any]) -> dict[str, Any]:
 
 
 def _proposed_shadow_change(lesson: str, context: dict[str, Any]) -> str:
+    if "counterfactual_credit_candidate_lost" in lesson:
+        return "compare_options_gate_warning_clusters"
     if "surrendered" in lesson:
         return "compare_earlier_profit_ratchet_vs_frozen_exit"
     if not context:
@@ -169,6 +179,83 @@ def _proposed_shadow_change(lesson: str, context: dict[str, Any]) -> str:
     if context.get("spread_bucket") == "wide_ge_10":
         return "require_entry_spread_below_10_cents"
     return "require_breakout_follow_through_confirmation"
+
+
+def _options_twin_failures(path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    records = _read_jsonl(path)
+    candidates: dict[str, dict[str, Any]] = {}
+    decisions: dict[str, dict[str, Any]] = {}
+    outcomes: dict[str, dict[str, Any]] = {}
+    for row in records:
+        candidate_id = str(row.get("candidate_id") or "")
+        if not candidate_id:
+            continue
+        if row.get("type") == "candidate":
+            candidates[candidate_id] = row
+        elif row.get("type") == "decision":
+            decisions[candidate_id] = row
+        elif row.get("type") == "outcome":
+            outcomes[candidate_id] = row
+
+    failures: list[dict[str, Any]] = []
+    for candidate_id, outcome in outcomes.items():
+        pnl = _safe_float(outcome.get("pnl_before_fees"))
+        candidate = candidates.get(candidate_id, {})
+        decision = decisions.get(candidate_id, {})
+        # A negative result before fees remains negative after fees. Positive
+        # pre-fee results are not promoted to evidence until fee truth exists.
+        if pnl is None or pnl >= 0 or candidate.get("entry_quote_complete") is not True:
+            continue
+        consensus = candidate.get("shadow_consensus") if isinstance(candidate.get("shadow_consensus"), dict) else {}
+        blockers = sorted({str(item) for item in (consensus.get("blockers") or []) if str(item)})
+        identity = {
+            "source": "options_shadow_twin",
+            "candidate_id": candidate_id,
+            "resolved_at": outcome.get("resolved_at"),
+        }
+        context = {
+            "strategy": candidate.get("strategy"),
+            "decision": decision.get("decision") or "unknown",
+            "blockers": blockers,
+            "quote_scope": candidate.get("quote_scope"),
+            "fees_included": False,
+        }
+        pattern = {
+            "source": "options_shadow_twin",
+            "strategy": candidate.get("strategy"),
+            "decision": context["decision"],
+            "blockers": blockers,
+            "lesson": "counterfactual_credit_candidate_lost_before_fees",
+        }
+        failures.append({
+            **identity,
+            "event_id": _stable_id(identity),
+            "pattern_id": _stable_id(pattern),
+            "lesson": "counterfactual_credit_candidate_lost_before_fees",
+            "next_action": "nominate_shadow_trial_only",
+            "severity": "review",
+            "context": context,
+            "bot": "options",
+            "bot_family": "credit_strategy",
+            "strategy": candidate.get("strategy"),
+            "symbol": candidate.get("underlying"),
+            "evidence_eligible": True,
+            "pnl_before_fees": pnl,
+            "evidence_logic": "negative_before_fees_cannot_be_rescued_by_fees",
+        })
+
+    summary = {
+        "candidate_count": len(candidates),
+        "decision_count": len(decisions),
+        "resolved_count": len(outcomes),
+        "robust_negative_outcome_count": len(failures),
+        "positive_outcomes_withheld_until_fee_truth": sum(
+            (_safe_float(row.get("pnl_before_fees")) or 0) > 0 for row in outcomes.values()
+        ),
+        "authority": "shadow_counterfactual_only",
+        "automatic_parameter_changes_allowed": False,
+    }
+    return failures, summary
 
 
 def _cohort_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -351,13 +438,15 @@ def build_report(
     ledger_path: Path = LEDGER_PATH,
     shadow_path: Path = SHADOW_PATH,
     flip_state_path: Path = FLIP_STATE_PATH,
+    options_shadow_twin_path: Path = OPTIONS_SHADOW_TWIN_PATH,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     existing = _read_jsonl(ledger_path)
     known = {row.get("event_id") for row in existing}
     learning = _read_json(learning_path)
     watchdog = _read_json(watchdog_path)
     audit = _read_json(audit_path)
-    discovered = _mistakes(learning, watchdog, audit)
+    twin_failures, twin_summary = _options_twin_failures(options_shadow_twin_path)
+    discovered = _mistakes(learning, watchdog, audit) + twin_failures
     new_rows = [row for row in discovered if row["event_id"] not in known]
     # The immutable event remains unchanged, while current watchdog lifecycle
     # can downgrade a repaired issue from high to decaying in today's report.
@@ -444,7 +533,10 @@ def build_report(
         "regression_repairs": regression_repairs,
         "shadow_challenger_nominations": nominations,
         "historical_resolved_patterns": historical,
-        "contrastive_evidence": {"orb_fresh_retest_vs_raw_breakout": retest_contrast},
+        "contrastive_evidence": {
+            "orb_fresh_retest_vs_raw_breakout": retest_contrast,
+            "options_shadow_twin": twin_summary,
+        },
         "alpaca_execution_evidence": execution_evidence,
         "active_preregistered_trial": {
             "plan_id": "fresh-orb-retest-forward-2026-07-20",
@@ -453,6 +545,10 @@ def build_report(
         },
         "trial_lifecycle": trial_lifecycle,
         "highest_value_next_step": trial_lifecycle["next_action"],
+        "parallel_evidence_actions": [
+            "accumulate_options_shadow_twin_outcomes",
+            "capture_executable_option_quotes_and_broker_fills",
+        ],
         "promotion_blockers": ["unresolved_repeated_high_severity_mistakes"] if critical else [],
         "learning_contract": {
             "observe": "Ingest completed actual/shadow outcomes, watchdog mismatches, and adversarial failures.",

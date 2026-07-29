@@ -37,6 +37,10 @@ from alpaca.data.requests import OptionChainRequest, OptionLatestQuoteRequest
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import GetOrdersRequest
 from alpaca.trading.enums import QueryOrderStatus
+from scripts.options_shadow_twin import (
+    record_candidate as shadow_twin_record_candidate,
+    record_decision as shadow_twin_record_decision,
+)
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
@@ -60,7 +64,8 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "agent", "
 # â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 LOG_DIR  = os.path.expanduser(r"~\.vibe-trading\logs")
 LOG_FILE = os.path.join(LOG_DIR, "options-bot.log")
-DECISION_LOG_FILE = os.path.join(LOG_DIR, "options-decisions.jsonl")
+DEFAULT_DECISION_LOG_FILE = os.path.join(LOG_DIR, "options-decisions.jsonl")
+DECISION_LOG_FILE = DEFAULT_DECISION_LOG_FILE
 os.makedirs(LOG_DIR, exist_ok=True)
 
 _fmt = logging.Formatter("%(asctime)s  %(levelname)-8s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
@@ -68,14 +73,17 @@ _sh  = logging.StreamHandler()
 _sh.setFormatter(_fmt)
 
 _handlers: list[logging.Handler] = [_sh]
-try:
-    _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
-except OSError:
-    fallback_log = os.path.join(LOG_DIR, f"options-bot-{os.getpid()}-{int(time.time())}.log")
+if os.getenv("PYTEST_CURRENT_TEST"):
+    _fh = logging.NullHandler()
+else:
     try:
-        _fh = logging.FileHandler(fallback_log, encoding="utf-8")
+        _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
     except OSError:
-        _fh = logging.NullHandler()
+        fallback_log = os.path.join(LOG_DIR, f"options-bot-{os.getpid()}-{int(time.time())}.log")
+        try:
+            _fh = logging.FileHandler(fallback_log, encoding="utf-8")
+        except OSError:
+            _fh = logging.NullHandler()
 _fh.setFormatter(_fmt)
 _handlers.insert(0, _fh)
 
@@ -191,6 +199,10 @@ OPTIONS_STRICT_SHADOW_CAUTION_GATE = os.getenv(
 ).lower() == "true"
 OPTIONS_STRICT_CAUTION_MIN_WARNINGS = max(
     2, int(os.getenv("OPTIONS_STRICT_CAUTION_MIN_WARNINGS", "2"))
+)
+OPTIONS_BYPASS_BOT_ASSIST_DISABLE = (
+    PAPER
+    and os.getenv("OPTIONS_BYPASS_BOT_ASSIST_DISABLE", "false").lower() == "true"
 )
 AUTO_CLOSE_GROUPS = os.getenv("AUTO_CLOSE_GROUPS", "true" if PAPER else "false").lower() == "true"
 TRADE_STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\options-trades.json"))
@@ -661,6 +673,8 @@ def _trades_today(trade_client: TradingClient) -> int:
 
 
 def _decision(symbol: str, strategy: str, action: str, reason: str, **details) -> None:
+    if os.getenv("PYTEST_CURRENT_TEST") and DECISION_LOG_FILE == DEFAULT_DECISION_LOG_FILE:
+        return
     event = {
         "ts": _utc_timestamp(),
         "symbol": symbol,
@@ -1714,18 +1728,36 @@ def _place_mleg(
         _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
         return False
     consensus = shadow_entry_advice(underlying, qty)
+    shadow_candidate_id = shadow_twin_record_candidate(
+        trade_meta,
+        legs_payload,
+        consensus=consensus,
+        effective_qty=qty,
+    )
+    if shadow_candidate_id:
+        trade_meta["shadow_twin_candidate_id"] = shadow_candidate_id
     if consensus.get("enabled"):
         warning_list = sorted(
             {str(item) for item in (consensus.get("blockers") or []) if str(item)}
         )
         blockers = ", ".join(warning_list) or consensus.get("recommendation", "needs_review")
         if not consensus.get("allowed"):
+            shadow_twin_record_decision(
+                shadow_candidate_id,
+                "blocked_hard_shadow_consensus",
+                details={"blockers": warning_list},
+            )
             log.warning(f"{label}: SHADOW CONSENSUS BLOCKED {underlying}: {blockers}")
             _alert(f"SHADOW CONSENSUS BLOCKED: **{label}**\nreason={blockers}")
             return False
         bot_assist = (consensus.get("decision") or {}).get("bot_assist") or {}
-        if bot_assist.get("options_bot") is False:
+        if bot_assist.get("options_bot") is False and not OPTIONS_BYPASS_BOT_ASSIST_DISABLE:
             strategy = str(trade_meta.get("strategy") or "mleg")
+            shadow_twin_record_decision(
+                shadow_candidate_id,
+                "blocked_options_assist_disabled",
+                details={"blockers": warning_list},
+            )
             _decision(
                 underlying,
                 strategy,
@@ -1737,27 +1769,49 @@ def _place_mleg(
             log.warning(f"{label}: SHADOW OPTIONS ASSIST DISABLED {underlying}: {blockers}")
             _alert(f"SHADOW OPTIONS ASSIST DISABLED: **{label}**\nreason={blockers}")
             return False
+        if bot_assist.get("options_bot") is False:
+            log.info(
+                f"{label}: paper exploration bypassed shadow options-assist disable "
+                f"for {underlying}; hard blockers remain active"
+            )
         if str(consensus.get("recommendation") or "").lower() == "stand_aside":
             strategy = str(trade_meta.get("strategy") or "mleg")
-            _decision(
-                underlying,
-                strategy,
-                "skip",
-                "shadow_consensus_stand_aside",
-                blockers=warning_list,
-                warning_count=len(warning_list),
-                recommendation=consensus.get("recommendation"),
-                options_playbook=consensus.get("options_playbook"),
-                candidate_confidence=trade_meta.get("candidate_confidence"),
+            strict_caution_block = (
+                OPTIONS_STRICT_SHADOW_CAUTION_GATE
+                and len(warning_list) >= OPTIONS_STRICT_CAUTION_MIN_WARNINGS
             )
-            log.warning(
-                f"{label}: SHADOW CONSENSUS STAND ASIDE {underlying}: {blockers}"
+            if strict_caution_block:
+                shadow_twin_record_decision(
+                    shadow_candidate_id,
+                    "blocked_strict_caution",
+                    details={
+                        "blockers": warning_list,
+                        "warning_count": len(warning_list),
+                    },
+                )
+                _decision(
+                    underlying,
+                    strategy,
+                    "skip",
+                    "shadow_consensus_stand_aside",
+                    blockers=warning_list,
+                    warning_count=len(warning_list),
+                    recommendation=consensus.get("recommendation"),
+                    options_playbook=consensus.get("options_playbook"),
+                    candidate_confidence=trade_meta.get("candidate_confidence"),
+                )
+                log.warning(
+                    f"{label}: SHADOW CONSENSUS STAND ASIDE {underlying}: {blockers}"
+                )
+                _alert(
+                    f"SHADOW CONSENSUS STAND ASIDE: **{label}**\n"
+                    f"warnings={len(warning_list)} reason={blockers}"
+                )
+                return False
+            log.info(
+                f"{label}: shadow stand-aside remains advisory for paper exploration "
+                f"({len(warning_list)}/{OPTIONS_STRICT_CAUTION_MIN_WARNINGS} warnings)"
             )
-            _alert(
-                f"SHADOW CONSENSUS STAND ASIDE: **{label}**\n"
-                f"warnings={len(warning_list)} reason={blockers}"
-            )
-            return False
         adjusted_qty = int(consensus.get("adjusted_contracts", qty) or 0)
         if 0 < adjusted_qty < qty:
             log.info(
@@ -1789,6 +1843,11 @@ def _place_mleg(
     trade_meta["qty"] = qty
     if not quant_allowed:
         strategy = str(trade_meta.get("strategy") or "mleg")
+        shadow_twin_record_decision(
+            shadow_candidate_id,
+            "blocked_quant_risk",
+            details={"reason": quant_meta.get("reason")},
+        )
         _decision(underlying, strategy, "skip", str(quant_meta.get("reason") or "quant_risk_budget_block"), quant_risk_budget=quant_meta)
         log.warning(f"{label}: QUANT RISK BUDGET BLOCKED {underlying}: {quant_meta.get('reason')}")
         _alert(f"QUANT RISK BUDGET BLOCKED: **{label}**\nreason={quant_meta.get('reason')}")
@@ -1799,8 +1858,10 @@ def _place_mleg(
             f"{quant_meta.get('requested_qty')} -> {qty} cap=${quant_meta.get('risk_cap_dollars')}"
         )
     if not _guard_submission(label, qty, trade_meta):
+        shadow_twin_record_decision(shadow_candidate_id, "blocked_execution_guard")
         return False
     if REQUIRE_MANUAL_APPROVAL:
+        shadow_twin_record_decision(shadow_candidate_id, "manual_approval_required")
         log.warning(
             f"{label}: manual approval required; candidate NOT submitted "
             f"credit={limit_price:.2f} qty={qty}"
@@ -1817,8 +1878,14 @@ def _place_mleg(
     }
     order = _post_order_with_retry(body, label)
     if not order:
+        shadow_twin_record_decision(shadow_candidate_id, "submission_failed")
         return False
     oid = order.get("id", "?")
+    shadow_twin_record_decision(
+        shadow_candidate_id,
+        "submitted",
+        details={"order_id": oid, "quantity": qty},
+    )
     log.info(f"{label}: submitted  order_id={oid}  credit={limit_price:.2f}  qty={qty}")
     _alert(f"ðŸ“¥ **{label}** submitted\ncredit=${limit_price:.2f}  qty={qty}  order={oid}")
     _record_trade_group(trade_meta or {}, order)
@@ -2489,21 +2556,6 @@ def _place_single_leg(
     log.info(f"{label}: submitted  order_id={oid}  credit={limit_price:.2f}  qty={qty}")
     _alert(f"ðŸ“¥ **{label}** submitted\ncredit=${limit_price:.2f}  qty={qty}  order={oid}")
     return True
-    try:
-        resp = r.post(
-            f"{BASE}/v2/orders",
-            json=body,
-            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        oid = resp.json().get("id", "?")
-        log.info(f"{label}: submitted  order_id={oid}  credit={limit_price:.2f}  qty={qty}")
-        _alert(f"ðŸ“¥ **{label}** submitted\ncredit=${limit_price:.2f}  qty={qty}  order={oid}")
-        return True
-    except Exception as exc:
-        log.error(f"{label}: submission failed â€” {exc}")
-        return False
 
 
 # â”€â”€ Strategy: Wheel â€” Cash-Secured Put leg â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
