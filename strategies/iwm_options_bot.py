@@ -99,6 +99,9 @@ IV_RANK_MIN          = float(os.getenv("IV_RANK_MIN", "30.0"))            # lega
 IC_IV_RANK_MIN       = float(os.getenv("IC_IV_RANK_MIN", "50.0"))
 SPREAD_IV_RANK_MIN   = float(os.getenv("SPREAD_IV_RANK_MIN", "35.0"))
 WHEEL_IV_RANK_MIN    = float(os.getenv("WHEEL_IV_RANK_MIN", "45.0"))
+ENABLE_IV_REALIZED_VOL_EDGE = os.getenv("ENABLE_IV_REALIZED_VOL_EDGE", "true").lower() == "true"
+IV_REALIZED_VOL_WINDOW = int(os.getenv("IV_REALIZED_VOL_WINDOW", "30"))
+IV_OVER_REALIZED_MIN_RATIO = float(os.getenv("IV_OVER_REALIZED_MIN_RATIO", "1.05"))
 EARNINGS_SKIP_DAYS   = int(os.getenv("EARNINGS_SKIP_DAYS", "5"))          # skip entry if earnings within this many days
 MIN_CREDIT_TO_RISK   = float(os.getenv("MIN_CREDIT_TO_RISK", "0.33"))     # avoid tiny-credit steamroller trades
 MIN_NET_CREDIT       = float(os.getenv("MIN_NET_CREDIT", "0.10"))         # ignore pennies after bid/ask friction
@@ -454,6 +457,65 @@ def _strategy_iv_rank_ok(symbol: str, strategy: str, rank: float) -> bool:
         minimum_iv_rank=minimum,
     )
     return False
+
+
+def _compute_realized_vol(symbol: str, window: int = IV_REALIZED_VOL_WINDOW) -> float | None:
+    try:
+        hist = yf.Ticker(symbol).history(period=f"{max(window * 3, 90)}d")
+        closes = hist["Close"].dropna()
+        if len(closes) <= window:
+            log.warning(f"{symbol}: insufficient history for {window}d realized vol")
+            return None
+        log_returns = np.log(closes / closes.shift(1)).dropna()
+        rv = float(log_returns.tail(window).std() * math.sqrt(252) * 100)
+        return rv if math.isfinite(rv) and rv > 0 else None
+    except Exception as exc:
+        log.warning(f"{symbol}: realized vol check failed: {exc}")
+        return None
+
+
+def _implied_vol_pct(symbol: str) -> float | None:
+    try:
+        from scripts.ivr_scanner import scan_symbol
+
+        scan = scan_symbol(symbol)
+        if scan.get("status") == "ok" and scan.get("current_iv_pct") is not None:
+            iv = float(scan["current_iv_pct"])
+            return iv if math.isfinite(iv) and iv > 0 else None
+        log.warning(f"{symbol}: implied vol unavailable from IVR scanner ({scan.get('error') or scan.get('status')})")
+    except Exception as exc:
+        log.warning(f"{symbol}: implied vol scanner failed: {exc}")
+    return None
+
+
+def _iv_over_realized_ok(symbol: str) -> bool:
+    if not ENABLE_IV_REALIZED_VOL_EDGE:
+        return True
+    implied = _implied_vol_pct(symbol)
+    realized = _compute_realized_vol(symbol, IV_REALIZED_VOL_WINDOW)
+    if implied is None or realized is None:
+        _decision(symbol, "all", "skip", "iv_realized_vol_unavailable")
+        log.info(f"{symbol}: IV/RV unavailable - skipping premium sale")
+        return False
+    ratio = implied / realized if realized > 0 else 0.0
+    if ratio < IV_OVER_REALIZED_MIN_RATIO:
+        _decision(
+            symbol,
+            "all",
+            "skip",
+            "iv_not_overpriced_vs_realized",
+            implied_vol_pct=round(implied, 2),
+            realized_vol_pct=round(realized, 2),
+            iv_over_realized=round(ratio, 4),
+            minimum_ratio=IV_OVER_REALIZED_MIN_RATIO,
+        )
+        log.info(
+            f"{symbol}: IV {implied:.1f}% < {IV_OVER_REALIZED_MIN_RATIO:.2f}x "
+            f"realized {realized:.1f}% - skipping"
+        )
+        return False
+    log.info(f"{symbol}: IV/RV edge ok IV={implied:.1f}% RV{IV_REALIZED_VOL_WINDOW}={realized:.1f}% ratio={ratio:.2f}")
+    return True
 
 # â”€â”€ Earnings check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _has_earnings_soon(symbol: str, days: int = EARNINGS_SKIP_DAYS) -> bool:
@@ -3066,6 +3128,8 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
         # IV Rank gate per symbol â€” also stored for trade journal
         rank = iv_rank(sym)
         _JOURNAL_IV_RANK[sym] = rank
+        if not _iv_over_realized_ok(sym):
+            continue
 
         # Earnings gate â€” skip individual stocks near earnings
         if _has_earnings_soon(sym):
