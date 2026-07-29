@@ -50,7 +50,10 @@ def _daily_closes(symbol: str) -> list[tuple[str, float]]:
         return []
     import pandas as pd
 
-    frame = pd.read_parquet(matches[-1])
+    try:
+        frame = pd.read_parquet(matches[-1])
+    except (ImportError, OSError, ValueError):
+        return []
     frame.columns = [str(column).lower() for column in frame.columns]
     index = pd.to_datetime(frame.index).tz_localize(None).normalize()
     closes = frame["close"].astype(float)
