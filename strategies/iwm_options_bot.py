@@ -2746,7 +2746,7 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             continue
 
         # Per-symbol strategy runs
-        ran_ic = ran_ps = False
+        ran_ic = ran_ps = ran_cs = False
         new_trades_this_symbol = 0
 
         if strategy in ("both", "ic") and "ic" in sym_strategies:
@@ -2764,6 +2764,10 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             if ran_ps:
                 new_trades_this_symbol += 1
                 _decision(sym, "ps", "submitted", "candidate_passed_all_filters")
+        elif strategy in ("both", "ps") and "ps" in sym_strategies:
+            log.info(f"{sym}: per-run symbol trade cap reached; skipping put spread")
+            _decision(sym, "ps", "skip", "per_run_symbol_trade_cap")
+
         if (
             strategy in ("both", "cs")
             and "cs" in sym_strategies
@@ -2773,10 +2777,9 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             if ran_cs:
                 new_trades_this_symbol += 1
                 _decision(sym, "cs", "submitted", "candidate_passed_all_filters")
-
-        elif strategy in ("both", "ps") and "ps" in sym_strategies:
-            log.info(f"{sym}: per-run symbol trade cap reached; skipping put spread")
-            _decision(sym, "ps", "skip", "per_run_symbol_trade_cap")
+        elif strategy in ("both", "cs") and "cs" in sym_strategies:
+            log.info(f"{sym}: per-run symbol trade cap reached; skipping call spread")
+            _decision(sym, "cs", "skip", "per_run_symbol_trade_cap")
 
         if (
             strategy in ("both", "wheel")
@@ -2790,7 +2793,7 @@ def main(strategy: str = "both", symbols: Optional[list[str]] = None) -> None:
             log.info(f"{sym}: per-run symbol trade cap reached; skipping wheel")
             _decision(sym, "wheel", "skip", "per_run_symbol_trade_cap")
 
-        if not ran_ic and not ran_ps:
+        if not ran_ic and not ran_ps and not ran_cs:
             log.info(f"{sym}: no trades placed")
 
         # Re-check daily limit after each symbol
