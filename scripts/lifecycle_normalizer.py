@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-LIFECYCLE_SCHEMA_VERSION = "1.0.0"
+LIFECYCLE_SCHEMA_VERSION = "1.1.0"
 
 FLIP_FAMILY = "flip_directional_debit"
 OPTIONS_FAMILY = "options_defined_risk_credit"
@@ -216,9 +216,22 @@ def normalize_options_trade(trade: dict[str, Any]) -> dict[str, Any]:
     qty = _positive_quantity(trade.get("qty"), "qty", quarantine)
     credit = _safe_float(trade.get("net_credit"))
     closing_debit = _safe_float(trade.get("closing_filled_avg_price"))
-    pnl = _safe_float(trade.get("pnl"))
+    realized_pnl = _safe_float(trade.get("realized_pnl_dollars"))
+    declared_pnl_source = str(trade.get("pnl_source") or "")
+    pnl = (
+        realized_pnl
+        if declared_pnl_source == "fill_derived" and realized_pnl is not None
+        else None
+    )
+    normalized_pnl_source = "fill_derived" if pnl is not None else UNKNOWN
     if pnl is None and credit is not None and closing_debit is not None and qty is not None:
         pnl = round((credit - closing_debit) * 100 * qty, 2)
+        normalized_pnl_source = "fill_derived"
+    legacy_no_fill_pnl = (
+        str(trade.get("status") or "") == "closed"
+        and pnl is None
+        and closing_debit is None
+    )
 
     # The options bot stores max_risk_per_contract in dollars, not option
     # price points. See iwm_options_bot._sized_qty() and the trade metadata
@@ -254,6 +267,8 @@ def normalize_options_trade(trade: dict[str, Any]) -> dict[str, Any]:
         "right": NOT_APPLICABLE,
         "outcome_status": outcome,
         "pnl_dollars": pnl,
+        "pnl_source": normalized_pnl_source,
+        "legacy_no_fill_pnl": legacy_no_fill_pnl,
         "risk_basis": "credit_max_risk",
         "risk_dollars": max_risk,
         "opening_credit_dollars": (

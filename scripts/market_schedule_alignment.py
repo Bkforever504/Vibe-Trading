@@ -46,6 +46,10 @@ EXPECTED_TASKS = {
     r"\VibeTrade\OpeningRangeBreadthScanner": {"08:40"},
     # Regular-hours execution/watch.
     r"\Flip-Bot-Monitor": {"08:45"},
+    r"\VibeTradingOptionsShadowTwin": {
+        "08:45", "09:15", "09:45", "10:15", "10:45", "11:15", "11:45",
+        "12:15", "12:45", "13:15", "13:45", "14:15", "14:45",
+    },
     r"\VibeTradingShadowScanner": {"09:30", "10:30", "11:30", "12:30", "13:30", "14:30"},
     r"\Flip-Bot-Trend-Entry": {
         "09:45", "10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30",

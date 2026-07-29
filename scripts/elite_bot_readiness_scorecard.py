@@ -32,8 +32,10 @@ SOURCE_PATHS = {
     "ablation": REPORT_DIR / "flip-feature-ablation.json",
     "trial_ledger": REPORT_DIR / "edge-trial-ledger.json",
     "equity_curve": REPORT_DIR / "flip-equity-curve.json",
+    "options_twin": REPORT_DIR / "options-shadow-twin.json",
 }
 AUTOMATION_TASKS = {
+    r"\VibeTradingOptionsShadowTwin",
     r"\VibeTrade\OptionsSurfaceIntelligence",
     r"\VibeTrade\DailyOptionsUniverseRanker",
     r"\VibeTrade\FlipExitQualityReport",
@@ -231,7 +233,7 @@ def _exit(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 def _learning(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    present = {name: bool(s[name]) for name in ("learning", "shadow", "grades", "loop_closure", "universe", "exit_quality", "path_telemetry", "surface", "ablation", "trial_ledger", "equity_curve", "risk_fail_closed")}
+    present = {name: bool(s[name]) for name in ("learning", "shadow", "grades", "loop_closure", "universe", "exit_quality", "path_telemetry", "surface", "ablation", "trial_ledger", "equity_curve", "risk_fail_closed", "options_twin")}
     raw = sum(1.5 for value in present.values() if value)
     learning = s["learning"]
     raw += 0.5 if learning.get("next_learning_actions") else 0
@@ -250,6 +252,35 @@ def _learning(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
     if promotion_count == 0:
         blockers.append("No challenger has yet graduated through the learning and OOS review loop.")
     return _category("Learning loop", raw, cap, [f"report_sources={present}", f"post_hardening_trades={count}", f"promotion_review={promotion_count}"], blockers)
+
+
+def _counterfactual_gate_quality(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    twin = s["options_twin"]
+    earned = twin.get("earned_confidence") if isinstance(twin.get("earned_confidence"), dict) else {}
+    score = _number(earned.get("score"))
+    cap = _number(earned.get("evidence_cap"))
+    candidates = _integer(twin.get("candidate_count"))
+    resolved = _integer(twin.get("resolved_count"))
+    dates = _integer(twin.get("distinct_candidate_dates"))
+    entry_coverage = _number(twin.get("entry_quote_coverage"))
+    mark_coverage = _number(twin.get("mark_quote_coverage"))
+    blockers = [str(item) for item in (earned.get("blockers") or []) if str(item)]
+    if not twin:
+        blockers.insert(0, "Restore the forward-only options shadow-twin report.")
+        cap = 0
+    return _category(
+        "Counterfactual gate quality",
+        score,
+        cap,
+        [
+            f"candidates={candidates}",
+            f"resolved={resolved}",
+            f"distinct_dates={dates}",
+            f"entry_quote_coverage={entry_coverage:.1%}",
+            f"mark_quote_coverage={mark_coverage:.1%}",
+        ],
+        blockers,
+    )
 
 
 def _research_validity(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -366,6 +397,7 @@ def build_report(sources: dict[str, dict[str, Any]] | None = None, today: date |
         _universe(sources),
         _exit(sources),
         _learning(sources),
+        _counterfactual_gate_quality(sources),
         _research_validity(sources),
         _profitability(sources, today),
         _automation(sources),

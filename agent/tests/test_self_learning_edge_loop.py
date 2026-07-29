@@ -177,3 +177,39 @@ def test_alpaca_execution_evidence_summarizes_real_fill_delay_and_slippage(tmp_p
     assert result["average_submit_to_fill_seconds"] == 2.5
     assert result["average_fill_vs_signal_ask_pct"] == 6.0
     assert result["automatic_parameter_changes_allowed"] is False
+
+
+def test_options_twin_learns_only_losses_that_remain_losses_after_fees(tmp_path) -> None:
+    loop = __import__("scripts.self_learning_edge_loop", fromlist=["_options_twin_failures"])
+    path = tmp_path / "options-shadow.jsonl"
+    rows = [
+        {
+            "type": "candidate",
+            "candidate_id": "loss",
+            "strategy": "put_spread",
+            "underlying": "SPY",
+            "entry_quote_complete": True,
+            "quote_scope": "indicative",
+            "shadow_consensus": {"blockers": ["late_session", "weak_trend"]},
+        },
+        {"type": "decision", "candidate_id": "loss", "decision": "blocked_strict_caution"},
+        {"type": "outcome", "candidate_id": "loss", "resolved_at": "2026-07-25T20:00:00Z", "pnl_before_fees": -40},
+        {
+            "type": "candidate",
+            "candidate_id": "winner",
+            "strategy": "put_spread",
+            "underlying": "SPY",
+            "entry_quote_complete": True,
+        },
+        {"type": "outcome", "candidate_id": "winner", "pnl_before_fees": 20},
+    ]
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    failures, summary = loop._options_twin_failures(path)
+
+    assert len(failures) == 1
+    assert failures[0]["candidate_id"] == "loss"
+    assert failures[0]["evidence_eligible"] is True
+    assert failures[0]["evidence_logic"] == "negative_before_fees_cannot_be_rescued_by_fees"
+    assert summary["positive_outcomes_withheld_until_fee_truth"] == 1
+    assert summary["automatic_parameter_changes_allowed"] is False
