@@ -108,6 +108,42 @@ def test_put_spread_records_credit_to_risk_skip(monkeypatch) -> None:
     assert details["credit_to_risk"] < bot.MIN_CREDIT_TO_RISK
 
 
+def test_put_spread_credit_skip_feeds_shadow_assumption_lab(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    expiry = date.today() + timedelta(days=10)
+    short_put = _leg("SPY260717P00740000", delta=0.25, bid=1.00, ask=1.10, expiry=expiry, strike=740.0)
+    long_put = _leg("SPY260717P00735000", delta=0.10, bid=0.24, ask=0.26, expiry=expiry, strike=735.0)
+    candidates = []
+    twin_decisions = []
+
+    monkeypatch.setattr(bot, "_above_20sma", lambda symbol: True)
+    monkeypatch.setattr(bot, "_fetch_chain", lambda data_client, symbol, dte_min, dte_max, right: [short_put, long_put])
+    monkeypatch.setattr(bot, "_decision", lambda *args, **kwargs: None)
+    monkeypatch.setattr(bot, "MIN_CREDIT_TO_RISK", 0.20)
+    monkeypatch.setattr(
+        bot,
+        "shadow_twin_record_candidate",
+        lambda meta, payload, **kwargs: candidates.append((meta, payload, kwargs)) or "candidate-1",
+    )
+    monkeypatch.setattr(
+        bot,
+        "shadow_twin_record_decision",
+        lambda candidate_id, decision, **kwargs: twin_decisions.append((candidate_id, decision, kwargs)),
+    )
+
+    assert bot.run_put_spread(None, None, "SPY", 100_000) is False
+
+    assert candidates
+    meta, payload, kwargs = candidates[0]
+    assert meta["strategy"] == "put_spread"
+    assert meta["leg_market_snapshots"][0]["bid"] == short_put.bid
+    assert meta["shadow_assumption_lab"]["blocked_before_order_path"] is True
+    assert payload[0]["side"] == "sell"
+    assert kwargs["effective_qty"] == 1
+    assert twin_decisions[0][1] == "blocked_credit_to_risk_below_minimum"
+
+
 def test_call_spread_records_above_sma_skip(monkeypatch) -> None:
     from strategies import iwm_options_bot as bot
 
