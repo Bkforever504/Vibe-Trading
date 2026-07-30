@@ -1356,6 +1356,63 @@ def _leg_market_snapshot(leg: Leg) -> dict:
     }
 
 
+def _record_mleg_shadow_assumption(
+    *,
+    label: str,
+    strategy: str,
+    symbol: str,
+    legs: list[Leg],
+    legs_payload: list[dict],
+    net_credit: float,
+    max_risk: float,
+    equity: float,
+    qty: int,
+    profit_close_pct: float,
+    expiry: date,
+    candidate_confidence: Optional[dict] = None,
+    decision: str,
+    details: Optional[dict] = None,
+) -> Optional[str]:
+    """Record a formed spread candidate even when a pre-submit filter rejects it."""
+    trade_meta = {
+        "label": label,
+        "strategy": strategy,
+        "underlying": symbol,
+        "legs": [leg.symbol for leg in legs],
+        "net_credit": net_credit,
+        "max_risk_per_contract": max_risk,
+        "sizing_equity": equity,
+        "qty": max(1, qty),
+        "profit_close_pct": profit_close_pct,
+        "stop_loss_pct": STOP_LOSS_PCT,
+        "expiry": str(expiry),
+        "candidate_confidence": candidate_confidence or {},
+        "leg_market_snapshots": [_leg_market_snapshot(leg) for leg in legs],
+        "vix_at_entry": _JOURNAL_VIX,
+        "vix_term_ratio": _JOURNAL_VIX_TERM_RATIO,
+        "iv_rank_at_entry": _JOURNAL_IV_RANK.get(symbol),
+        "shadow_assumption_lab": {
+            "authority": "pre_submit_read_only_counterfactual",
+            "blocked_before_order_path": True,
+        },
+    }
+    candidate_id = shadow_twin_record_candidate(
+        trade_meta,
+        legs_payload,
+        effective_qty=max(1, qty),
+    )
+    shadow_twin_record_decision(
+        candidate_id,
+        decision,
+        details={
+            "label": label,
+            "reason": decision,
+            **(details or {}),
+        },
+    )
+    return candidate_id
+
+
 def _candidate_confidence(
     *,
     strategy: str,
@@ -2074,15 +2131,6 @@ def _place_mleg(
 ) -> bool:
     trade_meta = dict(trade_meta or {})
     underlying = str(trade_meta.get("underlying") or label)
-    qty, garch_meta, garch_allowed = _garch_entry_adjustment(underlying, qty)
-    trade_meta["garch_volatility_risk"] = garch_meta
-    trade_meta["qty"] = qty
-    if not garch_allowed:
-        strategy = str(trade_meta.get("strategy") or "mleg")
-        _decision(underlying, strategy, "skip", garch_meta["reason"], garch_volatility_risk=garch_meta)
-        log.warning(f"{label}: GARCH ENTRY BLOCKED {underlying}: {garch_meta['reason']}")
-        _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
-        return False
     consensus = shadow_entry_advice(underlying, qty)
     shadow_candidate_id = shadow_twin_record_candidate(
         trade_meta,
@@ -2092,6 +2140,20 @@ def _place_mleg(
     )
     if shadow_candidate_id:
         trade_meta["shadow_twin_candidate_id"] = shadow_candidate_id
+    qty, garch_meta, garch_allowed = _garch_entry_adjustment(underlying, qty)
+    trade_meta["garch_volatility_risk"] = garch_meta
+    trade_meta["qty"] = qty
+    if not garch_allowed:
+        strategy = str(trade_meta.get("strategy") or "mleg")
+        shadow_twin_record_decision(
+            shadow_candidate_id,
+            "blocked_garch_risk",
+            details={"reason": garch_meta.get("reason")},
+        )
+        _decision(underlying, strategy, "skip", garch_meta["reason"], garch_volatility_risk=garch_meta)
+        log.warning(f"{label}: GARCH ENTRY BLOCKED {underlying}: {garch_meta['reason']}")
+        _alert(f"GARCH ENTRY BLOCKED: **{label}**\nreason={garch_meta['reason']}")
+        return False
     if consensus.get("enabled"):
         warning_list = sorted(
             {str(item) for item in (consensus.get("blockers") or []) if str(item)}
@@ -2599,22 +2661,84 @@ def run_iron_condor(
         log.warning(f"IC [{symbol}]: bad credit/risk ({net_credit:.2f} / {max_risk:.2f})")
         return False
 
+    legs_payload = [
+        {"symbol": short_put.symbol,  "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+        {"symbol": long_put.symbol,   "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
+        {"symbol": short_call.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+        {"symbol": long_call.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
+    ]
+    legs = [short_put, long_put, short_call, long_call]
     if not _credit_quality_ok(f"IC [{symbol}]", net_credit, max_risk):
+        ratio = (net_credit * 100) / max_risk if max_risk else 0.0
+        reason = "net_credit_below_minimum" if net_credit < MIN_NET_CREDIT else "credit_to_risk_below_minimum"
+        _record_mleg_shadow_assumption(
+            label=f"IC [{symbol}]",
+            strategy="iron_condor",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=IC_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            decision=f"blocked_{reason}",
+            details={
+                "net_credit": round(net_credit, 4),
+                "max_risk": round(max_risk, 4),
+                "credit_to_risk": round(ratio, 4),
+                "minimum_credit_to_risk": MIN_CREDIT_TO_RISK,
+                "minimum_net_credit": MIN_NET_CREDIT,
+            },
+        )
         return False
 
     candidate_confidence = _candidate_confidence(
         strategy="iron_condor",
         symbol=symbol,
-        legs=[short_put, long_put, short_call, long_call],
+        legs=legs,
         net_credit=net_credit,
         max_risk=max_risk,
         dte=_dte(short_put.expiry),
     )
     if not _candidate_confidence_ok(f"IC [{symbol}]", candidate_confidence):
+        _record_mleg_shadow_assumption(
+            label=f"IC [{symbol}]",
+            strategy="iron_condor",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=IC_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_candidate_confidence",
+            details={"candidate_confidence": candidate_confidence},
+        )
         return False
 
     qty = _sized_qty(equity, max_risk, 2, f"IC [{symbol}]")
     if qty < 1:
+        _record_mleg_shadow_assumption(
+            label=f"IC [{symbol}]",
+            strategy="iron_condor",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=IC_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_sized_quantity_below_one",
+            details={"max_risk": round(max_risk, 4), "equity": round(equity, 2)},
+        )
         return False
     log.info(
         f"IC [{symbol}]: expiry={short_put.expiry}  DTE={_dte(short_put.expiry)}  "
@@ -2624,12 +2748,7 @@ def run_iron_condor(
     )
 
     return _place_mleg(
-        legs_payload=[
-            {"symbol": short_put.symbol,  "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
-            {"symbol": long_put.symbol,   "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
-            {"symbol": short_call.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
-            {"symbol": long_call.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
-        ],
+        legs_payload=legs_payload,
         limit_price=net_credit,
         qty=qty,
         label=f"Iron Condor [{symbol}]",
@@ -2646,6 +2765,7 @@ def run_iron_condor(
             "stop_loss_pct": STOP_LOSS_PCT,
             "expiry": str(short_put.expiry),
             "candidate_confidence": candidate_confidence,
+            "leg_market_snapshots": [_leg_market_snapshot(leg) for leg in legs],
             "vix_at_entry": _JOURNAL_VIX,
             "vix_term_ratio": _JOURNAL_VIX_TERM_RATIO,
             "iv_rank_at_entry": _JOURNAL_IV_RANK.get(symbol),
@@ -2715,6 +2835,11 @@ def run_put_spread(
         )
         return False
 
+    legs_payload = [
+        {"symbol": short_put.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+        {"symbol": long_put.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
+    ]
+    legs = [short_put, long_put]
     if not _credit_quality_ok(f"PS [{symbol}]", net_credit, max_risk):
         ratio = (net_credit * 100) / max_risk if max_risk else 0.0
         reason = "net_credit_below_minimum" if net_credit < MIN_NET_CREDIT else "credit_to_risk_below_minimum"
@@ -2728,18 +2853,55 @@ def run_put_spread(
             minimum_credit_to_risk=MIN_CREDIT_TO_RISK,
             minimum_net_credit=MIN_NET_CREDIT,
         )
+        _record_mleg_shadow_assumption(
+            label=f"PS [{symbol}]",
+            strategy="put_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            decision=f"blocked_{reason}",
+            details={
+                "net_credit": round(net_credit, 4),
+                "max_risk": round(max_risk, 4),
+                "credit_to_risk": round(ratio, 4),
+                "minimum_credit_to_risk": MIN_CREDIT_TO_RISK,
+                "minimum_net_credit": MIN_NET_CREDIT,
+            },
+        )
         return False
 
     candidate_confidence = _candidate_confidence(
         strategy="put_spread",
         symbol=symbol,
-        legs=[short_put, long_put],
+        legs=legs,
         net_credit=net_credit,
         max_risk=max_risk,
         dte=_dte(short_put.expiry),
         trend_ok=trend_ok,
     )
     if not _candidate_confidence_ok(f"PS [{symbol}]", candidate_confidence):
+        _record_mleg_shadow_assumption(
+            label=f"PS [{symbol}]",
+            strategy="put_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_candidate_confidence",
+            details={"candidate_confidence": candidate_confidence},
+        )
         return False
 
     qty = _sized_qty(equity, max_risk, 3, f"PS [{symbol}]")
@@ -2751,6 +2913,22 @@ def run_put_spread(
             max_risk=round(max_risk, 4),
             equity=round(equity, 2),
         )
+        _record_mleg_shadow_assumption(
+            label=f"PS [{symbol}]",
+            strategy="put_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_put.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_sized_quantity_below_one",
+            details={"max_risk": round(max_risk, 4), "equity": round(equity, 2)},
+        )
         return False
     log.info(
         f"PS [{symbol}]: expiry={short_put.expiry}  DTE={_dte(short_put.expiry)}  "
@@ -2759,10 +2937,7 @@ def run_put_spread(
     )
 
     return _place_mleg(
-        legs_payload=[
-            {"symbol": short_put.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
-            {"symbol": long_put.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
-        ],
+        legs_payload=legs_payload,
         limit_price=net_credit,
         qty=qty,
         label=f"Put Spread [{symbol}]",
@@ -2779,6 +2954,7 @@ def run_put_spread(
             "stop_loss_pct": STOP_LOSS_PCT,
             "expiry": str(short_put.expiry),
             "candidate_confidence": candidate_confidence,
+            "leg_market_snapshots": [_leg_market_snapshot(leg) for leg in legs],
             "vix_at_entry": _JOURNAL_VIX,
             "vix_term_ratio": _JOURNAL_VIX_TERM_RATIO,
             "iv_rank_at_entry": _JOURNAL_IV_RANK.get(symbol),
@@ -2825,22 +3001,80 @@ def run_call_spread(
         _strategy_skip(symbol, "cs", "invalid_credit_risk",
                        net_credit=round(net_credit, 4), max_risk=round(max_risk, 4))
         return False
+    legs_payload = [
+        {"symbol": short_call.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
+        {"symbol": long_call.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
+    ]
+    legs = [short_call, long_call]
     if not _credit_quality_ok(f"CS [{symbol}]", net_credit, max_risk):
         ratio = (net_credit * 100) / max_risk if max_risk else 0.0
         reason = "net_credit_below_minimum" if net_credit < MIN_NET_CREDIT else "credit_to_risk_below_minimum"
         _strategy_skip(symbol, "cs", reason, net_credit=round(net_credit, 4),
                        max_risk=round(max_risk, 4), credit_to_risk=round(ratio, 4))
+        _record_mleg_shadow_assumption(
+            label=f"CS [{symbol}]",
+            strategy="call_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_call.expiry,
+            decision=f"blocked_{reason}",
+            details={
+                "net_credit": round(net_credit, 4),
+                "max_risk": round(max_risk, 4),
+                "credit_to_risk": round(ratio, 4),
+                "minimum_credit_to_risk": MIN_CREDIT_TO_RISK,
+                "minimum_net_credit": MIN_NET_CREDIT,
+            },
+        )
         return False
     candidate_confidence = _candidate_confidence(
-        strategy="call_spread", symbol=symbol, legs=[short_call, long_call],
+        strategy="call_spread", symbol=symbol, legs=legs,
         net_credit=net_credit, max_risk=max_risk, dte=_dte(short_call.expiry), trend_ok=True,
     )
     if not _candidate_confidence_ok(f"CS [{symbol}]", candidate_confidence):
+        _record_mleg_shadow_assumption(
+            label=f"CS [{symbol}]",
+            strategy="call_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_call.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_candidate_confidence",
+            details={"candidate_confidence": candidate_confidence},
+        )
         return False
     qty = _sized_qty(equity, max_risk, 3, f"CS [{symbol}]")
     if qty < 1:
         _strategy_skip(symbol, "cs", "sized_quantity_below_one",
                        max_risk=round(max_risk, 4), equity=round(equity, 2))
+        _record_mleg_shadow_assumption(
+            label=f"CS [{symbol}]",
+            strategy="call_spread",
+            symbol=symbol,
+            legs=legs,
+            legs_payload=legs_payload,
+            net_credit=net_credit,
+            max_risk=max_risk,
+            equity=equity,
+            qty=1,
+            profit_close_pct=PS_PROFIT_CLOSE_PCT,
+            expiry=short_call.expiry,
+            candidate_confidence=candidate_confidence,
+            decision="blocked_sized_quantity_below_one",
+            details={"max_risk": round(max_risk, 4), "equity": round(equity, 2)},
+        )
         return False
     log.info(
         f"CS [{symbol}]: expiry={short_call.expiry}  DTE={_dte(short_call.expiry)}  "
@@ -2848,10 +3082,7 @@ def run_call_spread(
         f"credit={net_credit:.2f}  risk={max_risk:.2f}/contract  qty={qty}"
     )
     return _place_mleg(
-        legs_payload=[
-            {"symbol": short_call.symbol, "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_open"},
-            {"symbol": long_call.symbol,  "side": "buy",  "ratio_qty": "1", "position_intent": "buy_to_open"},
-        ],
+        legs_payload=legs_payload,
         limit_price=net_credit, qty=qty, label=f"Call Spread [{symbol}]",
         trade_meta={
             "label": f"Call Spread [{symbol}]", "strategy": "call_spread",
