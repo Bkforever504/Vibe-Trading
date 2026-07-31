@@ -29,6 +29,7 @@ REPORT_PATH = VIBE_HOME / "reports" / "flip-shadow-time-buckets.json"
 LOG_PATH = ROOT / "data" / "flip_shadow_time_bucket_log.jsonl"
 MIN_BUCKET_RANKING_COMPLETED = 10
 MIN_BUCKET_GATE_REVIEW_COMPLETED = 30
+SELECTOR_HAIRCUT_PER_TRIAL_PCT = 0.35
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -106,6 +107,37 @@ def _summarize(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _apply_selector_haircut(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deflate bucket expectancy for the number of rankable choices inspected."""
+    rankable_trials = sum(
+        1 for row in rows
+        if int(row.get("completed_count") or 0) >= MIN_BUCKET_RANKING_COMPLETED
+    )
+    penalty = round(rankable_trials * SELECTOR_HAIRCUT_PER_TRIAL_PCT, 2)
+    adjusted: list[dict[str, Any]] = []
+    for row in rows:
+        expectancy = _num(row.get("expectancy_return_pct"))
+        deflated = round(expectancy - penalty, 2)
+        blockers = [
+            "forward_confirmation_required",
+            "human_review_required",
+        ]
+        if int(row.get("completed_count") or 0) < MIN_BUCKET_GATE_REVIEW_COMPLETED:
+            blockers.append("gate_review_sample_floor_not_met")
+        if deflated <= 0:
+            blockers.append("selection_bias_adjusted_expectancy_not_positive")
+        adjusted.append(
+            {
+                **row,
+                "selector_trial_count": rankable_trials,
+                "selection_bias_haircut_return_pct": penalty,
+                "selection_bias_adjusted_expectancy_return_pct": deflated,
+                "promotion_blockers": blockers,
+            }
+        )
+    return adjusted
+
+
 def build_report(source_path: Path = SOURCE_PATH) -> dict[str, Any]:
     all_trades = _group_shadow_rows(_read_jsonl(source_path))
     research_trades = [
@@ -127,18 +159,18 @@ def build_report(source_path: Path = SOURCE_PATH) -> dict[str, Any]:
         by_bucket_strategy[f"{bucket}|{strategy}"].append(trade)
         by_bucket_symbol[f"{bucket}|{symbol}"].append(trade)
 
-    bucket_rows = [
+    bucket_rows = _apply_selector_haircut([
         {"bucket_et": bucket, **_summarize(items)}
         for bucket, items in sorted(by_bucket.items())
-    ]
-    strategy_rows = [
+    ])
+    strategy_rows = _apply_selector_haircut([
         {"bucket_et": key.split("|", 1)[0], "strategy": key.split("|", 1)[1], **_summarize(items)}
         for key, items in sorted(by_bucket_strategy.items())
-    ]
-    symbol_rows = [
+    ])
+    symbol_rows = _apply_selector_haircut([
         {"bucket_et": key.split("|", 1)[0], "symbol": key.split("|", 1)[1], **_summarize(items)}
         for key, items in sorted(by_bucket_symbol.items())
-    ]
+    ])
     rankable = [row for row in bucket_rows if row["completed_count"] >= MIN_BUCKET_RANKING_COMPLETED]
     ranked = sorted(
         rankable,
@@ -176,6 +208,7 @@ def build_report(source_path: Path = SOURCE_PATH) -> dict[str, Any]:
         "research_completed_lifecycle_count": len(research_trades),
         "min_bucket_ranking_completed": MIN_BUCKET_RANKING_COMPLETED,
         "min_bucket_gate_review_completed": MIN_BUCKET_GATE_REVIEW_COMPLETED,
+        "selector_haircut_per_trial_pct": SELECTOR_HAIRCUT_PER_TRIAL_PCT,
         "buckets": bucket_rows,
         "by_bucket_strategy": strategy_rows,
         "by_bucket_symbol": symbol_rows,
@@ -190,6 +223,7 @@ def build_report(source_path: Path = SOURCE_PATH) -> dict[str, Any]:
             "Buckets with 10-29 completions may be ranked for shadow research but cannot become live gates.",
             "Thirty completions only permits gate review; it never auto-promotes a time filter.",
             "Research-only 15-minute ORB and level-sweep lifecycles are excluded from primary time-bucket selector rankings.",
+            "Selector rankings include a simple multiple-testing haircut; it is a governance brake, not a statistical proof.",
         ],
     }
 

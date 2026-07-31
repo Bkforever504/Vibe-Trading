@@ -62,6 +62,10 @@ def test_time_bucket_report_ranks_completed_shadow_lifecycles(tmp_path: Path) ->
     assert built["best_buckets"][0]["shadow_selector_rank"] == 1
     assert built["best_buckets"][0]["sample_status"] == "shadow_rank_only"
     assert built["best_buckets"][0]["live_gate_eligible"] is False
+    assert built["best_buckets"][0]["selector_trial_count"] == 2
+    assert built["best_buckets"][0]["selection_bias_haircut_return_pct"] == 0.7
+    assert built["best_buckets"][0]["selection_bias_adjusted_expectancy_return_pct"] == 89.3
+    assert "gate_review_sample_floor_not_met" in built["best_buckets"][0]["promotion_blockers"]
     assert built["weak_buckets"][0]["bucket_et"] == "13:30"
     assert built["time_gate_authority"] == "none"
 

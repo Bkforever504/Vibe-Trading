@@ -101,6 +101,22 @@ def test_candidate_is_append_only_and_deduped_within_five_minutes(tmp_path: Path
     assert rows[0]["executable_entry_credit"] == pytest.approx(1.0)
 
 
+def test_report_quantifies_midpoint_to_executable_entry_friction(tmp_path: Path) -> None:
+    path = tmp_path / "shadow.jsonl"
+    now = datetime(2026, 7, 25, 15, 0, tzinfo=timezone.utc)
+    record_candidate(_meta(), _payload(), path=path, now=now)
+
+    built = build_report(read_records(path), now=now + timedelta(minutes=1))
+    quality = built["execution_cost_quality"]
+
+    assert quality["status"] == "watch_execution_friction"
+    assert quality["paired_coverage"] == pytest.approx(1.0)
+    assert quality["avg_entry_edge_loss_credit"] == pytest.approx(0.1)
+    assert quality["avg_entry_edge_loss_pct_of_mid"] == pytest.approx(0.0909)
+    assert quality["benchmark"] == "arrival_mid_credit_vs_sell_bid_buy_ask_executable_entry_credit"
+    assert quality["authority"] == "shadow_governance_only"
+
+
 def test_mark_resolves_target_with_conservative_group_debit(tmp_path: Path) -> None:
     path = tmp_path / "shadow.jsonl"
     now = datetime(2026, 7, 25, 15, 0, tzinfo=timezone.utc)
