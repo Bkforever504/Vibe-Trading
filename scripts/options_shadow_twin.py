@@ -514,6 +514,58 @@ def _calibration(candidates: dict[str, dict], outcomes: dict[str, dict]) -> dict
     }
 
 
+def _execution_cost_quality(candidate_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure how much entry credit disappears from mid to executable quotes."""
+    mid_rows = [
+        row for row in candidate_rows
+        if (_number(row.get("quoted_mid_credit")) or 0.0) > 0
+    ]
+    paired: list[dict[str, float]] = []
+    for row in mid_rows:
+        mid_credit = _number(row.get("quoted_mid_credit"))
+        executable_credit = _number(row.get("executable_entry_credit"))
+        if mid_credit is None or mid_credit <= 0 or executable_credit is None:
+            continue
+        edge_loss = max(0.0, mid_credit - executable_credit)
+        paired.append(
+            {
+                "mid_credit": mid_credit,
+                "executable_credit": executable_credit,
+                "edge_loss": edge_loss,
+                "edge_loss_pct_of_mid": edge_loss / mid_credit,
+            }
+        )
+    coverage = len(paired) / len(mid_rows) if mid_rows else 0.0
+    avg_loss = mean(item["edge_loss"] for item in paired) if paired else None
+    avg_loss_pct = mean(item["edge_loss_pct_of_mid"] for item in paired) if paired else None
+    worst_loss_pct = max((item["edge_loss_pct_of_mid"] for item in paired), default=None)
+    blockers: list[str] = []
+    status = "no_mid_quotes"
+    if mid_rows:
+        status = "ok"
+        if coverage < 0.8:
+            status = "incomplete_quote_coverage"
+            blockers.append("Executable bid/ask entry coverage below 80%.")
+        if avg_loss_pct is not None and avg_loss_pct > 0.15:
+            status = "high_execution_friction"
+            blockers.append("Average midpoint-to-executable credit loss exceeds 15%.")
+        elif avg_loss_pct is not None and avg_loss_pct > 0.05 and status == "ok":
+            status = "watch_execution_friction"
+    return {
+        "status": status,
+        "candidate_count": len(candidate_rows),
+        "mid_credit_candidate_count": len(mid_rows),
+        "paired_mid_to_executable_count": len(paired),
+        "paired_coverage": round(coverage, 4),
+        "avg_entry_edge_loss_credit": round(avg_loss, 4) if avg_loss is not None else None,
+        "avg_entry_edge_loss_pct_of_mid": round(avg_loss_pct, 4) if avg_loss_pct is not None else None,
+        "worst_entry_edge_loss_pct_of_mid": round(worst_loss_pct, 4) if worst_loss_pct is not None else None,
+        "benchmark": "arrival_mid_credit_vs_sell_bid_buy_ask_executable_entry_credit",
+        "authority": "shadow_governance_only",
+        "blockers": blockers,
+    }
+
+
 def _earned_confidence(
     candidate_count: int,
     resolved_count: int,
@@ -587,6 +639,7 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
     expectancy = mean(pnls) if pnls else None
     profit_factor = _profit_factor(pnls)
     calibration = _calibration(candidates, outcomes)
+    execution_cost_quality = _execution_cost_quality(candidate_rows)
     confidence = _earned_confidence(
         len(candidate_rows),
         len(pnls),
@@ -628,6 +681,7 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
             "fees_included": False,
         },
         "calibration": calibration,
+        "execution_cost_quality": execution_cost_quality,
         "earned_confidence": confidence,
         "promotion_eligible": False,
         "promotion_policy": "human_review_only_after_all_preregistered_gates",
