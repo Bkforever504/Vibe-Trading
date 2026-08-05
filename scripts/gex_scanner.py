@@ -124,22 +124,27 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         return {"status": "unavailable", "error": "no contracts", "gex_wall": None, "net_gex": 0.0}
 
     today = (as_of or date.today()).isoformat()
+    # Prefer 0DTE; fall back to shortest available expiry (Alpaca often lacks 0DTE snapshots)
     zero_dte = [c for c in contracts if c["expiry"] == today]
     if not zero_dte:
-        return {
-            "status": "unavailable",
-            "error": "no 0dte contracts",
-            "expiry_filter": "0dte_required",
-            "contract_count": 0,
-            "gex_wall": None,
-            "net_gex": 0.0,
-            "dealer_positioning_observed": False,
-        }
+        all_expiries = sorted({c["expiry"] for c in contracts if c["expiry"] >= today})
+        if not all_expiries:
+            return {
+                "status": "unavailable",
+                "error": "no near-term contracts",
+                "expiry_filter": "shortest_available",
+                "contract_count": 0,
+                "gex_wall": None,
+                "net_gex": 0.0,
+                "dealer_positioning_observed": False,
+            }
+        nearest = all_expiries[0]
+        zero_dte = [c for c in contracts if c["expiry"] == nearest]
     use = [
         contract for contract in zero_dte
         if contract.get("size_source") == "open_interest" and contract.get("size_used", 0) > 0
     ]
-    oi_coverage = len(use) / len(zero_dte)
+    oi_coverage = len(use) / len(zero_dte) if zero_dte else 0.0
     if not use or oi_coverage < min_oi_coverage:
         return {
             "status": "unavailable",
