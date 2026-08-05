@@ -120,6 +120,8 @@ SHADOW_CONTINUE_AFTER_TARGET = os.getenv("SHADOW_CONTINUE_AFTER_TARGET", "true")
 NOISE_AREA_PAPER_ENABLED = os.getenv("FLIP_NOISE_AREA_PAPER_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 NOISE_AREA_LOOKBACK_SESSIONS = max(14, int(os.getenv("FLIP_NOISE_AREA_LOOKBACK_SESSIONS", "14")))
 GEX_WALL_PROXIMITY_PCT = float(os.getenv("FLIP_GEX_WALL_PROXIMITY_PCT", "0.003"))  # 0.3% of spot
+MOMENTUM_ORB_MIN_ATR_RATIO = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_ATR_RATIO", "1.8"))
+MOMENTUM_ORB_MIN_CLV       = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_CLV", "0.70"))
 
 # â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
@@ -1792,6 +1794,22 @@ def _find_0dte_for_symbol(
     orb_retest_ready = bool(orb and orb.get("entry_ready"))
     use_orb = orb_break and (orb_retest_ready or not require_orb_retest)
 
+    # Momentum continuation: retest invalidated (price ripped, never pulled back) but
+    # breakout velocity confirms real move — enter 1 contract without waiting for retest.
+    # Requires ATR ratio >= MOMENTUM_ORB_MIN_ATR_RATIO and directional CLV >= MOMENTUM_ORB_MIN_CLV.
+    momentum_continuation = False
+    if not use_orb and not catalyst and orb_break and not orb_retest_ready and orb is not None:
+        if str(orb.get("retest_status") or "") == "retest_invalidated":
+            _atr_ratio = float(orb.get("breakout_candle_atr_ratio") or 0.0)
+            _clv = float(orb.get("orb_breakout_directional_close_location_value") or 0.0)
+            if _atr_ratio >= MOMENTUM_ORB_MIN_ATR_RATIO and _clv >= MOMENTUM_ORB_MIN_CLV:
+                momentum_continuation = True
+                use_orb = True
+                log.info(
+                    f"0DTE [{sym}]: momentum continuation — retest_invalidated but "
+                    f"ATR_ratio={_atr_ratio:.2f} CLV={_clv:.2f} → enter 1 contract"
+                )
+
     if not catalyst and gap < GAP_THRESHOLD and not use_orb:
         reason = "orb_retest_not_confirmed" if orb_break and require_orb_retest else "no_catalyst_confirmation"
         _strategy_skip(
@@ -1856,6 +1874,8 @@ def _find_0dte_for_symbol(
 
     max_risk  = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
+    if momentum_continuation:
+        contracts = min(contracts, 1)  # hard 1-contract cap — no retest = lower conviction
     if contracts < 1:
         _strategy_skip(sym, "0dte", "budget_insufficient", option_price=px, max_risk=max_risk)
         log.info(f"0DTE [{sym}]: can't afford 1 contract at ${px:.2f} (budget ${max_risk:.0f})")
@@ -1871,7 +1891,9 @@ def _find_0dte_for_symbol(
         "hard_close_date": str(today), "hard_close_time": "13:45",
         "spread_cents": _option_bid_ask_spread_cents(occ),
         "orb_direction": orb["direction"] if use_orb else None,
-        "orb_entry_pattern": "breakout_retest" if use_orb and orb_retest_ready else "raw_breakout" if use_orb else None,
+        "momentum_continuation": momentum_continuation,
+        "execution_lane": "momentum_continuation" if momentum_continuation else None,
+        "orb_entry_pattern": "momentum_continuation" if momentum_continuation else "breakout_retest" if use_orb and orb_retest_ready else "raw_breakout" if use_orb else None,
         "orb_breakout_at": orb.get("breakout_at") if use_orb else None,
         "orb_retest_at": orb.get("retest_at") if use_orb else None,
         "orb_retest_status": orb.get("retest_status") if use_orb else None,
@@ -4127,7 +4149,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             )
         if consensus.get("enabled"):
             blockers = ", ".join(consensus.get("blockers") or []) or consensus.get("recommendation", "needs_review")
-            if not consensus.get("allowed"):
+            if not consensus.get("allowed") and not setup.get("momentum_continuation"):
                 log.warning(
                     f"SHADOW CONSENSUS BLOCKED {setup.get('symbol')} {setup.get('strategy')}: "
                     f"{blockers}"
@@ -4151,6 +4173,11 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                     setup_score=setup.get("score"),
                 )
                 continue
+            if not consensus.get("allowed") and setup.get("momentum_continuation"):
+                log.info(
+                    f"MOMENTUM CONTINUATION {setup.get('symbol')}: shadow consensus advisory "
+                    f"({blockers}) — proceeding with 1-contract momentum entry"
+                )
             primary_caution = _primary_consensus_caution_blocker(setup, consensus)
             if primary_caution:
                 log.warning(
