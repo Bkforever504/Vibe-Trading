@@ -119,6 +119,7 @@ SHADOW_MAX_ACTIVE_PER_SYMBOL_STRATEGY = 1
 SHADOW_CONTINUE_AFTER_TARGET = os.getenv("SHADOW_CONTINUE_AFTER_TARGET", "true").strip().lower() in {"1", "true", "yes", "on"}
 NOISE_AREA_PAPER_ENABLED = os.getenv("FLIP_NOISE_AREA_PAPER_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 NOISE_AREA_LOOKBACK_SESSIONS = max(14, int(os.getenv("FLIP_NOISE_AREA_LOOKBACK_SESSIONS", "14")))
+GEX_WALL_PROXIMITY_PCT = float(os.getenv("FLIP_GEX_WALL_PROXIMITY_PCT", "0.003"))  # 0.3% of spot
 
 # â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
@@ -1731,6 +1732,45 @@ def _premium_level_entry_snapshot(
     }
 
 
+def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
+    """Block 0DTE entry when spot is pinned at a positive GEX wall.
+
+    Positive net GEX = dealers long gamma = buy dips, sell rips = price pinned.
+    Negative net GEX = dealers short gamma = amplify moves = favorable for directional.
+    Only blocks when BOTH conditions true: net_gex > 0 AND spot within GEX_WALL_PROXIMITY_PCT.
+    Missing GEX data → no block (fail open, not fail closed).
+    """
+    try:
+        from scripts.market_conviction import _latest_gex
+        gex = _latest_gex()
+        scans = gex.get("scans") or []
+        sym_gex = next((s for s in scans if s.get("symbol") == sym), {})
+        if sym_gex.get("status") != "ok":
+            return None
+        net_gex = sym_gex.get("net_gex")
+        if net_gex is None or float(net_gex) <= 0:
+            return None  # negative GEX = move amplification = good for 0DTE directional
+        wall = sym_gex.get("gex_wall") or {}
+        wall_strike = wall.get("strike")
+        if not wall_strike or spot <= 0:
+            return None
+        proximity_pct = abs(float(spot) - float(wall_strike)) / float(spot)
+        if proximity_pct <= GEX_WALL_PROXIMITY_PCT:
+            return {
+                "reason": "gex_wall_pin",
+                "net_gex": net_gex,
+                "gex_wall_strike": wall_strike,
+                "gex_wall_bias": wall.get("bias"),
+                "spot": spot,
+                "proximity_pct": round(proximity_pct * 100, 3),
+                "threshold_pct": round(GEX_WALL_PROXIMITY_PCT * 100, 2),
+                "interpretation": "positive_net_gex_spot_at_wall_range_bound_expected",
+            }
+    except Exception as exc:
+        log.debug(f"GEX wall check [{sym}] skipped: {exc}")
+    return None
+
+
 def _find_0dte_for_symbol(
     account: float,
     sym: str,
@@ -1764,6 +1804,18 @@ def _find_0dte_for_symbol(
         )
         log.info(f"0DTE [{sym}]: no catalyst, no gap, no execution-ready ORB retest")
         return None
+
+    # GEX wall pin — skip when positive net GEX traps price at dealer wall
+    if not catalyst:
+        _gex_block = _gex_wall_blocker(sym, price)
+        if _gex_block:
+            _strategy_skip(sym, "0dte", "gex_wall_pin", **_gex_block)
+            log.info(
+                f"0DTE [{sym}]: GEX wall pin — ${price:.2f} within "
+                f"{_gex_block['proximity_pct']:.2f}% of ${_gex_block['gex_wall_strike']:.2f} wall, "
+                f"net_gex={_gex_block['net_gex']:+.0f} (range-bound)"
+            )
+            return None
 
     if use_orb and not catalyst:
         right    = "PUT" if orb["direction"] == "bear" else "CALL"
