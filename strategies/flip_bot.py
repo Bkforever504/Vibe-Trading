@@ -53,6 +53,7 @@ from strategies.flip_contract_ranker import rank_contracts
 from strategies.flip_day_type_router import classify_intraday_day_type
 from strategies.flip_retest_quality import score_retest_quality
 from strategies.spy_noise_area import evaluate_noise_area
+from scripts.alpaca_resilience import AlpacaReadUnavailable, get_json as alpaca_get_json
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
@@ -95,17 +96,21 @@ HDR    = {"APCA-API-KEY-ID": KEY, "APCA-API-SECRET-KEY": SECRET, "Content-Type":
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL", "")
 LIVE_EXECUTION_ENABLED = os.getenv("FLIP_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
 LIVE_APPROVAL_ACK_VALUE = os.getenv("FLIP_LIVE_APPROVAL_ACK", "")
+RH_MIMIC_MODE = os.getenv("RH_MIMIC_MODE", "false").lower() == "true"
+RH_ACCOUNT_SIZE = float(os.getenv("RH_ACCOUNT_SIZE", "0") or 0)
 
 # â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\flip-trades.json"))
 DECISION_LOG_FILE = Path(os.getenv("FLIP_DECISION_LOG_FILE", str(LOG_DIR / "flip-decisions.jsonl")))
 SHADOW_CANDIDATE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "flip_shadow_candidates_log.jsonl"
 IV_HISTORY_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "iv_history_log.jsonl"
-SHADOW_CANDIDATE_SCHEMA_VERSION = 3
+SHADOW_CANDIDATE_SCHEMA_VERSION = 4
 OPTIONS_LIQUIDITY_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "options-liquidity-feasibility.json"
 OPTION_PREMIUM_LEVEL_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "option-premium-levels.json"
 MARKET_FORCE_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "market-force-score.json"
 MARKET_FORCE_SHADOW_MAX_AGE_SECONDS = 30 * 60
+MARKET_CONTEXT_REPORT_DIR = Path.home() / ".vibe-trading" / "reports"
+MARKET_CONTEXT_SHADOW_MAX_AGE_SECONDS = 45 * 60
 ACCELERATED_SHADOW_LEARNING = os.getenv("ACCELERATED_SHADOW_LEARNING", "false").lower() == "true"
 SHADOW_EPISODE_INTERVAL_MINUTES = max(15, int(os.getenv("SHADOW_EPISODE_INTERVAL_MINUTES", "30")))
 SHADOW_EPISODE_HORIZON_MINUTES = max(15, int(os.getenv("SHADOW_EPISODE_HORIZON_MINUTES", "60")))
@@ -388,9 +393,14 @@ def _entry_evidence_blocker(setup: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def _get(path: str, params: dict | None = None) -> dict | list:
-    r = req.get(f"{BASE}{path}", headers=HDR, params=params or {}, timeout=10)
-    r.raise_for_status()
-    return r.json()
+    return alpaca_get_json(
+        f"{BASE}{path}",
+        headers=HDR,
+        params=params,
+        component="flip_bot",
+        operation=f"GET {path}",
+        requester=req,
+    )
 
 
 def _post(path: str, body: dict) -> dict:
@@ -460,20 +470,27 @@ def _save(trades: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 def _fetch_alpaca_equity() -> float:
-    """Fetch live equity from Alpaca paper account. Returns 0.0 on failure."""
+    """Fetch paper-account equity; unresolved broker state returns 0.0."""
     try:
-        r = req.get(f"{BASE}/v2/account", headers=HDR, timeout=10)
-        if r.status_code == 200:
-            eq = float(r.json().get("equity", 0) or 0)
+        payload = _get("/v2/account")
+        if isinstance(payload, dict):
+            eq = float(payload.get("equity", 0) or 0)
+        else:
+            eq = 0.0
+        if eq > 0:
             log.info(f"Alpaca equity fetched: ${eq:,.2f}")
             return eq
-    except Exception as exc:
+    except AlpacaReadUnavailable as exc:
         log.warning(f"Could not fetch Alpaca equity: {exc}")
     return 0.0
 
 
-def resolve_account_size(cli_override: float | None = None) -> float:
-    """Priority: CLI arg > FLIP_ACCOUNT_SIZE_OVERRIDE env var > live Alpaca equity > $5000 fallback."""
+def resolve_account_size(
+    cli_override: float | None = None,
+    *,
+    allow_research_fallback: bool = False,
+) -> float:
+    """Resolve sizing equity; execution never uses an invented broker balance."""
     if cli_override is not None and cli_override > 0:
         return cli_override
     if ACCOUNT_OVERRIDE > 0:
@@ -482,6 +499,10 @@ def resolve_account_size(cli_override: float | None = None) -> float:
     live = _fetch_alpaca_equity()
     if live > 0:
         return live
+    if not allow_research_fallback:
+        raise AlpacaReadUnavailable(
+            "Alpaca equity is unresolved; execution sizing is blocked instead of using a fallback balance"
+        )
     log.warning("Could not resolve account size â€” falling back to $5,000")
     return 5_000.0
 
@@ -975,20 +996,19 @@ def _extract_underlying(sym: str) -> str:
     return sym
 
 
-def _fetch_broker_open_symbols() -> set[str]:
+def _fetch_broker_open_symbols() -> set[str] | None:
     """Fetch open positions from Alpaca and return underlying tickers (broker truth)."""
     try:
-        r = req.get(f"{BASE}/v2/positions", headers=HDR, timeout=10)
-        if r.status_code == 200:
-            positions = r.json()
-            if isinstance(positions, list):
-                syms = {_extract_underlying(str(p.get("symbol", ""))) for p in positions if p.get("symbol")}
-                syms.discard("")
-                log.info(f"Broker open position underlyings: {sorted(syms)}")
-                return syms
-    except Exception as exc:
-        log.warning(f"Broker positions fetch failed: {exc}")
-    return set()
+        positions = _get("/v2/positions")
+        if not isinstance(positions, list):
+            raise ValueError("positions response was not a list")
+        syms = {_extract_underlying(str(p.get("symbol", ""))) for p in positions if p.get("symbol")}
+        syms.discard("")
+        log.info(f"Broker open position underlyings: {sorted(syms)}")
+        return syms
+    except (AlpacaReadUnavailable, ValueError) as exc:
+        log.error(f"Broker positions unresolved; entries fail closed: {exc}")
+        return None
 
 
 def _vwap_50ema_bull_signal(hist, sym: str = "?") -> dict | None:
@@ -2138,6 +2158,91 @@ def _market_force_shadow_snapshot(
     return result
 
 
+def _point_in_time_report(
+    path: Path,
+    observed_at: datetime,
+    *,
+    max_age_seconds: float = MARKET_CONTEXT_SHADOW_MAX_AGE_SECONDS,
+) -> tuple[dict, str, float | None]:
+    """Read a report only when its timestamp existed at the observation time."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        timestamp = str(payload.get("generated_at") or payload.get("timestamp") or "")
+        captured = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if captured.tzinfo is None:
+            captured = captured.replace(tzinfo=timezone.utc)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}, "unavailable", None
+    observed = observed_at if observed_at.tzinfo else observed_at.replace(tzinfo=timezone.utc)
+    age_seconds = (observed.astimezone(timezone.utc) - captured.astimezone(timezone.utc)).total_seconds()
+    if payload.get("execution_enabled") is not False:
+        return {}, "authority_not_read_only", round(age_seconds, 1)
+    if age_seconds < -60:
+        return {}, "future_timestamp", round(age_seconds, 1)
+    if age_seconds > max_age_seconds:
+        return {}, "stale", round(age_seconds, 1)
+    return payload, "current", round(age_seconds, 1)
+
+
+def _market_context_shadow_snapshot(
+    symbol: str,
+    observed_at: datetime,
+    *,
+    report_dir: Path | None = None,
+) -> dict:
+    """Freeze candle, HTF, and catalyst context for later outcome attribution."""
+    directory = report_dir or MARKET_CONTEXT_REPORT_DIR
+    candle_report, candle_status, candle_age = _point_in_time_report(
+        directory / "candlestick-context.json", observed_at
+    )
+    htf_report, htf_status, htf_age = _point_in_time_report(
+        directory / "higher-timeframe-market-map.json", observed_at
+    )
+    catalyst_report, catalyst_status, catalyst_age = _point_in_time_report(
+        directory / "market-catalyst-calendar.json", observed_at
+    )
+
+    def _symbol_item(report: dict) -> dict:
+        return next(
+            (
+                row for row in report.get("items") or []
+                if isinstance(row, dict) and str(row.get("symbol") or "").upper() == symbol.upper()
+            ),
+            {},
+        )
+
+    candle = _symbol_item(candle_report) if candle_status == "current" else {}
+    htf = _symbol_item(htf_report) if htf_status == "current" else {}
+    catalyst = catalyst_report.get("today") if catalyst_status == "current" else {}
+    catalyst = catalyst if isinstance(catalyst, dict) else {}
+    statuses = (candle_status, htf_status, catalyst_status)
+    return {
+        "market_context_snapshot_status": (
+            "current" if all(status == "current" for status in statuses) else "incomplete"
+        ),
+        "candlestick_context_status": candle_status,
+        "candlestick_context_age_seconds": candle_age,
+        "candlestick_bias": candle.get("bias"),
+        "candlestick_primary_signal": candle.get("primary_signal"),
+        "candlestick_features": candle.get("features") or [],
+        "candlestick_veto_reasons": candle.get("veto_reasons") or [],
+        "candlestick_volume_expansion": candle.get("volume_expansion"),
+        "htf_context_status": htf_status,
+        "htf_context_age_seconds": htf_age,
+        "htf_primary_bias": htf.get("primary_bias"),
+        "htf_intraday_alignment": htf.get("intraday_alignment"),
+        "htf_veto_reasons": htf.get("veto_reasons") or [],
+        "catalyst_context_status": catalyst_status,
+        "catalyst_context_age_seconds": catalyst_age,
+        "catalyst_max_impact": catalyst.get("max_impact"),
+        "catalyst_vetoes": catalyst.get("vetoes") or [],
+        "catalyst_event_names": [
+            str(event.get("name")) for event in catalyst.get("events") or []
+            if isinstance(event, dict) and event.get("name")
+        ],
+    }
+
+
 def _shadow_lifecycle_key(row: dict) -> tuple[str, ...]:
     lifecycle_id = str(row.get("lifecycle_id") or "")
     if lifecycle_id:
@@ -2297,6 +2402,8 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
                 continue
             expires_et = now_et + timedelta(minutes=SHADOW_EPISODE_HORIZON_MINUTES)
             expires_at = expires_et.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            candidate_setup.update(market_force_snapshot)
+            candidate_setup.update(_market_context_shadow_snapshot(sym, scanned_dt))
             feature_snapshot = _entry_feature_snapshot(candidate_setup)
             contract_selection_challengers = _shadow_contract_challengers(candidate_setup)
             entry = {
@@ -3128,6 +3235,22 @@ def _entry_feature_snapshot(setup: dict) -> dict:
         "ttm_first_release": bool(squeeze.get("first_release")),
         "ttm_momentum_rising": bool(squeeze.get("momentum_rising")),
         "shadow_consensus_recommendation": consensus.get("recommendation"),
+        "market_force_snapshot_status": setup.get("market_force_snapshot_status"),
+        "market_force_classification": setup.get("market_force_classification"),
+        "market_context_snapshot_status": setup.get("market_context_snapshot_status"),
+        "candlestick_context_status": setup.get("candlestick_context_status"),
+        "candlestick_bias": setup.get("candlestick_bias"),
+        "candlestick_primary_signal": setup.get("candlestick_primary_signal"),
+        "candlestick_features": setup.get("candlestick_features") or [],
+        "candlestick_veto_reasons": setup.get("candlestick_veto_reasons") or [],
+        "candlestick_volume_expansion": setup.get("candlestick_volume_expansion"),
+        "htf_context_status": setup.get("htf_context_status"),
+        "htf_primary_bias": setup.get("htf_primary_bias"),
+        "htf_intraday_alignment": setup.get("htf_intraday_alignment"),
+        "htf_veto_reasons": setup.get("htf_veto_reasons") or [],
+        "catalyst_context_status": setup.get("catalyst_context_status"),
+        "catalyst_max_impact": setup.get("catalyst_max_impact"),
+        "catalyst_vetoes": setup.get("catalyst_vetoes") or [],
         "spread_cents_at_signal": setup.get("spread_cents"),
         "quote_age_seconds": setup.get("quote_age_seconds"),
         "day_type": setup.get("day_type"),
@@ -3168,7 +3291,15 @@ def _path_telemetry_baseline() -> dict:
         "best_pnl_pct": 0.0,
         "worst_pnl_pct": 0.0,
         "path_telemetry_schema_version": 1,
-        "path_telemetry_source": "live_entry_baseline",
+        "path_telemetry_source": "forward_observed_lifecycle",
+        "path_telemetry_observed": True,
+        "telemetry_quality": "forward_observed",
+        "telemetry_provenance": {
+            "entry_at": "observed_entry_fill_lifecycle",
+            "exit_at": "observed_exit_fill_lifecycle",
+            "best_pnl_pct": "observed_monitor_and_exit_quotes",
+            "worst_pnl_pct": "observed_monitor_and_exit_quotes",
+        },
     }
 
 
@@ -3199,6 +3330,9 @@ def _stamp_exit(
     trade["exit_date"] = str(date.today())
     trade["exit_at"] = _utc_now_text()
     trade["pnl"] = round((mid - entry) * qty * 100, 2)
+    if entry > 0:
+        _update_pnl_extremes(trade, (mid - entry) / entry * 100)
+    trade["path_telemetry_observed"] = True
     trade["exit_price_source"] = exit_price_source
     if exit_order_id:
         trade["exit_order_id"] = exit_order_id
@@ -3785,11 +3919,23 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         log.info("Market is closed - skip flip entry")
         return
 
-    open_trades = [t for t in _load() if t.get("status") == "open"]
+    all_trades = _load()
+    open_trades = [t for t in all_trades if t.get(“status”) == “open”]
     if len(open_trades) >= MAX_OPEN_FLIPS:
-        _strategy_skip("SPY", "entry_run", "max_open_positions", open_count=len(open_trades), maximum=MAX_OPEN_FLIPS)
-        log.info(f"Max open ({MAX_OPEN_FLIPS}) reached â€” skip")
+        _strategy_skip(“SPY”, “entry_run”, “max_open_positions”, open_count=len(open_trades), maximum=MAX_OPEN_FLIPS)
+        log.info(f”Max open ({MAX_OPEN_FLIPS}) reached – skip”)
         return
+
+    if RH_MIMIC_MODE and RH_ACCOUNT_SIZE > 0:
+        from strategies.robinhood_mimic import pdt_blocker, pdt_remaining
+        pdt_block = pdt_blocker(all_trades, RH_ACCOUNT_SIZE)
+        if pdt_block:
+            log.warning(f”RH MIMIC PDT BLOCKED: {pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used in rolling window”)
+            _decision(“SPY”, “entry_run”, “blocked”, “rh_mimic_pdt_limit”, **pdt_block)
+            _alert(f”RH MIMIC — PDT LIMIT\n{pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used\nWindow: {pdt_block['rolling_window_start']} to {pdt_block['rolling_window_end']}\nEntry blocked to protect RH account.”)
+            return
+        capacity = pdt_remaining(all_trades, RH_ACCOUNT_SIZE)
+        log.info(f”RH MIMIC PDT: {capacity['day_trades_used']}/{capacity['day_trades_max']} used, {capacity['day_trades_remaining']} remaining”)
 
     slots      = MAX_OPEN_FLIPS - len(open_trades)
     candidates = []
@@ -3850,6 +3996,10 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         return
 
     broker_symbols = _fetch_broker_open_symbols()
+    if broker_symbols is None:
+        log.error("ENTRY BLOCKED: broker positions are unknown; refusing duplicate-position risk")
+        _decision("PORTFOLIO", "all", "blocked", "broker_positions_unknown")
+        return
     trades = _load()
     daily_loss_pct = _today_realized_loss_pct(trades, account)
     for setup in candidates:
@@ -3903,7 +4053,26 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
 
         max_notional = account * MAX_RISK_PCT
         is_spread = bool(setup.get("short_option_symbol"))
-        consensus = shadow_entry_advice(setup.get("symbol", ""), int(setup.get("contracts", 0) or 0))
+        setup_playbook = (
+            "directional_long_call" if str(setup.get("right") or "").upper() == "CALL"
+            else "directional_long_put" if str(setup.get("right") or "").upper() == "PUT"
+            else None
+        )
+        try:
+            consensus = shadow_entry_advice(
+                setup.get("symbol", ""),
+                int(setup.get("contracts", 0) or 0),
+                requested_playbook=setup_playbook,
+            )
+        except TypeError as exc:
+            # Preserve compatibility with injected legacy/test advisors while
+            # keeping the production advisor playbook-aware.
+            if "requested_playbook" not in str(exc):
+                raise
+            consensus = shadow_entry_advice(
+                setup.get("symbol", ""),
+                int(setup.get("contracts", 0) or 0),
+            )
         if consensus.get("enabled"):
             blockers = ", ".join(consensus.get("blockers") or []) or consensus.get("recommendation", "needs_review")
             if not consensus.get("allowed"):
@@ -4462,7 +4631,7 @@ def run_monitor(protect_loop: bool = False) -> None:
     # Research collection must never delay or block protection of open trades.
     if ACCELERATED_SHADOW_LEARNING and not protect_loop:
         try:
-            log_shadow_0dte_candidates(resolve_account_size())
+            log_shadow_0dte_candidates(resolve_account_size(allow_research_fallback=True))
         except Exception as exc:
             log.warning(f"Shadow lifecycle collection failed after monitor: {exc}")
 
@@ -4555,17 +4724,15 @@ def main() -> None:
         log.error("Alpaca keys missing in agent/.env")
         sys.exit(1)
 
-    account = resolve_account_size(args.account)
-
     try:
         if args.status:
             print_status()
         elif args.close_all:
             close_all()
         elif args.entry:
-            run_entry(account)
+            run_entry(resolve_account_size(args.account))
         elif args.intraday_entry:
-            run_entry(account, intraday_only=True)
+            run_entry(resolve_account_size(args.account), intraday_only=True)
         elif args.monitor:
             run_monitor(protect_loop=args.protect_loop)
         else:
