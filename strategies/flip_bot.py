@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-Flip Bot â€” automated small-account directional options trading.
+Flip Bot -- automated small-account directional options trading.
 
 Two modes:
   --entry    Find catalyst setups and submit buy orders (run at 9:15am ET)
   --monitor  Check open trades, close at +75% profit or -50% stop (run every 15min)
 
 Three strategies:
-  0DTE   â€” buy ATM SPY call/put on FOMC/CPI/gap days, exit by 1:45pm
-  Lotto  â€” buy OTM call 2-4 days before earnings, exit day before print
-  Break  â€” buy OTM weekly call on momentum breakout + volume spike
+  0DTE   -- buy ATM SPY call/put on FOMC/CPI/gap days, exit by 1:45pm
+  Lotto  -- buy OTM call 2-4 days before earnings, exit day before print
+  Break  -- buy OTM weekly call on momentum breakout + volume spike
 
 State file: ~/.vibe-trading/flip-trades.json
 
@@ -76,7 +76,7 @@ except ImportError:
     print("ERROR: pip install yfinance")
     sys.exit(1)
 
-# â”€â”€ Logging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Logging â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 LOG_DIR = Path(os.path.expanduser(r"~\.vibe-trading\logs"))
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 _fmt = logging.Formatter("%(asctime)s  %(levelname)-8s  %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
@@ -87,7 +87,7 @@ _sh.setFormatter(_fmt)
 logging.basicConfig(level=logging.INFO, handlers=[_fh, _sh])
 log = logging.getLogger("flip-bot")
 
-# â”€â”€ Alpaca â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Alpaca â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 KEY    = os.getenv("ALPACA_API_KEY", "")
 SECRET = os.getenv("ALPACA_SECRET_KEY", "")
 PAPER  = os.getenv("ALPACA_PAPER", "true").lower() == "true"
@@ -99,7 +99,7 @@ LIVE_APPROVAL_ACK_VALUE = os.getenv("FLIP_LIVE_APPROVAL_ACK", "")
 RH_MIMIC_MODE = os.getenv("RH_MIMIC_MODE", "false").lower() == "true"
 RH_ACCOUNT_SIZE = float(os.getenv("RH_ACCOUNT_SIZE", "0") or 0)
 
-# â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ State â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\flip-trades.json"))
 DECISION_LOG_FILE = Path(os.getenv("FLIP_DECISION_LOG_FILE", str(LOG_DIR / "flip-decisions.jsonl")))
 SHADOW_CANDIDATE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "flip_shadow_candidates_log.jsonl"
@@ -123,9 +123,9 @@ GEX_WALL_PROXIMITY_PCT = float(os.getenv("FLIP_GEX_WALL_PROXIMITY_PCT", "0.003")
 MOMENTUM_ORB_MIN_ATR_RATIO = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_ATR_RATIO", "1.8"))
 MOMENTUM_ORB_MIN_CLV       = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_CLV", "0.70"))
 
-# â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â"€â"€ Config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
-MAX_RISK_PCT      = 0.02   # 2% account risk per trade (was 0.25 â€” caused 69-contract blowup)
+MAX_RISK_PCT      = 0.02   # 2% account risk per trade (was 0.25 -- caused 69-contract blowup)
 MAX_CONTRACTS     = 5      # hard ceiling regardless of account size or option price
 MAX_ENTRY_SPREAD_CENTS = int(os.getenv("FLIP_MAX_ENTRY_SPREAD_CENTS", "10"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("FLIP_MAX_ENTRY_SLIPPAGE_PCT", "3.0"))
@@ -506,7 +506,7 @@ def resolve_account_size(
         raise AlpacaReadUnavailable(
             "Alpaca equity is unresolved; execution sizing is blocked instead of using a fallback balance"
         )
-    log.warning("Could not resolve account size â€” falling back to $5,000")
+    log.warning("Could not resolve account size -- falling back to $5,000")
     return 5_000.0
 
 
@@ -824,22 +824,22 @@ def _fresh_vwap_ema_pullback(
 def _vwap_50ema_signal(hist, sym: str = "?") -> dict | None:
     if hist is None or len(hist) < BEAR_TREND_MIN_BARS:
         bars = len(hist) if hist is not None else 0
-        log.info(f"Bear trend [{sym}]: insufficient bars {bars} < {BEAR_TREND_MIN_BARS} â€” skip")
+        log.info(f"Bear trend [{sym}]: insufficient bars {bars} < {BEAR_TREND_MIN_BARS} -- skip")
         return None
     required = {"High", "Low", "Close", "Volume"}
     if not required.issubset(set(hist.columns)):
-        log.info(f"Bear trend [{sym}]: missing columns {required - set(hist.columns)} â€” skip")
+        log.info(f"Bear trend [{sym}]: missing columns {required - set(hist.columns)} -- skip")
         return None
 
     df = _completed_intraday_bars(hist).dropna(subset=["High", "Low", "Close", "Volume"]).copy()
     if len(df) < BEAR_TREND_MIN_BARS:
-        log.info(f"Bear trend [{sym}]: bars after dropna {len(df)} < {BEAR_TREND_MIN_BARS} â€” skip")
+        log.info(f"Bear trend [{sym}]: bars after dropna {len(df)} < {BEAR_TREND_MIN_BARS} -- skip")
         return None
 
     typical = (df["High"] + df["Low"] + df["Close"]) / 3
     cumulative_volume = df["Volume"].cumsum()
     if float(cumulative_volume.iloc[-1]) <= 0:
-        log.info(f"Bear trend [{sym}]: zero cumulative volume â€” skip")
+        log.info(f"Bear trend [{sym}]: zero cumulative volume -- skip")
         return None
 
     df["vwap"] = (typical * df["Volume"]).cumsum() / cumulative_volume
@@ -1327,7 +1327,7 @@ def _mark_shadow_contract_challengers(first: dict) -> list[dict]:
 
 
 def _orb_signal(sym: str) -> dict | None:
-    """5-min opening range breakout (first 5 bars 9:30â€“9:35 ET). Returns direction + key levels."""
+    """5-min opening range breakout (first 5 bars 9:30--9:35 ET). Returns direction + key levels."""
     try:
         bars = _intraday_bars(sym)
         if bars is None or len(bars) < 10:
@@ -1795,7 +1795,7 @@ def _find_0dte_for_symbol(
     use_orb = orb_break and (orb_retest_ready or not require_orb_retest)
 
     # Momentum continuation: retest invalidated (price ripped, never pulled back) but
-    # breakout velocity confirms real move — enter 1 contract without waiting for retest.
+    # breakout velocity confirms real move -- enter 1 contract without waiting for retest.
     # Requires ATR ratio >= MOMENTUM_ORB_MIN_ATR_RATIO and directional CLV >= MOMENTUM_ORB_MIN_CLV.
     momentum_continuation = False
     if not use_orb and not catalyst and orb_break and not orb_retest_ready and orb is not None:
@@ -1806,7 +1806,7 @@ def _find_0dte_for_symbol(
                 momentum_continuation = True
                 use_orb = True
                 log.info(
-                    f"0DTE [{sym}]: momentum continuation — retest_invalidated but "
+                    f"0DTE [{sym}]: momentum continuation -- retest_invalidated but "
                     f"ATR_ratio={_atr_ratio:.2f} CLV={_clv:.2f} → enter 1 contract"
                 )
 
@@ -1823,13 +1823,13 @@ def _find_0dte_for_symbol(
         log.info(f"0DTE [{sym}]: no catalyst, no gap, no execution-ready ORB retest")
         return None
 
-    # GEX wall pin — skip when positive net GEX traps price at dealer wall
+    # GEX wall pin -- skip when positive net GEX traps price at dealer wall
     if not catalyst:
         _gex_block = _gex_wall_blocker(sym, price)
         if _gex_block:
             _strategy_skip(sym, "0dte", "gex_wall_pin", **_gex_block)
             log.info(
-                f"0DTE [{sym}]: GEX wall pin — ${price:.2f} within "
+                f"0DTE [{sym}]: GEX wall pin -- ${price:.2f} within "
                 f"{_gex_block['proximity_pct']:.2f}% of ${_gex_block['gex_wall_strike']:.2f} wall, "
                 f"net_gex={_gex_block['net_gex']:+.0f} (range-bound)"
             )
@@ -1875,7 +1875,7 @@ def _find_0dte_for_symbol(
     max_risk  = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
     if momentum_continuation:
-        contracts = min(contracts, 1)  # hard 1-contract cap — no retest = lower conviction
+        contracts = min(contracts, 1)  # hard 1-contract cap -- no retest = lower conviction
     if contracts < 1:
         _strategy_skip(sym, "0dte", "budget_insufficient", option_price=px, max_risk=max_risk)
         log.info(f"0DTE [{sym}]: can't afford 1 contract at ${px:.2f} (budget ${max_risk:.0f})")
@@ -2648,7 +2648,7 @@ def find_bear_trend_day(account: float) -> dict | None:
     now_et = _now_et()
     if now_et.time() >= BEAR_TREND_ENTRY_CUTOFF_ET:
         _strategy_skip("SPY", "bear_trend", "entry_cutoff", cutoff_et=BEAR_TREND_ENTRY_CUTOFF_ET.isoformat())
-        log.info("Bear trend: past 2pm ET entry cutoff â€” skip")
+        log.info("Bear trend: past 2pm ET entry cutoff -- skip")
         return None
 
     if not _vix_term_structure_direction_ok("bear", _fetch_vix_term_structure()):
@@ -2685,16 +2685,16 @@ def find_bear_trend_day(account: float) -> dict | None:
         for sym, sig in failing.items():
             gap = BEAR_TREND_MIN_CONFIDENCE - sig["score"]
             log.info(
-                f"Bear trend [{sym}]: score {sig['score']}/10 â€” needs {gap} more pts "
+                f"Bear trend [{sym}]: score {sig['score']}/10 -- needs {gap} more pts "
                 f"(vwap_dist={sig['vwap_distance']*100:.2f}% reasons={sig['reasons']})"
             )
-        log.info(f"Bear trend: only {len(valid)}/3 symbols confirm â€” need 2 â€” skip")
+        log.info(f"Bear trend: only {len(valid)}/3 symbols confirm -- need 2 -- skip")
         return None
 
     signal = valid["SPY"]
     if signal["score"] < BEAR_TREND_MIN_CONFIDENCE:
         _strategy_skip("SPY", "bear_trend", "score_below_minimum", score=signal["score"], minimum=BEAR_TREND_MIN_CONFIDENCE)
-        log.info(f"Bear trend: SPY score {signal['score']}/10 < min {BEAR_TREND_MIN_CONFIDENCE} â€” skip")
+        log.info(f"Bear trend: SPY score {signal['score']}/10 < min {BEAR_TREND_MIN_CONFIDENCE} -- skip")
         return None
 
     orb = _orb_breakout_retest_signal("SPY")
@@ -2716,7 +2716,7 @@ def find_bear_trend_day(account: float) -> dict | None:
     occ, strike, px, exp = _atm_option("SPY", "PUT")
     if not occ or px <= 0:
         _strategy_skip("SPY", "bear_trend", "atm_option_unavailable", right="PUT")
-        log.info("Bear trend: could not find SPY ATM put â€” skip")
+        log.info("Bear trend: could not find SPY ATM put -- skip")
         return None
 
     max_risk = account * MAX_RISK_PCT
@@ -2753,8 +2753,8 @@ def find_bear_trend_day(account: float) -> dict | None:
             },
         }
 
-    # ATM put too expensive for budget â€” try bear put debit spread
-    log.info(f"Bear trend: SPY put ${px:.2f} exceeds budget ${max_risk:.0f} â€” trying bear put spread")
+    # ATM put too expensive for budget -- try bear put debit spread
+    log.info(f"Bear trend: SPY put ${px:.2f} exceeds budget ${max_risk:.0f} -- trying bear put spread")
     spread = _bear_put_spread("SPY", exp, strike, max_risk)
     if spread:
         net_debit, long_strike, short_strike = spread
@@ -2797,7 +2797,7 @@ def find_bear_trend_day(account: float) -> dict | None:
                 },
             }
 
-    log.info(f"Bear trend: no spread fits budget ${max_risk:.0f} â€” skip")
+    log.info(f"Bear trend: no spread fits budget ${max_risk:.0f} -- skip")
     _strategy_skip("SPY", "bear_trend", "budget_or_spread_unavailable", option_price=px, max_risk=max_risk)
     return None
 
@@ -2982,8 +2982,8 @@ def find_bull_trend_day(account: float) -> dict | None:
             },
         }
 
-    # ATM call too expensive for budget â€” try bull call debit spread
-    log.info(f"Bull trend: SPY call ${px:.2f} exceeds budget ${max_risk:.0f} â€” trying bull call spread")
+    # ATM call too expensive for budget -- try bull call debit spread
+    log.info(f"Bull trend: SPY call ${px:.2f} exceeds budget ${max_risk:.0f} -- trying bull call spread")
     spread = _bull_call_spread("SPY", exp, strike, max_risk)
     if spread:
         net_debit, long_strike, short_strike = spread
@@ -3032,7 +3032,7 @@ def find_bull_trend_day(account: float) -> dict | None:
                 },
             }
 
-    log.info(f"Bull trend: no spread fits budget ${max_risk:.0f} â€” skip")
+    log.info(f"Bull trend: no spread fits budget ${max_risk:.0f} -- skip")
     _strategy_skip("SPY", "bull_trend", "budget_or_spread_unavailable", option_price=px, max_risk=max_risk)
     return None
 
@@ -3994,22 +3994,22 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         return
 
     all_trades = _load()
-    open_trades = [t for t in all_trades if t.get(“status”) == “open”]
+    open_trades = [t for t in all_trades if t.get("status") == "open"]
     if len(open_trades) >= MAX_OPEN_FLIPS:
-        _strategy_skip(“SPY”, “entry_run”, “max_open_positions”, open_count=len(open_trades), maximum=MAX_OPEN_FLIPS)
-        log.info(f”Max open ({MAX_OPEN_FLIPS}) reached – skip”)
+        _strategy_skip("SPY", "entry_run", "max_open_positions", open_count=len(open_trades), maximum=MAX_OPEN_FLIPS)
+        log.info(f"Max open ({MAX_OPEN_FLIPS}) reached - skip")
         return
 
     if RH_MIMIC_MODE and RH_ACCOUNT_SIZE > 0:
         from strategies.robinhood_mimic import pdt_blocker, pdt_remaining
         pdt_block = pdt_blocker(all_trades, RH_ACCOUNT_SIZE)
         if pdt_block:
-            log.warning(f”RH MIMIC PDT BLOCKED: {pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used in rolling window”)
-            _decision(“SPY”, “entry_run”, “blocked”, “rh_mimic_pdt_limit”, **pdt_block)
-            _alert(f”RH MIMIC — PDT LIMIT\n{pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used\nWindow: {pdt_block['rolling_window_start']} to {pdt_block['rolling_window_end']}\nEntry blocked to protect RH account.”)
+            log.warning(f"RH MIMIC PDT BLOCKED: {pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used in rolling window")
+            _decision("SPY", "entry_run", "blocked", "rh_mimic_pdt_limit", **pdt_block)
+            _alert(f"RH MIMIC -- PDT LIMIT\n{pdt_block['day_trades_used']}/{pdt_block['day_trades_max']} day trades used\nWindow: {pdt_block['rolling_window_start']} to {pdt_block['rolling_window_end']}\nEntry blocked to protect RH account.")
             return
         capacity = pdt_remaining(all_trades, RH_ACCOUNT_SIZE)
-        log.info(f”RH MIMIC PDT: {capacity['day_trades_used']}/{capacity['day_trades_max']} used, {capacity['day_trades_remaining']} remaining”)
+        log.info(f"RH MIMIC PDT: {capacity['day_trades_used']}/{capacity['day_trades_max']} used, {capacity['day_trades_remaining']} remaining")
 
     slots      = MAX_OPEN_FLIPS - len(open_trades)
     candidates = []
@@ -4066,7 +4066,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                     candidates.append(s)
 
     if not candidates:
-        log.info("No flip setup today â€” waiting")
+        log.info("No flip setup today -- waiting")
         return
 
     broker_symbols = _fetch_broker_open_symbols()
@@ -4176,7 +4176,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             if not consensus.get("allowed") and setup.get("momentum_continuation"):
                 log.info(
                     f"MOMENTUM CONTINUATION {setup.get('symbol')}: shadow consensus advisory "
-                    f"({blockers}) — proceeding with 1-contract momentum entry"
+                    f"({blockers}) -- proceeding with 1-contract momentum entry"
                 )
             primary_caution = _primary_consensus_caution_blocker(setup, consensus)
             if primary_caution:
@@ -4692,7 +4692,7 @@ def _monitor_pass() -> bool:
                 log.info(msg)
                 _alert(msg)
             else:
-                _alert(f"CLOSE FAILED {occ} â€” CLOSE MANUALLY NOW")
+                _alert(f"CLOSE FAILED {occ} -- CLOSE MANUALLY NOW")
 
     if changed:
         _save(trades)
@@ -4784,7 +4784,7 @@ def close_all() -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Flip Bot â€” automated directional options for small accounts")
+    ap = argparse.ArgumentParser(description="Flip Bot -- automated directional options for small accounts")
     ap.add_argument("--entry",     action="store_true")
     ap.add_argument("--intraday-entry", action="store_true",
                     help="Scan only SPY ORB first, then the paper-only Noise Area fallback.")
