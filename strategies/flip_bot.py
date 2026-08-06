@@ -122,6 +122,10 @@ NOISE_AREA_LOOKBACK_SESSIONS = max(14, int(os.getenv("FLIP_NOISE_AREA_LOOKBACK_S
 GEX_WALL_PROXIMITY_PCT = float(os.getenv("FLIP_GEX_WALL_PROXIMITY_PCT", "0.003"))  # 0.3% of spot
 MOMENTUM_ORB_MIN_ATR_RATIO = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_ATR_RATIO", "1.8"))
 MOMENTUM_ORB_MIN_CLV       = float(os.getenv("FLIP_MOMENTUM_ORB_MIN_CLV", "0.70"))
+ORB_ENTRY_CUTOFF_ET        = dtime(int(os.getenv("FLIP_ORB_ENTRY_CUTOFF_HOUR", "10")),
+                                   int(os.getenv("FLIP_ORB_ENTRY_CUTOFF_MIN", "30")))
+TICK_EXTREME_THRESHOLD     = int(os.getenv("FLIP_TICK_EXTREME_THRESHOLD", "1000"))
+PDHL_PROXIMITY_PCT         = float(os.getenv("FLIP_PDHL_PROXIMITY_PCT", "0.002"))
 
 # â"€â"€ Config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
@@ -1734,6 +1738,66 @@ def _premium_level_entry_snapshot(
     }
 
 
+def _tick_signal() -> dict:
+    """Fetch NYSE TICK intraday. Returns exhaustion flags and latest reading.
+
+    TICK > +1000 = extreme buying -- all stocks ticking up -- exhaustion top.
+    TICK < -1000 = extreme selling -- all stocks ticking down -- exhaustion bottom.
+    Fail open on unavailability: never blocks entries on missing data.
+    """
+    try:
+        data = yf.download("^TICK", period="1d", interval="1m", progress=False, auto_adjust=True)
+        if data is None or data.empty:
+            return {"status": "unavailable"}
+        latest = float(data["Close"].iloc[-1])
+        extreme_high = float(data["High"].max())
+        extreme_low = float(data["Low"].min())
+        return {
+            "status": "ok",
+            "latest": round(latest, 0),
+            "extreme_high": round(extreme_high, 0),
+            "extreme_low": round(extreme_low, 0),
+            "exhaustion_top": extreme_high >= TICK_EXTREME_THRESHOLD,
+            "exhaustion_bottom": extreme_low <= -TICK_EXTREME_THRESHOLD,
+        }
+    except Exception as exc:
+        log.debug(f"TICK fetch failed: {exc}")
+        return {"status": "unavailable", "error": str(exc)[:100]}
+
+
+def _prior_day_hl_context(sym: str, spot: float) -> dict:
+    """Prior day high/low proximity. ORB at prior day level = stronger signal.
+
+    Confluence rules (confidence boost applied in caller):
+      - CALL setup + ORB low near prior day low = strong reclaim signal
+      - PUT setup + ORB high near prior day high = strong rejection signal
+      - Gap above prior day high = breakout extension (already moving)
+    """
+    try:
+        bars = yf.download(sym, period="5d", interval="1d", progress=False, auto_adjust=True)
+        if bars is None or len(bars) < 2:
+            return {"status": "unavailable"}
+        prev = bars.iloc[-2]
+        pd_high = float(prev["High"])
+        pd_low  = float(prev["Low"])
+        pd_close = float(prev["Close"])
+        tol = spot * PDHL_PROXIMITY_PCT
+        return {
+            "status": "ok",
+            "pd_high": round(pd_high, 2),
+            "pd_low":  round(pd_low, 2),
+            "pd_close": round(pd_close, 2),
+            "at_pd_high": abs(spot - pd_high) <= tol,
+            "at_pd_low":  abs(spot - pd_low)  <= tol,
+            "above_pd_high": spot > pd_high + tol,
+            "below_pd_low":  spot < pd_low  - tol,
+            "gap_pct_from_pd_high": round((spot - pd_high) / pd_high * 100, 3),
+        }
+    except Exception as exc:
+        log.debug(f"Prior day HL context failed [{sym}]: {exc}")
+        return {"status": "unavailable"}
+
+
 def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
     """Block 0DTE entry when spot is pinned at a positive GEX wall.
 
@@ -1750,6 +1814,12 @@ def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
         if sym_gex.get("status") != "ok":
             return None
         net_gex = sym_gex.get("net_gex")
+        gamma_flip = sym_gex.get("gamma_flip")
+
+        # Below gamma flip = dealers short gamma = amplify moves = favorable for directional
+        if gamma_flip is not None and float(spot) < float(gamma_flip):
+            return None
+
         if net_gex is None or float(net_gex) <= 0:
             return None  # negative GEX = move amplification = good for 0DTE directional
         wall = sym_gex.get("gex_wall") or {}
@@ -1761,6 +1831,7 @@ def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
             return {
                 "reason": "gex_wall_pin",
                 "net_gex": net_gex,
+                "gamma_flip": gamma_flip,
                 "gex_wall_strike": wall_strike,
                 "gex_wall_bias": wall.get("bias"),
                 "spot": spot,
@@ -1797,6 +1868,17 @@ def _find_0dte_for_symbol(
     # Momentum continuation: retest invalidated (price ripped, never pulled back) but
     # breakout velocity confirms real move -- enter 1 contract without waiting for retest.
     # Requires ATR ratio >= MOMENTUM_ORB_MIN_ATR_RATIO and directional CLV >= MOMENTUM_ORB_MIN_CLV.
+    # Entry cutoff: theta decay doubles after 10:30 AM -- late directional buys have structural negative EV.
+    # Momentum continuation and catalyst days bypass (macro/velocity override time gate).
+    if not catalyst:
+        _now_check = _now_et()
+        if _now_check.time() > ORB_ENTRY_CUTOFF_ET:
+            _strategy_skip(sym, "0dte", "entry_cutoff_passed",
+                           cutoff_et=ORB_ENTRY_CUTOFF_ET.strftime("%H:%M"),
+                           now_et=_now_check.strftime("%H:%M"))
+            log.info(f"0DTE [{sym}]: entry cutoff {ORB_ENTRY_CUTOFF_ET.strftime('%H:%M')} ET passed -- skip")
+            return None
+
     momentum_continuation = False
     if not use_orb and not catalyst and orb_break and not orb_retest_ready and orb is not None:
         if str(orb.get("retest_status") or "") == "retest_invalidated":
@@ -1865,6 +1947,39 @@ def _find_0dte_for_symbol(
     else:
         confidence = 8.5
         confidence_basis = "scheduled_catalyst"
+    confidence = round(min(10.0, confidence), 2)
+
+    # TICK + Prior Day H/L: fetch context, apply confidence adjustments
+    tick = _tick_signal()
+    pdhl = _prior_day_hl_context(sym, price)
+
+    if tick.get("status") == "ok" and use_orb and not catalyst:
+        # TICK exhaustion bottom + CALL = strong confirmation (+0.5)
+        if right == "CALL" and tick.get("exhaustion_bottom"):
+            confidence = round(min(10.0, confidence + 0.5), 2)
+        # TICK exhaustion top + PUT = strong confirmation (+0.5)
+        elif right == "PUT" and tick.get("exhaustion_top"):
+            confidence = round(min(10.0, confidence + 0.5), 2)
+        # TICK conflicts hard with direction -- block (only when NOT momentum continuation)
+        elif right == "CALL" and tick.get("exhaustion_top") and not momentum_continuation:
+            _strategy_skip(sym, "0dte", "tick_exhaustion_conflict",
+                           right=right, tick_high=tick.get("extreme_high"))
+            log.info(f"0DTE [{sym}]: TICK exhaustion top ({tick.get('extreme_high')}) conflicts with CALL -- skip")
+            return None
+        elif right == "PUT" and tick.get("exhaustion_bottom") and not momentum_continuation:
+            _strategy_skip(sym, "0dte", "tick_exhaustion_conflict",
+                           right=right, tick_low=tick.get("extreme_low"))
+            log.info(f"0DTE [{sym}]: TICK exhaustion bottom ({tick.get('extreme_low')}) conflicts with PUT -- skip")
+            return None
+
+    if pdhl.get("status") == "ok" and use_orb and orb_retest_ready:
+        # ORB retest at prior day low + CALL = reclaim of key level (+0.25)
+        if right == "CALL" and pdhl.get("at_pd_low"):
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        # ORB retest at prior day high + PUT = rejection of key level (+0.25)
+        elif right == "PUT" and pdhl.get("at_pd_high"):
+            confidence = round(min(10.0, confidence + 0.25), 2)
+
     confidence = round(min(10.0, confidence), 2)
 
     occ, strike, px, exp = _atm_option(sym, right)
