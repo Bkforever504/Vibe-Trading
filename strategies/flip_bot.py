@@ -4829,7 +4829,26 @@ def run_monitor(protect_loop: bool = False) -> None:
         except Exception as exc:
             log.warning(f"Shadow lifecycle collection failed after monitor: {exc}")
 
+    # Entry re-scan: catch ORB breakouts that develop after the initial 9:35 scan.
+    # Today's bear move (ORB neutral at 9:35, broke bearish at 10:00-10:15) is the exact case.
+    # Runs on every 5-min monitor cycle when slot is open and within the entry window.
     if not protect_loop:
+        _rescan_trades = _load()
+        _open_now = [t for t in _rescan_trades if t.get("status") == "open"]
+        _now_rescan = _now_et()
+        _rescan_start = dtime(9, 37)   # 2 min after primary entry task — avoid race
+        if (not _open_now
+                and _now_rescan.time() >= _rescan_start
+                and _now_rescan.time() <= ORB_ENTRY_CUTOFF_ET):
+            log.info(
+                f"MONITOR ENTRY RESCAN {_now_rescan.strftime('%H:%M')} ET: "
+                f"no open trades, within ORB window -- scanning"
+            )
+            try:
+                _rescan_account = resolve_account_size(allow_research_fallback=True)
+                run_entry(_rescan_account, intraday_only=True)
+            except Exception as exc:
+                log.warning(f"Monitor entry rescan failed: {exc}")
         return
 
     deadline = time.monotonic() + MONITOR_PROTECT_WINDOW_MINUTES * 60
