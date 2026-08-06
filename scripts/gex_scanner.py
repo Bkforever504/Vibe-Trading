@@ -174,6 +174,19 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
     sorted_strikes = sorted(strike_gex.items(), key=lambda x: x[0])
     net_gex = sum(strike_gex.values())
 
+    # Gamma flip: strike where cumulative net GEX crosses zero (dealers flip long <-> short)
+    # Below this price = dealers short gamma = amplify moves. Above = long gamma = pin/dampen.
+    gamma_flip = None
+    cum = 0.0
+    for i, (s, g) in enumerate(sorted_strikes):
+        prev_cum = cum
+        cum += g
+        if i > 0 and ((prev_cum < 0 <= cum) or (prev_cum > 0 >= cum)):
+            prev_s = sorted_strikes[i - 1][0]
+            denom = abs(cum - prev_cum)
+            gamma_flip = round(prev_s + (s - prev_s) * abs(prev_cum) / denom, 2) if denom > 0 else s
+            break
+
     # GEX wall = strike with largest |net GEX|
     gex_wall_strike = max(strike_gex, key=lambda s: abs(strike_gex[s]))
     gex_wall_value = strike_gex[gex_wall_strike]
@@ -197,6 +210,11 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         "size_source": "open_interest",
         "dealer_positioning_observed": False,
         "sign_assumption": "calls_positive_puts_negative",
+        "gamma_flip": gamma_flip,
+        "gamma_flip_regime": (
+            "above_flip_range_bound" if gamma_flip and float(next(iter(sorted_strikes))[0]) > gamma_flip else
+            "below_flip_amplify" if gamma_flip else "unknown"
+        ),
         "net_gex": round(net_gex, 2),
         "net_gex_regime": "positive" if net_gex > 0 else "negative",
         "net_gex_interpretation": (
