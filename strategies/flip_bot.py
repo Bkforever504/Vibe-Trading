@@ -127,7 +127,7 @@ ORB_ENTRY_CUTOFF_ET        = dtime(int(os.getenv("FLIP_ORB_ENTRY_CUTOFF_HOUR", "
 TICK_EXTREME_THRESHOLD     = int(os.getenv("FLIP_TICK_EXTREME_THRESHOLD", "1000"))
 PDHL_PROXIMITY_PCT         = float(os.getenv("FLIP_PDHL_PROXIMITY_PCT", "0.002"))
 # ORB edge filters (research: Mon/Wed/Fri +18% win-rate; VIX 15-25 optimal range)
-ORB_DOW_ALLOWED            = {int(d) for d in os.getenv("FLIP_ORB_DOW_ALLOWED", "0,2,4").split(",")}  # 0=Mon,2=Wed,4=Fri
+ORB_DOW_ALLOWED            = {int(d) for d in os.getenv("FLIP_ORB_DOW_ALLOWED", "0,1,2,3,4").split(",")}  # 0=Mon..4=Fri; default=all days
 ORB_VIX_MAX                = float(os.getenv("FLIP_ORB_VIX_MAX", "25.0"))
 # OTM sigma: target strike = breakout_level ± ORB_OTM_SIGMA × expected_daily_move
 # Research (Chuk SSRN 2026): 0.96-2.00σ OTM produces $1.61-$4.40 EV vs -$11.11 ATM
