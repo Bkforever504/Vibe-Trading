@@ -129,6 +129,9 @@ PDHL_PROXIMITY_PCT         = float(os.getenv("FLIP_PDHL_PROXIMITY_PCT", "0.002")
 # ORB edge filters (research: Mon/Wed/Fri +18% win-rate; VIX 15-25 optimal range)
 ORB_DOW_ALLOWED            = {int(d) for d in os.getenv("FLIP_ORB_DOW_ALLOWED", "0,2,4").split(",")}  # 0=Mon,2=Wed,4=Fri
 ORB_VIX_MAX                = float(os.getenv("FLIP_ORB_VIX_MAX", "25.0"))
+# OTM sigma: target strike = breakout_level ± ORB_OTM_SIGMA × expected_daily_move
+# Research (Chuk SSRN 2026): 0.96-2.00σ OTM produces $1.61-$4.40 EV vs -$11.11 ATM
+ORB_OTM_SIGMA              = float(os.getenv("FLIP_ORB_OTM_SIGMA", "1.0"))
 
 # â"€â"€ Config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
@@ -1105,6 +1108,80 @@ def _atm_option(sym: str, right: str) -> tuple[str, float, float, str]:
         return "", 0.0, 0.0, ""
 
 
+def _orb_otm_option(
+    sym: str,
+    right: str,
+    breakout_level: float,
+    *,
+    sigma: float = ORB_OTM_SIGMA,
+) -> tuple[str, float, float, str]:
+    """Select OTM strike = breakout_level ± sigma × expected_daily_move.
+
+    Research (Chuk SSRN 2026): 0.96-2.00σ OTM from breakout produces
+    $1.61-$4.40 EV vs -$11.11 for ATM. Falls back to ATM on any failure.
+    """
+    try:
+        t       = yf.Ticker(sym)
+        spot    = _spot(sym)
+        if spot <= 0 or breakout_level <= 0:
+            return _atm_option(sym, right)
+        today_s = date.today().strftime("%Y-%m-%d")
+        exp     = next((e for e in t.options if e >= today_s), None)
+        if not exp:
+            return _atm_option(sym, right)
+        chain = t.option_chain(exp)
+        df    = chain.calls if right == "CALL" else chain.puts
+        if df.empty:
+            return _atm_option(sym, right)
+
+        # Expected daily move: spot × ATM_IV / sqrt(252)
+        atm_iv = _latest_atm_iv(sym, today_s)
+        if atm_iv and atm_iv > 0:
+            expected_move = spot * atm_iv / math.sqrt(252.0)
+        else:
+            # Fallback: approximate IV from chain mid price of ATM option
+            atm_row  = df.iloc[(df["strike"] - spot).abs().argsort()[:1]]
+            atm_mid  = (float(atm_row["bid"].values[0]) + float(atm_row["ask"].values[0])) / 2.0
+            # Rough ATM IV proxy: mid / (spot × 0.4 / sqrt(252))
+            expected_move = atm_mid * 2.5 if atm_mid > 0 else spot * 0.01
+
+        # Target: CALL → above breakout, PUT → below breakout
+        if right == "CALL":
+            target_strike = breakout_level + sigma * expected_move
+        else:
+            target_strike = breakout_level - sigma * expected_move
+
+        # Snap to nearest available strike ≥ breakout (CALL) or ≤ breakout (PUT)
+        strikes = df["strike"].values
+        if right == "CALL":
+            candidates = strikes[strikes >= breakout_level]
+        else:
+            candidates = strikes[strikes <= breakout_level]
+
+        if len(candidates) == 0:
+            return _atm_option(sym, right)
+
+        strike = float(candidates[abs(candidates - target_strike).argmin()])
+        row    = df[df["strike"] == strike]
+        if row.empty:
+            return _atm_option(sym, right)
+
+        occ      = _occ(sym, exp, right, strike)
+        live_mid = _option_mid(occ)
+        px       = live_mid if live_mid > 0 else float(row["lastPrice"].values[0])
+        if px <= 0:
+            return _atm_option(sym, right)
+
+        log.info(
+            f"OTM strike [{sym}] {right}: target={target_strike:.2f} "
+            f"→ snap={strike:.2f}  expected_move={expected_move:.2f}  sigma={sigma}"
+        )
+        return occ, strike, px, exp
+    except Exception as exc:
+        log.debug(f"_orb_otm_option fallback to ATM: {exc}")
+        return _atm_option(sym, right)
+
+
 def _noise_area_history(sym: str) -> pd.DataFrame | None:
     """Fetch enough regular-session 5-minute history for 14 prior sessions."""
     try:
@@ -2004,7 +2081,8 @@ def _find_0dte_for_symbol(
 
     confidence = round(min(10.0, confidence), 2)
 
-    occ, strike, px, exp = _atm_option(sym, right)
+    _breakout_level = float((orb or {}).get("orb_high" if right == "CALL" else "orb_low") or 0.0)
+    occ, strike, px, exp = _orb_otm_option(sym, right, _breakout_level)
     if not occ or px <= 0:
         _strategy_skip(sym, "0dte", "atm_option_unavailable", right=right)
         return None
