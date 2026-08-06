@@ -126,6 +126,9 @@ ORB_ENTRY_CUTOFF_ET        = dtime(int(os.getenv("FLIP_ORB_ENTRY_CUTOFF_HOUR", "
                                    int(os.getenv("FLIP_ORB_ENTRY_CUTOFF_MIN", "30")))
 TICK_EXTREME_THRESHOLD     = int(os.getenv("FLIP_TICK_EXTREME_THRESHOLD", "1000"))
 PDHL_PROXIMITY_PCT         = float(os.getenv("FLIP_PDHL_PROXIMITY_PCT", "0.002"))
+# ORB edge filters (research: Mon/Wed/Fri +18% win-rate; VIX 15-25 optimal range)
+ORB_DOW_ALLOWED            = {int(d) for d in os.getenv("FLIP_ORB_DOW_ALLOWED", "0,2,4").split(",")}  # 0=Mon,2=Wed,4=Fri
+ORB_VIX_MAX                = float(os.getenv("FLIP_ORB_VIX_MAX", "25.0"))
 
 # â"€â"€ Config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
@@ -1877,6 +1880,25 @@ def _find_0dte_for_symbol(
                            cutoff_et=ORB_ENTRY_CUTOFF_ET.strftime("%H:%M"),
                            now_et=_now_check.strftime("%H:%M"))
             log.info(f"0DTE [{sym}]: entry cutoff {ORB_ENTRY_CUTOFF_ET.strftime('%H:%M')} ET passed -- skip")
+            return None
+        # Day-of-week filter: Mon/Wed/Fri only (research: +18pp win-rate vs Tue/Thu)
+        _dow = _now_check.weekday()
+        if _dow not in ORB_DOW_ALLOWED:
+            _day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            _strategy_skip(sym, "0dte", "orb_dow_filtered", day=_day_names[_dow],
+                           allowed=[_day_names[d] for d in sorted(ORB_DOW_ALLOWED)])
+            log.info(f"0DTE [{sym}]: day-of-week filtered ({_day_names[_dow]}) -- ORB runs Mon/Wed/Fri only")
+            return None
+        # VIX ceiling for ORB: above 25 = vol regime where directional debit buys lose edge
+        try:
+            import yfinance as _yf_vix
+            _vix_df = _yf_vix.download("^VIX", period="1d", interval="1m", progress=False, auto_adjust=True)
+            _vix_val = float(_vix_df["Close"].iloc[-1]) if not _vix_df.empty else 0.0
+        except Exception:
+            _vix_val = 0.0
+        if 0 < _vix_val > ORB_VIX_MAX:
+            _strategy_skip(sym, "0dte", "orb_vix_too_high", vix=round(_vix_val, 2), vix_max=ORB_VIX_MAX)
+            log.info(f"0DTE [{sym}]: VIX {_vix_val:.2f} > {ORB_VIX_MAX} -- ORB debit buys lose edge here")
             return None
 
     momentum_continuation = False

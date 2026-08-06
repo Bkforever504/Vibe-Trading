@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-PDT_THRESHOLD_DOLLARS = 25_000.0
+PDT_THRESHOLD_DOLLARS = 2_000.0   # SEC/FINRA rule change effective June 4, 2026 (was $25k)
 PDT_MAX_DAY_TRADES = 3
 PDT_ROLLING_BUSINESS_DAYS = 5
 REGULATORY_FEE_PER_CONTRACT = 0.03  # SEC + FINRA combined
