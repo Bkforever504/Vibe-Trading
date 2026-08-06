@@ -1,5 +1,5 @@
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 $env:PYTHONPATH = $repo
 $env:ALPACA_PAPER = "true"
