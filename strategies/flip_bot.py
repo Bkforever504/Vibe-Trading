@@ -1845,6 +1845,80 @@ def _tick_signal() -> dict:
         return {"status": "unavailable", "error": str(exc)[:100]}
 
 
+def _market_internals_signal() -> dict:
+    """Fetch NYSE ADD and TRIN breadth internals. Fail-open on unavailability.
+
+    ADD (Advance/Decline): >+500 = broad advance; <-500 = broad decline.
+    TRIN (Arms Index):     >2.0 = panic selling; <0.5 = panic buying (exhaustion top).
+    """
+    result: dict = {"status": "unavailable"}
+    try:
+        add_df = yf.download("$ADD", period="1d", interval="1m", progress=False, auto_adjust=True)
+        if add_df is not None and not add_df.empty:
+            add_val = float(add_df["Close"].iloc[-1])
+            result["add_latest"] = round(add_val, 0)
+            result["add_bullish"] = add_val > 500
+            result["add_bearish"] = add_val < -500
+            result["status"] = "ok"
+    except Exception as exc:
+        log.debug(f"ADD fetch failed: {exc}")
+    try:
+        trin_df = yf.download("$TRIN", period="1d", interval="1m", progress=False, auto_adjust=True)
+        if trin_df is not None and not trin_df.empty:
+            trin_val = float(trin_df["Close"].iloc[-1])
+            result["trin_latest"] = round(trin_val, 3)
+            result["trin_panic_sell"] = trin_val > 2.0    # confirms PUT
+            result["trin_panic_buy"]  = trin_val < 0.5    # exhaustion top, caution on CALL
+            result["status"] = "ok"
+    except Exception as exc:
+        log.debug(f"TRIN fetch failed: {exc}")
+    return result
+
+
+def _max_pain_level(sym: str) -> float | None:
+    """Calculate 0DTE max pain strike from options OI. Returns None on failure.
+
+    Max pain = strike minimizing total option holder payout = price gravitates here.
+    Useful as a pin-level warning: if spot near max pain, breakout may stall.
+    """
+    try:
+        t = yf.Ticker(sym)
+        today_s = date.today().strftime("%Y-%m-%d")
+        exp = next((e for e in t.options if e >= today_s), None)
+        if not exp:
+            return None
+        chain = t.option_chain(exp)
+        calls, puts = chain.calls, chain.puts
+        if calls.empty or puts.empty:
+            return None
+        strikes = sorted(set(calls["strike"].tolist()) & set(puts["strike"].tolist()))
+        if not strikes:
+            return None
+        best_strike, best_pain = strikes[0], float("inf")
+        for s in strikes:
+            c_row = calls[calls["strike"] == s]
+            p_row = puts[puts["strike"] == s]
+            c_oi = float(c_row["openInterest"].values[0]) if not c_row.empty else 0.0
+            p_oi = float(p_row["openInterest"].values[0]) if not p_row.empty else 0.0
+            # call pain: ITM calls below s × OI × (s - strike)
+            call_pain = sum(
+                float(calls[calls["strike"] == k]["openInterest"].values[0] or 0) * (s - k)
+                for k in strikes if k < s
+            )
+            put_pain = sum(
+                float(puts[puts["strike"] == k]["openInterest"].values[0] or 0) * (k - s)
+                for k in strikes if k > s
+            )
+            total = call_pain + put_pain
+            if total < best_pain:
+                best_pain = total
+                best_strike = s
+        return float(best_strike)
+    except Exception as exc:
+        log.debug(f"Max pain calc failed [{sym}]: {exc}")
+        return None
+
+
 def _prior_day_hl_context(sym: str, spot: float) -> dict:
     """Prior day high/low proximity. ORB at prior day level = stronger signal.
 
@@ -2078,6 +2152,35 @@ def _find_0dte_for_symbol(
         # ORB retest at prior day high + PUT = rejection of key level (+0.25)
         elif right == "PUT" and pdhl.get("at_pd_high"):
             confidence = round(min(10.0, confidence + 0.25), 2)
+
+    # ADD/TRIN market internals breadth confirmation (fail-open)
+    internals = _market_internals_signal()
+    if internals.get("status") == "ok" and use_orb and not catalyst:
+        if right == "CALL" and internals.get("add_bullish"):
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        elif right == "PUT" and internals.get("add_bearish"):
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        if right == "PUT" and internals.get("trin_panic_sell"):
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        elif right == "CALL" and internals.get("trin_panic_buy") and not momentum_continuation:
+            # TRIN < 0.5 = panic buying exhaustion top -- cautious on CALL
+            confidence = round(max(0.0, confidence - 0.25), 2)
+
+    # Max pain pin warning: spot within 0.3% = price likely to stall
+    _max_pain = _max_pain_level(sym)
+    if _max_pain and spot > 0:
+        _pain_dist_pct = abs(spot - _max_pain) / spot
+        if _pain_dist_pct < 0.003 and use_orb:
+            confidence = round(max(0.0, confidence - 0.25), 2)
+            log.info(f"0DTE [{sym}]: spot {spot:.2f} within 0.3% of max pain {_max_pain:.2f} -- reducing confidence")
+
+    # VIX term structure: backwardation (VIX > VIX3M, ratio > 1.0) = stress = reduce CALL conviction
+    _vts = _fetch_vix_term_structure()
+    if _vts.get("available") and use_orb and not catalyst:
+        _vts_ratio = _vts.get("ratio", 0.0) or 0.0
+        if right == "CALL" and _vts_ratio > 1.0:
+            confidence = round(max(0.0, confidence - 0.5), 2)
+            log.info(f"0DTE [{sym}]: VIX term structure backwardation (ratio {_vts_ratio:.3f}) -- CALL confidence reduced")
 
     confidence = round(min(10.0, confidence), 2)
 
