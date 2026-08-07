@@ -2188,6 +2188,27 @@ def _find_0dte_for_symbol(
             confidence = round(max(0.0, confidence - 0.5), 2)
             log.info(f"0DTE [{sym}]: VIX term structure backwardation (ratio {_vts_ratio:.3f}) -- CALL confidence reduced")
 
+    # Day-of-week confidence modifier (soft — no hard blocks; learned from Thu false-block incident)
+    # Research: Mon/Wed/Fri strongest for ORB; Tue/Thu weakest across all backtests
+    if use_orb and not catalyst:
+        _dow = _now_et().weekday()
+        if _dow == 0:    # Monday — strongest ORB day, highest first-candle follow-through
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        elif _dow in (1, 3):  # Tuesday / Thursday — weakest; more reversals
+            confidence = round(max(0.0, confidence - 0.25), 2)
+
+    # Time-of-day entry window: 9:50-10:30 ET = confirmed momentum window (best probability)
+    # 9:30-9:50 = chaos / stop hunt zone; after 10:30 theta accelerating against debit buyers
+    if use_orb and not catalyst and not momentum_continuation:
+        _t = _now_et().time()
+        _optimal_start = dtime(9, 50)
+        _optimal_end   = dtime(10, 30)
+        _late_cutoff   = dtime(11, 0)
+        if _optimal_start <= _t <= _optimal_end:
+            confidence = round(min(10.0, confidence + 0.25), 2)
+        elif _t > _late_cutoff:
+            confidence = round(max(0.0, confidence - 0.25), 2)
+
     confidence = round(min(10.0, confidence), 2)
 
     _breakout_level = float((orb or {}).get("orb_high" if right == "CALL" else "orb_low") or 0.0)
