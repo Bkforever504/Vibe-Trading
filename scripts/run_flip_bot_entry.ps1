@@ -11,4 +11,6 @@ $env:SHADOW_EPISODE_HORIZON_MINUTES = "60"
 $env:FLIP_PAPER_CHALLENGER_SYMBOLS = "SPY,QQQ"
 $env:FLIP_NOISE_AREA_PAPER_ENABLED = "true"
 Set-Location $repo
+# Refresh shadow consensus before every entry scan so decisions use today's market regime
+python scripts\shadow_consensus_gate.py
 python strategies\flip_bot.py --entry
