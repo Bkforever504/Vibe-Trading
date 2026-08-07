@@ -1925,6 +1925,107 @@ def _max_pain_level(sym: str) -> float | None:
         return None
 
 
+def _gex_profile_yf(sym: str) -> dict:
+    """Compute GEX profile from yfinance options chain using Black-Scholes gamma.
+
+    Positive net GEX = dealers long gamma = range-bound (ORB breakouts more likely to fail).
+    Negative net GEX = dealers short gamma = trending/amplified (ORB breakouts more likely to hold).
+    Gamma flip = strike where dealer positioning switches — key intraday level.
+    Fail-open: returns status='unavailable' on any error.
+    """
+    import math as _math
+    result = {"status": "unavailable", "sym": sym}
+    try:
+        t_obj = yf.Ticker(sym)
+        spot_p = _spot(sym)
+        if spot_p <= 0:
+            return result
+        today_s = date.today().strftime("%Y-%m-%d")
+        exp = next((e for e in t_obj.options if e >= today_s), None)
+        if not exp:
+            return result
+        chain = t_obj.option_chain(exp)
+        calls, puts = chain.calls, chain.puts
+        if calls.empty or puts.empty:
+            return result
+
+        # Time to expiry for 0DTE: hours remaining / trading-hours-per-year
+        _now_t = _now_et()
+        _market_close = _now_t.replace(hour=16, minute=0, second=0, microsecond=0)
+        hours_left = max(0.05, (_market_close - _now_t).total_seconds() / 3600.0)
+        T = hours_left / (252 * 6.5)  # fraction of trading year
+        r = 0.045  # risk-free rate
+
+        def _bs_gamma(S: float, K: float, T: float, sigma: float) -> float:
+            if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
+                return 0.0
+            try:
+                d1 = (_math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * _math.sqrt(T))
+                return _math.exp(-0.5 * d1 ** 2) / (_math.sqrt(2 * _math.pi) * S * sigma * _math.sqrt(T))
+            except Exception:
+                return 0.0
+
+        strike_gex: dict[float, float] = {}
+        for _, row in calls.iterrows():
+            K = float(row["strike"])
+            oi = float(row.get("openInterest") or 0)
+            iv = float(row.get("impliedVolatility") or 0)
+            if oi <= 0 or iv <= 0:
+                continue
+            g = _bs_gamma(spot_p, K, T, iv)
+            strike_gex[K] = strike_gex.get(K, 0.0) + g * oi * spot_p * 100
+        for _, row in puts.iterrows():
+            K = float(row["strike"])
+            oi = float(row.get("openInterest") or 0)
+            iv = float(row.get("impliedVolatility") or 0)
+            if oi <= 0 or iv <= 0:
+                continue
+            g = _bs_gamma(spot_p, K, T, iv)
+            strike_gex[K] = strike_gex.get(K, 0.0) - g * oi * spot_p * 100
+
+        if not strike_gex:
+            return result
+
+        net_gex = sum(strike_gex.values())
+        sorted_strikes = sorted(strike_gex.items())
+
+        # Gamma flip: strike where cumulative GEX crosses zero
+        gamma_flip = None
+        cum = 0.0
+        for i, (s, g) in enumerate(sorted_strikes):
+            prev = cum
+            cum += g
+            if i > 0 and ((prev < 0 <= cum) or (prev > 0 >= cum)):
+                ps = sorted_strikes[i - 1][0]
+                denom = abs(cum - prev)
+                gamma_flip = round(ps + (s - ps) * abs(prev) / denom, 2) if denom > 0 else s
+                break
+
+        # 4-profile classification
+        above_flip = gamma_flip is not None and spot_p >= gamma_flip
+        if net_gex > 0 and above_flip:
+            profile = "positive_pinned"      # dealers long gamma, price above flip = max pinning
+        elif net_gex > 0:
+            profile = "positive_mild"        # dealers long gamma but below flip = mild dampening
+        elif net_gex < 0 and not above_flip:
+            profile = "negative_amplify"     # dealers short gamma, price below flip = explosive moves
+        else:
+            profile = "negative_partial"     # dealers short gamma but above flip = partial amplification
+
+        result.update({
+            "status": "ok",
+            "net_gex": round(net_gex, 0),
+            "net_gex_sign": "positive" if net_gex > 0 else "negative",
+            "gamma_flip": gamma_flip,
+            "above_flip": above_flip,
+            "profile": profile,
+            "spot": round(spot_p, 2),
+        })
+    except Exception as exc:
+        log.debug(f"GEX profile failed [{sym}]: {exc}")
+    return result
+
+
 def _prior_day_hl_context(sym: str, spot: float) -> dict:
     """Prior day high/low proximity. ORB at prior day level = stronger signal.
 
@@ -2187,6 +2288,23 @@ def _find_0dte_for_symbol(
         if right == "CALL" and _vts_ratio > 1.0:
             confidence = round(max(0.0, confidence - 0.5), 2)
             log.info(f"0DTE [{sym}]: VIX term structure backwardation (ratio {_vts_ratio:.3f}) -- CALL confidence reduced")
+
+    # GEX 4-profile: yfinance BS-gamma computed from 0DTE OI (Alpaca paper has no OI)
+    _gex = _gex_profile_yf(sym)
+    if _gex.get("status") == "ok" and use_orb and not catalyst:
+        _prof = _gex.get("profile", "")
+        if _prof == "positive_pinned":
+            # Max pinning regime — ORB breakouts most likely to fail, price glued to gamma wall
+            confidence = round(max(0.0, confidence - 0.75), 2)
+            log.info(f"0DTE [{sym}]: GEX positive_pinned (net={_gex['net_gex']:.0f}, flip={_gex['gamma_flip']}) -- ORB likely fails, confidence -0.75")
+        elif _prof == "positive_mild":
+            confidence = round(max(0.0, confidence - 0.25), 2)
+        elif _prof == "negative_amplify":
+            # Dealers short gamma below flip — moves extend, ORB breakouts hold best here
+            confidence = round(min(10.0, confidence + 0.5), 2)
+            log.info(f"0DTE [{sym}]: GEX negative_amplify (net={_gex['net_gex']:.0f}) -- dealers amplify moves, confidence +0.5")
+        elif _prof == "negative_partial":
+            confidence = round(min(10.0, confidence + 0.25), 2)
 
     # Day-of-week confidence modifier (soft — no hard blocks; learned from Thu false-block incident)
     # Research: Mon/Wed/Fri strongest for ORB; Tue/Thu weakest across all backtests
