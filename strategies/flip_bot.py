@@ -142,13 +142,19 @@ MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("FLIP_MAX_ENTRY_SLIPPAGE_PCT", "3.0"))
 MAX_ENTRY_QUOTE_AGE_SECONDS = float(os.getenv("FLIP_MAX_ENTRY_QUOTE_AGE_SECONDS", "15.0"))
 PROFIT_MULT       = 1.75   # entry * 1.75 = target (+75%)
 STOP_MULT         = 0.70   # entry * 0.70 = stop   (-30%)
-PROFIT_PROTECT_ARM_PCT = 40.0   # once a long option reaches +40%, protect the win
-PROFIT_PROTECT_FLOOR_PCT = 25.0 # minimum win to protect after a 0DTE runner arms
-PROFIT_PROTECT_GIVEBACK_PCT = 15.0 # ratchet: close if a winner gives back 15 pts from best
+# Ratchet tuned from 861-trade shadow dataset (Aug 2026):
+# Old: arm=40, giveback=15 → capture efficiency 24.7% (most 0DTE peaks at +25-30%, never armed)
+# New: arm=25, giveback=10 → arms sooner, tighter trail, more of each winning move captured
+PROFIT_PROTECT_ARM_PCT = 25.0   # arm ratchet at +25% (was 40%; most 0DTE peaks never reached 40)
+PROFIT_PROTECT_FLOOR_PCT = 15.0 # minimum protected floor once armed (was 25%)
+PROFIT_PROTECT_GIVEBACK_PCT = 10.0 # trail: close if winner gives back 10 pts from best (was 15)
 PROFIT_PROTECT_TIER_FLOORS = (
-    (60.0, 45.0),
-    (50.0, 35.0),
+    (40.0, 30.0),  # best >= 40%: protect at 30% (was 60/45)
+    (30.0, 20.0),  # best >= 30%: protect at 20% (was 50/35)
 )
+# Spread filter: skip entry if bid-ask spread > this fraction of mid price.
+# $28k of $41k mid-price profit erased by spread costs across 861 shadow trades.
+MAX_SPREAD_PCT = float(os.getenv("FLIP_MAX_SPREAD_PCT", "0.30"))  # 30% of mid = max allowable
 # Closed trades showed stops filling at -62% to -66% against the -30% design and
 # ratchet floors leaking ~28 points because the 15-minute scheduler gap is longer
 # than a 0DTE option's adverse move. While positions are open, the monitor loops
@@ -2189,6 +2195,13 @@ def _find_0dte_for_symbol(
     if not occ or px <= 0:
         _strategy_skip(sym, "0dte", "atm_option_unavailable", right=right)
         return None
+    _spread_c = _option_bid_ask_spread_cents(occ)
+    if _spread_c is not None and px > 0:
+        _spread_frac = (_spread_c / 100.0) / px
+        if _spread_frac > MAX_SPREAD_PCT:
+            _strategy_skip(sym, "0dte", "spread_too_wide", spread_pct=round(_spread_frac * 100, 1), max_pct=int(MAX_SPREAD_PCT * 100))
+            log.info(f"0DTE [{sym}]: spread {_spread_frac*100:.1f}% of mid exceeds {MAX_SPREAD_PCT*100:.0f}% limit -- skip")
+            return None
 
     max_risk  = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
