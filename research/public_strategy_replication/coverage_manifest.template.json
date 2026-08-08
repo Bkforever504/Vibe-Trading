@@ -1,0 +1,13 @@
+{
+  "source_type": "tradingview_webhook",
+  "source_id": "replace_with_capture_source_id",
+  "trader": "replace_with_verified_trader_id",
+  "coverage_start": "2026-08-01T00:00:00Z",
+  "coverage_end": "2026-08-31T23:59:59Z",
+  "capture_method": "replace_with_lawful_capture_method",
+  "poll_interval_seconds": 60,
+  "captured_record_count": 0,
+  "capture_complete": true,
+  "deletions_tracked": true,
+  "archive_sha256": "replace_with_64_character_sha256"
+}

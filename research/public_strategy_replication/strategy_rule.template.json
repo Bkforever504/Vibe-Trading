@@ -1,0 +1,57 @@
+{
+  "rule_id": "replace_with_public_rule_id",
+  "version": "1.0.0",
+  "frozen_at": "2026-08-08T00:00:00Z",
+  "setup_family": "replace_with_disclosed_setup_family",
+  "source_traders": [
+    "replace_with_verified_trader_id"
+  ],
+  "instruments": [
+    "SPY"
+  ],
+  "session_windows_et": [
+    {
+      "start": "09:45",
+      "end": "10:30"
+    }
+  ],
+  "entry_predicates": [
+    {
+      "left": "replace_with_point_in_time_feature",
+      "operator": "eq",
+      "right": true
+    }
+  ],
+  "contract_selection": {
+    "quote_authority": "opra",
+    "dte_min": 0,
+    "dte_max": 1,
+    "max_quote_age_seconds": 5,
+    "max_spread_pct": 10
+  },
+  "entry_order": {
+    "type": "limit",
+    "market_fallback": false
+  },
+  "stop_policy": {
+    "type": "replace_with_disclosed_stop_policy"
+  },
+  "target_policy": {
+    "type": "replace_with_disclosed_target_policy"
+  },
+  "time_exit": {
+    "minutes_after_entry": 30
+  },
+  "no_trade_conditions": [],
+  "regime_filters": [],
+  "regime_definition": {
+    "method": "replace_with_point_in_time_regime_method",
+    "version": "1.0.0",
+    "parameters": {}
+  },
+  "position_sizing": {
+    "max_account_risk_pct": 0.5,
+    "max_contracts": 1
+  },
+  "research_status": "template_only_not_an_edge_claim"
+}

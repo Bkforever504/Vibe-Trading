@@ -1,0 +1,23 @@
+{
+  "signal_event_id": "replace_with_signal_snapshot_event_id",
+  "rule_hash": "replace_with_registered_rule_hash",
+  "quote_authority": "opra",
+  "quote_method": "opra_aggregate_executable_nbbo",
+  "regime_definition_hash": "replace_with_registered_regime_definition_hash",
+  "instrument": "replace_with_exact_option_symbol",
+  "position_side": "long_premium",
+  "entry_quote_timestamp": "2026-08-10T14:00:01Z",
+  "exit_quote_timestamp": "2026-08-10T14:20:00Z",
+  "entry_executable_value": 1.05,
+  "exit_executable_value": 1.20,
+  "entry_mid_value": 1.00,
+  "exit_mid_value": 1.25,
+  "quantity": 1,
+  "multiplier": 100,
+  "capital_at_risk_dollars": 105,
+  "fees_dollars": 1.3,
+  "additional_slippage_dollars": 0,
+  "regime": "replace_with_frozen_regime_label",
+  "trading_date": "2026-08-10",
+  "resolution": "target_stop_or_time_exit"
+}
