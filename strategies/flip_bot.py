@@ -26,6 +26,7 @@ Task Scheduler:
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import logging
 import math
@@ -53,6 +54,12 @@ from strategies.flip_contract_ranker import rank_contracts
 from strategies.flip_day_type_router import classify_intraday_day_type
 from strategies.flip_retest_quality import score_retest_quality
 from strategies.spy_noise_area import evaluate_noise_area
+from strategies.spy_spx_execution_policy import (
+    edge_gate_decision,
+    evaluate_underlying_exit,
+    execution_ladder_prices,
+    marketable_exit_limits,
+)
 from scripts.alpaca_resilience import AlpacaReadUnavailable, get_json as alpaca_get_json
 
 try:
@@ -107,6 +114,9 @@ IV_HISTORY_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "iv_hist
 SHADOW_CANDIDATE_SCHEMA_VERSION = 4
 OPTIONS_LIQUIDITY_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "options-liquidity-feasibility.json"
 OPTION_PREMIUM_LEVEL_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "option-premium-levels.json"
+EXECUTABLE_EDGE_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "flip-executable-edge.json"
+OPTION_STREAM_CACHE_PATH = Path.home() / ".vibe-trading" / "state" / "flip-option-stream-quotes.json"
+MONITOR_LOCK_PATH = Path.home() / ".vibe-trading" / "locks" / "flip-monitor.lock"
 MARKET_FORCE_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "market-force-score.json"
 MARKET_FORCE_SHADOW_MAX_AGE_SECONDS = 30 * 60
 MARKET_CONTEXT_REPORT_DIR = Path.home() / ".vibe-trading" / "reports"
@@ -140,6 +150,11 @@ MAX_CONTRACTS     = 5      # hard ceiling regardless of account size or option p
 MAX_ENTRY_SPREAD_CENTS = int(os.getenv("FLIP_MAX_ENTRY_SPREAD_CENTS", "10"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("FLIP_MAX_ENTRY_SLIPPAGE_PCT", "3.0"))
 MAX_ENTRY_QUOTE_AGE_SECONDS = float(os.getenv("FLIP_MAX_ENTRY_QUOTE_AGE_SECONDS", "15.0"))
+REQUIRE_OPRA_EXECUTION_QUOTES = os.getenv("FLIP_REQUIRE_OPRA_EXECUTION_QUOTES", "false").lower() == "true"
+EXECUTABLE_EV_GATE_ENABLED = os.getenv("FLIP_EXECUTABLE_EV_GATE_ENABLED", "false").lower() == "true"
+ENTRY_LADDER_WAIT_SECONDS = max(0.0, float(os.getenv("FLIP_ENTRY_LADDER_WAIT_SECONDS", "2.0")))
+UNDERLYING_TIME_STOP_MINUTES = max(5, int(os.getenv("FLIP_UNDERLYING_TIME_STOP_MINUTES", "25")))
+STREAM_QUOTE_MAX_AGE_SECONDS = max(0.5, float(os.getenv("FLIP_STREAM_QUOTE_MAX_AGE_SECONDS", "3.0")))
 PROFIT_MULT       = 1.75   # entry * 1.75 = target (+75%)
 STOP_MULT         = 0.70   # entry * 0.70 = stop   (-30%)
 # Ratchet tuned from 861-trade shadow dataset (Aug 2026):
@@ -328,7 +343,7 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
     # Force a new broker-data snapshot here. The selection quote can be several
     # decision steps old and must not be treated as executable evidence.
     _option_mid(setup.get("option_symbol", ""))
-    quote = _selection_quote_fields(setup.get("option_symbol", ""))
+    quote = _execution_quote_fields(setup.get("option_symbol", ""))
     try:
         current_ask = float(quote.get("selection_ask") or 0.0)
     except (TypeError, ValueError):
@@ -352,6 +367,13 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "quote_age_seconds": quote_age,
             "max_quote_age_seconds": MAX_ENTRY_QUOTE_AGE_SECONDS,
         }
+    if REQUIRE_OPRA_EXECUTION_QUOTES and quote.get("quote_authority") != "opra":
+        return {
+            "reason": "opra_execution_quote_required",
+            "quote_authority": quote.get("quote_authority"),
+            "quote_feed": quote.get("quote_feed"),
+            "quote_transport": quote.get("quote_transport"),
+        }
     if current_ask > limit_price:
         return {
             "reason": "entry_slippage_above_limit",
@@ -366,6 +388,9 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
     setup["entry_live_ask_at_submit"] = round(current_ask, 3)
     setup["entry_quote_timestamp_at_submit"] = quote.get("quote_timestamp")
     setup["entry_quote_age_seconds_at_submit"] = quote_age
+    setup["entry_quote_feed_at_submit"] = quote.get("quote_feed")
+    setup["entry_quote_authority_at_submit"] = quote.get("quote_authority")
+    setup["entry_quote_transport_at_submit"] = quote.get("quote_transport")
     setup["entry_slippage_guard_max_pct"] = MAX_ENTRY_SLIPPAGE_PCT
     return None
 
@@ -407,6 +432,39 @@ def _entry_evidence_blocker(setup: dict) -> dict | None:
     return None
 
 
+def _executable_ev_blocker(setup: dict, *, now_et: datetime | None = None) -> dict | None:
+    """Require a positive chronological executable-EV lower bound in paper."""
+    if not EXECUTABLE_EV_GATE_ENABLED:
+        return None
+    if not PAPER:
+        return {"reason": "executable_ev_gate_paper_only"}
+    try:
+        report = json.loads(EXECUTABLE_EDGE_REPORT_PATH.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"reason": "executable_ev_report_unavailable", "error": str(exc)[:160]}
+    generated = _parse_timestamp(report.get("generated_at"))
+    age_seconds = (
+        max(0.0, (datetime.now(timezone.utc) - generated).total_seconds())
+        if generated else None
+    )
+    if age_seconds is None or age_seconds > 6 * 60 * 60:
+        return {
+            "reason": "executable_ev_report_stale",
+            "report_generated_at": report.get("generated_at"),
+            "report_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+        }
+    decision = edge_gate_decision(
+        report,
+        symbol=str(setup.get("symbol") or ""),
+        strategy=str(setup.get("strategy") or "unknown"),
+        time_bucket=_shadow_episode_bucket(now_et or _now_et()),
+    )
+    setup["executable_ev_gate"] = decision
+    if decision.get("allowed"):
+        return None
+    return {"reason": str(decision.get("reason") or "executable_ev_gate_blocked"), **decision}
+
+
 # ---------------------------------------------------------------------------
 # Alpaca helpers
 # ---------------------------------------------------------------------------
@@ -424,6 +482,12 @@ def _get(path: str, params: dict | None = None) -> dict | list:
 
 def _post(path: str, body: dict) -> dict:
     r = req.post(f"{BASE}{path}", headers=HDR, json=body, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def _patch(path: str, body: dict) -> dict:
+    r = req.patch(f"{BASE}{path}", headers=HDR, json=body, timeout=10)
     r.raise_for_status()
     return r.json()
 
@@ -482,6 +546,38 @@ def _save(trades: list[dict]) -> None:
     except ModuleNotFoundError:
         from strategies.options_state import atomic_save_json
     atomic_save_json(STATE_FILE, trades)
+
+
+@contextmanager
+def _monitor_authority_lock(stale_seconds: float = 180.0):
+    """Serialize websocket and scheduled monitor passes across processes."""
+    MONITOR_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    acquired = False
+    for _attempt in range(2):
+        try:
+            descriptor = os.open(MONITOR_LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                age = time.time() - MONITOR_LOCK_PATH.stat().st_mtime
+                if age > stale_seconds:
+                    MONITOR_LOCK_PATH.unlink(missing_ok=True)
+                    continue
+            except OSError:
+                pass
+            break
+        else:
+            with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+                handle.write(f"pid={os.getpid()} ts={_utc_now_text()}\n")
+            acquired = True
+            break
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            try:
+                MONITOR_LOCK_PATH.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -656,6 +752,31 @@ def _noise_area_structural_exit_reason(trade: dict, now_et: datetime | None = No
         if close > stop:
             return f"NOISE AREA STRUCTURE EXIT close={close:.2f} stop={stop:.2f}"
     return ""
+
+
+def _underlying_structure_exit_reason(
+    trade: dict,
+    pnl_pct: float,
+    *,
+    now_et: datetime | None = None,
+) -> str:
+    """Use underlying thesis failure as the primary directional exit signal."""
+    now_et = now_et or _now_et()
+    mark = _underlying_mark_snapshot(str(trade.get("symbol") or ""), now_et=now_et)
+    decision = evaluate_underlying_exit(
+        trade,
+        mark,
+        pnl_pct=pnl_pct,
+        now=now_et,
+        time_stop_minutes=UNDERLYING_TIME_STOP_MINUTES,
+    )
+    trade["underlying_exit_controller"] = {
+        **decision,
+        "mark": mark,
+        "evaluated_at": _utc_now_text(),
+        "option_premium_stop_role": "emergency_failsafe",
+    }
+    return str(decision.get("reason") or "") if decision.get("exit") else ""
 
 
 def _fetch_vix_term_structure() -> dict:
@@ -911,7 +1032,40 @@ def _vwap_50ema_signal(hist, sym: str = "?") -> dict | None:
     }
 
 
+def _stream_option_quote(occ_symbol: str) -> dict:
+    """Return a fresh websocket quote, preserving its feed authority."""
+    try:
+        payload = json.loads(OPTION_STREAM_CACHE_PATH.read_text(encoding="utf-8-sig"))
+        quote = (payload.get("quotes") or {}).get(occ_symbol) or {}
+        received = datetime.fromisoformat(str(quote.get("received_at") or "").replace("Z", "+00:00"))
+        if received.tzinfo is None:
+            received = received.replace(tzinfo=timezone.utc)
+        age = max(0.0, (datetime.now(timezone.utc) - received.astimezone(timezone.utc)).total_seconds())
+        if age > STREAM_QUOTE_MAX_AGE_SECONDS:
+            return {}
+        bid = float(quote.get("bid") or 0.0)
+        ask = float(quote.get("ask") or 0.0)
+        if bid <= 0 or ask < bid:
+            return {}
+        feed = str(quote.get("feed") or payload.get("feed") or "unknown").lower()
+        return {
+            "selection_bid": bid,
+            "selection_ask": ask,
+            "quote_timestamp": quote.get("timestamp"),
+            "quote_age_seconds": round(age, 3),
+            "quote_feed": feed,
+            "quote_authority": "opra" if feed == "opra" else "indicative_telemetry_only",
+            "quote_transport": "websocket",
+        }
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+
+
 def _option_mid(occ_symbol: str) -> float:
+    streamed = _stream_option_quote(occ_symbol)
+    if streamed:
+        _OPTION_QUOTE_TELEMETRY[occ_symbol] = streamed
+        return round((float(streamed["selection_bid"]) + float(streamed["selection_ask"])) / 2.0, 3)
     try:
         r = req.get(
             "https://data.alpaca.markets/v1beta1/options/snapshots",
@@ -936,6 +1090,9 @@ def _option_mid(occ_symbol: str) -> float:
             "selection_ask": ask or None,
             "quote_timestamp": quote_ts,
             "quote_age_seconds": round(quote_age, 3) if quote_age is not None else None,
+            "quote_feed": "unverified_snapshot",
+            "quote_authority": "unverified_rest_snapshot",
+            "quote_transport": "rest",
         }
         if bid > 0 and ask > 0:
             return round((bid + ask) / 2, 3)
@@ -985,6 +1142,18 @@ def _selection_quote_fields(occ_symbol: str) -> dict:
         "selection_ask": cached.get("selection_ask"),
         "quote_timestamp": cached.get("quote_timestamp"),
         "quote_age_seconds": cached.get("quote_age_seconds"),
+    }
+
+
+def _execution_quote_fields(occ_symbol: str) -> dict:
+    """Extend the stable selection schema with execution authority metadata."""
+    selected = _selection_quote_fields(occ_symbol)
+    cached = _OPTION_QUOTE_TELEMETRY.get(occ_symbol) or {}
+    return {
+        **selected,
+        "quote_feed": selected.get("quote_feed", cached.get("quote_feed")),
+        "quote_authority": selected.get("quote_authority", cached.get("quote_authority")),
+        "quote_transport": selected.get("quote_transport", cached.get("quote_transport")),
     }
 
 
@@ -2193,17 +2362,9 @@ def _find_0dte_for_symbol(
         log.info(f"0DTE [{sym}]: no catalyst, no gap, no execution-ready ORB retest")
         return None
 
-    # GEX wall pin -- skip when positive net GEX traps price at dealer wall
-    if not catalyst:
-        _gex_block = _gex_wall_blocker(sym, price)
-        if _gex_block:
-            _strategy_skip(sym, "0dte", "gex_wall_pin", **_gex_block)
-            log.info(
-                f"0DTE [{sym}]: GEX wall pin -- ${price:.2f} within "
-                f"{_gex_block['proximity_pct']:.2f}% of ${_gex_block['gex_wall_strike']:.2f} wall, "
-                f"net_gex={_gex_block['net_gex']:+.0f} (range-bound)"
-            )
-            return None
+    # Public/open-interest GEX is inferred rather than dealer-position truth.
+    # It remains useful telemetry but cannot veto an executable setup.
+    _gex_wall_advisory = _gex_wall_blocker(sym, price) if not catalyst else None
 
     if use_orb and not catalyst:
         right    = "PUT" if orb["direction"] == "bear" else "CALL"
@@ -2299,22 +2460,14 @@ def _find_0dte_for_symbol(
             confidence = round(max(0.0, confidence - 0.5), 2)
             log.info(f"0DTE [{sym}]: VIX backwardation (vix/vix3m={_vts_ratio:.3f}) -- CALL confidence reduced")
 
-    # GEX 4-profile: yfinance BS-gamma computed from 0DTE OI (Alpaca paper has no OI)
+    # Inferred GEX remains shadow telemetry and has zero execution-confidence effect.
     _gex = _gex_profile_yf(sym)
     if _gex.get("status") == "ok" and use_orb and not catalyst:
         _prof = _gex.get("profile", "")
-        if _prof == "positive_pinned":
-            # Max pinning regime — ORB breakouts most likely to fail, price glued to gamma wall
-            confidence = round(max(0.0, confidence - 0.75), 2)
-            log.info(f"0DTE [{sym}]: GEX positive_pinned (net={_gex['net_gex']:.0f}, flip={_gex['gamma_flip']}) -- ORB likely fails, confidence -0.75")
-        elif _prof == "positive_mild":
-            confidence = round(max(0.0, confidence - 0.25), 2)
-        elif _prof == "negative_amplify":
-            # Dealers short gamma below flip — moves extend, ORB breakouts hold best here
-            confidence = round(min(10.0, confidence + 0.5), 2)
-            log.info(f"0DTE [{sym}]: GEX negative_amplify (net={_gex['net_gex']:.0f}) -- dealers amplify moves, confidence +0.5")
-        elif _prof == "negative_partial":
-            confidence = round(min(10.0, confidence + 0.25), 2)
+        log.info(
+            f"0DTE [{sym}]: inferred GEX profile={_prof} retained as shadow telemetry; "
+            "execution confidence unchanged"
+        )
 
     # Day-of-week confidence modifier (soft — no hard blocks; learned from Thu false-block incident)
     # Research: Mon/Wed/Fri strongest for ORB; Tue/Thu weakest across all backtests
@@ -2396,6 +2549,14 @@ def _find_0dte_for_symbol(
         "day_type_recommended_strategy": day_type.get("recommended_strategy"),
         "day_type_router_authority": day_type.get("authority"),
         "underlying_spot_at_selection": price,
+        "underlying_structure_level": _breakout_level or None,
+        "gex_profile_advisory": {
+            **_gex,
+            "wall": _gex_wall_advisory,
+            "authority": "shadow_telemetry_only",
+            "confidence_effect": 0.0,
+            "can_block_execution": False,
+        },
         **_expected_move_entry_snapshot(sym, price, orb),
         **_premium_level_entry_snapshot(sym, price),
         **_selection_quote_fields(occ),
@@ -3688,6 +3849,9 @@ def _entry_quality_snapshot(
         "entry_live_ask_at_submit": setup.get("entry_live_ask_at_submit"),
         "entry_quote_timestamp_at_submit": setup.get("entry_quote_timestamp_at_submit"),
         "entry_quote_age_seconds_at_submit": setup.get("entry_quote_age_seconds_at_submit"),
+        "entry_quote_feed_at_submit": setup.get("entry_quote_feed_at_submit"),
+        "entry_quote_authority_at_submit": setup.get("entry_quote_authority_at_submit"),
+        "entry_quote_transport_at_submit": setup.get("entry_quote_transport_at_submit"),
         "entry_slippage_guard_max_pct": setup.get("entry_slippage_guard_max_pct"),
         "quote_timestamp": setup.get("quote_timestamp"),
         "quote_age_seconds": setup.get("quote_age_seconds"),
@@ -3698,6 +3862,8 @@ def _entry_quality_snapshot(
         "entry_evidence_gate": setup.get("entry_evidence_gate"),
         "signal_snapshot": setup.get("signal_snapshot"),
         "feature_snapshot": _entry_feature_snapshot(setup),
+        "gex_profile_advisory": setup.get("gex_profile_advisory"),
+        "executable_ev_gate": setup.get("executable_ev_gate"),
     }
 
 
@@ -4227,6 +4393,10 @@ def _entry_execution_snapshot(setup: dict, entry_fill: dict, submitted_at: str) 
     signal_ask = float(setup.get("selection_ask") or 0.0)
     submit_ask = float(setup.get("entry_live_ask_at_submit") or 0.0)
     filled_price = float(entry_fill.get("entry_price") or 0.0)
+    option_symbol = str(setup.get("option_symbol") or "")
+    if option_symbol:
+        _option_mid(option_symbol)
+    post_fill_quote = _execution_quote_fields(option_symbol)
     fill_vs_signal_ask_pct = (
         round((filled_price - signal_ask) / signal_ask * 100.0, 3)
         if signal_ask > 0 and filled_price > 0 else None
@@ -4249,6 +4419,11 @@ def _entry_execution_snapshot(setup: dict, entry_fill: dict, submitted_at: str) 
         "filled_price": filled_price or None,
         "fill_vs_signal_ask_pct": fill_vs_signal_ask_pct,
         "fill_vs_submit_ask_pct": fill_vs_submit_ask_pct,
+        "execution_ladder": setup.get("entry_execution_ladder"),
+        "post_fill_bid": post_fill_quote.get("selection_bid"),
+        "post_fill_ask": post_fill_quote.get("selection_ask"),
+        "post_fill_quote_timestamp": post_fill_quote.get("quote_timestamp"),
+        "post_fill_quote_authority": post_fill_quote.get("quote_authority"),
         "orb_entry_pattern": setup.get("orb_entry_pattern"),
         "orb_retest_status": setup.get("orb_retest_status"),
         "orb_retest_age_bars": setup.get("orb_retest_age_bars"),
@@ -4334,12 +4509,23 @@ def _submit(
         _alert(f"ORDER BLOCKED {occ_symbol} x{qty} {side}\nManual reset required before any new orders.")
         return None
 
-    body = {"symbol": occ_symbol, "qty": str(qty), "side": side, "time_in_force": "day"}
-    if limit_price is not None:
-        body["type"] = "limit"
-        body["limit_price"] = str(round(float(limit_price), 2))
-    else:
-        body["type"] = "market"
+    if limit_price is None or float(limit_price or 0.0) <= 0:
+        if side != "sell":
+            log.error(f"ORDER BLOCKED: automatic market orders are disabled for {occ_symbol} {side}")
+            _alert(f"ORDER BLOCKED {occ_symbol} x{qty} {side}\nA positive limit price is required.")
+            return None
+        # Compatibility for emergency/manual protective callers: synthesize a
+        # positive limit, never a market order. Normal monitor paths pass bid.
+        protective_mark = _option_mid(occ_symbol)
+        limit_price = round(protective_mark, 2) if protective_mark > 0 else 0.01
+    body = {
+        "symbol": occ_symbol,
+        "qty": str(qty),
+        "side": side,
+        "time_in_force": "day",
+        "type": "limit",
+        "limit_price": str(round(float(limit_price), 2)),
+    }
     for attempt in range(3):
         try:
             resp = _post("/v2/orders", body)
@@ -4357,6 +4543,81 @@ def _submit(
                 _alert(f"ORDER FAILED {occ_symbol} x{qty} {side}\n{exc}")
                 return None
     return None
+
+
+def _submit_entry_ladder(setup: dict, max_notional: float) -> dict | None:
+    """Submit midpoint, improve one tick, then stop at the validated cap."""
+    occ = str(setup.get("option_symbol") or "")
+    qty = int(setup.get("contracts") or 0)
+    _option_mid(occ)
+    quote = _execution_quote_fields(occ)
+    bid = float(quote.get("selection_bid") or 0.0)
+    ask = float(quote.get("selection_ask") or 0.0)
+    cap = float(setup.get("entry_limit_price") or 0.0)
+    prices = execution_ladder_prices(bid, ask, cap)
+    if quote.get("quote_authority") != "opra" and cap > 0:
+        # Unverified snapshots do not support queue-price experimentation. The
+        # OPRA requirement blocks these in production; legacy tests use cap.
+        prices = [round(cap, 2)]
+    setup["entry_execution_ladder"] = {
+        "arrival_bid": bid or None,
+        "arrival_ask": ask or None,
+        "arrival_quote_timestamp": quote.get("quote_timestamp"),
+        "arrival_quote_authority": quote.get("quote_authority"),
+        "maximum_price": cap or None,
+        "planned_prices": prices,
+        "submitted_prices": [],
+        "replacement_count": 0,
+        "market_order_allowed": False,
+    }
+    if not prices:
+        return None
+    response = _submit(occ, qty, "buy", max_notional=max_notional, limit_price=prices[0])
+    if not response:
+        return None
+    setup["entry_execution_ladder"]["submitted_prices"].append(prices[0])
+    order_id = str(response.get("id") or "")
+    latest = dict(response)
+    for price in prices[1:]:
+        if ENTRY_LADDER_WAIT_SECONDS:
+            time.sleep(ENTRY_LADDER_WAIT_SECONDS)
+        if order_id:
+            try:
+                detail = _get(f"/v2/orders/{order_id}")
+                if isinstance(detail, dict):
+                    latest = detail
+            except Exception as exc:
+                log.warning(f"Entry ladder refresh failed for {order_id}: {exc}")
+        status = str(latest.get("status") or "").strip().lower()
+        if status == "filled" or _parse_filled_qty(latest) > 0:
+            return latest
+        if status and status not in _ACTIVE_ENTRY_ORDER_STATUSES:
+            return latest
+        try:
+            replacement = _patch(f"/v2/orders/{order_id}", {"limit_price": str(price)})
+        except Exception as exc:
+            log.warning(f"Entry ladder replacement stopped at ${price:.2f}: {exc}")
+            break
+        latest = replacement if isinstance(replacement, dict) else latest
+        order_id = str(latest.get("id") or order_id)
+        setup["entry_execution_ladder"]["submitted_prices"].append(price)
+        setup["entry_execution_ladder"]["replacement_count"] += 1
+    return latest
+
+
+def _submit_exit_limit(occ_symbol: str, qty: int) -> dict | None:
+    """Submit an executable sell limit at the observed bid, never market."""
+    midpoint = _option_mid(occ_symbol)
+    quote = _selection_quote_fields(occ_symbol)
+    bid = float(quote.get("selection_bid") or 0.0)
+    prices = marketable_exit_limits(bid, concessions=0)
+    if not prices:
+        if midpoint <= 0:
+            log.error(f"EXIT BLOCKED: executable bid unavailable for {occ_symbol}")
+            return None
+        # _submit converts this compatibility call into a limit at midpoint.
+        return _submit(occ_symbol, qty, "sell")
+    return _submit(occ_symbol, qty, "sell", limit_price=prices[0])
 
 
 def _submit_spread(setup: dict, max_notional: float = 0.0) -> dict | None:
@@ -4415,10 +4676,23 @@ def _close_spread(trade: dict) -> dict | None:
     qty = int(trade.get("contracts", 0))
     if qty < 1:
         return None
+    _option_mid(str(trade["option_symbol"]))
+    _option_mid(str(trade["short_option_symbol"]))
+    long_quote = _selection_quote_fields(str(trade["option_symbol"]))
+    short_quote = _selection_quote_fields(str(trade["short_option_symbol"]))
+    close_credit = round(
+        float(long_quote.get("selection_bid") or 0.0)
+        - float(short_quote.get("selection_ask") or 0.0),
+        2,
+    )
+    if close_credit <= 0:
+        log.error(f"Spread close blocked: executable credit unavailable for {trade.get('symbol')}")
+        return None
     body = {
         "order_class": "mleg",
         "qty": str(qty),
-        "type": "market",
+        "type": "limit",
+        "limit_price": str(close_credit),
         "time_in_force": "day",
         "legs": [
             {"symbol": trade["option_symbol"], "side": "sell", "ratio_qty": "1"},
@@ -4429,7 +4703,7 @@ def _close_spread(trade: dict) -> dict | None:
         resp = _post("/v2/orders", body)
         log.info(
             f"Spread close OK: {resp.get('id')} sell {trade['option_symbol']} / "
-            f"buy {trade['short_option_symbol']} x{qty}"
+            f"buy {trade['short_option_symbol']} x{qty} credit=${close_credit:.2f}"
         )
         return resp
     except Exception as exc:
@@ -4780,6 +5054,20 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 entry_evidence=evidence_block,
             )
             continue
+        ev_block = _executable_ev_blocker(setup)
+        if ev_block:
+            log.warning(
+                f"EXECUTION BLOCKED {setup.get('symbol')} {setup.get('strategy')}: "
+                f"{ev_block['reason']} details={ev_block}"
+            )
+            _decision(
+                setup_symbol,
+                setup.get("strategy", "unknown"),
+                "blocked",
+                ev_block["reason"],
+                executable_ev_gate=ev_block,
+            )
+            continue
         _capture_point_in_time(
             "signal",
             setup,
@@ -4796,13 +5084,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         if is_spread:
             resp = _submit_spread(setup, max_notional=max_notional)
         else:
-            resp = _submit(
-                setup["option_symbol"],
-                setup["contracts"],
-                "buy",
-                max_notional=max_notional,
-                limit_price=setup.get("entry_limit_price"),
-            )
+            resp = _submit_entry_ladder(setup, max_notional=max_notional)
         if not resp:
             _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked", "order_submission_failed")
             continue
@@ -4865,6 +5147,11 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             "hard_close_time": setup.get("hard_close_time"),
             "entry_date":      str(date.today()),
             "entry_at":        _utc_now_text(),
+            "entry_underlying_price": setup.get("underlying_spot_at_selection") or (setup.get("signal_snapshot") or {}).get("close"),
+            "underlying_structure_level": setup.get("underlying_structure_level") or (setup.get("signal_snapshot") or {}).get("vwap"),
+            "signal_snapshot": setup.get("signal_snapshot"),
+            "gex_profile_advisory": setup.get("gex_profile_advisory"),
+            "executable_ev_gate": setup.get("executable_ev_gate"),
             "status":          "open",
             "catalyst":        setup.get("catalyst", ""),
             "execution_lane":  setup.get("execution_lane", "primary"),
@@ -5060,10 +5347,13 @@ def _monitor_pass() -> bool:
                 )
         if mid >= target:
             reason = f"PROFIT TARGET +{pnl_pct:.1f}%"
-        elif mid <= stop:
-            reason = f"STOP LOSS {pnl_pct:.1f}%"
         else:
             reason = _noise_area_structural_exit_reason(trade, now_et=now_et)
+            if not reason:
+                reason = _underlying_structure_exit_reason(trade, pnl_pct, now_et=now_et)
+                changed = True
+            if not reason and mid <= stop:
+                reason = f"STOP LOSS (EMERGENCY OPTION FAILSAFE) {pnl_pct:.1f}%"
             if not reason:
                 lock_floor = _profit_protect_lock_floor(best_pnl_pct)
                 if (
@@ -5129,7 +5419,7 @@ def _monitor_pass() -> bool:
                     log.error(msg)
                     _alert(msg)
                     continue
-            resp = _close_spread(trade) if is_spread else _submit(occ, qty, "sell")
+            resp = _close_spread(trade) if is_spread else _submit_exit_limit(occ, qty)
             if resp:
                 exit_state = _stage_exit_order(trade, resp, reason, mid)
                 changed = True
@@ -5181,13 +5471,35 @@ def _monitor_pass() -> bool:
     return any(t.get("status") == "open" for t in trades)
 
 
+def _serialized_monitor_pass() -> bool:
+    with _monitor_authority_lock() as acquired:
+        if not acquired:
+            log.info("Monitor pass skipped: another process owns exit authority")
+            try:
+                return any(t.get("status") == "open" for t in _load())
+            except Exception:
+                return True
+        return _monitor_pass()
+
+
+def run_event_monitor_pass(*, source: str) -> None:
+    """Quote/order event entrypoint; exits only and never performs an entry scan."""
+    if not PAPER or LIVE_EXECUTION_ENABLED:
+        log.error(f"Event monitor blocked ({source}): paper-only authority required")
+        return
+    if not _market_open():
+        return
+    log.info(f"=== FLIP EVENT MONITOR source={source} ===")
+    _serialized_monitor_pass()
+
+
 def run_monitor(protect_loop: bool = False) -> None:
     log.info("=== FLIP MONITOR (protect loop) ===" if protect_loop else "=== FLIP MONITOR ===")
     if not _market_open():
         log.info("Market is closed - skip flip monitor")
         return
 
-    open_remaining = _monitor_pass()
+    open_remaining = _serialized_monitor_pass()
 
     # Research collection must never delay or block protection of open trades.
     if ACCELERATED_SHADOW_LEARNING and not protect_loop:
@@ -5221,7 +5533,7 @@ def run_monitor(protect_loop: bool = False) -> None:
     deadline = time.monotonic() + MONITOR_PROTECT_WINDOW_MINUTES * 60
     while open_remaining and time.monotonic() < deadline and _market_open():
         time.sleep(MONITOR_PROTECT_LOOP_SECONDS)
-        open_remaining = _monitor_pass()
+        open_remaining = _serialized_monitor_pass()
     if not open_remaining:
         log.info("Protect loop released: no open trades remain")
 
@@ -5267,8 +5579,8 @@ def close_all() -> None:
                     "manual review required to avoid a double-sell."
                 )
                 continue
-        resp = _close_spread(t) if t.get("short_option_symbol") else _submit(
-            t["option_symbol"], t["contracts"], "sell"
+        resp = _close_spread(t) if t.get("short_option_symbol") else _submit_exit_limit(
+            t["option_symbol"], t["contracts"]
         )
         if resp:
             mid = _option_mid(t["option_symbol"])

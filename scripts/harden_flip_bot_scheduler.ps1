@@ -5,19 +5,24 @@ $taskNames = @(
     "Flip-Bot-Entry",
     "Flip-Bot-Monitor",
     "Flip-Bot-Monitor-5m-A",
-    "Flip-Bot-Monitor-5m-B"
+    "Flip-Bot-Monitor-5m-B",
+    "Flip-Bot-Event-Monitor"
 )
-
-$settings = New-ScheduledTaskSettingsSet `
-    -MultipleInstances IgnoreNew `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 20) `
-    -StartWhenAvailable `
-    -WakeToRun `
-    -AllowStartIfOnBatteries `
-    -DontStopIfGoingOnBatteries
 
 foreach ($taskName in $taskNames) {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
+    $limit = if ($taskName -eq "Flip-Bot-Event-Monitor") {
+        New-TimeSpan -Hours 8
+    } else {
+        New-TimeSpan -Minutes 20
+    }
+    $settings = New-ScheduledTaskSettingsSet `
+        -MultipleInstances IgnoreNew `
+        -ExecutionTimeLimit $limit `
+        -StartWhenAvailable `
+        -WakeToRun `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries
     Set-ScheduledTask `
         -TaskName $task.TaskName `
         -TaskPath $task.TaskPath `

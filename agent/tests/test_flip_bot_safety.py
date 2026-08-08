@@ -64,7 +64,8 @@ def test_manual_reset_blocks_new_buys_but_allows_protective_sells(monkeypatch) -
             "qty": "1",
             "side": "sell",
             "time_in_force": "day",
-            "type": "market",
+            "type": "limit",
+            "limit_price": "0.01",
         }
     ]
 

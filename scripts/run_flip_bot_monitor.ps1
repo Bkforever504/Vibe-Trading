@@ -11,7 +11,11 @@ $env:SHADOW_EPISODE_HORIZON_MINUTES = "60"
 $env:FLIP_PAPER_CHALLENGER_SYMBOLS = "SPY,QQQ"
 $env:FLIP_ACCOUNT_SIZE_OVERRIDE = "1000"
 $env:FLIP_NOISE_AREA_PAPER_ENABLED = "true"
+$env:FLIP_REQUIRE_OPRA_EXECUTION_QUOTES = "true"
+$env:FLIP_EXECUTABLE_EV_GATE_ENABLED = "true"
 Set-Location $repo
+python scripts\flip_executable_edge_report.py
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python strategies\flip_bot.py --monitor
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python strategies\flip_bot.py --intraday-entry

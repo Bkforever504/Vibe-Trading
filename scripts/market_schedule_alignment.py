@@ -40,6 +40,7 @@ EXPECTED_TASKS = {
     r"\VibeTrade\IntradayRiskRefresh": {"08:24"},
     r"\VibeTrade\PreOpenSentimentLogger": {"08:25"},
     # Open + early session.
+    r"\Flip-Bot-Event-Monitor": {"08:27"},
     r"\Flip-Bot-Entry": {"08:35"},
     r"\VibeTrade\GEXScanner": {"08:35"},
     r"\VibeTrade\IVRScanner": {"08:35"},
