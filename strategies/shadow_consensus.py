@@ -60,12 +60,39 @@ def symbol_decision(symbol: str, report_path: Path | str | None = None) -> dict[
     }
 
 
+def _playbook_applicable_blockers(
+    blockers: list[str],
+    requested_playbook: str | None,
+) -> tuple[list[str], list[str]]:
+    """Separate execution facts from warnings produced for another payoff shape."""
+    playbook = str(requested_playbook or "").lower()
+    if playbook not in {"long_call", "long_put", "directional_long_call", "directional_long_put"}:
+        return list(blockers), []
+
+    short_premium_markers = (
+        "credit/risk_is_below_minimum",
+        "credit_to_risk",
+        "iv_not_overpriced",
+        "new_short_premium_blocked",
+    )
+    applicable: list[str] = []
+    ignored: list[str] = []
+    for blocker in blockers:
+        normalized = str(blocker).lower()
+        if any(marker in normalized for marker in short_premium_markers):
+            ignored.append(blocker)
+        else:
+            applicable.append(blocker)
+    return applicable, ignored
+
+
 def entry_advice(
     symbol: str,
     contracts: int,
     *,
     report_path: Path | str | None = None,
     enabled: bool | None = None,
+    requested_playbook: str | None = None,
 ) -> dict[str, Any]:
     if enabled is None:
         enabled = consensus_enabled()
@@ -95,16 +122,19 @@ def entry_advice(
 
     decision = symbol_decision(symbol, report_path)
     recommendation = str(decision.get("recommendation") or "needs_review")
-    blockers = list(decision.get("blockers") or [])
+    raw_blockers = list(decision.get("blockers") or [])
+    blockers, ignored_blockers = _playbook_applicable_blockers(raw_blockers, requested_playbook)
     reasons = list(decision.get("reasons") or [])
     kill_switch_active = bool(decision.get("_kill_switch_active"))
     # This report combines alpha opinions produced for different playbooks. It is
     # not setup-direction aware, so those opinions may size a trade down but must
     # not veto an otherwise valid Flip setup. Only portfolio/execution safety
     # facts retain hard-block authority here.
+    # options_liquidity_blocked is advisory only: nightly scan can't assess 0DTE
+    # liquidity (contracts don't exist pre-market); execution-time MAX_SPREAD_PCT
+    # is the real guard.
     hard_blockers = {
         "portfolio_kill_switch_active",
-        "options_liquidity_blocked",
     }
     active_hard_blockers = sorted(hard_blockers.intersection(blockers))
     blocked = kill_switch_active or bool(active_hard_blockers)
@@ -122,6 +152,9 @@ def entry_advice(
         "recommendation": recommendation,
         "options_playbook": decision.get("options_playbook", "none"),
         "blockers": blockers,
+        "raw_blockers": raw_blockers,
+        "ignored_wrong_playbook_blockers": ignored_blockers,
+        "requested_playbook": requested_playbook,
         "hard_blockers": active_hard_blockers,
         "alpha_advisory_only": bool(blockers) and not blocked,
         "reasons": reasons,

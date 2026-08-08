@@ -212,8 +212,8 @@ def _adaptive_quality(row: dict[str, Any], market_direction: str) -> tuple[int, 
     if not tradeable or playbook == "none" or "stand_aside" in action:
         out_blockers = ["adaptive_stand_aside"]
         out_blockers.extend("adaptive_" + item.lower().replace(" ", "_") for item in blocker_list[:3])
-        if any("liquidity" in item.lower() for item in blocker_list):
-            out_blockers.append("options_liquidity_blocked")
+        # Do not escalate to options_liquidity_blocked here — adaptive is already
+        # stand_aside. Execution-time spread filter is the real liquidity guard.
         return -1, [], out_blockers, playbook
 
     reasons = [f"adaptive_playbook={playbook}"]
