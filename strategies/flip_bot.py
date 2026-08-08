@@ -691,10 +691,11 @@ def _intraday_bars(sym: str):
             last_bar = pd.Timestamp(bars.index[-1])
             if last_bar.tzinfo is not None:
                 last_bar = last_bar.tz_convert("America/New_York")
-            if last_bar.date() != date.today():
+            market_date = _now_et().date()
+            if last_bar.date() != market_date:
                 _INTRADAY_DATA_ISSUES[sym] = "stale_session"
                 log.warning(
-                    f"Intraday [{sym}]: stale session {last_bar.date()} != {date.today()} - skip"
+                    f"Intraday [{sym}]: stale session {last_bar.date()} != {market_date} - skip"
                 )
                 return None
         _INTRADAY_DATA_ISSUES.pop(sym, None)
@@ -2119,7 +2120,7 @@ def _find_0dte_for_symbol(
     allow_calendar_catalyst: bool = False,
     require_orb_retest: bool = True,
 ) -> dict | None:
-    today    = date.today()
+    today    = _now_et().date()
     catalyst = next(((d, t, mode) for d, t, mode in CATALYST_DAYS if d == today), None) if allow_calendar_catalyst else None
     price    = _spot(sym)
     prev     = _prev_close(sym)
@@ -4973,9 +4974,10 @@ def _monitor_pass() -> bool:
             changed = True
             if pending_result == "filled":
                 _capture_point_in_time(
-                    "exit_fill",
+                    "exit",
                     trade,
                     context={
+                        "lifecycle_phase": "exit_fill",
                         "exit_reason": trade.get("exit_reason"),
                         "exit_price": trade.get("exit_price"),
                         "exit_price_source": trade.get("exit_price_source"),
@@ -5142,9 +5144,10 @@ def _monitor_pass() -> bool:
                 )
                 if exit_state == "filled":
                     _capture_point_in_time(
-                        "exit_fill",
+                        "exit",
                         trade,
                         context={
+                            "lifecycle_phase": "exit_fill",
                             "exit_reason": reason,
                             "exit_price": trade.get("exit_price"),
                             "exit_price_source": trade.get("exit_price_source"),

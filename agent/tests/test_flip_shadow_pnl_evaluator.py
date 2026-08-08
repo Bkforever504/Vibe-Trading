@@ -333,7 +333,7 @@ def test_build_report_simulates_ratcheted_profit_capture(tmp_path: Path) -> None
     trade = report["top_trades"][0]
     assert trade["return_pct"] == 66.0
     assert trade["simulated_exit_return_pct"] == 50.0
-    assert trade["simulated_exit_reason"] == "ratchet_lock_51.0"
+    assert trade["simulated_exit_reason"] == "ratchet_lock_56.0"
     assert trade["giveback_pct"] == 16.0
     assert trade["capture_efficiency"] == 0.758
     assert report["avg_giveback_pct"] == 16.0

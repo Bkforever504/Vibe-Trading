@@ -1,5 +1,5 @@
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 $repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 $env:PYTHONPATH = $repo
 $env:ALPACA_PAPER = "true"
@@ -14,4 +14,6 @@ $env:FLIP_NOISE_AREA_PAPER_ENABLED = "true"
 Set-Location $repo
 # Refresh shadow consensus before every entry scan so decisions use today's market regime
 python scripts\shadow_consensus_gate.py
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 python strategies\flip_bot.py --entry
+exit $LASTEXITCODE

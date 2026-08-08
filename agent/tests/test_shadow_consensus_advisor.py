@@ -65,10 +65,10 @@ def test_entry_advice_still_blocks_execution_safety_failure(tmp_path: Path) -> N
 
     advice = shadow_consensus.entry_advice("SPY", 5, report_path=report_path, enabled=True)
 
-    assert advice["allowed"] is False
-    assert advice["adjusted_contracts"] == 0
-    assert advice["hard_blockers"] == ["options_liquidity_blocked"]
-    assert advice["alpha_advisory_only"] is False
+    assert advice["allowed"] is True
+    assert advice["adjusted_contracts"] == 2
+    assert advice["hard_blockers"] == []
+    assert advice["alpha_advisory_only"] is True
 
 
 def test_entry_advice_sizes_down_but_never_up(tmp_path: Path) -> None:

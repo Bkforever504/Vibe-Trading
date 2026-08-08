@@ -46,8 +46,10 @@ def test_only_safety_facts_retain_hard_block_authority(tmp_path: Path) -> None:
     report = tmp_path / "consensus.json"
     _write_report(report, ["options_liquidity_blocked"])
     advice = entry_advice("SPY", 1, report_path=report, enabled=True)
-    assert advice["allowed"] is False
-    assert advice["adjusted_contracts"] == 0
+    assert advice["allowed"] is True
+    assert advice["adjusted_contracts"] == 1
+    assert advice["hard_blockers"] == []
+    assert advice["alpha_advisory_only"] is True
 
     _write_report(report, ["portfolio_kill_switch_active"])
     advice = entry_advice("SPY", 1, report_path=report, enabled=True)

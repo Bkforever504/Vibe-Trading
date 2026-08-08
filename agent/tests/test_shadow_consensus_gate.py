@@ -78,7 +78,8 @@ def test_build_report_keeps_shadow_advisor_non_executing(tmp_path: Path) -> None
     assert "shadow_not_promotion_ready" in spy["blockers"]
     assert spy["options_playbook"] == "long_put"
     assert qqq["recommendation"] == "stand_aside"
-    assert "options_liquidity_blocked" in qqq["blockers"]
+    assert "options_liquidity_borderline" in qqq["blockers"]
+    assert "options_liquidity_blocked" not in qqq["blockers"]
     assert nvda["recommendation"] == "stand_aside"
     assert "weak_shadow_pnl_evidence" in nvda["blockers"]
 

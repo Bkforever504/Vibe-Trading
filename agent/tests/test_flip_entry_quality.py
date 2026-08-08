@@ -298,6 +298,17 @@ def test_orb_breakout_retest_rejects_stale_confirmation(monkeypatch) -> None:
     assert signal["entry_ready"] is False
 
 
+def _stub_0dte_advisory_context(monkeypatch) -> None:
+    monkeypatch.setattr(bot, "_day_type_snapshot", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(bot, "_gex_wall_blocker", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(bot, "_tick_signal", lambda: {"status": "unavailable"})
+    monkeypatch.setattr(bot, "_prior_day_hl_context", lambda *_args, **_kwargs: {"status": "unavailable"})
+    monkeypatch.setattr(bot, "_market_internals_signal", lambda: {"status": "unavailable"})
+    monkeypatch.setattr(bot, "_max_pain_level", lambda _symbol: None)
+    monkeypatch.setattr(bot, "_fetch_vix_term_structure", lambda: {"regime": "unknown"})
+    monkeypatch.setattr(bot, "_gex_profile_yf", lambda _symbol: {"status": "unavailable"})
+
+
 def test_live_orb_path_blocks_until_retest_but_raw_shadow_can_measure(monkeypatch) -> None:
     decisions: list[tuple[str, dict]] = []
     raw_orb = {
@@ -314,8 +325,11 @@ def test_live_orb_path_blocks_until_retest_but_raw_shadow_can_measure(monkeypatc
     monkeypatch.setattr(bot, "_orb_breakout_retest_signal", lambda _symbol: raw_orb)
     monkeypatch.setattr(bot, "_strategy_skip", lambda _s, _st, reason, **details: decisions.append((reason, details)))
     monkeypatch.setattr(bot, "_atm_option", lambda *_args: ("SPY260716C00100000", 100.0, 1.0, "2026-07-16"))
+    monkeypatch.setattr(bot, "_orb_otm_option", lambda *_args: ("SPY260716C00100000", 100.0, 1.0, "2026-07-16"))
     monkeypatch.setattr(bot, "_option_bid_ask_spread_cents", lambda _symbol: 2)
     monkeypatch.setattr(bot, "_selection_quote_fields", lambda _symbol: {})
+    monkeypatch.setattr(bot, "_now_et", lambda: datetime(2026, 7, 15, 9, 45))
+    _stub_0dte_advisory_context(monkeypatch)
 
     assert bot._find_0dte_for_symbol(10_000, "SPY") is None
     assert decisions[0][0] == "orb_retest_not_confirmed"
@@ -350,8 +364,11 @@ def test_confirmed_orb_retest_reaches_execution_candidate(monkeypatch) -> None:
     monkeypatch.setattr(bot, "_prev_close", lambda _symbol: 100.0)
     monkeypatch.setattr(bot, "_orb_breakout_retest_signal", lambda _symbol: confirmed)
     monkeypatch.setattr(bot, "_atm_option", lambda *_args: ("SPY260716P00100000", 100.0, 1.0, "2026-07-16"))
+    monkeypatch.setattr(bot, "_orb_otm_option", lambda *_args: ("SPY260716P00100000", 100.0, 1.0, "2026-07-16"))
     monkeypatch.setattr(bot, "_option_bid_ask_spread_cents", lambda _symbol: 2)
     monkeypatch.setattr(bot, "_selection_quote_fields", lambda _symbol: {})
+    monkeypatch.setattr(bot, "_now_et", lambda: datetime(2026, 7, 15, 9, 45))
+    _stub_0dte_advisory_context(monkeypatch)
 
     setup = bot._find_0dte_for_symbol(10_000, "SPY")
 
@@ -370,8 +387,11 @@ def test_qualifying_gap_candidate_stays_shadow_only_without_orb_confirmation(mon
     monkeypatch.setattr(bot, "_prev_close", lambda _symbol: 100.0)
     monkeypatch.setattr(bot, "_orb_breakout_retest_signal", lambda _symbol: None)
     monkeypatch.setattr(bot, "_atm_option", lambda *_args: ("SPY260717P00099000", 99.0, 1.0, "2026-07-17"))
+    monkeypatch.setattr(bot, "_orb_otm_option", lambda *_args: ("SPY260717P00099000", 99.0, 1.0, "2026-07-17"))
     monkeypatch.setattr(bot, "_option_bid_ask_spread_cents", lambda _symbol: 2)
     monkeypatch.setattr(bot, "_selection_quote_fields", lambda _symbol: {})
+    monkeypatch.setattr(bot, "_now_et", lambda: datetime(2026, 7, 17, 9, 45))
+    _stub_0dte_advisory_context(monkeypatch)
 
     setup = bot._find_0dte_for_symbol(10_000, "SPY")
 
@@ -504,10 +524,10 @@ def test_update_pnl_extremes_uses_break_even_baseline_after_restart() -> None:
 
 
 def test_profit_protect_lock_floor_has_explicit_runner_tiers() -> None:
-    assert bot._profit_protect_lock_floor(40.0) == 25.0
-    assert bot._profit_protect_lock_floor(50.0) == 35.0
-    assert bot._profit_protect_lock_floor(60.0) == 45.0
-    assert bot._profit_protect_lock_floor(66.0) == 51.0
+    assert bot._profit_protect_lock_floor(40.0) == 30.0
+    assert bot._profit_protect_lock_floor(50.0) == 40.0
+    assert bot._profit_protect_lock_floor(60.0) == 50.0
+    assert bot._profit_protect_lock_floor(66.0) == 56.0
 
 
 def test_stamp_exit_writes_complete_exit_record() -> None:

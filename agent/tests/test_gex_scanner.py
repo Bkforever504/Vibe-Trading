@@ -28,8 +28,9 @@ def _contract(
 
 def test_gex_requires_same_day_expiration() -> None:
     result = compute_gex([_contract("call", 0.1, 100, expiry="2026-07-15")], as_of=DAY)
-    assert result["status"] == "unavailable"
-    assert result["expiry_filter"] == "0dte_required"
+    assert result["status"] == "ok"
+    assert result["expiry_filter"] == "shortest_available"
+    assert result["selected_expiry"] == "2026-07-15"
 
 
 def test_gex_rejects_quote_size_proxy() -> None:

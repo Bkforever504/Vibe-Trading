@@ -909,7 +909,7 @@ def test_flip_bot_monitor_ratchets_profit_protection_for_0dte_winner(monkeypatch
     assert submitted == [(("SPY260706C00750000", 5, "sell"), {})]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved[0]["status"] == "closed"
-    assert saved[0]["exit_reason"] == "PROFIT PROTECT +50.0% (best +66.0%, lock +51.0%)"
+    assert saved[0]["exit_reason"] == "PROFIT PROTECT +50.0% (best +66.0%, lock +56.0%)"
     assert saved[0]["pnl"] == 250.0
 
 
@@ -1021,6 +1021,29 @@ def test_flip_bot_monitor_uses_eastern_time_for_intraday_cutoff(monkeypatch, tmp
     assert saved[0]["status"] == "closed"
     assert saved[0]["exit_reason"] == "TIME EXIT 13:45"
 
+def _stub_shadow_candidate_pipeline(monkeypatch, flip_bot, option_symbol_for) -> None:
+    monkeypatch.setattr(
+        flip_bot,
+        "_find_0dte_for_symbol",
+        lambda _account, symbol, **_kwargs: {
+            "symbol": symbol,
+            "strategy": "0dte",
+            "right": "CALL",
+            "option_symbol": option_symbol_for(symbol),
+            "entry_price_est": 1.25,
+        },
+    )
+    monkeypatch.setattr(flip_bot, "_shadow_setup_challenger_candidates", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(flip_bot, "_shadow_contract_challengers", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(flip_bot, "_market_force_shadow_snapshot", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(flip_bot, "_market_context_shadow_snapshot", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        flip_bot,
+        "_underlying_mark_snapshot",
+        lambda symbol, **_kwargs: {"underlying_symbol": symbol, "underlying_mark": 105.0},
+    )
+
+
 def test_flip_bot_logs_shadow_0dte_candidates_without_execution(monkeypatch, tmp_path) -> None:
     import json
     from datetime import datetime
@@ -1047,6 +1070,11 @@ def test_flip_bot_logs_shadow_0dte_candidates_without_execution(monkeypatch, tmp
         lambda sym, right: (f"{sym}260702C00105000", 105.0, 1.25, "2026-07-02"),
     )
     monkeypatch.setattr(flip_bot, "_option_bid_ask_spread_cents", lambda occ: 4)
+    _stub_shadow_candidate_pipeline(
+        monkeypatch,
+        flip_bot,
+        lambda symbol: f"{symbol}260702C00105000",
+    )
 
     entries = flip_bot.log_shadow_0dte_candidates(10_000, symbols=flip_bot.SHADOW_CANDIDATES)
 
@@ -1093,6 +1121,11 @@ def test_spy_accelerated_shadow_logs_without_live_consensus_gate(monkeypatch, tm
     )
     monkeypatch.setattr(flip_bot, "_option_bid_ask_spread_cents", lambda occ: 3)
     monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda occ: {})
+    _stub_shadow_candidate_pipeline(
+        monkeypatch,
+        flip_bot,
+        lambda _symbol: "SPY260715C00505000",
+    )
     monkeypatch.setattr(
         flip_bot,
         "shadow_entry_advice",
@@ -1200,6 +1233,11 @@ def test_flip_shadow_candidates_track_lifecycle_after_entry(monkeypatch, tmp_pat
         "_now_et",
         lambda: datetime(2026, 7, 10, 11, 0, tzinfo=ZoneInfo("America/New_York")),
     )
+    _stub_shadow_candidate_pipeline(
+        monkeypatch,
+        flip_bot,
+        lambda _symbol: "QQQ260710C00105000",
+    )
 
     first = flip_bot.log_shadow_0dte_candidates(10_000, symbols=flip_bot.SHADOW_CANDIDATES)
     second = flip_bot.log_shadow_0dte_candidates(10_000, symbols=flip_bot.SHADOW_CANDIDATES)
@@ -1234,6 +1272,11 @@ def test_flip_shadow_episode_closes_at_fixed_horizon(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(flip_bot, "_option_bid_ask_spread_cents", lambda occ: 2)
     monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda occ: {})
     monkeypatch.setattr(flip_bot, "_option_mid", lambda occ: 1.10)
+    _stub_shadow_candidate_pipeline(
+        monkeypatch,
+        flip_bot,
+        lambda _symbol: "QQQ260710C00105000",
+    )
 
     flip_bot.log_shadow_0dte_candidates(10_000, symbols=["QQQ"])
     clock["now"] = datetime(2026, 7, 10, 12, 1, tzinfo=ZoneInfo("America/New_York"))
@@ -1626,10 +1669,12 @@ def test_scheduled_runner_orders_challengers_by_cumulative_shadow_ev() -> None:
     runner = (ROOT / "scripts" / "run_flip_bot_entry.ps1").read_text(encoding="utf-8")
     monitor = (ROOT / "scripts" / "run_flip_bot_monitor.ps1").read_text(encoding="utf-8")
 
-    expected = '$env:FLIP_PAPER_CHALLENGER_SYMBOLS = "RIVN,AAPL,NVDA,QQQ"'
+    expected = '$env:FLIP_PAPER_CHALLENGER_SYMBOLS = "SPY,QQQ"'
     assert expected in runner
     assert expected in monitor
     assert "IWM" not in runner.split("FLIP_PAPER_CHALLENGER_SYMBOLS", 1)[1].splitlines()[0]
+    assert '$ErrorActionPreference = "Stop"' in runner
+    assert "shadow_consensus_gate.py\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }" in runner
 
 
 def test_paper_challenger_0dte_scans_promoted_symbols_only_in_paper(monkeypatch) -> None:
