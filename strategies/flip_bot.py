@@ -1856,8 +1856,13 @@ def _market_internals_signal() -> dict:
 
     ADD (Advance/Decline): >+500 = broad advance; <-500 = broad decline.
     TRIN (Arms Index):     >2.0 = panic selling; <0.5 = panic buying (exhaustion top).
+    Note: $ADD/$TRIN/$TICK return 404 on yfinance free API -- fail-open silently.
     """
+    import logging as _logging
     result: dict = {"status": "unavailable"}
+    _yf_log = _logging.getLogger("yfinance")
+    _prev = _yf_log.level
+    _yf_log.setLevel(_logging.CRITICAL)  # suppress 404 spam -- these tickers unavailable on free API
     try:
         add_df = yf.download("$ADD", period="1d", interval="1m", progress=False, auto_adjust=True)
         if add_df is not None and not add_df.empty:
@@ -1873,11 +1878,13 @@ def _market_internals_signal() -> dict:
         if trin_df is not None and not trin_df.empty:
             trin_val = float(trin_df["Close"].iloc[-1])
             result["trin_latest"] = round(trin_val, 3)
-            result["trin_panic_sell"] = trin_val > 2.0    # confirms PUT
-            result["trin_panic_buy"]  = trin_val < 0.5    # exhaustion top, caution on CALL
+            result["trin_panic_sell"] = trin_val > 2.0
+            result["trin_panic_buy"]  = trin_val < 0.5
             result["status"] = "ok"
     except Exception as exc:
         log.debug(f"TRIN fetch failed: {exc}")
+    finally:
+        _yf_log.setLevel(_prev)
     return result
 
 
@@ -2273,21 +2280,23 @@ def _find_0dte_for_symbol(
             # TRIN < 0.5 = panic buying exhaustion top -- cautious on CALL
             confidence = round(max(0.0, confidence - 0.25), 2)
 
-    # Max pain pin warning: spot within 0.3% = price likely to stall
+    # Max pain pin warning: price within 0.3% of max pain = stall risk
     _max_pain = _max_pain_level(sym)
-    if _max_pain and spot > 0:
-        _pain_dist_pct = abs(spot - _max_pain) / spot
+    if _max_pain and price > 0:
+        _pain_dist_pct = abs(price - _max_pain) / price
         if _pain_dist_pct < 0.003 and use_orb:
             confidence = round(max(0.0, confidence - 0.25), 2)
-            log.info(f"0DTE [{sym}]: spot {spot:.2f} within 0.3% of max pain {_max_pain:.2f} -- reducing confidence")
+            log.info(f"0DTE [{sym}]: price {price:.2f} within 0.3% of max pain {_max_pain:.2f} -- reducing confidence")
 
-    # VIX term structure: backwardation (VIX > VIX3M, ratio > 1.0) = stress = reduce CALL conviction
+    # VIX term structure: backwardation (VIX > VIX3M) = stress = reduce CALL conviction
+    # Use vix_over_vix3m key: >1.0 means VIX > VIX3M = backwardation = stress
+    # Bug fix: was using "ratio" (= vix3m_over_vix = 1.234 in calm contango) which fired backwards
     _vts = _fetch_vix_term_structure()
-    if _vts.get("available") and use_orb and not catalyst:
-        _vts_ratio = _vts.get("ratio", 0.0) or 0.0
-        if right == "CALL" and _vts_ratio > 1.0:
+    if _vts.get("regime") and use_orb and not catalyst:
+        if right == "CALL" and _vts.get("regime") == "backwardation":
+            _vts_ratio = _vts.get("vix_over_vix3m", 0.0) or 0.0
             confidence = round(max(0.0, confidence - 0.5), 2)
-            log.info(f"0DTE [{sym}]: VIX term structure backwardation (ratio {_vts_ratio:.3f}) -- CALL confidence reduced")
+            log.info(f"0DTE [{sym}]: VIX backwardation (vix/vix3m={_vts_ratio:.3f}) -- CALL confidence reduced")
 
     # GEX 4-profile: yfinance BS-gamma computed from 0DTE OI (Alpaca paper has no OI)
     _gex = _gex_profile_yf(sym)
