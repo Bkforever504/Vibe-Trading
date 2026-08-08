@@ -126,6 +126,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
     today = (as_of or date.today()).isoformat()
     # Prefer 0DTE; fall back to shortest available expiry (Alpaca often lacks 0DTE snapshots)
     zero_dte = [c for c in contracts if c["expiry"] == today]
+    expiry_filter = "0dte"
+    selected_expiry = today
     if not zero_dte:
         all_expiries = sorted({c["expiry"] for c in contracts if c["expiry"] >= today})
         if not all_expiries:
@@ -140,6 +142,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
             }
         nearest = all_expiries[0]
         zero_dte = [c for c in contracts if c["expiry"] == nearest]
+        expiry_filter = "shortest_available"
+        selected_expiry = nearest
     use = [
         contract for contract in zero_dte
         if contract.get("size_source") == "open_interest" and contract.get("size_used", 0) > 0
@@ -149,7 +153,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         return {
             "status": "unavailable",
             "error": "insufficient open interest coverage",
-            "expiry_filter": "0dte",
+            "expiry_filter": expiry_filter,
+            "selected_expiry": selected_expiry,
             "contract_count": len(zero_dte),
             "open_interest_contract_count": len(use),
             "open_interest_coverage": round(oi_coverage, 4),
@@ -203,7 +208,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         "mode": "shadow_only_context",
         "execution_enabled": False,
         "can_submit_orders": False,
-        "expiry_filter": "0dte",
+        "expiry_filter": expiry_filter,
+        "selected_expiry": selected_expiry,
         "contract_count": len(use),
         "zero_dte_contract_count": len(zero_dte),
         "open_interest_coverage": round(oi_coverage, 4),

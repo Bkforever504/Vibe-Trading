@@ -1,6 +1,6 @@
 # Claude → Codex Handoff: Full Trading Strategy
 **Date:** 2026-08-08  
-**Session:** Bug fixes + QQQ gate unblock. Bot is ready for Monday Aug 11 live paper trading.
+**Session:** Bug fixes + QQQ gate unblock. Bot is ready for Monday Aug 10 live paper trading.
 
 ---
 
@@ -159,7 +159,7 @@ Three monitor tasks staggered every 5 min = continuous 60-second protect loop co
 
 | Task | Schedule |
 |------|----------|
-| `Flip-Bot-Entry` | 9:35 CT (once, market open) |
+| `Flip-Bot-Entry` | 8:35 CT / 9:35 ET (once, market open) |
 | `Flip-Bot-Monitor` | Every 15 min starting :45 |
 | `Flip-Bot-Monitor-5m-A` | Every 15 min starting :50 |
 | `Flip-Bot-Monitor-5m-B` | Every 15 min starting :55 |
@@ -244,10 +244,10 @@ None. No trades entered Friday Aug 7 (bugs blocked entry). Ledger clean.
 
 ---
 
-## Monday Aug 11 Checklist
+## Monday Aug 10 Checklist
 
 - [ ] Bot runs automatically via Task Scheduler — no manual action needed
-- [ ] `Flip-Bot-Entry` fires at 9:35 CT
+- [ ] `Flip-Bot-Entry` fires at 8:35 CT / 9:35 ET
 - [ ] If ORB fires for SPY or QQQ, entry should execute (all gates clear)
 - [ ] Monitor tasks handle exits automatically
 - [ ] After market close: check `data/flip_equity_curve_log.jsonl` for trade results
