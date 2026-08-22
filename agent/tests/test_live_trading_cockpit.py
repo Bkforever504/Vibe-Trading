@@ -293,6 +293,13 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
             "mode": "read_only",
             "review_score": 80,
         },
+        "daily-aplus-review.json": {
+            "timestamp": "2026-08-19T14:59:30Z",
+            "provider": "daily_aplus_review",
+            "mode": "read_only",
+            "review_status": "complete",
+            "summary": {"distinct_setup_count": 2, "system_review_coverage_pct": 100.0},
+        },
         "closed-trade-postmortem.json": {
             "timestamp": "2026-08-19T14:59:30Z",
             "provider": "closed_trade_postmortem",
@@ -375,7 +382,7 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 9
+    assert cockpit["schema_version"] == 10
     for group_name in ("retro", "journal", "social"):
         group = cockpit["evidence"][group_name]
         assert group["execution_enabled"] is False
@@ -387,6 +394,10 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
     assert daily_eod["data"]["verdict"] == "stand_aside"
     assert daily_eod["execution_enabled"] is False
     assert daily_eod["can_submit_orders"] is False
+    aplus = cockpit["evidence"]["retro"]["aplus_review"]
+    assert aplus["data"]["summary"]["system_review_coverage_pct"] == 100.0
+    assert aplus["execution_enabled"] is False
+    assert aplus["can_submit_orders"] is False
 
     catalysts = cockpit["evidence"]["catalysts_today"]
     assert [row["date"] for row in catalysts["days"]] == ["2026-08-19", "2026-08-20"]
@@ -407,6 +418,7 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
     for name in (
         "daily_eod",
         "daily_outcome",
+        "aplus_review",
         "closed_postmortem",
         "missed_banger",
         "rejected_intel",
@@ -453,7 +465,7 @@ def test_trade_board_scores_factors_without_inventing_probability_or_contract(tm
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
     plan = cockpit["trade_board"]["stocks"][0]
 
-    assert cockpit["schema_version"] == 9
+    assert cockpit["schema_version"] == 10
     assert plan["grade"] in {"A+", "A", "A-", "B+", "B", "B-", "C", "D"}
     assert plan["probability"]["value"] is None
     assert plan["trade_plan"]["contract"] is None
@@ -822,7 +834,7 @@ def test_reconciliation_diff_forces_stand_aside_and_exposes_weekly_failures(tmp_
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 9
+    assert cockpit["schema_version"] == 10
     assert cockpit["command_card"]["state"] == "STAND_ASIDE"
     assert cockpit["command_card"]["color"] == "RED"
     assert cockpit["operations"]["failure_taxonomy_week"] == {"BAD_ENTRY": 2, "STALE_DATA": 1}

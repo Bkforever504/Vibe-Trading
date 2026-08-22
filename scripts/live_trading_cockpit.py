@@ -46,6 +46,7 @@ REPORT_FILES: dict[str, str] = {
     "catalysts": "market-catalyst-calendar.json",
     "daily_eod": "daily-eod-summary.json",
     "daily_outcome": "daily-outcome-review.json",
+    "aplus_review": "daily-aplus-review.json",
     "closed_postmortem": "closed-trade-postmortem.json",
     "missed_banger": "flip-decision-missed-banger-review.json",
     "rejected_intel": "rejected-trade-intelligence.json",
@@ -1517,7 +1518,7 @@ def build_cockpit(
         }
 
     return {
-        "schema_version": 9,
+        "schema_version": 10,
         "generated_at": now.isoformat(),
         "refresh_seconds": 15,
         "mode": "read_only_decision_support",
@@ -1618,7 +1619,7 @@ def build_cockpit(
             "exit_accountability": _list(daily_edge.get("exit_accountability")),
             "move_coverage": reports["move_coverage"],
             "retro": _evidence_group(
-                ("daily_eod", "daily_outcome", "closed_postmortem", "missed_banger"),
+                ("daily_eod", "daily_outcome", "aplus_review", "closed_postmortem", "missed_banger"),
                 reports,
                 sources_by_name,
             ),

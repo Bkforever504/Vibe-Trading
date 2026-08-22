@@ -110,6 +110,7 @@ def _make_verdict(
     needs_review: dict[str, Any],
     schedule: dict[str, Any] | None = None,
     bot_status: dict[str, Any] | None = None,
+    aplus_review: dict[str, Any] | None = None,
 ) -> tuple[str, list[str], list[str]]:
     positives: list[str] = []
     concerns: list[str] = []
@@ -166,6 +167,18 @@ def _make_verdict(
     else:
         positives.append("No manual guard review items are open.")
 
+    aplus_review = aplus_review or {}
+    aplus_summary = aplus_review.get("summary") if isinstance(aplus_review.get("summary"), dict) else {}
+    if aplus_review.get("review_status") == "attention_required":
+        concerns.append("Daily A+ review has missing or unreadable declared sources.")
+        actions.append("Inspect daily-aplus-review.json; do not assume zero A+ setups when a source is missing.")
+    elif aplus_review:
+        positives.append(
+            f"Every enumerated A+ setup was system-reviewed ({aplus_summary.get('system_reviewed_setup_count', 0)} setups)."
+        )
+        if int(aplus_summary.get("outcome_followup_count") or 0):
+            actions.append(f"Carry {aplus_summary.get('outcome_followup_count')} A+ setups forward for outcome review.")
+
     if activity.get("guard_block_count", 0) > 20:
         concerns.append(f"Guard blocks are elevated: {activity['guard_block_count']}.")
         actions.append("Check whether blocks are protective duplicates or repeated near-miss opportunities.")
@@ -196,6 +209,7 @@ def build_report(day: str | None = None) -> dict[str, Any]:
     needs_review = _read_json(REPORT_DIR / "needs-review-queue.json")
     outcome = _read_json(REPORT_DIR / "daily-outcome-review.json")
     bot_status = _read_json(REPORT_DIR / "bot-status-snapshot.json")
+    aplus_review = _read_json(REPORT_DIR / "daily-aplus-review.json")
     activity_path = REPORT_DIR / f"daily-bot-activity-{day}.csv"
     activity = _activity_counts(_read_csv(activity_path))
     grade_summary = _grade_counts(grades)
@@ -207,6 +221,7 @@ def build_report(day: str | None = None) -> dict[str, Any]:
         needs_review,
         schedule,
         bot_status,
+        aplus_review,
     )
     return {
         "date": day,
@@ -251,6 +266,10 @@ def build_report(day: str | None = None) -> dict[str, Any]:
             "queue_count": needs_review.get("queue_count", 0),
             "by_priority": needs_review.get("by_priority", {}),
             "by_reason": needs_review.get("by_reason", {}),
+        },
+        "aplus_review": {
+            "review_status": aplus_review.get("review_status"),
+            "summary": aplus_review.get("summary", {}),
         },
         "warnings": [
             "Read-only summary. No bot settings are changed.",

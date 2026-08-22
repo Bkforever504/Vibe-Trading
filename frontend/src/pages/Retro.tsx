@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { APlusReviewPanel } from "@/components/trading/APlusReviewPanel";
 import { EvidenceReport } from "@/components/trading/EvidenceReport";
 import { api, type TradingDashboard } from "@/lib/api";
 
@@ -24,6 +25,7 @@ export function Retro() {
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <EvidenceReport title="End-of-day summary" source={retro.daily_eod} />
         <EvidenceReport title="Outcome review" source={retro.daily_outcome} />
+        <APlusReviewPanel source={retro.aplus_review} />
         <EvidenceReport title="Closed-trade postmortems · top 5" source={retro.closed_postmortem} limit={5} />
         <EvidenceReport title="Missed bangers" source={retro.missed_banger} limit={5} />
       </div>

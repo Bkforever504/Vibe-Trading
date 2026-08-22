@@ -1016,6 +1016,7 @@ export interface TradingEvidenceAuthority {
 export interface TradingRetroEvidence extends TradingEvidenceAuthority {
   daily_eod: TradingEvidenceSource;
   daily_outcome: TradingEvidenceSource;
+  aplus_review: TradingEvidenceSource;
   closed_postmortem: TradingEvidenceSource;
   missed_banger: TradingEvidenceSource;
 }
@@ -1488,7 +1489,7 @@ export interface CisdPromotionStatus {
 }
 
 export interface TradingDashboard {
-  schema_version: 9;
+  schema_version: 10;
   generated_at: string;
   refresh_seconds: number;
   mode: string;

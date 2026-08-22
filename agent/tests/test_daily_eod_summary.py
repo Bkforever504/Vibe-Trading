@@ -79,6 +79,22 @@ def test_make_verdict_action_required_on_option_position_mismatch() -> None:
     assert any("reconcile" in item.lower() for item in actions)
 
 
+def test_make_verdict_carries_aplus_outcomes_and_fails_closed_on_missing_source() -> None:
+    verdict, _positives, actions = eod._make_verdict(
+        {"summary": {"ok": 44, "missing": 0, "error": 0}},
+        {"by_ops_grade": {"A": 20}, "promotion_ready_count": 0, "items": []},
+        {"passed": True, "issue_count": 0},
+        {"guard_block_count": 0},
+        {"queue_count": 0},
+        {"passed": True, "issue_count": 0},
+        {"status": "normal", "option_position_integrity": {"status": "ok"}},
+        {"review_status": "attention_required", "summary": {"outcome_followup_count": 2}},
+    )
+
+    assert verdict == "watch"
+    assert any("daily-aplus-review.json" in item for item in actions)
+
+
 def test_build_report_reads_report_folder(tmp_path: Path, monkeypatch) -> None:
     report_dir = tmp_path / "reports"
     report_dir.mkdir()
@@ -98,6 +114,10 @@ def test_build_report_reads_report_folder(tmp_path: Path, monkeypatch) -> None:
         json.dumps({"status": "normal", "status_flags": [], "option_position_integrity": {"status": "ok"}}),
         encoding="utf-8",
     )
+    (report_dir / "daily-aplus-review.json").write_text(
+        json.dumps({"review_status": "complete", "summary": {"system_reviewed_setup_count": 1, "outcome_followup_count": 1}}),
+        encoding="utf-8",
+    )
     with (report_dir / "daily-bot-activity-2026-06-30.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["event_type", "source", "pnl", "reason"])
         writer.writeheader()
@@ -112,3 +132,4 @@ def test_build_report_reads_report_folder(tmp_path: Path, monkeypatch) -> None:
     assert report["activity"]["trade_count"] == 1
     assert report["activity"]["realized_pnl_from_csv"] == 10
     assert report["schedule_alignment"]["passed"] is True
+    assert report["aplus_review"]["summary"]["system_reviewed_setup_count"] == 1
