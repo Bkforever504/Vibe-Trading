@@ -4989,6 +4989,7 @@ dependencies = [
     { name = "tushare" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "weasyprint" },
+    { name = "websocket-client" },
     { name = "yfinance" },
 ]
 
@@ -5046,6 +5047,7 @@ requires-dist = [
     { name = "tushare", specifier = ">=1.2.89" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },
     { name = "weasyprint", specifier = ">=60.0" },
+    { name = "websocket-client", specifier = ">=1.8.0" },
     { name = "yfinance", specifier = ">=0.2.30" },
 ]
 provides-extras = ["ibkr", "dev"]
