@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-08-22",
+  "status": "active_shadow_only",
+  "asset_profile": "us_cash_equities_and_equity_underlyings",
+  "definition": "A+ is a setup-quality review bucket, not a win probability or execution instruction.",
+  "timeframes": [
+    {"timeframe": "1m", "role": "execution_refinement", "minimum_bars": 8, "required_for_aplus": false, "standalone_grade_allowed": false},
+    {"timeframe": "5m", "role": "primary_trigger", "minimum_bars": 8, "required_for_aplus": true, "standalone_grade_allowed": false},
+    {"timeframe": "15m", "role": "trigger_confirmation", "minimum_bars": 8, "required_for_aplus": true, "standalone_grade_allowed": false},
+    {"timeframe": "30m", "role": "session_state", "minimum_bars": 4, "required_for_aplus": true, "standalone_grade_allowed": false},
+    {"timeframe": "60m", "role": "structure_bias", "minimum_bars": 4, "required_for_aplus": true, "standalone_grade_allowed": false},
+    {"timeframe": "1d", "role": "daily_regime", "minimum_bars": 20, "required_for_aplus": true, "standalone_grade_allowed": false},
+    {"timeframe": "1w", "role": "major_structure", "minimum_bars": 8, "required_for_aplus": false, "standalone_grade_allowed": false}
+  ],
+  "family_roles": {
+    "opening_range_break_retest": {"trigger": ["5m"], "confirmation": ["15m", "30m"], "structure": ["60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "catalyst_gap_continuation": {"trigger": ["5m"], "confirmation": ["15m", "30m"], "structure": ["60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "trend_pullback_vwap": {"trigger": ["5m"], "confirmation": ["15m"], "structure": ["30m", "60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "liquidity_sweep_mss_retest": {"trigger": ["5m"], "confirmation": ["15m"], "structure": ["30m", "60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "ict_cisd_universal_model": {"trigger": ["5m"], "confirmation": ["15m"], "structure": ["30m", "60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "compression_flag_continuation": {"trigger": ["5m", "15m"], "confirmation": ["15m", "30m"], "structure": ["60m"], "regime": ["1d"], "advisory": ["1w"]},
+    "classical_reversal": {"trigger": ["5m", "15m"], "confirmation": ["15m", "30m"], "structure": ["60m"], "regime": ["1d"], "advisory": ["1w"]},
+    "failed_breakout_reversal": {"trigger": ["5m"], "confirmation": ["15m"], "structure": ["30m", "60m"], "regime": ["1d"], "advisory": ["1m", "1w"]},
+    "range_mean_reversion": {"trigger": ["5m"], "confirmation": ["15m"], "structure": ["30m", "60m"], "regime": ["1d"], "advisory": ["1m", "1w"]}
+  },
+  "universal_vetoes": [
+    "unfinished_or_repainting_input",
+    "stale_quote",
+    "spread_too_wide_or_missing",
+    "insufficient_dollar_liquidity",
+    "rvol_below_preregistered_threshold",
+    "incomplete_aplus_timeframe_coverage",
+    "higher_timeframe_conflict",
+    "failed_breakout_against_direction",
+    "late_chase_exhaustion",
+    "midrange_chop",
+    "weak_breakout_no_participation",
+    "post_friction_reward_risk_below_1_5",
+    "unverified_catalyst_or_options_surface"
+  ],
+  "authority": {"execution_enabled": false, "can_submit_orders": false, "manual_review_only": true}
+}

@@ -22,7 +22,8 @@ def test_every_top_tier_observation_is_enumerated_and_duplicate_snapshots_are_gr
             {"candidate_id": "amd-watch", "symbol": "AMD", "setup": "watch", "direction": "bullish", "grade": "B", "score": 72},
         ]},
         {"date": "2026-08-21", "generated_at": "2026-08-21T16:00:00Z", "ranked_candidates": [
-            {"candidate_id": "nvda-orb", "symbol": "NVDA", "setup": "opening_range_breakout", "direction": "bullish", "grade": "A+", "score": 96, "entry": 181, "stop": 179},
+            {"candidate_id": "nvda-orb", "symbol": "NVDA", "setup": "opening_range_breakout", "direction": "bullish", "grade": "A+", "score": 96, "entry": 181, "stop": 179,
+             "market_structure": {"timeframe_coverage": {"status": "complete_for_aplus_review", "missing_required": [], "frames": [{"timeframe": "5m", "status": "available"}]}}},
         ]},
     ])
     pattern = tmp_path / "patterns.jsonl"
@@ -48,6 +49,8 @@ def test_every_top_tier_observation_is_enumerated_and_duplicate_snapshots_are_gr
     assert nvda["max_score"] == 96
     assert nvda["system_review_status"] == "reviewed"
     assert nvda["outcome_review_status"] == "pending"
+    assert nvda["timeframe_coverage_status"] == "complete_for_aplus_review"
+    assert nvda["missing_required_timeframes"] == []
     assert nvda["execution_enabled"] is False
     assert nvda["can_submit_orders"] is False
 

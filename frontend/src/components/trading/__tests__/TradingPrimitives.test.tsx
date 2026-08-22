@@ -138,8 +138,19 @@ describe("trading primitives", () => {
           },
         },
         worst_setup: { pattern_id: "late_chase_exhaustion", complexity: "anti_pattern", direction: "bearish", confidence_score: 61, trigger_state: "confirmed", reason: "Path consumed", trigger: null, invalidation: null, reference_level: 180, closed_bar_only: true },
-        entry_plan: { status: "actionable_manual_review", trigger: 181.2, entry_zone: { low: 181.1, high: 181.3 }, invalidation: 179.8, risk_per_share: 1.4, instruction: "Wait for completed bar." },
-        exit_plan: { status: "defined", targets: [{ name: "target_1r", price: 182.6, reward_risk: 1 }, { name: "target_2r", price: 184, reward_risk: 2 }], time_stop_bars: 6, management: "Never widen invalidation." },
+        entry_plan: { status: "actionable_manual_review", timeframe: "5m", trigger: 181.2, entry_zone: { low: 181.1, high: 181.3 }, invalidation: 179.8, risk_per_share: 1.4, instruction: "Wait for completed bar." },
+        exit_plan: { status: "defined", targets: [{ name: "target_1r", price: 182.6, reward_risk: 1 }, { name: "target_2r", price: 184, reward_risk: 2 }], time_stop_bars: 6, time_stop: { bars: 6, timeframe: "5m", minutes: 30, status: "research_default_pending_local_validation" }, management: "Never widen invalidation." },
+        timeframe_plan: { primary_trigger: "5m", execution_refinement: "1m_optional_not_standalone", confirmation: ["15m", "30m"], structure: ["60m"], regime: ["1d", "1w"], coverage_status: "complete_for_aplus_review", closed_bar_only: true, execution_enabled: false, can_submit_orders: false },
+        timeframe_coverage: { status: "complete_for_aplus_review", missing_required: [], frames: [
+          { timeframe: "1m", role: "execution_refinement", minimum_bars: 8, completed_bars: 0, status: "optional_unavailable", provenance: "unavailable", required_for_aplus: false },
+          { timeframe: "5m", role: "primary_trigger", minimum_bars: 8, completed_bars: 120, status: "available", provenance: "primary_completed_bars", required_for_aplus: true },
+          { timeframe: "15m", role: "trigger_confirmation", minimum_bars: 8, completed_bars: 40, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
+          { timeframe: "30m", role: "session_state", minimum_bars: 4, completed_bars: 20, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
+          { timeframe: "60m", role: "structure_bias", minimum_bars: 4, completed_bars: 10, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
+          { timeframe: "1d", role: "daily_regime", minimum_bars: 20, completed_bars: 30, status: "available", provenance: "supplied_completed_bars", required_for_aplus: true },
+          { timeframe: "1w", role: "major_structure", minimum_bars: 8, completed_bars: 12, status: "available", provenance: "supplied_completed_bars", required_for_aplus: false },
+        ], closed_bar_only: true, execution_enabled: false, can_submit_orders: false },
+        timeframe_scan: [{ timeframe: "5m", role: "primary_trigger", completed_bars: 120, trend: { bias: "bullish", strength: 81 }, best_setup: { pattern_id: "range_break_retest", direction: "bullish", trigger_state: "confirmed" }, worst_setup: null, source_label: "completed_5m_bars", closed_bar_only: true, execution_enabled: false, can_submit_orders: false }],
         hard_blockers: [], timeframe_alignment: { state: "aligned", frames: {}, closed_bar_only: true }, freshness: "live", source_labels: ["completed_5m_bars", "latest_quote"], execution_enabled: false, can_submit_orders: false,
         liquidity_level_context: {
           status: "available", levels: [
@@ -174,6 +185,9 @@ describe("trading primitives", () => {
     expect(screen.getByText(/Worst look-alike/i)).toBeInTheDocument();
     expect(screen.getByText(/late chase exhaustion/i)).toBeInTheDocument();
     expect(screen.getByText(/6 bars/i)).toBeInTheDocument();
+    expect(screen.getByText(/A\+ timeframe coverage/i)).toBeInTheDocument();
+    expect(screen.getByText(/5M primary trigger/i)).toBeInTheDocument();
+    expect(screen.getByText(/complete for aplus review/i)).toBeInTheDocument();
     expect(screen.getByText(/Grade A · 89.5/)).toBeInTheDocument();
     expect(screen.getByText(/all observed conditions aligned/i)).toBeInTheDocument();
     expect(screen.getByText(/One canonical score/i)).toBeInTheDocument();

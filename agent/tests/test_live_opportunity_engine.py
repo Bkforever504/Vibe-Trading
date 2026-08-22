@@ -7,6 +7,7 @@ from scripts.live_opportunity_engine import (
     LiveOpportunityEngine,
     _aggregate_rth_hourly,
     build_feed_provenance,
+    _filter_completed_period_bars,
     _receive_control,
     project_radar_report,
 )
@@ -60,6 +61,21 @@ def test_hourly_context_is_anchored_to_rth_and_excludes_extended_hours() -> None
     assert len(hourly) == 2
     assert hourly[0] == {"t": "2026-08-21T14:30:00Z", "o": 100.0, "h": 102.0, "l": 99.5, "c": 101.5, "v": 50.0}
     assert hourly[1] == {"t": "2026-08-21T15:30:00Z", "o": 101.5, "h": 103.0, "l": 101.0, "c": 102.5, "v": 40.0}
+
+
+def test_daily_and_weekly_context_excludes_current_incomplete_periods() -> None:
+    now = datetime(2026, 8, 21, 15, 0, tzinfo=timezone.utc)
+    rows = [
+        {"t": "2026-08-14T04:00:00Z", "o": 98.0, "h": 99.0, "l": 97.0, "c": 98.5, "v": 10},
+        {"t": "2026-08-20T04:00:00Z", "o": 99.0, "h": 100.0, "l": 98.0, "c": 99.5, "v": 20},
+        {"t": "2026-08-21T04:00:00Z", "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5, "v": 30},
+    ]
+
+    daily = _filter_completed_period_bars(rows, timeframe="1Day", now=now)
+    weekly = _filter_completed_period_bars(rows, timeframe="1Week", now=now)
+
+    assert [row["t"] for row in daily] == ["2026-08-14T04:00:00Z", "2026-08-20T04:00:00Z"]
+    assert [row["t"] for row in weekly] == ["2026-08-14T04:00:00Z"]
 
 
 def test_live_engine_emits_ranked_read_only_setup_with_post_cost_geometry() -> None:

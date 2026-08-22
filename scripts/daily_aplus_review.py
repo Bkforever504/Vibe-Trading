@@ -177,6 +177,13 @@ def _observation(
     entry = next((_number(row.get(key)) for key in ("entry", "trigger", "entry_trigger") if _number(row.get(key)) is not None), None)
     invalidation = next((_number(row.get(key)) for key in ("invalidation", "stop") if _number(row.get(key)) is not None), None)
     blockers = [str(item) for item in row.get("blockers", [])] if isinstance(row.get("blockers"), list) else []
+    if isinstance(row.get("hard_blockers"), list):
+        blockers.extend(str(item) for item in row["hard_blockers"] if isinstance(item, (str, int, float)))
+    market_structure = row.get("market_structure") if isinstance(row.get("market_structure"), dict) else {}
+    coverage = row.get("timeframe_coverage") if isinstance(row.get("timeframe_coverage"), dict) else market_structure.get("timeframe_coverage") if isinstance(market_structure.get("timeframe_coverage"), dict) else {}
+    missing_timeframes = [str(item) for item in coverage.get("missing_required", [])] if isinstance(coverage.get("missing_required"), list) else []
+    if missing_timeframes and "incomplete_aplus_timeframe_coverage" not in blockers:
+        blockers.append("incomplete_aplus_timeframe_coverage")
     return {
         "review_id": identity,
         "source": source,
@@ -189,7 +196,9 @@ def _observation(
         "detected_at": detected_at,
         "entry": entry,
         "invalidation": invalidation,
-        "blockers": blockers,
+        "blockers": list(dict.fromkeys(blockers)),
+        "timeframe_coverage_status": str(coverage.get("status") or "unavailable"),
+        "missing_required_timeframes": missing_timeframes,
     }
 
 

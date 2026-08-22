@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from scripts.market_structure_intelligence import (
+    APLUS_TIMEFRAME_MATRIX,
     PATTERN_CATALOG,
     _ny_0800_0900_range_context,
     analyze_market_structure,
@@ -49,6 +52,24 @@ def test_pattern_catalog_covers_simple_intermediate_advanced_and_anti_patterns()
         "late_chase_exhaustion",
         "midrange_chop",
     } <= names
+
+
+def test_machine_readable_aplus_timeframe_matrix_matches_runtime_contract() -> None:
+    path = Path(__file__).resolve().parents[2] / "research" / "aplus_timeframe_matrix.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    runtime = [
+        {key: row[key] for key in ("timeframe", "role", "minimum_bars", "required_for_aplus")}
+        for row in APLUS_TIMEFRAME_MATRIX
+    ]
+    documented = [
+        {key: row[key] for key in ("timeframe", "role", "minimum_bars", "required_for_aplus")}
+        for row in payload["timeframes"]
+    ]
+
+    assert documented == runtime
+    assert payload["authority"]["execution_enabled"] is False
+    assert payload["authority"]["can_submit_orders"] is False
 
 
 def test_cbc_strong_flip_requires_a_completed_two_sided_sweep_and_close_through() -> None:
@@ -283,8 +304,78 @@ def test_confirmed_breakout_retest_produces_exact_manual_review_plan() -> None:
     assert result["entry_plan"]["invalidation"] < result["entry_plan"]["trigger"]
     assert len(result["exit_plan"]["targets"]) == 2
     assert result["exit_plan"]["time_stop_bars"] > 0
+    assert result["exit_plan"]["time_stop"] == {
+        "bars": 6,
+        "timeframe": "5m",
+        "minutes": 30,
+        "status": "research_default_pending_local_validation",
+    }
+    assert result["entry_plan"]["timeframe"] == "5m"
+    assert result["timeframe_plan"]["primary_trigger"] == "5m"
+    assert result["timeframe_plan"]["execution_refinement"] == "1m_optional_not_standalone"
     assert result["execution_enabled"] is False
     assert result["can_submit_orders"] is False
+
+
+def test_aplus_timeframe_matrix_scans_derived_and_supplied_completed_frames() -> None:
+    rows = _bars([100.0 + index * 0.05 for index in range(120)])
+    daily = _bars([90.0 + index * 0.4 for index in range(30)])
+    weekly = _bars([75.0 + index * 1.0 for index in range(12)])
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 105.94, "ask": 105.96, "freshness": "live", "spread_bps": 1.89},
+        rvol=1.8,
+        average_dollar_volume=900_000_000,
+        direction_hint="bullish",
+        higher_timeframes={"1d": daily, "1w": weekly},
+    )
+
+    coverage = {row["timeframe"]: row for row in result["timeframe_coverage"]["frames"]}
+    assert result["timeframe_coverage"]["status"] == "complete_for_aplus_review"
+    assert result["timeframe_coverage"]["missing_required"] == []
+    assert coverage["5m"]["provenance"] == "primary_completed_bars"
+    assert coverage["15m"]["provenance"] == "derived_from_completed_5m"
+    assert coverage["30m"]["provenance"] == "derived_from_completed_5m"
+    assert coverage["60m"]["provenance"] == "derived_from_completed_5m"
+    assert coverage["1d"]["provenance"] == "supplied_completed_bars"
+    assert coverage["1w"]["required_for_aplus"] is False
+    assert {row["timeframe"] for row in result["timeframe_scan"]} >= {"5m", "15m", "30m", "60m", "1d", "1w"}
+    assert all(row["execution_enabled"] is False and row["can_submit_orders"] is False for row in result["timeframe_scan"])
+
+
+def test_missing_daily_regime_context_blocks_aplus_review_without_hiding_setup() -> None:
+    rows = _bars([100.0 + index * 0.04 for index in range(120)])
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 104.74, "ask": 104.76, "freshness": "live", "spread_bps": 1.91},
+        rvol=2.0,
+        average_dollar_volume=900_000_000,
+        direction_hint="bullish",
+    )
+
+    assert "1d" in result["timeframe_coverage"]["missing_required"]
+    assert "incomplete_aplus_timeframe_coverage" in result["hard_blockers"]
+    assert result["decision"] != "READY_TO_REVIEW"
+
+
+def test_weekly_advisory_context_is_visible_but_does_not_create_intraday_conflict() -> None:
+    result = analyze_market_structure(
+        _bars([100.0 + index * 0.05 for index in range(120)]),
+        quote={"bid": 105.94, "ask": 105.96, "freshness": "live", "spread_bps": 1.89},
+        rvol=1.8,
+        average_dollar_volume=900_000_000,
+        direction_hint="bullish",
+        higher_timeframes={
+            "1d": _bars([90.0 + index * 0.4 for index in range(30)]),
+            "1w": _bars([100.0 - index * 1.0 for index in range(12)]),
+        },
+    )
+
+    assert result["timeframe_alignment"]["frames"]["1w"]["bias"] == "bearish"
+    assert result["timeframe_alignment"]["state"] == "aligned"
+    assert "higher_timeframe_conflict" not in result["hard_blockers"]
 
 
 def test_stale_market_structure_applies_freshness_penalty_and_cannot_be_ready() -> None:

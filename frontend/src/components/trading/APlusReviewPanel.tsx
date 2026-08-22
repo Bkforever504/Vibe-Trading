@@ -61,7 +61,10 @@ export function APlusReviewPanel({ source }: { source: TradingEvidenceSource }) 
           ) : items.slice(0, 20).map((item, index) => (
             <div key={`${String(item.source)}-${String(item.review_id)}-${index}`} className="grid gap-2 px-3 py-2.5 text-xs sm:grid-cols-[80px_1fr_100px_160px] sm:items-center">
               <div className="font-bold">{String(item.symbol ?? "--")} <span className="text-emerald-400">{String(item.grade ?? "A+")}</span></div>
-              <div><div className="font-medium">{String(item.setup ?? "Unspecified setup")}</div><div className="text-[10px] text-muted-foreground">{String(item.source ?? "unknown source")}</div></div>
+              <div>
+                <div className="font-medium">{String(item.setup ?? "Unspecified setup")}</div>
+                <div className="text-[10px] text-muted-foreground">{String(item.source ?? "unknown source")} · {String(item.timeframe_coverage_status ?? "timeframes unavailable").split("_").join(" ")}</div>
+              </div>
               <div>{item.is_carry_forward ? <span className="flex items-center gap-1 text-amber-300"><Clock3 className="h-3 w-3" />Carried</span> : "Today"}</div>
               <div className="text-muted-foreground">{String(item.verdict ?? item.outcome_review_status ?? "reviewed")}</div>
             </div>

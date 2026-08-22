@@ -58,6 +58,19 @@ MIN_DOLLAR_LIQUIDITY = 20_000_000.0
 MIN_BARS = 8
 MARKET_TZ = ZoneInfo("America/New_York")
 
+# Timeframes have distinct jobs.  A lower timeframe is not allowed to stand in
+# for regime context, and a higher timeframe is not treated as an entry
+# trigger.  The thresholds are data-sufficiency gates, not performance claims.
+APLUS_TIMEFRAME_MATRIX: tuple[dict[str, Any], ...] = (
+    {"timeframe": "1m", "role": "execution_refinement", "minimum_bars": 8, "required_for_aplus": False},
+    {"timeframe": "5m", "role": "primary_trigger", "minimum_bars": 8, "required_for_aplus": True},
+    {"timeframe": "15m", "role": "trigger_confirmation", "minimum_bars": 8, "required_for_aplus": True},
+    {"timeframe": "30m", "role": "session_state", "minimum_bars": 4, "required_for_aplus": True},
+    {"timeframe": "60m", "role": "structure_bias", "minimum_bars": 4, "required_for_aplus": True},
+    {"timeframe": "1d", "role": "daily_regime", "minimum_bars": 20, "required_for_aplus": True},
+    {"timeframe": "1w", "role": "major_structure", "minimum_bars": 8, "required_for_aplus": False},
+)
+
 
 def _finite(value: Any) -> float | None:
     try:
@@ -156,18 +169,174 @@ def _trend(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def _resample(rows: Sequence[Mapping[str, Any]], factor: int) -> list[dict[str, Any]]:
+    # Anchor aggregation to the 09:30 ET equity session so bars never bridge
+    # lunch-to-next-open or cross a session boundary.
+    buckets: dict[tuple[Any, int], list[dict[str, Any]]] = {}
+    unstamped = False
+    for row in rows:
+        stamp = _timestamp(row.get("t"))
+        if stamp is None:
+            unstamped = True
+            break
+        local = stamp.astimezone(MARKET_TZ)
+        elapsed = local.hour * 60 + local.minute - (9 * 60 + 30)
+        if 0 <= elapsed < 390:
+            buckets.setdefault((local.date(), elapsed // (factor * 5)), []).append(dict(row))
+    groups = [buckets[key] for key in sorted(buckets)] if not unstamped else [list(rows[start : start + factor]) for start in range(0, len(rows), factor)]
     output: list[dict[str, Any]] = []
-    for start in range(0, len(rows), factor):
-        group = rows[start : start + factor]
-        if len(group) < factor and start != 0:
+    for group in groups:
+        # Never manufacture a higher-timeframe signal from an unfinished bar.
+        if len(group) < factor:
             continue
         output.append({
-            "t": group[-1].get("t"),
+            "t": group[0].get("t"),
             "o": float(group[0]["o"]),
             "h": max(float(row["h"]) for row in group),
             "l": min(float(row["l"]) for row in group),
             "c": float(group[-1]["c"]),
             "v": sum(float(row["v"]) for row in group),
+        })
+    return output
+
+
+def _canonical_timeframe(value: str) -> str:
+    normalized = value.strip().lower()
+    return {
+        "1min": "1m",
+        "5min": "5m",
+        "15min": "15m",
+        "30min": "30m",
+        "1h": "60m",
+        "60min": "60m",
+        "1day": "1d",
+        "day": "1d",
+        "1week": "1w",
+        "week": "1w",
+    }.get(normalized, normalized)
+
+
+def _timeframe_rows(
+    rows: Sequence[Mapping[str, Any]],
+    higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, str]]:
+    """Build causal role frames, preferring whichever completed source is fresher."""
+    base = _normalize(rows)
+    frames: dict[str, list[dict[str, Any]]] = {"5m": base}
+    provenance: dict[str, str] = {"5m": "primary_completed_bars"}
+    for timeframe, factor in (("15m", 3), ("30m", 6), ("60m", 12)):
+        derived = _resample(base, factor)
+        if derived:
+            frames[timeframe] = derived
+            provenance[timeframe] = "derived_from_completed_5m"
+
+    for raw_name, raw_rows in (higher_timeframes or {}).items():
+        name = _canonical_timeframe(str(raw_name))
+        supplied = _normalize(raw_rows)
+        if not supplied:
+            continue
+        current = frames.get(name) or []
+        if not current:
+            frames[name] = supplied[-120:]
+            provenance[name] = "supplied_completed_bars"
+            continue
+        combined = {
+            str(row.get("t") or f"untimed:{index}"): row
+            for index, row in enumerate([*supplied, *current])
+        }
+        frames[name] = sorted(combined.values(), key=lambda row: str(row.get("t") or ""))[-120:]
+        provenance[name] = "supplied_plus_derived_completed_5m"
+    return frames, provenance
+
+
+def _timeframe_coverage(
+    rows: Sequence[Mapping[str, Any]],
+    higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+) -> dict[str, Any]:
+    frames, provenance = _timeframe_rows(rows, higher_timeframes)
+    report_rows: list[dict[str, Any]] = []
+    missing_required: list[str] = []
+    for spec in APLUS_TIMEFRAME_MATRIX:
+        timeframe = str(spec["timeframe"])
+        completed = len(frames.get(timeframe) or [])
+        minimum = int(spec["minimum_bars"])
+        required = bool(spec["required_for_aplus"])
+        if completed >= minimum:
+            status = "available"
+        elif required:
+            status = "required_missing" if completed == 0 else "required_insufficient_history"
+            missing_required.append(timeframe)
+        else:
+            status = "optional_unavailable" if completed == 0 else "optional_insufficient_history"
+        report_rows.append({
+            **spec,
+            "completed_bars": completed,
+            "status": status,
+            "provenance": provenance.get(timeframe, "unavailable"),
+        })
+    return {
+        "status": "complete_for_aplus_review" if not missing_required else "incomplete_for_aplus_review",
+        "missing_required": missing_required,
+        "frames": report_rows,
+        "closed_bar_only": True,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _timeframe_scan(
+    rows: Sequence[Mapping[str, Any]],
+    higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+) -> list[dict[str, Any]]:
+    """Run existing causal detectors on every available role frame.
+
+    These observations are context-only.  They do not duplicate detections into
+    the canonical 5m grade, which avoids accidental confluence inflation.
+    """
+    frames, provenance = _timeframe_rows(rows, higher_timeframes)
+    roles = {str(row["timeframe"]): str(row["role"]) for row in APLUS_TIMEFRAME_MATRIX}
+    output: list[dict[str, Any]] = []
+    for timeframe in ("5m", "15m", "30m", "60m", "1d", "1w", "1m"):
+        frame_rows = frames.get(timeframe) or []
+        if not frame_rows:
+            continue
+        trend = _trend(frame_rows)
+        positives: list[dict[str, Any]] = []
+        negatives: list[dict[str, Any]] = []
+        if len(frame_rows) >= MIN_BARS:
+            atr = max(_atr(frame_rows), abs(float(frame_rows[-1]["c"])) * 0.0005)
+            range_positive, range_negative = _range_events(frame_rows, atr)
+            swing_positive, swing_negative = _swing_patterns(frame_rows, atr)
+            continuation = _continuation_patterns(frame_rows, atr, trend)
+            if timeframe in {"1d", "1w"}:
+                continuation = [row for row in continuation if row["pattern_id"] != "vwap_reclaim_reject"]
+            positives.extend(range_positive)
+            positives.extend(swing_positive)
+            positives.extend(continuation)
+            positives.extend(_sweep_pattern(frame_rows, atr))
+            positives.extend(_cbc_patterns(frame_rows))
+            negatives.extend(range_negative)
+            negatives.extend(swing_negative)
+        annotated_positive = [{**row, "timeframe": timeframe} for row in positives]
+        annotated_negative = [{**row, "timeframe": timeframe} for row in negatives]
+        best = max(
+            annotated_positive,
+            key=lambda row: (row.get("trigger_state") == "confirmed", float(row.get("confidence_score") or 0.0)),
+            default=None,
+        )
+        worst = max(annotated_negative, key=lambda row: float(row.get("confidence_score") or 0.0), default=None)
+        output.append({
+            "timeframe": timeframe,
+            "role": roles.get(timeframe, "supplemental_context"),
+            "completed_bars": len(frame_rows),
+            "trend": trend,
+            "best_setup": best,
+            "worst_setup": worst,
+            "source_label": f"completed_{timeframe}_bars",
+            "provenance": provenance.get(timeframe, "unavailable"),
+            "score_effect": "context_only_no_duplicate_confluence_credit",
+            "closed_bar_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
         })
     return output
 
@@ -953,19 +1122,26 @@ def _anti_patterns(rows: Sequence[Mapping[str, Any]], atr: float, quote: Mapping
 def _timeframe_alignment(
     rows: Sequence[Mapping[str, Any]], direction: str | None, higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None
 ) -> dict[str, Any]:
-    frames: dict[str, dict[str, Any]] = {"5m": _trend(rows)}
-    supplied = higher_timeframes or {}
-    if supplied:
-        for name, frame_rows in supplied.items():
-            normalized = _normalize(frame_rows)
-            if normalized:
-                frames[str(name)] = _trend(normalized)
-    else:
-        if len(rows) >= 9:
-            frames["15m"] = _trend(_resample(rows, 3))
-        if len(rows) >= 24:
-            frames["60m"] = _trend(_resample(rows, 12))
-    directional = [frame["bias"] for frame in frames.values() if frame["bias"] != "neutral"]
+    frame_rows, provenance = _timeframe_rows(rows, higher_timeframes)
+    frames: dict[str, dict[str, Any]] = {}
+    for name, values in frame_rows.items():
+        if not values:
+            continue
+        frames[name] = {
+            **_trend(values),
+            "completed_bars": len(values),
+            "provenance": provenance.get(name, "unavailable"),
+        }
+    alignment_names = {
+        str(spec["timeframe"])
+        for spec in APLUS_TIMEFRAME_MATRIX
+        if bool(spec["required_for_aplus"])
+    }
+    directional = [
+        frame["bias"]
+        for name, frame in frames.items()
+        if name in alignment_names and frame["bias"] != "neutral"
+    ]
     if not direction or direction == "neutral" or not directional:
         state = "mixed"
     elif all(value == direction for value in directional):
@@ -974,7 +1150,13 @@ def _timeframe_alignment(
         state = "conflict"
     else:
         state = "mixed"
-    return {"state": state, "frames": frames, "closed_bar_only": True}
+    return {
+        "state": state,
+        "frames": frames,
+        "closed_bar_only": True,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
 
 
 def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
@@ -994,14 +1176,27 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
         "worst_setup": None,
         "positive_patterns": [],
         "negative_patterns": [],
-        "timeframe_alignment": {"state": "unavailable", "frames": {}, "closed_bar_only": True},
+        "timeframe_alignment": {"state": "unavailable", "frames": {}, "closed_bar_only": True, "execution_enabled": False, "can_submit_orders": False},
+        "timeframe_coverage": _timeframe_coverage([], None),
+        "timeframe_scan": [],
+        "timeframe_plan": {
+            "primary_trigger": "5m",
+            "execution_refinement": "1m_optional_not_standalone",
+            "confirmation": ["15m", "30m"],
+            "structure": ["60m"],
+            "regime": ["1d", "1w"],
+            "coverage_status": "incomplete_for_aplus_review",
+            "closed_bar_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
         "liquidity_level_context": {"status": "unavailable", "levels": [], "active_sweeps": [], "probability_status": "unavailable_pending_local_outcomes", "execution_enabled": False, "can_submit_orders": False},
         "participation_context": _participation_context([]),
         "macro_context": _macro_context([]),
         "strat_context": _strat_context([], None, []),
         "ny_0800_0900_range_context": _ny_0800_0900_range_context([], []),
-        "entry_plan": {"status": "unavailable", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "instruction": f"Need at least {MIN_BARS} completed bars; received {bars}."},
-        "exit_plan": {"status": "unavailable", "targets": [], "time_stop_bars": None, "management": "No entry, so no exit plan."},
+        "entry_plan": {"status": "unavailable", "timeframe": "5m", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "instruction": f"Need at least {MIN_BARS} completed bars; received {bars}."},
+        "exit_plan": {"status": "unavailable", "targets": [], "time_stop_bars": None, "time_stop": None, "management": "No entry, so no exit plan."},
         "factor_scores": {},
         "hard_blockers": ["insufficient_completed_bars"],
         "warnings": ["Pattern recognition is descriptive research, not a guarantee of future returns."],
@@ -1052,6 +1247,8 @@ def analyze_market_structure(
     if direction not in {"bullish", "bearish"}:
         direction = trend["bias"] if trend["bias"] in {"bullish", "bearish"} else "neutral"
     alignment = _timeframe_alignment(rows, direction, higher_timeframes)
+    timeframe_coverage = _timeframe_coverage(rows, higher_timeframes)
+    timeframe_scan = _timeframe_scan(rows, higher_timeframes)
 
     matching = [row for row in positive if row["direction"] == direction] if direction != "neutral" else positive
     best = max(matching or positive, key=lambda row: (row["trigger_state"] == "confirmed", float(row["confidence_score"])), default=None)
@@ -1070,6 +1267,8 @@ def analyze_market_structure(
         blockers.append("rvol_below_preregistered_threshold")
     if alignment["state"] == "conflict":
         blockers.append("higher_timeframe_conflict")
+    if timeframe_coverage["missing_required"]:
+        blockers.append("incomplete_aplus_timeframe_coverage")
     failed = next((row for row in negatives if row["pattern_id"] == "failed_breakout_trap"), None)
     if failed and direction != "neutral" and failed["direction"] != direction:
         blockers.append("failed_breakout_against_direction")
@@ -1090,6 +1289,8 @@ def analyze_market_structure(
     planned_reward_risk = 2.0 if trigger is not None and invalidation is not None and trigger != invalidation else None
     volume_score = 100.0 if rvol is not None and rvol >= 2.0 else 70.0 if rvol is not None and rvol >= 1.5 else 40.0 if rvol is not None and rvol >= 1.2 else 0.0
     mtf_score = 100.0 if alignment["state"] == "aligned" else 50.0 if alignment["state"] == "mixed" else 0.0
+    if timeframe_coverage["missing_required"]:
+        mtf_score = min(mtf_score, 50.0)
     regime_score = 100.0 if trend["bias"] == direction else 50.0 if trend["bias"] == "neutral" else 0.0
     confirmed_families = {
         str(row.get("family") or "unknown")
@@ -1151,6 +1352,7 @@ def analyze_market_structure(
         zone_half = min(atr * 0.12, risk * 0.15)
         entry_plan = {
             "status": "actionable_manual_review" if decision == "READY_TO_REVIEW" else "conditional",
+            "timeframe": "5m",
             "trigger": _round(trigger),
             "entry_zone": {"low": _round(trigger - zone_half), "high": _round(trigger + zone_half)},
             "invalidation": _round(invalidation),
@@ -1161,11 +1363,17 @@ def analyze_market_structure(
             "status": "defined",
             "targets": targets,
             "time_stop_bars": 6,
+            "time_stop": {
+                "bars": 6,
+                "timeframe": "5m",
+                "minutes": 30,
+                "status": "research_default_pending_local_validation",
+            },
             "management": "At +1R, reduce risk or trail behind the last confirmed swing; exit on invalidation or after six 5m bars without progress. Never widen the invalidation.",
         }
     else:
-        entry_plan = {"status": "unavailable", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "risk_per_share": None, "instruction": "Wait for a pattern with objective trigger and invalidation geometry."}
-        exit_plan = {"status": "unavailable", "targets": [], "time_stop_bars": None, "management": "No valid entry geometry; stand aside."}
+        entry_plan = {"status": "unavailable", "timeframe": "5m", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "risk_per_share": None, "instruction": "Wait for a pattern with objective trigger and invalidation geometry."}
+        exit_plan = {"status": "unavailable", "targets": [], "time_stop_bars": None, "time_stop": None, "management": "No valid entry geometry; stand aside."}
 
     regime = "trend" if trend["bias"] != "neutral" else "range_or_transition"
     if any(row["pattern_id"] in {"midrange_chop", "broadening_instability"} for row in negatives):
@@ -1184,6 +1392,19 @@ def analyze_market_structure(
         "positive_patterns": sorted(positive, key=lambda row: -float(row["confidence_score"])),
         "negative_patterns": sorted(negatives, key=lambda row: -float(row["confidence_score"])),
         "timeframe_alignment": alignment,
+        "timeframe_coverage": timeframe_coverage,
+        "timeframe_scan": timeframe_scan,
+        "timeframe_plan": {
+            "primary_trigger": "5m",
+            "execution_refinement": "1m_optional_not_standalone",
+            "confirmation": ["15m", "30m"],
+            "structure": ["60m"],
+            "regime": ["1d", "1w"],
+            "coverage_status": timeframe_coverage["status"],
+            "closed_bar_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
         "liquidity_level_context": {
             "status": "available" if liquidity_levels else "unavailable",
             "levels": liquidity_levels,
@@ -1215,7 +1436,19 @@ def analyze_market_structure(
             "Scores rank observable setup quality; they are not win probabilities.",
         ],
         "freshness": freshness,
-        "source_labels": ["completed_5m_bars", "latest_quote", "pattern_grade_v1", "ict_cisd_sequence_v1", "cbc_strong_flip_v1", "session_liquidity_levels_v1", "ohlcv_participation_curvature_proxy_v1", "completed_ohlcv_strat_scenarios_v1", "completed_0800_0900_et_bars"],
+        "source_labels": list(dict.fromkeys([
+            "completed_5m_bars",
+            *[f"completed_{name}_bars" for name in ("15m", "30m", "60m", "1d", "1w") if name in alignment["frames"]],
+            "latest_quote",
+            "pattern_grade_v1",
+            "aplus_timeframe_matrix_v1",
+            "ict_cisd_sequence_v1",
+            "cbc_strong_flip_v1",
+            "session_liquidity_levels_v1",
+            "ohlcv_participation_curvature_proxy_v1",
+            "completed_ohlcv_strat_scenarios_v1",
+            "completed_0800_0900_et_bars",
+        ])),
         "bar_count": len(rows),
         "closed_bar_only": True,
         "execution_enabled": False,
@@ -1223,4 +1456,4 @@ def analyze_market_structure(
     }
 
 
-__all__ = ["PATTERN_CATALOG", "analyze_market_structure", "confirmed_swings", "detect_cisd_universal_model"]
+__all__ = ["APLUS_TIMEFRAME_MATRIX", "PATTERN_CATALOG", "analyze_market_structure", "confirmed_swings", "detect_cisd_universal_model"]

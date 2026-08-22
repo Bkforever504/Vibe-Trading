@@ -203,6 +203,35 @@ def _aggregate_rth_hourly(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def _filter_completed_period_bars(
+    rows: list[dict[str, Any]], *, timeframe: str, now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """Exclude the still-forming daily or weekly Alpaca aggregate."""
+    current = (now or datetime.now(timezone.utc)).astimezone(MARKET_TZ)
+    output: list[dict[str, Any]] = []
+    for row in sorted(_bars_normalized(rows), key=lambda value: str(value.get("t") or "")):
+        stamp = _utc(row.get("t"))
+        if stamp is None:
+            continue
+        local_date = stamp.astimezone(MARKET_TZ).date()
+        if timeframe == "1Day" and local_date < current.date():
+            output.append(row)
+        elif timeframe == "1Week" and local_date.isocalendar()[:2] < current.date().isocalendar()[:2]:
+            output.append(row)
+    return output
+
+
+def _context_source_labels(higher_timeframes: Mapping[str, list[dict[str, Any]]] | None) -> list[str]:
+    aliases = {"1h": "60m", "1day": "1d", "1week": "1w"}
+    labels: list[str] = []
+    for name, rows in (higher_timeframes or {}).items():
+        if not rows:
+            continue
+        normalized = aliases.get(str(name).strip().lower(), str(name).strip().lower())
+        labels.append(f"completed_{normalized}_bars")
+    return list(dict.fromkeys(labels))
+
+
 def _detect_families(
     rows: list[dict[str, Any]],
     features: dict[str, Any],
@@ -374,6 +403,7 @@ class LiveOpportunityEngine:
             average_dollar_volume=average_dollar,
             higher_timeframes=state.get("higher_timeframes") or None,
         )
+        structure_by_direction: dict[str, dict[str, Any]] = {}
         probe_setup = structure_probe.get("best_setup") if isinstance(structure_probe.get("best_setup"), dict) else {}
         structure_families = {"cbc_strong_flip", "session_liquidity_sweep_reclaim", "ict_cisd_universal_model"}
         if probe_setup.get("pattern_id") in structure_families and not any(
@@ -385,18 +415,21 @@ class LiveOpportunityEngine:
                 str(probe_setup.get("reason") or "Completed-bar structure sequence is developing."),
             ))
         output: list[dict[str, Any]] = []
+        context_source_labels = _context_source_labels(state.get("higher_timeframes"))
         for family, direction, reason in families:
             geometry = _geometry(direction, quote, features, rows[-1])
-            market_structure = analyze_market_structure(
-                rows,
-                quote=quote,
-                rvol=rvol,
-                average_dollar_volume=average_dollar,
-                direction_hint=direction,
-                higher_timeframes=state.get("higher_timeframes") or None,
-            )
-            if state.get("higher_timeframes"):
-                market_structure["source_labels"] = list(dict.fromkeys([*market_structure["source_labels"], "completed_60m_bars"]))
+            if direction not in structure_by_direction:
+                structure_by_direction[direction] = analyze_market_structure(
+                    rows,
+                    quote=quote,
+                    rvol=rvol,
+                    average_dollar_volume=average_dollar,
+                    direction_hint=direction,
+                    higher_timeframes=state.get("higher_timeframes") or None,
+                )
+            market_structure = structure_by_direction[direction]
+            if context_source_labels:
+                market_structure["source_labels"] = list(dict.fromkeys([*market_structure["source_labels"], *context_source_labels]))
             blockers: list[str] = []
             if quote["freshness"] not in {"live", "recent"}:
                 blockers.append("stale_quote")
@@ -447,7 +480,7 @@ class LiveOpportunityEngine:
                 "relative_strength_vs_market_sector": round(relative_strength, 5) if relative_strength is not None else None,
                 "catalyst": state.get("catalyst"),
                 "bar_completed_at": features.get("last_completed_bar_at"),
-                "source_labels": [f"alpaca_{self.feed}_{self.transport}", "completed_5m_bars"] + (["completed_60m_bars"] if state.get("higher_timeframes") else []) + ([str((state.get("catalyst") or {}).get("source") or "catalyst")] if state.get("catalyst") else []),
+                "source_labels": [f"alpaca_{self.feed}_{self.transport}", "completed_5m_bars", *context_source_labels] + ([str((state.get("catalyst") or {}).get("source") or "catalyst")] if state.get("catalyst") else []),
                 "blockers": blockers,
                 "factor_scores": {
                     "structure": round(structure_score, 1),
@@ -491,8 +524,9 @@ class LiveOpportunityEngine:
                     average_dollar_volume=average_dollar,
                     higher_timeframes=state.get("higher_timeframes") or None,
                 )
-                if state.get("higher_timeframes"):
-                    analysis["source_labels"] = list(dict.fromkeys([*analysis["source_labels"], "completed_60m_bars"]))
+                context_source_labels = _context_source_labels(state.get("higher_timeframes"))
+                if context_source_labels:
+                    analysis["source_labels"] = list(dict.fromkeys([*analysis["source_labels"], *context_source_labels]))
                 structure_watchlist.append({
                     "symbol": symbol,
                     "decision": analysis["decision"],
@@ -505,6 +539,9 @@ class LiveOpportunityEngine:
                     "exit_plan": analysis["exit_plan"],
                     "hard_blockers": analysis["hard_blockers"],
                     "timeframe_alignment": analysis["timeframe_alignment"],
+                    "timeframe_coverage": analysis["timeframe_coverage"],
+                    "timeframe_scan": analysis["timeframe_scan"],
+                    "timeframe_plan": analysis["timeframe_plan"],
                     "liquidity_level_context": analysis["liquidity_level_context"],
                     "participation_context": analysis["participation_context"],
                     "macro_context": analysis["macro_context"],
@@ -724,6 +761,130 @@ def _fetch_completed_hourly_bars(
     return {symbol: _aggregate_rth_hourly(rows)[-120:] for symbol, rows in output.items()}
 
 
+def _fetch_completed_intraday_context_bars(
+    symbols: list[str], *, feed: str, timeframe: str, minutes: int, now: datetime | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Fetch recent, completed RTH confirmation bars for 15m/30m roles."""
+    import requests
+
+    if not symbols:
+        return {}
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    key, secret = _load_alpaca_credentials()
+    params: dict[str, Any] = {
+        "symbols": ",".join(symbols[:100]),
+        "timeframe": timeframe,
+        "start": (current - timedelta(days=10)).isoformat().replace("+00:00", "Z"),
+        "end": current.isoformat().replace("+00:00", "Z"),
+        "adjustment": "raw",
+        "feed": feed,
+        "limit": 10000,
+        "sort": "asc",
+    }
+    output: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    token: str | None = None
+    for _ in range(4):
+        if token:
+            params["page_token"] = token
+        response = requests.get(
+            "https://data.alpaca.markets/v2/stocks/bars",
+            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
+            params=params,
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        for symbol, rows in (payload.get("bars") or {}).items():
+            for row in rows if isinstance(rows, list) else []:
+                stamp = _utc(row.get("t")) if isinstance(row, dict) else None
+                if stamp is None:
+                    continue
+                local = stamp.astimezone(MARKET_TZ)
+                minute_of_day = local.hour * 60 + local.minute
+                if 9 * 60 + 30 <= minute_of_day < 16 * 60 and stamp + timedelta(minutes=minutes) <= current:
+                    output[str(symbol).upper()].append(row)
+        token = str(payload.get("next_page_token") or "") or None
+        if not token:
+            break
+    return {symbol: _bars_normalized(rows)[-120:] for symbol, rows in output.items()}
+
+
+def _fetch_completed_period_bars(
+    symbols: list[str], *, feed: str, timeframe: str, lookback_days: int, now: datetime | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Fetch bounded daily/weekly context and discard the active period."""
+    import requests
+
+    if not symbols:
+        return {}
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    key, secret = _load_alpaca_credentials()
+    params: dict[str, Any] = {
+        "symbols": ",".join(symbols[:100]),
+        "timeframe": timeframe,
+        "start": (current - timedelta(days=lookback_days)).isoformat().replace("+00:00", "Z"),
+        "end": current.isoformat().replace("+00:00", "Z"),
+        "adjustment": "raw",
+        "feed": feed,
+        "limit": 10000,
+        "sort": "asc",
+    }
+    output: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    token: str | None = None
+    for _ in range(4):
+        if token:
+            params["page_token"] = token
+        response = requests.get(
+            "https://data.alpaca.markets/v2/stocks/bars",
+            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
+            params=params,
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        for symbol, rows in (payload.get("bars") or {}).items():
+            if isinstance(rows, list):
+                output[str(symbol).upper()].extend(row for row in rows if isinstance(row, dict))
+        token = str(payload.get("next_page_token") or "") or None
+        if not token:
+            break
+    return {
+        symbol: _filter_completed_period_bars(rows, timeframe=timeframe, now=current)[-120:]
+        for symbol, rows in output.items()
+    }
+
+
+def _fetch_completed_context_bars(
+    symbols: list[str], *, feed: str, now: datetime | None = None
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Fetch every broker-supported context frame needed by the A+ matrix."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=5, thread_name_prefix="aplus-context") as pool:
+        futures = {
+            "15m": pool.submit(_fetch_completed_intraday_context_bars, symbols, feed=feed, timeframe="15Min", minutes=15, now=now),
+            "30m": pool.submit(_fetch_completed_intraday_context_bars, symbols, feed=feed, timeframe="30Min", minutes=30, now=now),
+            "60m": pool.submit(_fetch_completed_hourly_bars, symbols, feed=feed, now=now),
+            "1d": pool.submit(_fetch_completed_period_bars, symbols, feed=feed, timeframe="1Day", lookback_days=220, now=now),
+            "1w": pool.submit(_fetch_completed_period_bars, symbols, feed=feed, timeframe="1Week", lookback_days=1_100, now=now),
+        }
+        context: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for timeframe, future in futures.items():
+            try:
+                context[timeframe] = future.result()
+            except Exception:
+                # Each missing frame is visible in coverage and fails its own
+                # gate closed without taking down the other read-only sources.
+                context[timeframe] = {}
+    return {
+        symbol: {
+            timeframe: context[timeframe].get(symbol) or []
+            for timeframe in ("15m", "30m", "60m", "1d", "1w")
+        }
+        for symbol in symbols
+    }
+
+
 def run_rest_poll(
     engine: LiveOpportunityEngine,
     symbols: list[str],
@@ -861,24 +1022,24 @@ def main() -> int:
         if row.get("symbol")
     }
     bootstrap_bars: dict[str, list[dict[str, Any]]] = {}
-    bootstrap_hourly: dict[str, list[dict[str, Any]]] = {}
+    bootstrap_context: dict[str, dict[str, list[dict[str, Any]]]] = {}
     if args.feed == "iex":
         # Seed completed bars before opening the socket so candidates can be
         # evaluated as soon as their first fresh quote arrives.
         bootstrap_bars, _ = fetch_intraday_bars(symbols, datetime.now(MARKET_TZ))
     try:
-        bootstrap_hourly = _fetch_completed_hourly_bars(symbols, feed=args.feed)
+        bootstrap_context = _fetch_completed_context_bars(symbols, feed=args.feed)
     except Exception:
-        # Missing HTF context fails the CISD model closed; it must not prevent
-        # the rest of the read-only dashboard from starting.
-        bootstrap_hourly = {}
+        # Missing HTF context fails A+ readiness and the CISD model closed; it
+        # must not prevent the rest of the read-only dashboard from starting.
+        bootstrap_context = {}
     for symbol in symbols:
         row = context_by_symbol.get(symbol, {})
         engine.seed_symbol(
             symbol,
             bars=bootstrap_bars.get(symbol) or [],
             quote={},
-            higher_timeframes={"60m": bootstrap_hourly.get(symbol) or []},
+            higher_timeframes=bootstrap_context.get(symbol) or {},
             average_dollar_volume=_finite(row.get("avg_dollar_volume_20d")),
             catalyst=(row.get("catalyst_headlines") or [None])[0],
         )

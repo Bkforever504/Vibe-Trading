@@ -27,6 +27,7 @@ export function LiveOpportunityPanel({
   const feed = report?.feed;
   const structureRows = (report?.market_structure_watchlist ?? []).slice(0, 3);
   const bestStructure = structureRows[0];
+  const timeframeCoverage = bestStructure?.timeframe_coverage;
   const canonicalGrade = bestStructure?.pattern_grade;
   const modelSequence = bestStructure?.best_setup?.model_sequence;
   const consequentEncroachment = modelSequence?.bonus_confluences.consequent_encroachment;
@@ -86,6 +87,30 @@ export function LiveOpportunityPanel({
             </span>
           </div>
         </div>
+        {timeframeCoverage ? (
+          <div className="border-b border-border bg-muted/10 px-3 py-3" aria-label="A+ timeframe coverage">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide">A+ timeframe coverage</span>
+              <span className={cn("text-xs font-medium", timeframeCoverage.missing_required.length === 0 ? "text-success" : "text-warning")}>
+                {label(timeframeCoverage.status)}
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {timeframeCoverage.frames.map((frame) => (
+                <span
+                  key={frame.timeframe}
+                  className={cn("border px-2 py-1 text-[10px] uppercase tracking-wide", frame.status === "available" ? "border-success/30 text-success" : frame.required_for_aplus ? "border-danger/30 text-danger" : "border-border text-muted-foreground")}
+                  title={`${frame.completed_bars}/${frame.minimum_bars} completed bars · ${label(frame.provenance)}`}
+                >
+                  {frame.timeframe.toUpperCase()} {label(frame.role)} · {frame.completed_bars}/{frame.minimum_bars}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              1m refines execution only; 5m triggers; 15m/30m confirm; 60m and daily define structure/regime; weekly is major-context advisory.
+            </p>
+          </div>
+        ) : null}
         {modelSequence ? (
           <div className="border-b border-border bg-muted/10 px-3 py-3" aria-label="CISD sequence">
             <div className="flex flex-wrap items-center justify-between gap-2">

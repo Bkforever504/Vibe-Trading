@@ -1192,6 +1192,7 @@ export interface PatternGrade {
 
 export interface MarketStructureEntryPlan {
   status: "actionable_manual_review" | "conditional" | "unavailable" | string;
+  timeframe?: string;
   trigger: number | null;
   entry_zone: { low: number | null; high: number | null };
   invalidation: number | null;
@@ -1203,7 +1204,54 @@ export interface MarketStructureExitPlan {
   status: "defined" | "unavailable" | string;
   targets: Array<{ name: string; price: number | null; reward_risk?: number }>;
   time_stop_bars: number | null;
+  time_stop?: { bars: number; timeframe: string; minutes: number; status: string } | null;
   management: string;
+}
+
+export interface TimeframeCoverageRow {
+  timeframe: string;
+  role: string;
+  minimum_bars: number;
+  completed_bars: number;
+  status: string;
+  provenance: string;
+  required_for_aplus: boolean;
+}
+
+export interface TimeframeCoverage {
+  status: string;
+  missing_required: string[];
+  frames: TimeframeCoverageRow[];
+  closed_bar_only: true;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TimeframeScanRow {
+  timeframe: string;
+  role: string;
+  completed_bars: number;
+  trend: { bias?: string; strength?: number; [key: string]: unknown };
+  best_setup: Partial<MarketStructurePattern> | null;
+  worst_setup: Partial<MarketStructurePattern> | null;
+  source_label: string;
+  provenance?: string;
+  score_effect?: string;
+  closed_bar_only: true;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TimeframePlan {
+  primary_trigger: string;
+  execution_refinement: string;
+  confirmation: string[];
+  structure: string[];
+  regime: string[];
+  coverage_status: string;
+  closed_bar_only: true;
+  execution_enabled: false;
+  can_submit_orders: false;
 }
 
 export interface LiquidityReferenceLevel {
@@ -1305,6 +1353,9 @@ export interface MarketStructureAnalysis {
     frames: Record<string, Record<string, unknown>>;
     closed_bar_only: true;
   };
+  timeframe_coverage?: TimeframeCoverage;
+  timeframe_scan?: TimeframeScanRow[];
+  timeframe_plan?: TimeframePlan;
   liquidity_level_context?: LiquidityLevelContext;
   participation_context?: ParticipationContext;
   macro_context?: MacroTimingContext;
