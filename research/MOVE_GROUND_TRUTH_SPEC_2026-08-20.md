@@ -1,9 +1,11 @@
 # MOVE Universe Ground-Truth Specification
 
-**Status:** draft
-**Kenny Approval:** pending
+**Status:** frozen
+**Kenny Approval:** approved
+**Variant:** MEDIUM (canonical baseline)
+**Approval prompt (Kenny, 2026-08-22):** "do everything, don't worry about the cost. We are here to create the best dashboard, give me the best trades so i can make money"
 **Draft Author:** Claude (2026-08-22)
-**Purpose:** Define what qualifies as a labeled "move" for the Detection Scorecard. Loaded by `scripts/move_universe_ground_truth.py` ONLY when this file contains both `Status: frozen` AND `Kenny Approval: approved`.
+**Purpose:** Define what qualifies as a labeled "move" for the Detection Scorecard. Loaded by `scripts/move_universe_ground_truth.py` ONLY when this file contains both `Status: frozen` AND `Kenny Approval: approved`. Two sidecar variants (`_TIGHT` + `_LOOSE`) sit unfrozen for post-Monday A/B/C comparison — see §11.
 
 ---
 
@@ -146,17 +148,32 @@ Additive fields to §6 schema are allowed w/o version bump.
 
 ---
 
-## 10. Approval
+## 10. Approval — DONE
 
-To activate real ground-truth loading in `scripts/move_universe_ground_truth.py`, Kenny must edit this file's front matter to:
+Kenny directed freeze via chat prompt on 2026-08-22. Markers flipped. Loader now active for MEDIUM variant.
 
-```
-Status: frozen
-Kenny Approval: approved
-```
+## 11. A/B/C Variant Comparison (Post-Monday Evaluation)
 
-Until both markers are set, the loader stays in placeholder mode and detection scorecard emits `status: placeholder_pending_kenny_signoff`.
+Three threshold sets ship in parallel:
+
+| Variant | File | Magnitude vs MEDIUM | Expected effect |
+|---|---|---|---|
+| TIGHT | `MOVE_GROUND_TRUTH_SPEC_TIGHT_2026-08-22.md` | +30% | Fewer labels, higher precision, lower recall. Best if MEDIUM too noisy. |
+| **MEDIUM** (canonical) | `MOVE_GROUND_TRUTH_SPEC_2026-08-20.md` | baseline | Balanced. Frozen + loaded now. |
+| LOOSE | `MOVE_GROUND_TRUTH_SPEC_LOOSE_2026-08-22.md` | -30% | More labels, higher recall, lower precision. Best if MEDIUM too sparse. |
+
+**Sidecar variants stay unfrozen** — labels get computed nightly against all 3 for accountability, but only MEDIUM populates the canonical detection scorecard.
+
+**Evaluation trigger:** after 10 trading days of live shadow data (~2026-09-05), run `scripts/compare_move_variants.py` (Codex Phase C follow-up) which reports:
+- Label count per variant per instrument×TF
+- Grader precision/recall using each variant as truth
+- F1 score per variant
+- Distribution of `realized_r` for labeled `+1`/`-1` moves per variant
+
+**Promotion rule:** if TIGHT or LOOSE beats MEDIUM on F1 by ≥ 15% AND maintains ≥ 20 labels/instrument/day, swap canonical. Otherwise keep MEDIUM.
+
+**Kenny approval required** to swap canonical variant — same fail-closed marker mechanism.
 
 ---
 
-**End of draft. Kenny: review §2 thresholds especially — these define what the grader is chasing. Adjust up if too many labels, down if too few. When ready, flip Status + Kenny Approval fields.**
+**Loader active. First real labels emit end of day 2026-08-25 (next trading day).**
