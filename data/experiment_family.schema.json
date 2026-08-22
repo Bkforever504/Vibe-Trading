@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": { "minLength": 1, "type": "string" },
+    "can_submit_orders": { "const": false },
+    "execution_enabled": { "const": false },
+    "family_id": { "minLength": 1, "type": "string" },
+    "origin": { "enum": ["research", "social", "external"] },
+    "recorded_at": { "minLength": 1, "type": "string" },
+    "schema_version": { "const": 1 },
+    "spec_hash": { "pattern": "^sha256:[0-9a-f]{64}$", "type": "string" },
+    "spec_path": { "minLength": 1, "type": "string" }
+  },
+  "required": ["schema_version", "recorded_at", "candidate_id", "family_id", "spec_hash", "spec_path", "origin", "execution_enabled", "can_submit_orders"],
+  "title": "Frozen experiment family member",
+  "type": "object"
+}

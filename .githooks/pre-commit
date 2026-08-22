@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+python scripts/precommit_research_guard.py $files
+python scripts/secret_leak_guard.py --staged

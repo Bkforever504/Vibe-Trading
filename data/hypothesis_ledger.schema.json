@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "can_submit_orders": { "const": false },
+    "dsr": { "type": ["number", "null"] },
+    "expectancy_lb": { "type": ["number", "null"] },
+    "execution_enabled": { "const": false },
+    "family_id": { "minLength": 1, "type": "string" },
+    "id": { "minLength": 1, "type": "string" },
+    "n_resolved": { "minimum": 0, "type": "integer" },
+    "origin": { "enum": ["research", "social", "external"] },
+    "pbo": { "type": ["number", "null"] },
+    "spec_hash": { "pattern": "^sha256:[0-9a-f]{64}$", "type": "string" },
+    "spec_path": { "minLength": 1, "type": "string" },
+    "status": { "enum": ["proposed", "development", "shadow", "paper_review", "approved", "rejected"] }
+  },
+  "required": ["id", "proposed_at", "spec_hash", "spec_path", "family_id", "origin", "status", "n_resolved", "execution_enabled", "can_submit_orders"],
+  "title": "Hypothesis ledger event",
+  "type": "object"
+}

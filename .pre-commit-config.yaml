@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - id: research-preregistration-guard
+        name: research preregistration guard
+        entry: python scripts/precommit_research_guard.py
+        language: system
+        files: '^(research/.*\.md|data/hypothesis_ledger\.jsonl)$'
+      - id: secret-leak-guard
+        name: secret leak guard
+        entry: python scripts/secret_leak_guard.py
+        language: system
+        pass_filenames: false

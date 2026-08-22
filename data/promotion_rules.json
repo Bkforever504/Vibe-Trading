@@ -1,0 +1,37 @@
+{
+  "automatic_order_authority": false,
+  "bonferroni": {
+    "alpha": 0.05,
+    "denominator": "unique spec_hash count in data/experiment_family.jsonl",
+    "family_scope": "experiment_wide"
+  },
+  "can_submit_orders": false,
+  "decay": {
+    "full_sample_and_last_20_percent_same_sign": true,
+    "last_sample_fraction": 0.2
+  },
+  "execution_enabled": false,
+  "expectancy": {
+    "cost_basis": "executable_ask_to_bid",
+    "minimum_lower_95_ci": 0.0
+  },
+  "minimum_distinct_sessions": 20,
+  "minimum_resolved_outcomes": 30,
+  "placebo": {
+    "required_status": "pass",
+    "test": "shuffled_labels"
+  },
+  "promotion_driver": "95_percent_moving_block_bootstrap_lower_bound",
+  "pbo_maximum": 0.5,
+  "rule_version": "2026-08-20-v1",
+  "schema_version": 1,
+  "stale_promotion": {
+    "action": "demote_to_paper_review",
+    "consecutive_hold_cash_weeks": 4,
+    "control_plane_state": "hold_cash_collect_counterfactuals"
+  },
+  "uncertainty": {
+    "block_length": "max(ceil(sqrt(n)),5)",
+    "confidence_level": 0.95
+  }
+}
