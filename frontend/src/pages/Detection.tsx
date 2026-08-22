@@ -15,7 +15,7 @@ export function Detection() {
         <h1 className="flex items-center gap-2 text-xl font-bold"><ScanSearch className="h-5 w-5" />Detection</h1>
         <p className="mt-1 text-xs text-muted-foreground">Did the radar find and rank the session’s causal liquid moves? Detection is measured separately from profitability.</p>
       </header>
-      <DetectionTab scorecard={scorecard} />
+      <DetectionTab scorecard={scorecard} promotion={data.discovery?.cisd_promotion_status} />
       <p className="mt-3 text-xs text-muted-foreground">Read-only accountability surface. execution_enabled=false · can_submit_orders=false</p>
     </div>
   );

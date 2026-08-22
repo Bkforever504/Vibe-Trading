@@ -24,9 +24,31 @@ const scorecard = {
   can_submit_orders: false as const,
 };
 
+const promotion = {
+  schema_version: 1,
+  pattern_id: "ict_cisd_universal_model" as const,
+  hypothesis_status: "unvalidated_pattern_hypothesis" as const,
+  n_outcomes: 47,
+  n_unique_dates: 18,
+  wins: 29,
+  win_rate_raw: 0.617,
+  wilson_lower_bound_95: 0.478,
+  n_scored_probabilities: 47,
+  brier_score: 0.198,
+  brier_baseline: 0.25,
+  brier_skill: 0.208,
+  gate_status: "pending" as const,
+  gate_reasons_pending: ["n_outcomes < 100", "n_unique_dates < 30"],
+  eligible_for_validated_promotion: false,
+  last_updated_utc: "2026-08-22T21:30:00Z",
+  source_labels: ["data/pattern_grader_outcomes.jsonl"],
+  execution_enabled: false as const,
+  can_submit_orders: false as const,
+};
+
 describe("DetectionTab", () => {
   it("renders family precision, recall, delta, and CISD evidence", () => {
-    render(<DetectionTab scorecard={scorecard} />);
+    render(<DetectionTab scorecard={scorecard} promotion={promotion} />);
 
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
     expect(screen.getByText("33.3%")).toBeInTheDocument();
@@ -35,5 +57,11 @@ describe("DetectionTab", () => {
     expect(screen.getByText(/n=9 · dates=4/)).toBeInTheDocument();
     expect(screen.getByText("Brier 0.180")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/placeholder denominator active/i);
+    expect(screen.getByText("CISD Hypothesis Progress")).toBeInTheDocument();
+    expect(screen.getByText("47 / 100")).toBeInTheDocument();
+    expect(screen.getByText("18 / 30")).toBeInTheDocument();
+    expect(screen.getByText("47.8%")).toBeInTheDocument();
+    expect(screen.getByText("0.208")).toBeInTheDocument();
+    expect(screen.getByText("unvalidated_pattern_hypothesis")).toBeInTheDocument();
   });
 });

@@ -255,6 +255,28 @@ def test_cockpit_surfaces_streaming_opportunities_with_feed_provenance(tmp_path:
     assert candidate["can_submit_orders"] is False
 
 
+def test_cockpit_surfaces_cisd_promotion_status_as_read_only_discovery_evidence(tmp_path: Path) -> None:
+    write_report(tmp_path, "cisd-promotion-status.json", {
+        "last_updated_utc": "2026-08-19T14:59:58Z",
+        "pattern_id": "ict_cisd_universal_model",
+        "n_outcomes": 47,
+        "n_unique_dates": 18,
+        "wilson_lower_bound_95": 0.478,
+        "brier_skill": 0.208,
+        "eligible_for_validated_promotion": False,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    status = cockpit["discovery"]["cisd_promotion_status"]
+    source = next(row for row in cockpit["sources"] if row["name"] == "cisd_promotion")
+    assert status["n_outcomes"] == 47
+    assert status["eligible_for_validated_promotion"] is False
+    assert source["freshness"] == "live"
+
+
 def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_options(
     tmp_path: Path,
 ) -> None:

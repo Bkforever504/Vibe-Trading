@@ -1,9 +1,10 @@
-import type { DetectionPatternCoverage, TradingDashboard } from "@/lib/api";
+import type { CisdPromotionStatus, DetectionPatternCoverage, TradingDashboard } from "@/lib/api";
 
 type Scorecard = NonNullable<NonNullable<TradingDashboard["discovery"]>["scorecard_rolling"]>;
 
 interface DetectionTabProps {
   scorecard?: Scorecard;
+  promotion?: CisdPromotionStatus;
 }
 
 function pct(value: number | null | undefined): string {
@@ -14,6 +15,38 @@ function deltaTone(delta: number): string {
   if (delta < 0) return "bg-red-500/15 text-red-500";
   if (delta > 0) return "bg-amber-500/15 text-amber-500";
   return "bg-emerald-500/15 text-emerald-500";
+}
+
+function metricTone(value: number | null, greenAt: number): string {
+  if (value == null) return "text-muted-foreground";
+  if (value >= greenAt) return "text-emerald-500";
+  if (value >= 0.45 && greenAt === 0.55) return "text-amber-500";
+  return "text-red-500";
+}
+
+function ProgressStat({ label, value, target }: { label: string; value: number; target: number }) {
+  const width = Math.min(100, value / target * 100);
+  return <div className="border border-border bg-background p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 text-lg font-bold tabular-nums">{value} / {target}</div><div className="mt-2 h-1.5 overflow-hidden rounded bg-muted"><div className="h-full bg-emerald-500" style={{ width: `${width}%` }} /></div></div>;
+}
+
+function CisdProgress({ promotion }: { promotion?: CisdPromotionStatus }) {
+  const validated = promotion?.eligible_for_validated_promotion === true;
+  const status = validated ? "validated_pattern" : "unvalidated_pattern_hypothesis";
+  return (
+    <section className="mt-4 border border-border bg-card" aria-labelledby="cisd-progress-heading">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div><h2 id="cisd-progress-heading" className="text-sm font-semibold">CISD Hypothesis Progress</h2><p className="mt-0.5 text-xs text-muted-foreground">Promotion requires every frozen evidence gate; progress is not probability of profit.</p></div>
+        <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${validated ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}>{status}</span>
+      </div>
+      <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ProgressStat label="Resolved outcomes" value={promotion?.n_outcomes ?? 0} target={100} />
+        <ProgressStat label="Unique dates" value={promotion?.n_unique_dates ?? 0} target={30} />
+        <div className="border border-border bg-background p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Wilson lower bound</div><div className={`mt-1 text-lg font-bold tabular-nums ${metricTone(promotion?.wilson_lower_bound_95 ?? null, 0.55)}`}>{pct(promotion?.wilson_lower_bound_95)}</div><div className="mt-2 text-xs text-muted-foreground">Gate ≥ 55.0%</div></div>
+        <div className="border border-border bg-background p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Brier skill</div><div className={`mt-1 text-lg font-bold tabular-nums ${metricTone(promotion?.brier_skill ?? null, Number.MIN_VALUE)}`}>{promotion?.brier_skill == null ? "Not measured" : promotion.brier_skill.toFixed(3)}</div><div className="mt-2 text-xs text-muted-foreground">Gate &gt; 0 vs 50% baseline</div></div>
+      </div>
+      <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">Source: cisd-promotion-status.json · execution_enabled=false · can_submit_orders=false</p>
+    </section>
+  );
 }
 
 function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
@@ -50,7 +83,7 @@ function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
   );
 }
 
-export function DetectionTab({ scorecard }: DetectionTabProps) {
+export function DetectionTab({ scorecard, promotion }: DetectionTabProps) {
   const metrics = scorecard?.metrics;
   const coverage = scorecard?.pattern_coverage;
   const misses = scorecard?.top_missed_moves ?? [];
@@ -68,6 +101,8 @@ export function DetectionTab({ scorecard }: DetectionTabProps) {
       </div>
 
       {coverage && !coverage.metrics_qualified ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Placeholder denominator active — precision and recall remain unqualified until Kenny approves the frozen MOVE ground-truth spec.</div> : null}
+
+      <CisdProgress promotion={promotion} />
 
       {coverage ? (
         <div className="mt-4 grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">

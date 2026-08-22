@@ -1429,6 +1429,28 @@ export interface DetectionPatternCoverage {
   can_submit_orders: false;
 }
 
+export interface CisdPromotionStatus {
+  schema_version: number;
+  pattern_id: "ict_cisd_universal_model";
+  hypothesis_status: "unvalidated_pattern_hypothesis" | "validated_pattern";
+  n_outcomes: number;
+  n_unique_dates: number;
+  wins: number;
+  win_rate_raw: number | null;
+  wilson_lower_bound_95: number | null;
+  n_scored_probabilities: number;
+  brier_score: number | null;
+  brier_baseline: number | null;
+  brier_skill: number | null;
+  gate_status: "pending" | "passed";
+  gate_reasons_pending: string[];
+  eligible_for_validated_promotion: boolean;
+  last_updated_utc: string;
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingDashboard {
   schema_version: 9;
   generated_at: string;
@@ -1596,6 +1618,7 @@ export interface TradingDashboard {
       execution_enabled: false;
       can_submit_orders: false;
     };
+    cisd_promotion_status?: CisdPromotionStatus;
     execution_enabled?: false;
     can_submit_orders?: false;
   };
