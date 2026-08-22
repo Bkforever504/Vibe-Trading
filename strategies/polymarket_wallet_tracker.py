@@ -115,18 +115,39 @@ def _row_to_closed_position_trade(row: dict[str, Any]) -> NormalisedTrade:
     )
 
 
-def _profile_metrics_from_rows(activity: list[dict[str, Any]], closed_positions: list[dict[str, Any]]) -> dict[str, Any]:
-    # Prefer activity (all trades incl. losses) over closed-positions.
-    # Polymarket /closed-positions only returns winning resolved positions —
-    # using it alone produces 100% win rate / infinite profit_factor (survivorship bias).
-    source_rows = activity if activity else closed_positions
-    parser = _row_to_activity_trade if activity else _row_to_closed_position_trade
-    trades = [parser(row) for row in source_rows]
-    metrics = derive_all_metrics(trades)
-    if not metrics and activity:
-        metrics = {"trades": len(activity), "win_rate": 0.0, "realized_pnl": 0.0}
+def _profile_metrics_from_rows(
+    activity: list[dict[str, Any]],
+    closed_positions: list[dict[str, Any]],
+    *,
+    closed_positions_limit: int | None = None,
+) -> dict[str, Any]:
+    # /closed-positions carries realizedPnl including losses, but the API
+    # returns rows sorted by profit and truncated at the request limit. The
+    # set is only trustworthy when it is COMPLETE (rows returned < limit).
+    # A truncated set is winners-heavy (survivorship) and must not be scored
+    # as if it were the full history.
+    closed_complete = bool(
+        closed_positions
+        and closed_positions_limit is not None
+        and len(closed_positions) < closed_positions_limit
+    )
+    if activity:
+        trades = [_row_to_activity_trade(row) for row in activity]
+        metrics = derive_all_metrics(trades)
+        if not metrics:
+            metrics = {"trades": len(activity), "win_rate": 0.0, "realized_pnl": 0.0}
+        metrics["history_basis"] = "activity_rows"
+    elif closed_complete:
+        trades = [_row_to_closed_position_trade(row) for row in closed_positions]
+        metrics = derive_all_metrics(trades)
+        metrics["history_basis"] = "closed_positions_complete"
+    else:
+        trades = [_row_to_closed_position_trade(row) for row in closed_positions]
+        metrics = derive_all_metrics(trades)
+        metrics["history_basis"] = "closed_positions_truncated_survivorship"
     metrics["raw_activity_count"] = len(activity)
     metrics["closed_position_count"] = len(closed_positions)
+    metrics["closed_positions_complete"] = closed_complete
     return metrics
 
 
@@ -164,7 +185,21 @@ class PolymarketPublicClient:
         return self._get(f"{DATA_API_BASE}/activity", {"user": address, "limit": limit})
 
     def fetch_closed_positions(self, address: str, *, limit: int = 500) -> list[dict[str, Any]]:
-        return self._get(f"{DATA_API_BASE}/closed-positions", {"user": address, "limit": limit})
+        # The API caps each response at 50 rows regardless of the limit
+        # parameter, so paginate with offset until a short page or `limit`.
+        page_size = 50
+        rows: list[dict[str, Any]] = []
+        offset = 0
+        while len(rows) < limit:
+            page = self._get(
+                f"{DATA_API_BASE}/closed-positions",
+                {"user": address, "limit": page_size, "offset": offset},
+            )
+            rows.extend(page)
+            if len(page) < page_size:
+                break
+            offset += page_size
+        return rows[:limit]
 
     def fetch_clob_trades(self, address: str, *, limit: int = 500) -> list[dict[str, Any]]:
         return self._get(f"{CLOB_API_BASE}/trades", {"maker_address": address, "limit": limit})
@@ -259,7 +294,7 @@ def wallet_profile_dict(
         closed_positions = active_client.fetch_closed_positions(address, limit=limit)
     except Exception:
         closed_positions = []
-    metrics = _profile_metrics_from_rows(activity, closed_positions)
+    metrics = _profile_metrics_from_rows(activity, closed_positions, closed_positions_limit=limit)
     profile = {
         "handle": handle or address,
         "wallet": address,
@@ -270,7 +305,9 @@ def wallet_profile_dict(
         "data_source": trade_fetch["source_endpoint"],
         "data_quality": trade_fetch["source_quality"],
         "endpoint_attempts": trade_fetch["endpoint_attempts"],
-        "closed_positions_survivorship_warning": bool(closed_positions and not activity),
+        "closed_positions_survivorship_warning": bool(
+            closed_positions and not activity and not metrics.get("closed_positions_complete")
+        ),
         **metrics,
     }
     scored = score_trader(profile_from_dict(profile))

@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.momentum_shadow_logger import compute_current_signal
+from scripts.edge_forward_tracker import MOMENTUM_STRATEGY_VERSION
 
 
 NY = ZoneInfo("America/New_York")
@@ -36,6 +36,7 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 DEFAULT_STATE = VIBE_HOME / "state" / "micro-momentum-paper.json"
 DEFAULT_REPORT = VIBE_HOME / "reports" / "micro-momentum-paper.json"
 DEFAULT_LOG = ROOT / "data" / "micro_momentum_paper_log.jsonl"
+DEFAULT_CANONICAL_SIGNAL_STATE = ROOT / "data" / "edge_forward_state.json"
 ENV_PATH = ROOT / "agent" / ".env"
 
 
@@ -60,7 +61,7 @@ def _finite_positive(value: Any) -> float | None:
 
 def initial_state(config: PaperConfig = PaperConfig()) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": "isolated_virtual_paper",
         "initial_cash": round(config.initial_cash, 2),
         "cash": round(config.initial_cash, 2),
@@ -69,6 +70,7 @@ def initial_state(config: PaperConfig = PaperConfig()) -> dict[str, Any]:
         "last_equity": round(config.initial_cash, 2),
         "max_observed_drawdown_pct": 0.0,
         "last_rebalance_week": None,
+        "last_signal_rebalance": None,
         "last_signal_asof": None,
         "halted": False,
         "halt_reason": None,
@@ -84,7 +86,44 @@ def load_state(path: Path, config: PaperConfig = PaperConfig()) -> dict[str, Any
         return initial_state(config)
     if not isinstance(payload, dict) or payload.get("mode") != "isolated_virtual_paper":
         raise ValueError(f"Invalid micro momentum state: {path}")
+    payload.setdefault("last_signal_rebalance", None)
     return payload
+
+
+def load_canonical_signal(
+    path: Path = DEFAULT_CANONICAL_SIGNAL_STATE,
+    *,
+    now: datetime | None = None,
+    max_age_days: int = 7,
+) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Canonical momentum state unavailable: {path}") from exc
+    lane = payload.get("momentum") if isinstance(payload, dict) else None
+    if not isinstance(lane, dict):
+        raise RuntimeError("Canonical momentum lane missing")
+    version = str(lane.get("strategy_version") or "")
+    if version != MOMENTUM_STRATEGY_VERSION:
+        raise RuntimeError(f"Canonical momentum strategy version mismatch: {version or 'missing'}")
+    signal_date = str(lane.get("signal_date") or "")
+    try:
+        observed = datetime.fromisoformat(signal_date).date()
+    except ValueError as exc:
+        raise RuntimeError("Canonical momentum signal date missing or invalid") from exc
+    current = (now or datetime.now(timezone.utc)).astimezone(NY).date()
+    age_days = (current - observed).days
+    if age_days < 0 or age_days > max_age_days:
+        raise RuntimeError(f"Canonical momentum signal stale or future-dated: age_days={age_days}")
+    position = lane.get("position") if isinstance(lane.get("position"), dict) else {}
+    holdings = [str(symbol) for symbol in position.get("symbols") or []]
+    return {
+        "holdings": holdings,
+        "signal_asof": signal_date,
+        "last_rebalance": lane.get("last_rebalance"),
+        "strategy_version": version,
+        "source": str(path),
+    }
 
 
 def save_state(path: Path, state: dict[str, Any]) -> None:
@@ -314,7 +353,8 @@ def run_cycle(
     holdings = [] if halted_now else list(signal.get("holdings") or [])
     targets = target_notionals(holdings, marks["equity"], config)
     orders = build_orders(working, prices, targets, config)
-    due = working.get("last_rebalance_week") != week_key
+    decision_key = str(signal.get("last_rebalance") or signal.get("signal_asof") or week_key)
+    due = working.get("last_signal_rebalance") != decision_key
     reason = "preview_only"
     fills: list[dict[str, Any]] = []
     state_changed = False
@@ -325,20 +365,22 @@ def run_cycle(
         reason = "drawdown_halt_liquidated"
         state_changed = True
     elif execute_paper and not due:
-        reason = "already_rebalanced_this_week"
+        reason = "canonical_signal_already_applied"
         state_changed = True
     elif execute_paper:
         fills = execute_virtual_orders(working, orders, now=now, cost_bps=config.modeled_cost_bps)
         working["last_rebalance_week"] = week_key
+        working["last_signal_rebalance"] = decision_key
         working["last_signal_asof"] = signal.get("signal_asof") or signal.get("date")
         working.setdefault("weekly_decisions", []).append({
             "week_key": week_key,
+            "decision_key": decision_key,
             "recorded_at": now.isoformat(),
             "signal_asof": signal.get("signal_asof") or signal.get("date"),
             "holdings": holdings,
             "pre_trade_equity": round(marks["equity"], 4),
         })
-        reason = "weekly_rebalance_completed" if fills else "weekly_rebalance_no_orders"
+        reason = "canonical_rebalance_completed" if fills else "canonical_rebalance_no_orders"
         state_changed = True
 
     post_marks = mark_to_market(working, prices)
@@ -348,7 +390,11 @@ def run_cycle(
         float(working.get("max_observed_drawdown_pct") or 0.0),
         post_marks["drawdown_pct"],
     )
-    decision_count = len({row.get("week_key") for row in working.get("weekly_decisions", []) if row.get("week_key")})
+    decision_count = len({
+        row.get("decision_key") or row.get("week_key")
+        for row in working.get("weekly_decisions", [])
+        if row.get("decision_key") or row.get("week_key")
+    })
     review_eligible = (
         decision_count >= 26
         and post_marks["equity"] > float(working.get("initial_cash") or config.initial_cash)
@@ -367,6 +413,7 @@ def run_cycle(
         "market_open": bool(market_open),
         "status": reason,
         "week_key": week_key,
+        "decision_key": decision_key,
         "signal_asof": signal.get("signal_asof") or signal.get("date"),
         "selected_holdings": holdings,
         "target_notionals": {key: round(value, 2) for key, value in targets.items()},
@@ -387,7 +434,9 @@ def run_cycle(
             "live_execution_automatic": False,
             "required_weekly_decisions": 26,
             "completed_weekly_decisions": decision_count,
-            "reason": "Manual review is required after 26 point-in-time weekly decisions, positive net P&L, and drawdown at or below 8%.",
+            "required_canonical_decisions": 26,
+            "completed_canonical_decisions": decision_count,
+            "reason": "Manual review is required after 26 point-in-time canonical decisions, positive net P&L, and drawdown at or below 8%.",
         },
         "evidence_boundary": "The 8% liquidation halt is a new paper overlay and was not included in the historical 21.25% result.",
     }
@@ -406,9 +455,10 @@ def main() -> int:
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--log", type=Path, default=DEFAULT_LOG)
+    parser.add_argument("--canonical-signal-state", type=Path, default=DEFAULT_CANONICAL_SIGNAL_STATE)
     args = parser.parse_args()
     now = datetime.now(timezone.utc)
-    signal = compute_current_signal()
+    signal = load_canonical_signal(args.canonical_signal_state, now=now)
     state = load_state(args.state)
     symbols = sorted(set(signal.get("holdings") or []) | set(state.get("positions") or {}))
     clock = fetch_market_clock()

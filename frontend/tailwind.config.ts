@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { tradingFontStacks, tradingPalette, tradingSpacing } from "./src/lib/design-tokens";
 
 export default {
   darkMode: "class",
@@ -17,10 +18,12 @@ export default {
         danger: "hsl(var(--danger))",
         warning: "hsl(var(--warning))",
         info: "hsl(var(--info))",
+        trading: tradingPalette,
       },
+      spacing: tradingSpacing,
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        sans: tradingFontStacks.sans,
+        mono: tradingFontStacks.mono,
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
     },

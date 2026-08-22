@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useSearchParams } from "react-router-dom";
-import { BarChart3, Bot, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2 } from "lucide-react";
+import { Activity, BarChart3, Bot, Gauge, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, ListChecks, BookOpenCheck, NotebookTabs, ScanSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, type SessionItem } from "@/lib/api";
@@ -11,7 +11,13 @@ import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
 const APP_VERSION = "v0.1.9";
 
 const NAV = [
-  { to: "/", icon: BarChart3, label: "Home" },
+  { to: "/", icon: Gauge, label: "Trading Cockpit" },
+  { to: "/watchlist", icon: ListChecks, label: "Watchlist" },
+  { to: "/retro", icon: BookOpenCheck, label: "Daily Retro" },
+  { to: "/journal", icon: NotebookTabs, label: "Journal" },
+  { to: "/detection", icon: ScanSearch, label: "Detection" },
+  { to: "/calibration", icon: Activity, label: "Calibration" },
+  { to: "/research", icon: BarChart3, label: "Research Home" },
   { to: "/agent", icon: Bot, label: "Agent" },
   { to: "/alpha-zoo", icon: Layers, label: "Alpha Zoo" },
   { to: "/settings", icon: Settings, label: "Settings" },
@@ -27,6 +33,10 @@ export function Layout() {
   const sseStatus = useAgentStore(s => s.sseStatus);
   const sseRetryAttempt = useAgentStore(s => s.sseRetryAttempt);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("qa-sidebar") === "collapsed");
+  const [compactViewport, setCompactViewport] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  const sidebarCollapsed = collapsed || compactViewport;
 
   const activeSessionId = searchParams.get("session");
   const streamingSessionId = useAgentStore(s => s.streamingSessionId);
@@ -34,6 +44,13 @@ export function Layout() {
   useEffect(() => {
     localStorage.setItem("qa-sidebar", collapsed ? "collapsed" : "expanded");
   }, [collapsed]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => setCompactViewport(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const loadSessions = () => {
     api.listSessions()
@@ -73,18 +90,18 @@ export function Layout() {
       {/* Sidebar */}
       <aside className={cn(
         "border-r bg-card flex flex-col shrink-0 transition-all duration-200",
-        collapsed ? "w-12" : "w-64"
+        sidebarCollapsed ? "w-12" : "w-64"
       )}>
         {/* Brand */}
-        <div className={cn("border-b", collapsed ? "p-2 flex justify-center" : "p-4")}>
-          <Link to="/" className={cn("flex items-center font-bold text-base tracking-tight", collapsed ? "justify-center" : "gap-2")}>
+        <div className={cn("border-b", sidebarCollapsed ? "p-2 flex justify-center" : "p-4")}>
+          <Link to="/" className={cn("flex items-center font-bold text-base tracking-tight", sidebarCollapsed ? "justify-center" : "gap-2")}>
             <BarChart3 className="h-5 w-5 text-primary shrink-0" />
-            {!collapsed && "Vibe-Trading"}
+            {!sidebarCollapsed && "Vibe-Trading"}
           </Link>
         </div>
 
         {/* Nav */}
-        <nav className={cn("space-y-0.5", collapsed ? "p-1" : "p-2")}>
+        <nav className={cn("space-y-0.5", sidebarCollapsed ? "p-1" : "p-2")}>
           {NAV.map(({ to, icon: Icon, label }) => {
             const text = label;
             return (
@@ -93,22 +110,22 @@ export function Layout() {
                 to={to}
                 className={cn(
                   "flex items-center rounded-md text-sm transition-colors",
-                  collapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
+                  sidebarCollapsed ? "justify-center p-2" : "gap-3 px-3 py-2",
                   (to === "/" ? pathname === "/" : pathname.startsWith(to))
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
-                title={collapsed ? text : undefined}
+                title={sidebarCollapsed ? text : undefined}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {!collapsed && text}
+                {!sidebarCollapsed && text}
               </Link>
             );
           })}
         </nav>
 
         {/* Sessions — hidden when collapsed */}
-        {!collapsed && (
+        {!sidebarCollapsed && (
           <div className="flex-1 overflow-auto border-t mt-2 flex flex-col">
             <div className="flex items-center justify-between px-4 py-2">
               <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -204,16 +221,16 @@ export function Layout() {
         )}
 
         {/* Spacer when collapsed */}
-        {collapsed && <div className="flex-1" />}
+        {sidebarCollapsed && <div className="flex-1" />}
 
         {/* Footer */}
-        <div className={cn("border-t", collapsed ? "p-1 flex flex-col items-center gap-1" : "p-3 space-y-2")}>
-          {collapsed ? (
+        <div className={cn("border-t", sidebarCollapsed ? "p-1 flex flex-col items-center gap-1" : "p-3 space-y-2")}>
+          {sidebarCollapsed ? (
             <>
               <button onClick={toggle} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={dark ? "Light" : "Dark"}>
                 {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               </button>
-              <button onClick={() => setCollapsed(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title="Expand">
+              <button onClick={() => setCollapsed(false)} className={cn("p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors", compactViewport && "hidden")} title="Expand">
                 <ChevronsRight className="h-3.5 w-3.5" />
               </button>
             </>
@@ -244,7 +261,7 @@ export function Layout() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
         <ConnectionBanner status={sseStatus} retryAttempt={sseRetryAttempt} />
         <main className="flex-1 overflow-auto">
           <Outlet />

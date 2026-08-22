@@ -48,6 +48,12 @@ class PropGateDecision:
 
 REQUIRED_PROFILE_FIELDS = ("firm", "account_type", "automation", "risk", "unknown_rules_block")
 REQUIRED_RISK_FIELDS = ("max_daily_loss", "max_trailing_drawdown", "max_contracts")
+MICRO_FUTURES_ROOTS = ("MES", "MNQ", "M2K", "MYM", "MCL", "MGC", "SIL", "MHG", "M6A", "M6B", "M6E", "MBT", "MET")
+
+
+def _is_micro_future(symbol: str) -> bool:
+    root = symbol.upper().split()[0]
+    return any(root.startswith(prefix) for prefix in MICRO_FUTURES_ROOTS)
 
 
 def load_rule_profile(path: Path) -> dict[str, Any]:
@@ -103,7 +109,10 @@ def evaluate_prop_trade(
         reasons.append("vps_or_remote_server_prohibited")
 
     risk = profile.get("risk") or {}
-    max_contracts = int(risk.get("max_contracts", 0) or 0)
+    if _is_micro_future(trade.symbol) and risk.get("max_micro_contracts") is not None:
+        max_contracts = int(risk.get("max_micro_contracts", 0) or 0)
+    else:
+        max_contracts = int(risk.get("max_contracts", 0) or 0)
     if max_contracts and account.current_contracts + trade.contracts > max_contracts:
         reasons.append("max_contracts")
 

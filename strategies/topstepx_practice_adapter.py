@@ -115,6 +115,7 @@ class PracticeExecutionConfig:
     entry_cutoff_et: time = time(11, 30)
     execution_confirmation: str = ""
     local_device_confirmation: str = ""
+    require_intelligence_clearance: bool = False
     journal_path: Path = DEFAULT_JOURNAL
     block_file: Path = DEFAULT_BLOCK_FILE
 
@@ -131,6 +132,10 @@ class PracticeExecutionConfig:
             allowed_account_id=account_id,
             execution_confirmation=os.environ.get("TOPSTEPX_PRACTICE_EXECUTION", "").strip(),
             local_device_confirmation=os.environ.get("TOPSTEPX_LOCAL_DEVICE", "").strip(),
+            require_intelligence_clearance=(
+                os.environ.get("TOPSTEPX_REQUIRE_INTELLIGENCE_CLEARANCE", "true").strip().lower()
+                not in {"0", "false", "no", "off"}
+            ),
             journal_path=journal_path,
             block_file=block_file,
         )
@@ -312,6 +317,12 @@ class TopstepXPracticeAdapter:
             raise ProjectXAPIError("API-key login returned no session token")
         self._token = token
 
+    def market_session_token(self) -> str:
+        """Return the authenticated token for the read-only market-data hub."""
+        if not self._token:
+            raise ProjectXAPIError("ProjectX session is not authenticated")
+        return self._token
+
     def search_accounts(self) -> list[PracticeAccount]:
         return parse_accounts(
             self._post("/api/Account/search", {"onlyActiveAccounts": True})
@@ -370,6 +381,56 @@ class TopstepXPracticeAdapter:
         )
         return [row for row in response.get("orders") or [] if isinstance(row, dict)]
 
+    def search_orders(
+        self,
+        account: PracticeAccount,
+        *,
+        start: datetime,
+        end: datetime,
+    ) -> list[dict[str, Any]]:
+        """Return authoritative order history without changing account state."""
+        if start.tzinfo is None or end.tzinfo is None:
+            raise ValueError("Order-search timestamps must be timezone-aware")
+        if end <= start:
+            raise ValueError("Order-search end must be after start")
+        response = _require_success(
+            self._post(
+                "/api/Order/search",
+                {
+                    "accountId": account.id,
+                    "startTimestamp": start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "endTimestamp": end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                },
+            ),
+            "order search",
+        )
+        return [row for row in response.get("orders") or [] if isinstance(row, dict)]
+
+    def search_trades(
+        self,
+        account: PracticeAccount,
+        *,
+        start: datetime,
+        end: datetime,
+    ) -> list[dict[str, Any]]:
+        """Return authoritative half-turn fills without changing account state."""
+        if start.tzinfo is None or end.tzinfo is None:
+            raise ValueError("Trade-search timestamps must be timezone-aware")
+        if end <= start:
+            raise ValueError("Trade-search end must be after start")
+        response = _require_success(
+            self._post(
+                "/api/Trade/search",
+                {
+                    "accountId": account.id,
+                    "startTimestamp": start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "endTimestamp": end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+                },
+            ),
+            "trade search",
+        )
+        return [row for row in response.get("trades") or [] if isinstance(row, dict)]
+
     def search_open_positions(self, account: PracticeAccount) -> list[dict[str, Any]]:
         response = _require_success(
             self._post("/api/Position/searchOpen", {"accountId": account.id}),
@@ -395,8 +456,16 @@ class TopstepXPracticeAdapter:
         account_state: AccountState,
         rule_profile: dict[str, Any],
         custom_tag: str | None = None,
+        intelligence_assessment: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         self._assert_execution_enabled()
+        if self.config.require_intelligence_clearance:
+            if not isinstance(intelligence_assessment, dict):
+                raise PracticeSafetyError("Decision-intelligence clearance is required")
+            if intelligence_assessment.get("status") != "paper_candidate":
+                raise PracticeSafetyError("Decision intelligence did not approve a paper candidate")
+            if intelligence_assessment.get("forward_validated_edge") is not True:
+                raise PracticeSafetyError("Decision intelligence lacks forward-validated edge evidence")
         now = to_eastern(self.now_fn())
         if not self.config.entry_start_et <= now.time().replace(tzinfo=None) <= self.config.entry_cutoff_et:
             raise PracticeSafetyError("Entry is outside the 09:45-11:30 ET practice window")
@@ -478,6 +547,7 @@ class TopstepXPracticeAdapter:
             "response": response,
             "risk_dollars": risk_dollars,
             "rule_gate": asdict(decision),
+            "intelligence_assessment": intelligence_assessment,
         }
         _append_journal(self.config.journal_path, record)
         return record

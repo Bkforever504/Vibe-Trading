@@ -41,6 +41,21 @@ from scripts.options_shadow_twin import (
     record_candidate as shadow_twin_record_candidate,
     record_decision as shadow_twin_record_decision,
 )
+from scripts.options_evidence_factory import record_matched_setup
+from scripts.options_vol_premium_report import capture_entry_snapshot
+from scripts.alpaca_resilience import (
+    AlpacaReadUnavailable,
+    configure_sdk_client,
+    read_with_retry,
+)
+from scripts.tradier_options_data import (
+    PROVIDER_TRADIER,
+    TRADIER_QUOTE_SCOPE,
+    fetch_quotes as fetch_tradier_quotes,
+    is_configured as tradier_is_configured,
+    quote_is_fresh as tradier_quote_is_fresh,
+    tradier_selected,
+)
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
@@ -77,11 +92,13 @@ if os.getenv("PYTEST_CURRENT_TEST"):
     _fh = logging.NullHandler()
 else:
     try:
-        _fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+        from logging.handlers import RotatingFileHandler
+        _fh = RotatingFileHandler(LOG_FILE, encoding="utf-8", maxBytes=50 * 1024 * 1024, backupCount=3)
     except OSError:
         fallback_log = os.path.join(LOG_DIR, f"options-bot-{os.getpid()}-{int(time.time())}.log")
         try:
-            _fh = logging.FileHandler(fallback_log, encoding="utf-8")
+            from logging.handlers import RotatingFileHandler as _RFH
+            _fh = _RFH(fallback_log, encoding="utf-8", maxBytes=50 * 1024 * 1024, backupCount=3)
         except OSError:
             _fh = logging.NullHandler()
 _fh.setFormatter(_fmt)
@@ -186,6 +203,10 @@ SHADOW_DEFENSIVE_EXIT_BLOCKERS = {
 PAPER = os.getenv("ALPACA_PAPER", "true").lower() == "true"
 BASE  = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.markets"
 LIVE_EXECUTION_ENABLED = os.getenv("OPTIONS_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+ENABLE_PAPER_RESTING_PROFIT_ORDERS = (
+    PAPER
+    and os.getenv("ENABLE_PAPER_RESTING_PROFIT_ORDERS", "false").lower() == "true"
+)
 VIBE_HOME = Path.home() / ".vibe-trading"
 GARCH_RISK_REPORT = Path(os.path.expanduser(os.getenv(
     "GARCH_RISK_REPORT", str(VIBE_HOME / "reports" / "garch-volatility-risk.json"),
@@ -384,9 +405,26 @@ def _build_clients() -> tuple[TradingClient, OptionHistoricalDataClient]:
     if not PAPER and os.getenv("CONFIRM_LIVE_TRADING", "") != "I_UNDERSTAND_THE_RISK":
         log.error("Live trading requested but CONFIRM_LIVE_TRADING is not set to I_UNDERSTAND_THE_RISK")
         sys.exit(1)
-    trade = TradingClient(key, secret, paper=PAPER)
-    data  = OptionHistoricalDataClient(key, secret)
+    if tradier_selected() and not tradier_is_configured():
+        log.error(
+            "OPTION_QUOTE_PROVIDER=tradier but TRADIER_ACCESS_TOKEN is missing; "
+            "aborting instead of using delayed or fallback option quotes"
+        )
+        sys.exit(1)
+    trade = configure_sdk_client(TradingClient(key, secret, paper=PAPER))
+    data  = configure_sdk_client(OptionHistoricalDataClient(key, secret))
     return trade, data
+
+
+def _broker_read(call, operation: str):
+    """Read broker truth with bounded retries; unknown state is never empty state."""
+    return read_with_retry(
+        call,
+        component="iwm_options_bot",
+        operation=operation,
+        attempts=max(1, int(os.getenv("ALPACA_READ_ATTEMPTS", "3"))),
+        backoff_seconds=max(0.0, float(os.getenv("ALPACA_READ_BACKOFF_SECONDS", "0.25"))),
+    )
 
 
 # â”€â”€ IV Rank (30-day HV as proxy over 252-day rolling window) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -401,7 +439,18 @@ def _hv_proxy_iv_rank(symbol: str) -> float:
     hist            = hist.dropna()
     current         = hist["hv30"].iloc[-1]
     lo, hi          = hist["hv30"].min(), hist["hv30"].max()
-    rank            = (current - lo) / (hi - lo) * 100 if hi > lo else 50.0
+    if not all(math.isfinite(float(value)) for value in (current, lo, hi)):
+        log.warning(
+            f"IV Rank {symbol}: non-finite HV proxy values; defaulting IV Rank to 50"
+        )
+        return 50.0
+    if hi <= lo:
+        log.warning(
+            f"IV Rank {symbol}: 52-week HV range is flat at {hi:.1f}; "
+            "defaulting IV Rank to 50"
+        )
+        return 50.0
+    rank            = (current - lo) / (hi - lo) * 100
     log.info(f"IV Rank {symbol}: {rank:.1f}  (HV30={current:.1f}, 52wk range {lo:.1f}-{hi:.1f})")
     return rank
 
@@ -518,8 +567,12 @@ def _iv_over_realized_ok(symbol: str) -> bool:
     return True
 
 # â”€â”€ Earnings check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+_ETF_SYMBOLS = {"IWM", "SPY", "QQQ", "DIA", "GLD", "TLT", "XLF", "XLE"}  # ETFs have no earnings
+
 def _has_earnings_soon(symbol: str, days: int = EARNINGS_SKIP_DAYS) -> bool:
     """Return True if earnings are within `days` calendar days â€” skip entry if so."""
+    if symbol in _ETF_SYMBOLS:
+        return False  # ETFs have no earnings; skip yfinance calendar call (avoids 404 ERROR spam)
     try:
         ticker   = yf.Ticker(symbol)
         cal      = ticker.calendar
@@ -556,6 +609,10 @@ class Leg:
     delta:  float
     bid:    float
     ask:    float
+    implied_volatility: float | None = None
+    quote_provider: str = "alpaca_options_snapshot_v1beta1"
+    quote_scope: str = "indicative_modified_not_opra_nbbo"
+    quote_timestamp: str | None = None
 
     @property
     def mid(self) -> float:
@@ -609,7 +666,45 @@ def _fetch_chain(
             delta=delta,
             bid=quote.bid_price or 0.0,
             ask=quote.ask_price or 0.0,
+            implied_volatility=getattr(snap, "implied_volatility", None),
+            quote_timestamp=str(getattr(quote, "timestamp", "") or "") or None,
         ))
+    if tradier_selected() and legs:
+        try:
+            tradier_quotes = fetch_tradier_quotes(leg.symbol for leg in legs)
+        except Exception as exc:
+            log.error(
+                f"{symbol} chain quote overlay ({right}, DTE {dte_min}-{dte_max}) failed: {exc}; "
+                "rejecting chain instead of falling back to indicative prices"
+            )
+            return []
+        fresh_legs: list[Leg] = []
+        stale_or_missing = 0
+        for leg in legs:
+            parsed = tradier_quotes.get(leg.symbol)
+            if not parsed or not tradier_quote_is_fresh(parsed):
+                stale_or_missing += 1
+                continue
+            live_quote = parsed["quote"]
+            leg.bid = float(live_quote["bid"])
+            leg.ask = float(live_quote["ask"])
+            leg.quote_timestamp = str(live_quote.get("quote_timestamp") or "") or None
+            leg.quote_provider = PROVIDER_TRADIER
+            leg.quote_scope = TRADIER_QUOTE_SCOPE
+            fresh_legs.append(leg)
+        if stale_or_missing:
+            log.warning(
+                f"{symbol} Tradier overlay rejected {stale_or_missing}/{len(legs)} "
+                "contracts with missing, invalid, or stale bid/ask"
+            )
+        legs = fresh_legs
+    for expiry in {leg.expiry for leg in legs}:
+        key = (symbol, expiry.isoformat())
+        existing = {row["symbol"]: row for row in _JOURNAL_OPTION_CHAINS.get(key, [])}
+        for leg in legs:
+            if leg.expiry == expiry:
+                existing[leg.symbol] = _leg_market_snapshot(leg)
+        _JOURNAL_OPTION_CHAINS[key] = list(existing.values())
     return legs
 
 
@@ -684,6 +779,7 @@ SPREAD_VIX_MAX = float(os.getenv("SPREAD_VIX_MAX", "35.0"))
 _JOURNAL_VIX: float | None = None
 _JOURNAL_VIX_TERM_RATIO: float | None = None
 _JOURNAL_IV_RANK: dict[str, float] = {}
+_JOURNAL_OPTION_CHAINS: dict[tuple[str, str], list[dict]] = {}
 
 
 def _vix_in_range() -> bool:
@@ -791,7 +887,7 @@ def _market_is_open() -> bool:
 
 # â”€â”€ Account helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _equity(trade_client: TradingClient) -> float:
-    actual_equity = float(trade_client.get_account().equity)
+    actual_equity = float(_broker_read(trade_client.get_account, "get_account").equity)
     if ACCOUNT_SIZE_OVERRIDE > 0:
         log.info(
             f"Account equity override active: sizing from ${ACCOUNT_SIZE_OVERRIDE:,.2f} "
@@ -803,15 +899,18 @@ def _equity(trade_client: TradingClient) -> float:
 
 def _open_option_count(trade_client: TradingClient) -> int:
     return sum(
-        1 for p in trade_client.get_all_positions()
+        1 for p in _broker_read(trade_client.get_all_positions, "get_all_positions_for_count")
         if getattr(p, "asset_class", "") == "us_option"
     )
 
 
 def _trades_today(trade_client: TradingClient) -> int:
     since = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    orders = trade_client.get_orders(
-        GetOrdersRequest(status=QueryOrderStatus.ALL, after=since, limit=50)
+    orders = _broker_read(
+        lambda: trade_client.get_orders(
+            GetOrdersRequest(status=QueryOrderStatus.ALL, after=since, limit=50)
+        ),
+        "get_orders_for_daily_limit",
     )
     return sum(1 for o in orders if getattr(o, "order_class", "") == "mleg"
                and o.status in ("filled", "partially_filled"))
@@ -851,6 +950,12 @@ def _load_trade_state() -> dict:
         return state
     except Exception as exc:
         log.error(f"Could not read trade state {TRADE_STATE_FILE}: {exc}")
+        _alert(
+            f"⚠️ **Trade state file unreadable** — starting with empty state.\n"
+            f"Error: `{exc}`\n"
+            f"File: `{TRADE_STATE_FILE}`\n"
+            f"**Verify open broker positions manually before any new entries.**"
+        )
         return {"trades": []}
 
 
@@ -914,6 +1019,7 @@ def _order_snapshot(order_id: str) -> Optional[dict]:
         resp = r.get(
             f"{BASE}/v2/orders/{order_id}",
             headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
+            params={"nested": "true"},
             timeout=10,
         )
         resp.raise_for_status()
@@ -922,6 +1028,58 @@ def _order_snapshot(order_id: str) -> Optional[dict]:
     except Exception as exc:
         log.warning(f"Could not refresh closing order {order_id}: {exc}")
         return None
+
+
+def _order_snapshot_by_client_id(client_order_id: str) -> Optional[dict]:
+    """Recover an order whose submission response was lost."""
+    import requests as r
+
+    key = os.getenv("ALPACA_API_KEY", "")
+    secret = os.getenv("ALPACA_SECRET_KEY", "")
+    if not client_order_id or not key or not secret:
+        return None
+    try:
+        response = r.get(
+            f"{BASE}/v2/orders:by_client_order_id",
+            params={"client_order_id": client_order_id},
+            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
+            timeout=10,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else None
+    except Exception as exc:
+        log.warning(f"Could not recover client order {client_order_id}: {exc}")
+        return None
+
+
+def _cancel_order_by_id(order_id: str) -> bool:
+    """Request cancellation; callers must still confirm terminal status."""
+    import requests as r
+
+    key = os.getenv("ALPACA_API_KEY", "")
+    secret = os.getenv("ALPACA_SECRET_KEY", "")
+    if not order_id or not key or not secret:
+        return False
+    try:
+        response = r.delete(
+            f"{BASE}/v2/orders/{order_id}",
+            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
+            timeout=10,
+        )
+        if response.status_code not in {200, 204}:
+            detail = (response.text or "").strip().replace("\n", " ")[:1000]
+            log.warning(
+                f"Cancel request for {order_id} returned {response.status_code}: "
+                f"{detail or '<empty response>'}"
+            )
+            return False
+        return True
+    except Exception as exc:
+        log.warning(f"Cancel request failed for {order_id}: {exc}")
+        return False
 
 
 def _apply_closing_fill(trade: dict, order: dict) -> bool:
@@ -944,6 +1102,44 @@ def _apply_closing_fill(trade: dict, order: dict) -> bool:
     return True
 
 
+def _apply_verified_group_close_fill(
+    trade: dict,
+    order: dict,
+    *,
+    order_id: str,
+    close_reason: str,
+) -> bool:
+    """Close state only after a full, exact MLEG broker fill is verified."""
+    order_legs = {
+        str(leg.get("symbol"))
+        for leg in (order.get("legs") or [])
+        if isinstance(leg, dict) and leg.get("symbol")
+    }
+    tracked_legs = {str(symbol) for symbol in (trade.get("legs") or [])}
+    try:
+        filled_qty = float(order.get("filled_qty") or 0)
+        required_qty = float(trade.get("qty") or 1)
+    except (TypeError, ValueError):
+        return False
+    if (
+        order.get("order_class") != "mleg"
+        or not tracked_legs
+        or order_legs != tracked_legs
+        or filled_qty < required_qty
+    ):
+        return False
+    if not _apply_closing_fill(trade, order):
+        return False
+    trade["status"] = "closed"
+    trade["closed_at"] = order.get("filled_at") or _utc_timestamp()
+    trade["closing_order_id"] = order_id
+    trade["closing_order_status"] = "filled"
+    trade["closing_reason"] = close_reason
+    trade["close_verified_by"] = "alpaca_filled_mleg_order"
+    _clear_flat_observation(trade)
+    return True
+
+
 def _refresh_filled_group_closes(state: dict) -> bool:
     """Retire economic groups only after their exact MLEG close is filled."""
     changed = False
@@ -953,45 +1149,93 @@ def _refresh_filled_group_closes(state: dict) -> bool:
         order = _order_snapshot(str(trade["closing_order_id"]))
         if not order or order.get("status") != "filled":
             continue
-        order_legs = [
-            str(leg.get("symbol"))
-            for leg in (order.get("legs") or [])
-            if isinstance(leg, dict) and leg.get("symbol")
-        ]
-        tracked_legs = [str(symbol) for symbol in (trade.get("legs") or [])]
-        try:
-            filled_qty = float(order.get("filled_qty") or 0)
-            required_qty = float(trade.get("qty") or 1)
-        except (TypeError, ValueError):
-            continue
-        if (
-            order.get("order_class") != "mleg"
-            or len(order_legs) != len(tracked_legs)
-            or set(order_legs) != set(tracked_legs)
-            or filled_qty < required_qty
+        if not _apply_verified_group_close_fill(
+            trade,
+            order,
+            order_id=str(trade["closing_order_id"]),
+            close_reason=str(trade.get("closing_reason") or "group close"),
         ):
             log.error(
                 f"{trade.get('label', 'trade')}: filled closing order does not exactly "
-                "match the tracked group; leaving state closing for manual review"
-            )
-            continue
-        if not _apply_closing_fill(trade, order):
-            log.error(
-                f"{trade.get('label', 'trade')}: close fill has invalid economics; "
+                "match the tracked group or has invalid economics; "
                 "leaving state closing for manual review"
             )
             continue
-        trade["status"] = "closed"
-        trade["closed_at"] = order.get("filled_at") or _utc_timestamp()
-        trade["closing_order_status"] = "filled"
-        trade["close_verified_by"] = "alpaca_filled_mleg_order"
-        _clear_flat_observation(trade)
         log.info(
             f"{trade.get('label', 'trade')}: close order {trade['closing_order_id']} "
             f"filled; economic group marked closed"
         )
         changed = True
     return changed
+
+
+_PROFIT_ORDER_TERMINAL = {"canceled", "expired", "rejected", "replaced"}
+_PROFIT_ORDER_LIVE = {
+    "accepted", "new", "pending_new", "accepted_for_bidding", "partially_filled",
+    "pending_cancel", "pending_replace", "done_for_day", "stopped", "suspended", "calculated",
+}
+
+
+def _refresh_resting_profit_orders(state: dict) -> tuple[bool, bool]:
+    """Refresh paper target orders and report whether exit state is unambiguous."""
+    changed = False
+    integrity_ok = True
+    for trade in state.get("trades", []):
+        order_id = str(trade.get("profit_order_id") or "")
+        if not order_id or trade.get("status") != "open":
+            continue
+        order = _order_snapshot(order_id)
+        if not order:
+            trade["profit_order_refresh_error_at"] = _utc_timestamp()
+            integrity_ok = False
+            changed = True
+            continue
+        status = str(order.get("status") or "").lower()
+        if trade.get("profit_order_status") != status:
+            trade["profit_order_status"] = status
+            changed = True
+        try:
+            filled_qty = float(order.get("filled_qty") or 0)
+            required_qty = float(trade.get("qty") or 1)
+        except (TypeError, ValueError):
+            filled_qty = 0.0
+            required_qty = 1.0
+        if status == "filled":
+            if _apply_verified_group_close_fill(
+                trade,
+                order,
+                order_id=order_id,
+                close_reason="resting profit target filled",
+            ):
+                trade["profit_order_filled_at"] = order.get("filled_at") or trade["closed_at"]
+                changed = True
+                log.info(
+                    f"{trade.get('label', 'trade')}: resting profit order {order_id} "
+                    "filled; economic group marked closed"
+                )
+            else:
+                trade["profit_order_manual_review"] = "filled_order_mismatch_or_invalid_economics"
+                integrity_ok = False
+                changed = True
+            continue
+        if 0 < filled_qty < required_qty or status == "partially_filled":
+            trade["profit_order_manual_review"] = "partial_mleg_fill_requires_reconciliation"
+            trade["profit_order_partial_filled_qty"] = filled_qty
+            integrity_ok = False
+            changed = True
+            continue
+        if status in _PROFIT_ORDER_TERMINAL:
+            trade["profit_order_terminal_at"] = (
+                order.get("canceled_at") or order.get("expired_at") or _utc_timestamp()
+            )
+            trade.pop("profit_order_id", None)
+            trade["profit_order_attempt"] = int(trade.get("profit_order_attempt") or 0) + 1
+            changed = True
+        elif status not in _PROFIT_ORDER_LIVE:
+            trade["profit_order_manual_review"] = f"unknown_order_status:{status or 'missing'}"
+            integrity_ok = False
+            changed = True
+    return changed, integrity_ok
 
 
 def _refresh_filled_ic_rolls(state: dict) -> bool:
@@ -1302,12 +1546,15 @@ def _open_underlying_trade_count(trade_client: TradingClient, underlying: str) -
     )
     try:
         untracked = {
-            p.symbol for p in trade_client.get_all_positions()
+            p.symbol for p in _broker_read(
+                trade_client.get_all_positions,
+                f"get_all_positions_for_{underlying}_exposure",
+            )
             if getattr(p, "asset_class", "") == "us_option" and str(p.symbol).startswith(underlying)
         }
-    except Exception as exc:
-        log.warning(f"{underlying}: could not inspect open option positions for exposure cap: {exc}")
-        untracked = set()
+    except AlpacaReadUnavailable as exc:
+        log.error(f"{underlying}: broker exposure is unknown; blocking additional entries: {exc}")
+        return MAX_OPEN_TRADES_PER_UNDERLYING
     return tracked + (1 if untracked else 0)
 
 
@@ -1353,7 +1600,70 @@ def _leg_market_snapshot(leg: Leg) -> dict:
         "bid": leg.bid,
         "ask": leg.ask,
         "mid": leg.mid,
+        "implied_volatility": leg.implied_volatility,
+        "quote_provider": leg.quote_provider,
+        "quote_scope": leg.quote_scope,
+        "quote_timestamp": leg.quote_timestamp,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _entry_volatility_edge(symbol: str, expiry: date, legs: list[Leg]) -> dict:
+    """Build research telemetry without granting it entry or sizing authority."""
+    selected = [{**_leg_market_snapshot(leg), "ratio_qty": 1} for leg in legs]
+    chain = _JOURNAL_OPTION_CHAINS.get((symbol, expiry.isoformat()), selected)
+    closes: list[float] = []
+    earnings_dates: list[date] | None = [] if symbol in {"IWM", "SPY", "QQQ"} else None
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1y")
+        closes = [float(value) for value in hist["Close"].dropna().tolist()]
+        if earnings_dates is None:
+            calendar = ticker.calendar
+            raw_dates = []
+            if isinstance(calendar, dict):
+                raw_dates = calendar.get("Earnings Date") or calendar.get("Earnings Dates") or []
+            elif hasattr(calendar, "columns") and "Earnings Date" in calendar.columns:
+                raw_dates = calendar["Earnings Date"].dropna().tolist()
+            elif hasattr(calendar, "index") and "Earnings Date" in calendar.index:
+                value = calendar.loc["Earnings Date"]
+                raw_dates = value.tolist() if hasattr(value, "tolist") else [value]
+            if not isinstance(raw_dates, (list, tuple)):
+                raw_dates = [raw_dates]
+            parsed_dates = []
+            for value in raw_dates:
+                try:
+                    parsed_dates.append(value.date() if hasattr(value, "date") else date.fromisoformat(str(value)[:10]))
+                except (TypeError, ValueError):
+                    continue
+            earnings_dates = parsed_dates
+    except Exception as exc:
+        log.warning(f"{symbol}: volatility-edge history unavailable: {exc}")
+    try:
+        from scripts.market_catalyst_calendar import EVENTS_2026
+        macro_events = EVENTS_2026
+    except Exception:
+        macro_events = None
+    try:
+        return capture_entry_snapshot(
+            symbol=symbol,
+            expiry=expiry,
+            selected_legs=selected,
+            chain_legs=chain,
+            vix_at_entry=_JOURNAL_VIX,
+            closes=closes,
+            macro_events=macro_events,
+            earnings_dates=earnings_dates,
+        )
+    except Exception as exc:
+        log.warning(f"{symbol}: volatility-edge telemetry failed: {exc}")
+        return {
+            "method_version": "maturity_matched_vol_premium_v1",
+            "authority": "shadow_research_only",
+            "status": "capture_failed",
+            "error": str(exc),
+            "gate_changed": False,
+        }
 
 
 def _record_mleg_shadow_assumption(
@@ -1391,16 +1701,27 @@ def _record_mleg_shadow_assumption(
         "vix_at_entry": _JOURNAL_VIX,
         "vix_term_ratio": _JOURNAL_VIX_TERM_RATIO,
         "iv_rank_at_entry": _JOURNAL_IV_RANK.get(symbol),
+        "volatility_edge": _entry_volatility_edge(symbol, expiry, legs),
         "shadow_assumption_lab": {
             "authority": "pre_submit_read_only_counterfactual",
             "blocked_before_order_path": True,
         },
     }
-    candidate_id = shadow_twin_record_candidate(
+    evidence = record_matched_setup(
+        {
+            "source_strategy": strategy,
+            "underlying": symbol,
+            "decision_at": datetime.now(timezone.utc).isoformat(),
+            "gate_states": {"formed_candidate": True, decision: False},
+            "warning_states": [decision],
+        },
         trade_meta,
         legs_payload,
         effective_qty=max(1, qty),
+        candidate_recorder=shadow_twin_record_candidate,
+        decision_recorder=shadow_twin_record_decision,
     )
+    candidate_id = evidence.get("primary_candidate_id")
     shadow_twin_record_decision(
         candidate_id,
         decision,
@@ -1615,6 +1936,26 @@ def _latest_option_quotes(
     """Fetch one coherent latest-quote set for an economic option group."""
     if not symbols:
         return {}
+    if tradier_selected():
+        try:
+            payload = fetch_tradier_quotes(symbols)
+        except Exception as exc:
+            log.error(f"Tradier option group quote fetch failed for {symbols}: {exc}")
+            return {}
+        quotes: dict[str, dict] = {}
+        for symbol in sorted(set(symbols)):
+            parsed = payload.get(symbol)
+            if not parsed or not tradier_quote_is_fresh(parsed):
+                continue
+            quote = parsed["quote"]
+            quotes[symbol] = {
+                "bid": float(quote["bid"]),
+                "ask": float(quote["ask"]),
+                "timestamp": str(quote.get("quote_timestamp") or ""),
+                "provider": PROVIDER_TRADIER,
+                "quote_scope": TRADIER_QUOTE_SCOPE,
+            }
+        return quotes
     try:
         request = OptionLatestQuoteRequest(symbol_or_symbols=sorted(set(symbols)))
         payload = data_client.get_option_latest_quote(request)
@@ -1907,6 +2248,180 @@ def _can_submit_option_close_orders() -> bool:
     return _market_is_open()
 
 
+def _resting_profit_close_legs(trade: dict) -> list[dict] | None:
+    tracked = {str(symbol) for symbol in (trade.get("legs") or [])}
+    details = trade.get("leg_details") if isinstance(trade.get("leg_details"), list) else []
+    detail_symbols = {str(leg.get("symbol") or "") for leg in details if isinstance(leg, dict)}
+    if not tracked or detail_symbols != tracked or len(details) != len(tracked):
+        return None
+    close_legs = []
+    for leg in details:
+        entry_side = str(leg.get("side") or "").lower()
+        if entry_side not in {"buy", "sell"}:
+            return None
+        close_side = "sell" if entry_side == "buy" else "buy"
+        close_legs.append({
+            "symbol": str(leg["symbol"]),
+            "side": close_side,
+            "ratio_qty": str(max(1, int(leg.get("ratio_qty") or 1))),
+            "position_intent": f"{close_side}_to_close",
+        })
+    return close_legs
+
+
+def _ensure_paper_resting_profit_order(trade: dict) -> tuple[bool, bool]:
+    """Submit one broker-held DAY target only for a confirmed paper MLEG fill."""
+    if not ENABLE_PAPER_RESTING_PROFIT_ORDERS:
+        return False, True
+    if not PAPER:
+        log.error("Resting profit orders are paper-only; refusing live submission")
+        return False, False
+    if trade.get("status") != "open" or trade.get("profit_order_id"):
+        return False, True
+    if trade.get("profit_order_manual_review"):
+        return False, False
+    if trade.get("entry_fill_source") != "alpaca_filled_avg_price":
+        return False, True
+    try:
+        qty = int(trade.get("qty") or 0)
+        filled_qty = float(trade.get("entry_filled_qty") or 0)
+        entry_credit = float(trade.get("net_credit") or 0)
+        profit_pct = float(trade.get("profit_close_pct", PS_PROFIT_CLOSE_PCT))
+    except (TypeError, ValueError):
+        return False, False
+    if qty < 1 or filled_qty < qty or entry_credit <= 0 or not 0 < profit_pct < 1:
+        return False, False
+    close_legs = _resting_profit_close_legs(trade)
+    if not close_legs:
+        trade["profit_order_manual_review"] = "missing_or_mismatched_leg_details"
+        return True, False
+    target_debit = round(max(0.01, entry_credit * (1.0 - profit_pct)), 2)
+    session_date = _now_et().date().isoformat()
+    trade_id = re.sub(r"[^a-zA-Z0-9]", "", str(trade.get("id") or "group"))[:12] or "group"
+    attempt = max(0, int(trade.get("profit_order_attempt") or 0))
+    client_order_id = (
+        f"vibe-tp-{trade_id}-{session_date.replace('-', '')}-{attempt}"
+    )[:48]
+    body = {
+        "type": "limit",
+        "limit_price": f"{target_debit:.2f}",
+        "time_in_force": "day",
+        "order_class": "mleg",
+        "qty": str(qty),
+        "client_order_id": client_order_id,
+        "legs": close_legs,
+    }
+    order = _order_snapshot_by_client_id(client_order_id)
+    recovered = bool(order)
+    if not order:
+        order = _post_order_with_retry(
+            body,
+            f"{trade.get('label', 'trade')} resting profit target",
+            risk_reducing_close=True,
+        )
+    if not order:
+        order = _order_snapshot_by_client_id(client_order_id)
+        recovered = bool(order)
+    order_id = str((order or {}).get("id") or (order or {}).get("client_order_id") or "")
+    if not order_id:
+        trade["profit_order_submit_error_at"] = _utc_timestamp()
+        return True, False
+    trade["profit_order_id"] = order_id
+    trade["profit_order_client_id"] = client_order_id
+    trade["profit_order_status"] = str(order.get("status") or "pending_new").lower()
+    trade["profit_order_limit_debit"] = target_debit
+    trade["profit_order_session_date"] = session_date
+    trade["profit_order_submitted_at"] = order.get("submitted_at") or _utc_timestamp()
+    trade["profit_order_recovered_by_client_id"] = recovered
+    log.info(
+        f"{trade.get('label', 'trade')}: paper resting MLEG target submitted "
+        f"order={order_id} debit={target_debit:.2f}"
+    )
+    return True, True
+
+
+def _cancel_resting_profit_order(trade: dict, reason: str) -> str:
+    """Cancel and confirm a target before another exit; return clear/filled/blocked."""
+    order_id = str(trade.get("profit_order_id") or "")
+    if not order_id:
+        return "clear"
+    order = _order_snapshot(order_id)
+    if not order:
+        trade["profit_order_cancel_blocked"] = "order_snapshot_unavailable"
+        return "blocked"
+    status = str(order.get("status") or "").lower()
+    try:
+        filled_qty = float(order.get("filled_qty") or 0)
+        required_qty = float(trade.get("qty") or 1)
+    except (TypeError, ValueError):
+        filled_qty = 0.0
+        required_qty = 1.0
+    if status == "filled":
+        if _apply_verified_group_close_fill(
+            trade,
+            order,
+            order_id=order_id,
+            close_reason="resting profit target filled during exit race",
+        ):
+            trade["profit_order_filled_at"] = order.get("filled_at") or trade["closed_at"]
+            return "filled"
+        trade["profit_order_manual_review"] = "filled_order_mismatch_or_invalid_economics"
+        return "blocked"
+    if 0 < filled_qty < required_qty or status == "partially_filled":
+        _cancel_order_by_id(order_id)
+        trade["profit_order_manual_review"] = "partial_mleg_fill_requires_reconciliation"
+        trade["profit_order_partial_filled_qty"] = filled_qty
+        return "blocked"
+    if status in _PROFIT_ORDER_TERMINAL:
+        trade["profit_order_terminal_at"] = (
+            order.get("canceled_at") or order.get("expired_at") or _utc_timestamp()
+        )
+        trade.pop("profit_order_id", None)
+        return "clear"
+    if status not in _PROFIT_ORDER_LIVE:
+        trade["profit_order_manual_review"] = f"unknown_order_status:{status or 'missing'}"
+        return "blocked"
+
+    trade["profit_order_cancel_reason"] = reason
+    trade["profit_order_cancel_requested_at"] = _utc_timestamp()
+    _cancel_order_by_id(order_id)
+    confirmation = _order_snapshot(order_id)
+    if not confirmation:
+        trade["profit_order_cancel_blocked"] = "cancel_confirmation_unavailable"
+        return "blocked"
+    confirmed_status = str(confirmation.get("status") or "").lower()
+    if confirmed_status == "filled":
+        if _apply_verified_group_close_fill(
+            trade,
+            confirmation,
+            order_id=order_id,
+            close_reason="resting profit target filled during cancel race",
+        ):
+            trade["profit_order_filled_at"] = confirmation.get("filled_at") or trade["closed_at"]
+            return "filled"
+        trade["profit_order_manual_review"] = "cancel_race_fill_mismatch_or_invalid_economics"
+        return "blocked"
+    try:
+        confirmed_filled = float(confirmation.get("filled_qty") or 0)
+    except (TypeError, ValueError):
+        confirmed_filled = 0.0
+    if confirmed_filled > 0 or confirmed_status == "partially_filled":
+        trade["profit_order_manual_review"] = "partial_fill_detected_during_cancel"
+        trade["profit_order_partial_filled_qty"] = confirmed_filled
+        return "blocked"
+    if confirmed_status in _PROFIT_ORDER_TERMINAL:
+        trade["profit_order_status"] = confirmed_status
+        trade["profit_order_terminal_at"] = (
+            confirmation.get("canceled_at") or confirmation.get("expired_at") or _utc_timestamp()
+        )
+        trade.pop("profit_order_id", None)
+        trade.pop("profit_order_cancel_blocked", None)
+        return "clear"
+    trade["profit_order_status"] = confirmed_status
+    trade["profit_order_cancel_blocked"] = f"cancel_not_terminal:{confirmed_status or 'missing'}"
+    return "blocked"
+
+
 # â”€â”€ Multi-leg order submission via raw REST â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _trade_stop_loss_pct(trade: dict) -> float:
     raw_stop = float(trade.get("stop_loss_pct", STOP_LOSS_PCT))
@@ -1976,6 +2491,13 @@ def _post_order_with_retry(
         _alert(f"ORDER BLOCKED: **{label}**\nManual reset required before any new orders.")
         return None
 
+    # Keep one broker id across transport retries so a timeout cannot create
+    # distinct logical orders when the first request reached Alpaca.
+    request_body = dict(body)
+    if not request_body.get("client_order_id"):
+        slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:16] or "order"
+        request_body["client_order_id"] = f"vibe-{slug}-{uuid4().hex[:16]}"[:48]
+
     key = os.getenv("ALPACA_API_KEY", "")
     secret = os.getenv("ALPACA_SECRET_KEY", "")
     last_error = ""
@@ -1984,7 +2506,7 @@ def _post_order_with_retry(
         try:
             resp = r.post(
                 f"{BASE}/v2/orders",
-                json=body,
+                json=request_body,
                 headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret},
                 timeout=10,
             )
@@ -2006,17 +2528,23 @@ def _post_order_with_retry(
             if attempt > 1:
                 log.info(f"{label}: Alpaca order succeeded after {attempt} attempts")
             return resp.json()
-        except Exception as exc:
+        except (r.Timeout, r.ConnectionError) as exc:
             last_error = str(exc)
             if attempt < ORDER_RETRY_ATTEMPTS:
                 delay = ORDER_RETRY_BASE_SECONDS * (2 ** (attempt - 1))
                 log.warning(
                     f"{label}: Alpaca order attempt {attempt}/{ORDER_RETRY_ATTEMPTS} "
-                    f"failed: {exc}; retrying in {delay:.1f}s"
+                    f"had a transient transport failure: {exc}; retrying in {delay:.1f}s"
                 )
                 time.sleep(delay)
             else:
                 break
+        except r.RequestException as exc:
+            last_error = str(exc)
+            break
+        except Exception as exc:
+            last_error = str(exc)
+            break
 
     log.error(f"{label}: submission failed after {ORDER_RETRY_ATTEMPTS} attempt(s): {last_error}")
     _alert(f"ORDER SUBMISSION FAILED: **{label}**\nafter {ORDER_RETRY_ATTEMPTS} attempts\n{last_error}")
@@ -2131,13 +2659,84 @@ def _place_mleg(
 ) -> bool:
     trade_meta = dict(trade_meta or {})
     underlying = str(trade_meta.get("underlying") or label)
+    if "volatility_edge" not in trade_meta:
+        expiry_text = str(trade_meta.get("expiry") or "")
+        snapshots = trade_meta.get("leg_market_snapshots") or []
+        try:
+            expiry_value = date.fromisoformat(expiry_text)
+            selected_legs = [
+                Leg(
+                    symbol=str(row.get("symbol") or ""),
+                    expiry=expiry_value,
+                    strike=float(row.get("strike") or 0.0),
+                    right=str(row.get("right") or ""),
+                    delta=float(row.get("delta") or 0.0),
+                    bid=float(row.get("bid") or 0.0),
+                    ask=float(row.get("ask") or 0.0),
+                    implied_volatility=row.get("implied_volatility"),
+                )
+                for row in snapshots
+                if isinstance(row, dict)
+            ]
+            trade_meta["volatility_edge"] = _entry_volatility_edge(
+                underlying,
+                expiry_value,
+                selected_legs,
+            )
+        except (TypeError, ValueError):
+            trade_meta["volatility_edge"] = {
+                "method_version": "maturity_matched_vol_premium_v1",
+                "authority": "shadow_research_only",
+                "status": "expiry_or_leg_data_unavailable",
+                "gate_changed": False,
+            }
     consensus = shadow_entry_advice(underlying, qty)
-    shadow_candidate_id = shadow_twin_record_candidate(
+    evidence = record_matched_setup(
+        {
+            "source_strategy": str(trade_meta.get("strategy") or "mleg"),
+            "underlying": underlying,
+            "decision_at": datetime.now(timezone.utc).isoformat(),
+            "gate_states": trade_meta.get("gate_states")
+            if isinstance(trade_meta.get("gate_states"), dict)
+            else {"formed_candidate": True},
+            "warning_states": trade_meta.get("warning_states")
+            if isinstance(trade_meta.get("warning_states"), list)
+            else [],
+            "spot_at_entry": trade_meta.get("spot_at_entry"),
+            "event_context": trade_meta.get("event_context")
+            if isinstance(trade_meta.get("event_context"), dict)
+            else {},
+            "regime_context": trade_meta.get("regime_context")
+            if isinstance(trade_meta.get("regime_context"), dict)
+            else {},
+        },
         trade_meta,
         legs_payload,
         consensus=consensus,
         effective_qty=qty,
+        candidate_recorder=shadow_twin_record_candidate,
+        decision_recorder=shadow_twin_record_decision,
     )
+    shadow_candidate_id = evidence.get("primary_candidate_id")
+    if shadow_candidate_id is None:
+        legacy_meta = dict(trade_meta)
+        legacy_meta.update({
+            "evidence_authority": "legacy_incomplete_candidate_not_review_eligible",
+            "warning_states": sorted({
+                *(
+                    str(item)
+                    for item in legacy_meta.get("warning_states", [])
+                    if str(item)
+                ),
+                "matched_evidence_primary_unavailable",
+            }),
+        })
+        shadow_candidate_id = shadow_twin_record_candidate(
+            legacy_meta,
+            legs_payload,
+            consensus=consensus,
+            effective_qty=qty,
+        )
     if shadow_candidate_id:
         trade_meta["shadow_twin_candidate_id"] = shadow_candidate_id
     qty, garch_meta, garch_allowed = _garch_entry_adjustment(underlying, qty)
@@ -2316,14 +2915,25 @@ def monitor_and_close(
     data_client: OptionHistoricalDataClient | None = None,
 ) -> bool:
     """Monitor exits and return whether broker/state integrity permits entries."""
-    positions = [
-        p for p in trade_client.get_all_positions()
-        if getattr(p, "asset_class", "") == "us_option"
-    ]
+    try:
+        positions = [
+            p for p in _broker_read(trade_client.get_all_positions, "monitor_get_all_positions")
+            if getattr(p, "asset_class", "") == "us_option"
+        ]
+    except AlpacaReadUnavailable as exc:
+        log.error(f"MONITOR DEGRADED: broker positions unresolved; state left unchanged: {exc}")
+        _alert(
+            "OPTIONS MONITOR DEGRADED\n"
+            "Alpaca positions could not be confirmed after bounded retries. "
+            "No state was changed and new entries remain blocked."
+        )
+        return False
     state = _load_trade_state()
     state_changed = _refresh_entry_order_fills(state)
     state_changed = _refresh_filled_group_closes(state) or state_changed
     state_changed = _refresh_filled_ic_rolls(state) or state_changed
+    profit_changed, profit_orders_ok = _refresh_resting_profit_orders(state)
+    state_changed = profit_changed or state_changed
     if not positions:
         pending = [
             trade for trade in state.get("trades", [])
@@ -2363,7 +2973,7 @@ def monitor_and_close(
     position_by_symbol = {p.symbol: p for p in positions}
     state_changed = _recover_untracked_mleg_groups(trade_client, state) or state_changed
     monitored_symbols: set[str] = set()
-    integrity_ok = True
+    integrity_ok = profit_orders_ok
     reconciliation: dict = {"group_states": {}}
 
     # Quantity/direction-aware reconciliation (read-only). Symbol-set checks
@@ -2385,6 +2995,13 @@ def monitor_and_close(
 
     for trade in state.get("trades", []):
         if trade.get("status") not in ("open", "closing"):
+            continue
+        if trade.get("profit_order_manual_review"):
+            log.error(
+                f"{trade.get('label', 'trade')}: resting profit order requires manual "
+                f"reconciliation ({trade.get('profit_order_manual_review')}); exits fail closed"
+            )
+            integrity_ok = False
             continue
         legs = trade.get("legs", [])
         monitored_symbols.update(legs)
@@ -2525,6 +3142,17 @@ def monitor_and_close(
                     if strategy_name == "iron_condor" and dte <= IC_DTE_MANAGE_DAYS:
                         roll_reason = f"time roll: iron condor reached {dte} DTE"
                         if AUTO_CLOSE_GROUPS and _can_submit_option_close_orders():
+                            target_state = _cancel_resting_profit_order(trade, roll_reason)
+                            state_changed = True
+                            if target_state == "filled":
+                                continue
+                            if target_state != "clear":
+                                trade["exit_pending_reason"] = (
+                                    f"{roll_reason}; resting target cancellation unconfirmed"
+                                )
+                                trade["exit_pending_at"] = _utc_timestamp()
+                                integrity_ok = False
+                                continue
                             if _submit_ic_roll(trade_client, data_client, trade, dte, roll_reason):
                                 state_changed = True
                                 continue
@@ -2539,6 +3167,18 @@ def monitor_and_close(
 
             if reason:
                 if AUTO_CLOSE_GROUPS:
+                    if (
+                        reason.startswith("profit target hit:")
+                        and trade.get("profit_order_id")
+                        and str(trade.get("profit_order_status") or "").lower() in _PROFIT_ORDER_LIVE
+                    ):
+                        trade["profit_order_target_observed_at"] = _utc_timestamp()
+                        state_changed = True
+                        log.info(
+                            f"  -> {reason}; broker-held paper target remains active "
+                            f"order={trade.get('profit_order_id')}"
+                        )
+                        continue
                     if not _can_submit_option_close_orders():
                         already_pending = trade.get("exit_pending_reason") == reason
                         trade["exit_pending_reason"] = reason
@@ -2553,6 +3193,21 @@ def monitor_and_close(
                                 f"EXIT PENDING: **{trade.get('label', 'trade')}**\n"
                                 f"{reason}\nOption market is closed; monitor will retry next market session."
                             )
+                        continue
+                    target_state = _cancel_resting_profit_order(trade, reason)
+                    state_changed = True
+                    if target_state == "filled":
+                        continue
+                    if target_state != "clear":
+                        trade["exit_pending_reason"] = (
+                            f"{reason}; resting target cancellation unconfirmed"
+                        )
+                        trade["exit_pending_at"] = _utc_timestamp()
+                        integrity_ok = False
+                        log.warning(
+                            f"  -> {reason}; refusing second exit until resting target "
+                            "is terminal and unfilled"
+                        )
                         continue
                     log.info(f"  -> {reason}; closing all tracked legs for {trade.get('label', 'trade')}")
                     if _close_trade_group(trade_client, trade, reason):
@@ -2571,6 +3226,11 @@ def monitor_and_close(
                 trade.pop("exit_pending_reason", None)
                 trade.pop("exit_pending_at", None)
                 state_changed = True
+            else:
+                target_changed, target_ok = _ensure_paper_resting_profit_order(trade)
+                state_changed = target_changed or state_changed
+                if not target_ok:
+                    integrity_ok = False
         except Exception as exc:
             log.error(f"  Error monitoring {trade.get('label', 'trade')}: {exc}")
 
@@ -3497,11 +4157,21 @@ if __name__ == "__main__":
     )
     args = ap.parse_args()
 
-    if args.monitor_only:
-        tc, dc = _build_clients()
-        monitor_and_close(tc, dc)
-    else:
-        sym_list = [args.symbol.upper()] if args.symbol else None
-        main(strategy=args.strategy, symbols=sym_list)
+    try:
+        if args.monitor_only:
+            tc, dc = _build_clients()
+            monitor_and_close(tc, dc)
+        else:
+            sym_list = [args.symbol.upper()] if args.symbol else None
+            main(strategy=args.strategy, symbols=sym_list)
+    except Exception as exc:
+        import traceback
+        tb = traceback.format_exc()
+        log.critical(f"Unhandled exception — bot crashed: {exc}", exc_info=True)
+        _alert(
+            f"💥 **Bot crashed** ({'monitor' if args.monitor_only else 'entry'} run)\n"
+            f"`{type(exc).__name__}: {exc}`\n"
+            f"```\n{tb[-1400:]}\n```"
+        )
+        sys.exit(1)
 # end of file
-

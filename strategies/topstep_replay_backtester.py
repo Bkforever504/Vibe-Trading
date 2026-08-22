@@ -21,8 +21,14 @@ try:
     from strategies.topstep_prop_bot import (
         Candle,
         OpeningRangeConfig,
+        build_delta_fingerprint_signal,
+        build_false_breakout_signal,
         build_first_pullback_signal,
+        build_intraday_range_signal,
+        build_liquidity_sweep_mss_retest_signal,
+        build_late_orb_retest_signal,
         build_opening_range_signal,
+        build_vwap_deviation_signal,
         contract_for_symbol,
         load_candles_csv,
         session_vwap,
@@ -31,8 +37,14 @@ except ModuleNotFoundError:
     from topstep_prop_bot import (
         Candle,
         OpeningRangeConfig,
+        build_delta_fingerprint_signal,
+        build_false_breakout_signal,
         build_first_pullback_signal,
+        build_intraday_range_signal,
+        build_liquidity_sweep_mss_retest_signal,
+        build_late_orb_retest_signal,
         build_opening_range_signal,
+        build_vwap_deviation_signal,
         contract_for_symbol,
         load_candles_csv,
         session_vwap,
@@ -48,13 +60,14 @@ class BacktestConfig:
     commission_per_rt: float = 4.00
     max_trades_per_day: int = 1
     daily_loss_limit: float = 1000.0
+    daily_profit_cap: float = 0.0  # 0 = disabled; stops new entries once day P&L >= cap
     session_entry_start_hour: int = 0
     session_entry_start_minute: int = 0
     session_entry_cutoff_hour: int = 13
     session_entry_cutoff_minute: int = 0
     consistency_rule_pct: float = 0.50
     fixed_stop_ticks: int | None = None  # overrides signal.stop with entry ± N ticks
-    signal_type: str = "orb"  # "orb" or "pullback"
+    signal_type: str = "orb"
     pullback_tolerance_ticks: int = 4  # how close price must come to range level to count as pullback
     pullback_stop_ticks: int = 8  # ticks below range_high (long) or above range_low (short)
     require_daily_trend_confirm: bool = False
@@ -77,6 +90,8 @@ class BacktestConfig:
     vix_min: float = 15.0   # below = too calm, breakouts fail to follow through
     vix_max: float = 28.0   # above = too chaotic, stops blow through on news
     overnight_csv_path: str = ""  # path to nq_1h_overnight.csv; empty = disabled
+    crb_range_start_hour: int = 11
+    crb_range_start_minute: int = 30
 
 
 @dataclass
@@ -281,6 +296,8 @@ def replay_day(
         return []
     if day_pnl_running <= -bt_config.daily_loss_limit:
         return []
+    if bt_config.daily_profit_cap > 0 and day_pnl_running >= bt_config.daily_profit_cap:
+        return []
     if len(candles) <= orb_config.range_minutes:
         return []
 
@@ -292,6 +309,65 @@ def replay_day(
             pullback_tolerance_ticks=bt_config.pullback_tolerance_ticks,
             pullback_stop_ticks=bt_config.pullback_stop_ticks,
             require_bos_confirm=bt_config.require_bos_confirm,
+        )
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "late_retest":
+        result = build_late_orb_retest_signal(
+            candles,
+            orb_config,
+            symbol=symbol,
+            pullback_tolerance_ticks=bt_config.pullback_tolerance_ticks,
+            pullback_stop_ticks=bt_config.pullback_stop_ticks,
+        )
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "crb":
+        result = build_intraday_range_signal(
+            candles,
+            orb_config,
+            range_start_hour=bt_config.crb_range_start_hour,
+            range_start_minute=bt_config.crb_range_start_minute,
+            symbol=symbol,
+        )
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "fbf":
+        result = build_false_breakout_signal(candles, orb_config, symbol=symbol)
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "vdf":
+        result = build_vwap_deviation_signal(
+            candles, orb_config, symbol=symbol,
+            deviation_points=orb_config.min_breakout_points,
+        )
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "delta":
+        result = build_delta_fingerprint_signal(
+            candles, orb_config, symbol=symbol,
+            delta_threshold=orb_config.min_breakout_points / 10.0,
+        )
+        if result is None:
+            return []
+        signal, entry_idx = result
+        trigger = candles[entry_idx]
+    elif bt_config.signal_type == "lsm":
+        result = build_liquidity_sweep_mss_retest_signal(
+            candles,
+            orb_config,
+            symbol=symbol,
+            key_levels=key_levels,
         )
         if result is None:
             return []
@@ -426,7 +502,12 @@ def build_daily_trend_sides(candles: list[Candle], *, sma_days: int = 20) -> dic
 
 
 def build_opening_gap_sides(candles: list[Candle], *, min_gap_pct: float = 0.0) -> dict[str, str | None]:
-    """Return allowed side by date from prior close to current first open."""
+    """Return allowed side by date from prior close to current first open.
+
+    When contract provenance is available, a contract-roll boundary blocks the
+    gap signal instead of treating the change in futures contract as a market
+    move.
+    """
     if min_gap_pct < 0:
         raise ValueError("min_gap_pct must be non-negative")
 
@@ -434,10 +515,17 @@ def build_opening_gap_sides(candles: list[Candle], *, min_gap_pct: float = 0.0) 
     dates = sorted(days.keys())
     sides: dict[str, str | None] = {}
     prior_close: float | None = None
+    prior_instrument_id: str | None = None
 
     for date_str in dates:
         day = days[date_str]
-        if prior_close is None or prior_close <= 0:
+        current_instrument_id = day[0].instrument_id
+        changed_contract = (
+            prior_instrument_id is not None
+            and current_instrument_id is not None
+            and current_instrument_id != prior_instrument_id
+        )
+        if prior_close is None or prior_close <= 0 or changed_contract:
             sides[date_str] = None
         else:
             gap_pct = (day[0].open - prior_close) / prior_close
@@ -448,6 +536,7 @@ def build_opening_gap_sides(candles: list[Candle], *, min_gap_pct: float = 0.0) 
             else:
                 sides[date_str] = None
         prior_close = day[-1].close
+        prior_instrument_id = day[-1].instrument_id
 
     return sides
 
@@ -572,7 +661,8 @@ def run_backtest(
         if bt_config.require_opening_gap_bias
         else {}
     )
-    prior_levels = build_prior_day_levels(candles) if bt_config.require_key_level_proximity else {}
+    needs_prior_levels = bt_config.require_key_level_proximity or bt_config.signal_type == "lsm"
+    prior_levels = build_prior_day_levels(candles) if needs_prior_levels else {}
     overnight_levels = build_overnight_levels(bt_config.overnight_csv_path)
     vix_allowed = (
         build_vix_filter(bt_config.vix_csv_path, vix_min=bt_config.vix_min, vix_max=bt_config.vix_max)
@@ -603,7 +693,7 @@ def run_backtest(
                 gap_sides.get(date_str) if bt_config.require_opening_gap_bias else None,
             ),
             key_levels=_merge_key_levels(
-                prior_levels.get(date_str) if bt_config.require_key_level_proximity else None,
+                prior_levels.get(date_str) if needs_prior_levels else None,
                 overnight_levels.get(date_str),
             ),
         )
@@ -825,7 +915,7 @@ def main() -> None:
     parser.add_argument("--start-minute", type=int, default=0)
     parser.add_argument("--fixed-stop-ticks", type=int, default=None,
                         help="Override range stop with fixed N-tick stop from entry (e.g. 40 for 10pt on MNQ)")
-    parser.add_argument("--signal-type", choices=["orb", "pullback"], default="orb")
+    parser.add_argument("--signal-type", choices=["orb", "pullback", "late_retest", "crb", "fbf", "vdf", "delta", "lsm"], default="orb")
     parser.add_argument("--pullback-tolerance-ticks", type=int, default=4)
     parser.add_argument("--pullback-stop-ticks", type=int, default=8)
     parser.add_argument("--train-end", default=None, help="Inclusive YYYY-MM-DD train/test split date")

@@ -6,10 +6,11 @@ Two modes:
   --entry    Find catalyst setups and submit buy orders (run at 9:15am ET)
   --monitor  Check open trades, close at +75% profit or -50% stop (run every 15min)
 
-Three strategies:
+Core strategies:
   0DTE   -- buy ATM SPY call/put on FOMC/CPI/gap days, exit by 1:45pm
   Lotto  -- buy OTM call 2-4 days before earnings, exit day before print
   Break  -- buy OTM weekly call on momentum breakout + volume spike
+  Gap    -- paper-only opening-gap continuation after retest confirmation
 
 State file: ~/.vibe-trading/flip-trades.json
 
@@ -27,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import hashlib
 import json
 import logging
 import math
@@ -52,6 +54,7 @@ from strategies.flip_shadow_setup_challengers import (
 )
 from strategies.flip_contract_ranker import rank_contracts
 from strategies.flip_day_type_router import classify_intraday_day_type
+from strategies.flip_execution_policy import evaluate_long_option_quote
 from strategies.flip_retest_quality import score_retest_quality
 from strategies.spy_noise_area import evaluate_noise_area
 from strategies.spy_spx_execution_policy import (
@@ -60,7 +63,19 @@ from strategies.spy_spx_execution_policy import (
     execution_ladder_prices,
     marketable_exit_limits,
 )
+from strategies.methodical_decision_policy import (
+    evaluate_methodical_entry,
+    load_methodical_context,
+)
+from strategies.fibonacci_structure import (
+    analyze_fibonacci_structure,
+    build_fibonacci_execution_plan,
+    direction_from_option_right,
+)
+from strategies.flip_option_quote_subscription import request_option_quote
+from strategies.fibonacci_shadow_journal import record_plan as record_fibonacci_shadow_plan
 from scripts.alpaca_resilience import AlpacaReadUnavailable, get_json as alpaca_get_json
+from scripts.multitimeframe_pattern_memory import advise_setup as pattern_memory_advice
 
 try:
     from risk_kill_switch import DEFAULT_BLOCK_FILE, manual_reset_required
@@ -102,19 +117,38 @@ BASE   = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.ma
 HDR    = {"APCA-API-KEY-ID": KEY, "APCA-API-SECRET-KEY": SECRET, "Content-Type": "application/json"}
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK_URL", "")
 LIVE_EXECUTION_ENABLED = os.getenv("FLIP_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+METHODICAL_DECISION_ENABLED = os.getenv("FLIP_METHODICAL_DECISION_ENABLED", "true").lower() == "true"
+METHODICAL_DECISION_ENFORCEMENT_ENABLED = (
+    os.getenv("FLIP_METHODICAL_DECISION_ENFORCEMENT_ENABLED", "false").lower() == "true"
+)
+FIBONACCI_ANALYSIS_REQUIRED = (
+    os.getenv("FLIP_FIBONACCI_ANALYSIS_REQUIRED", "true").lower() == "true"
+)
 LIVE_APPROVAL_ACK_VALUE = os.getenv("FLIP_LIVE_APPROVAL_ACK", "")
 RH_MIMIC_MODE = os.getenv("RH_MIMIC_MODE", "false").lower() == "true"
 RH_ACCOUNT_SIZE = float(os.getenv("RH_ACCOUNT_SIZE", "0") or 0)
 
 # â"€â"€ State â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\flip-trades.json"))
+EXPLORATION_STATE_FILE = Path(os.path.expanduser(r"~\.vibe-trading\flip-exploration-trades.json"))
+EXPLORATION_MAX_DAILY   = int(os.getenv("FLIP_EXPLORATION_MAX_DAILY", "1"))
+EXPLORATION_MAX_OPEN    = int(os.getenv("FLIP_EXPLORATION_MAX_OPEN",  "1"))
+EXPLORATION_MAX_NOTIONAL_DOLLARS = float(
+    os.getenv("FLIP_EXPLORATION_MAX_NOTIONAL_DOLLARS", "100")
+)
 DECISION_LOG_FILE = Path(os.getenv("FLIP_DECISION_LOG_FILE", str(LOG_DIR / "flip-decisions.jsonl")))
 SHADOW_CANDIDATE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "flip_shadow_candidates_log.jsonl"
+PAIRED_DIRECTION_COLLECTION_LOG_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "paired_direction_collection_log.jsonl"
+)
 IV_HISTORY_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "iv_history_log.jsonl"
 SHADOW_CANDIDATE_SCHEMA_VERSION = 4
 OPTIONS_LIQUIDITY_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "options-liquidity-feasibility.json"
 OPTION_PREMIUM_LEVEL_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "option-premium-levels.json"
 EXECUTABLE_EDGE_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "flip-executable-edge.json"
+DAILY_UNIVERSE_LOG_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "daily_options_universe_ranker_log.jsonl"
+)
 OPTION_STREAM_CACHE_PATH = Path.home() / ".vibe-trading" / "state" / "flip-option-stream-quotes.json"
 MONITOR_LOCK_PATH = Path.home() / ".vibe-trading" / "locks" / "flip-monitor.lock"
 MARKET_FORCE_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "market-force-score.json"
@@ -124,9 +158,31 @@ MARKET_CONTEXT_SHADOW_MAX_AGE_SECONDS = 45 * 60
 ACCELERATED_SHADOW_LEARNING = os.getenv("ACCELERATED_SHADOW_LEARNING", "false").lower() == "true"
 SHADOW_EPISODE_INTERVAL_MINUTES = max(15, int(os.getenv("SHADOW_EPISODE_INTERVAL_MINUTES", "30")))
 SHADOW_EPISODE_HORIZON_MINUTES = max(15, int(os.getenv("SHADOW_EPISODE_HORIZON_MINUTES", "60")))
+SHADOW_PAIRED_DIRECTION_ENABLED = os.getenv("SHADOW_PAIRED_DIRECTION_ENABLED", "true").lower() == "true"
 SHADOW_MAX_ACTIVE_PER_SYMBOL = max(4, int(os.getenv("SHADOW_MAX_ACTIVE_PER_SYMBOL", "6")))
 SHADOW_MAX_ACTIVE_PER_SYMBOL_STRATEGY = 1
 SHADOW_CONTINUE_AFTER_TARGET = os.getenv("SHADOW_CONTINUE_AFTER_TARGET", "true").strip().lower() in {"1", "true", "yes", "on"}
+SHADOW_PAIR_MAX_QUOTE_AGE_SECONDS = max(
+    1.0, float(os.getenv("SHADOW_PAIR_MAX_QUOTE_AGE_SECONDS", "15.0"))
+)
+SHADOW_PAIR_MAX_QUOTE_SKEW_SECONDS = max(
+    0.1, float(os.getenv("SHADOW_PAIR_MAX_QUOTE_SKEW_SECONDS", "2.0"))
+)
+PAIRED_DIRECTION_POLICY_VERSION = "prior_date_context_neighbors_positive_lcb_v1"
+PAIRED_DIRECTION_POLICY_SPEC = {
+    "actions": ["CALL", "PUT", "NONE"],
+    "minimum_train_dates": 10,
+    "minimum_neighbors": 30,
+    "minimum_neighbor_dates": 5,
+    "minimum_similarity": 0.60,
+    "maximum_neighbors": 100,
+    "lower_confidence_z": 1.28,
+    "minimum_action_margin_pct": 2.0,
+    "training_data": "resolved_synchronized_forward_pairs_from_prior_dates_only",
+}
+PAIRED_DIRECTION_POLICY_SPEC_HASH = hashlib.sha256(
+    json.dumps(PAIRED_DIRECTION_POLICY_SPEC, sort_keys=True, separators=(",", ":")).encode("utf-8")
+).hexdigest()
 NOISE_AREA_PAPER_ENABLED = os.getenv("FLIP_NOISE_AREA_PAPER_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 NOISE_AREA_LOOKBACK_SESSIONS = max(14, int(os.getenv("FLIP_NOISE_AREA_LOOKBACK_SESSIONS", "14")))
 GEX_WALL_PROXIMITY_PCT = float(os.getenv("FLIP_GEX_WALL_PROXIMITY_PCT", "0.003"))  # 0.3% of spot
@@ -145,9 +201,12 @@ ORB_OTM_SIGMA              = float(os.getenv("FLIP_ORB_OTM_SIGMA", "1.0"))
 
 # â"€â"€ Config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
-MAX_RISK_PCT      = 0.02   # 2% account risk per trade (was 0.25 -- caused 69-contract blowup)
-MAX_CONTRACTS     = 5      # hard ceiling regardless of account size or option price
+MAX_RISK_PCT      = float(os.getenv("FLIP_MAX_RISK_PCT", "0.0025"))
+MAX_CONTRACTS     = max(1, int(os.getenv("FLIP_MAX_CONTRACTS", "1")))
+MAX_DAILY_LOSS_PCT = float(os.getenv("FLIP_MAX_DAILY_LOSS_PCT", "0.005"))
 MAX_ENTRY_SPREAD_CENTS = int(os.getenv("FLIP_MAX_ENTRY_SPREAD_CENTS", "10"))
+MIN_ENTRY_ASK = float(os.getenv("FLIP_MIN_ENTRY_ASK", "0.10"))
+MAX_EXECUTION_SPREAD_PCT = float(os.getenv("FLIP_MAX_EXECUTION_SPREAD_PCT", "0.10"))
 MAX_ENTRY_SLIPPAGE_PCT = float(os.getenv("FLIP_MAX_ENTRY_SLIPPAGE_PCT", "3.0"))
 MAX_ENTRY_QUOTE_AGE_SECONDS = float(os.getenv("FLIP_MAX_ENTRY_QUOTE_AGE_SECONDS", "15.0"))
 REQUIRE_OPRA_EXECUTION_QUOTES = os.getenv("FLIP_REQUIRE_OPRA_EXECUTION_QUOTES", "false").lower() == "true"
@@ -155,6 +214,7 @@ EXECUTABLE_EV_GATE_ENABLED = os.getenv("FLIP_EXECUTABLE_EV_GATE_ENABLED", "false
 ENTRY_LADDER_WAIT_SECONDS = max(0.0, float(os.getenv("FLIP_ENTRY_LADDER_WAIT_SECONDS", "2.0")))
 UNDERLYING_TIME_STOP_MINUTES = max(5, int(os.getenv("FLIP_UNDERLYING_TIME_STOP_MINUTES", "25")))
 STREAM_QUOTE_MAX_AGE_SECONDS = max(0.5, float(os.getenv("FLIP_STREAM_QUOTE_MAX_AGE_SECONDS", "3.0")))
+OPRA_ENTRY_QUOTE_WAIT_SECONDS = max(0.0, float(os.getenv("FLIP_OPRA_ENTRY_QUOTE_WAIT_SECONDS", "6.0")))
 PROFIT_MULT       = 1.75   # entry * 1.75 = target (+75%)
 STOP_MULT         = 0.70   # entry * 0.70 = stop   (-30%)
 # Ratchet tuned from 861-trade shadow dataset (Aug 2026):
@@ -174,8 +234,8 @@ MAX_SPREAD_PCT = float(os.getenv("FLIP_MAX_SPREAD_PCT", "0.30"))  # 30% of mid =
 # ratchet floors leaking ~28 points because the 15-minute scheduler gap is longer
 # than a 0DTE option's adverse move. While positions are open, the monitor loops
 # in-process at this cadence instead of sleeping until the next scheduled run.
-MONITOR_PROTECT_LOOP_SECONDS = max(15, int(os.getenv("FLIP_MONITOR_PROTECT_LOOP_SECONDS", "60")))
-MONITOR_PROTECT_WINDOW_MINUTES = float(os.getenv("FLIP_MONITOR_PROTECT_WINDOW_MINUTES", "12"))
+MONITOR_PROTECT_LOOP_SECONDS = max(15, int(os.getenv("FLIP_MONITOR_PROTECT_LOOP_SECONDS", "30")))
+MONITOR_PROTECT_WINDOW_MINUTES = float(os.getenv("FLIP_MONITOR_PROTECT_WINDOW_MINUTES", "14"))
 SHADOW_DEFENSIVE_EXIT_LOSS_PCT = float(os.getenv("FLIP_SHADOW_DEFENSIVE_EXIT_LOSS_PCT", "0.0"))
 SHADOW_DEFENSIVE_EXIT_BLOCKERS = {
     "shadow_direction_flip",
@@ -199,9 +259,12 @@ PRIMARY_STAND_ASIDE_BLOCKERS = {
     "mixed_higher_timeframes",
     "weak_shadow_pnl_evidence",
 }
+EXPLORATION_STAND_ASIDE_BLOCKER_THRESHOLD = max(
+    2, int(os.getenv("FLIP_EXPLORATION_STAND_ASIDE_BLOCKER_THRESHOLD", "3"))
+)
 GAP_THRESHOLD     = 0.0075
 VOLUME_SPIKE      = 2.5
-MAX_OPEN_FLIPS    = 2
+MAX_OPEN_FLIPS    = max(1, int(os.getenv("FLIP_MAX_OPEN_POSITIONS", "1")))
 SAME_DAY_REENTRY_MIN_CONFIDENCE = 10.0
 BEAR_TREND_MIN_CONFIDENCE = 8.5  # matches ExecutionGuardConfig.min_confidence default
 BULL_TREND_MIN_CONFIDENCE = 8.5  # require genuine guard-grade confirmation; never pad confidence
@@ -217,6 +280,34 @@ TREND_PULLBACK_LOOKBACK_BARS = 8
 TREND_PULLBACK_TOLERANCE_BPS = 8.0
 TREND_MAX_ORB_EXTENSION_FRACTION = 1.5
 NOISE_AREA_PAPER_CONTRACT_CAP = 1
+GAP_CONTINUATION_MIN_GAP_PCT = float(
+    os.getenv("FLIP_GAP_CONTINUATION_MIN_GAP_PCT", str(GAP_THRESHOLD))
+)
+GAP_CONTINUATION_MAX_GAP_PCT = float(
+    os.getenv("FLIP_GAP_CONTINUATION_MAX_GAP_PCT", "0.06")
+)
+GAP_CONTINUATION_MIN_RELATIVE_PCT = float(
+    os.getenv("FLIP_GAP_CONTINUATION_MIN_RELATIVE_PCT", "0.0015")
+)
+GAP_CONTINUATION_MAX_VWAP_EXTENSION_PCT = float(
+    os.getenv("FLIP_GAP_CONTINUATION_MAX_VWAP_EXTENSION_PCT", "0.006")
+)
+GAP_CONTINUATION_MIN_VOLUME_RATIO = float(
+    os.getenv("FLIP_GAP_CONTINUATION_MIN_VOLUME_RATIO", "1.10")
+)
+GAP_CONTINUATION_MIN_BARS = max(
+    20, int(os.getenv("FLIP_GAP_CONTINUATION_MIN_BARS", "20"))
+)
+GAP_CONTINUATION_ENTRY_START_ET = dtime(9, 50)
+GAP_CONTINUATION_ENTRY_END_ET = dtime(10, 30)
+GAP_OPTION_MIN_DTE = max(0, int(os.getenv("FLIP_GAP_OPTION_MIN_DTE", "1")))
+GAP_OPTION_MAX_DTE = max(GAP_OPTION_MIN_DTE, int(os.getenv("FLIP_GAP_OPTION_MAX_DTE", "7")))
+GAP_OPTION_MIN_ABS_DELTA = float(os.getenv("FLIP_GAP_OPTION_MIN_ABS_DELTA", "0.35"))
+GAP_OPTION_MAX_ABS_DELTA = float(os.getenv("FLIP_GAP_OPTION_MAX_ABS_DELTA", "0.65"))
+GAP_OPTION_TARGET_ABS_DELTA = float(os.getenv("FLIP_GAP_OPTION_TARGET_ABS_DELTA", "0.55"))
+GAP_OPTION_MAX_SPREAD_PCT = float(os.getenv("FLIP_GAP_OPTION_MAX_SPREAD_PCT", "0.15"))
+GAP_OPTION_MIN_OPEN_INTEREST = max(0, int(os.getenv("FLIP_GAP_OPTION_MIN_OPEN_INTEREST", "100")))
+GAP_OPTION_MIN_VOLUME = max(0, int(os.getenv("FLIP_GAP_OPTION_MIN_VOLUME", "10")))
 
 CATALYST_DAYS = [
     (date(2026, 7, 14),  "CPI",  "straddle"),
@@ -228,9 +319,12 @@ CATALYST_DAYS = [
     (date(2026, 10, 28), "FOMC", "directional"),
 ]
 
-DEFAULT_SYMBOLS = ["TSLA", "NVDA", "AAPL", "META", "AMZN", "AMD", "PLTR", "COIN"]
+DEFAULT_SYMBOLS = ["TSLA", "NVDA", "AAPL", "MSFT", "META", "AMZN", "SMCI", "AMD", "PLTR", "COIN"]
 SHADOW_CANDIDATES = ["SPY", "QQQ", "IWM", "NVDA", "TSLA", "AAPL", "GOOGL", "META"]
-SHADOW_LIQUIDITY_ALLOWLIST = {"SPY", "QQQ", "IWM", "NVDA", "TSLA", "AAPL", "GOOGL", "META", "HOOD", "RIVN", "NFLX", "COIN"}
+SHADOW_LIQUIDITY_ALLOWLIST = {
+    "SPY", "QQQ", "IWM", "NVDA", "TSLA", "AAPL", "MSFT", "GOOGL", "META",
+    "AMZN", "SMCI", "HOOD", "RIVN", "NFLX", "COIN",
+}
 MAX_DYNAMIC_SHADOW_SYMBOLS = 3
 EXECUTION_SYMBOLS = {
     symbol.strip().upper()
@@ -243,6 +337,14 @@ PAPER_CHALLENGER_SYMBOL_ORDER = [
     if symbol.strip()
 ]
 PAPER_CHALLENGER_SYMBOLS = set(PAPER_CHALLENGER_SYMBOL_ORDER)
+GAP_CONTINUATION_PAPER_SYMBOLS = [
+    symbol.strip().upper()
+    for symbol in os.getenv(
+        "FLIP_GAP_CONTINUATION_PAPER_SYMBOLS",
+        "SPY,QQQ,AAPL,MSFT,NVDA,TSLA,META,AMZN,SMCI",
+    ).split(",")
+    if symbol.strip()
+]
 _OPTION_QUOTE_TELEMETRY: dict[str, dict] = {}
 _INTRADAY_DATA_ISSUES: dict[str, str] = {}
 
@@ -303,6 +405,23 @@ def _primary_consensus_caution_blocker(setup: dict, consensus: dict) -> str | No
     return None
 
 
+def _exploration_consensus_caution_blocker(consensus: dict) -> dict | None:
+    """Keep counterfactual logging but refuse paper orders on stacked cautions."""
+    if str(consensus.get("recommendation") or "").lower() != "stand_aside":
+        return None
+    blockers = {str(item) for item in (consensus.get("blockers") or [])}
+    caution = sorted(blockers & PRIMARY_STAND_ASIDE_BLOCKERS)
+    if len(caution) < EXPLORATION_STAND_ASIDE_BLOCKER_THRESHOLD:
+        return None
+    return {
+        "reason": "stacked_consensus_stand_aside",
+        "caution_blockers": caution,
+        "caution_count": len(caution),
+        "threshold": EXPLORATION_STAND_ASIDE_BLOCKER_THRESHOLD,
+        "counterfactual_logging_retained": True,
+    }
+
+
 def _max_entry_limit_price(
     setup: dict,
     *,
@@ -328,6 +447,20 @@ def _max_entry_limit_price(
     return round(anchor * (1.0 + max_slippage_pct / 100.0), 2)
 
 
+def _entry_execution_quality(setup: dict, quote: dict | None = None) -> dict:
+    """Evaluate the current long-option quote without changing signal discovery."""
+    source = quote or setup
+    return evaluate_long_option_quote(
+        bid=source.get("selection_bid"),
+        ask=source.get("selection_ask"),
+        quote_age_seconds=source.get("quote_age_seconds"),
+        min_ask=MIN_ENTRY_ASK,
+        max_spread_pct_of_mid=MAX_EXECUTION_SPREAD_PCT,
+        max_spread_cents=MAX_ENTRY_SPREAD_CENTS,
+        max_quote_age_seconds=MAX_ENTRY_QUOTE_AGE_SECONDS,
+    )
+
+
 def _entry_slippage_blocker(setup: dict) -> dict | None:
     """Block stale/expensive 0DTE entries before submitting the order."""
     if setup.get("short_option_symbol"):
@@ -340,10 +473,36 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "current_ask": None,
             "max_slippage_pct": MAX_ENTRY_SLIPPAGE_PCT,
         }
-    # Force a new broker-data snapshot here. The selection quote can be several
-    # decision steps old and must not be treated as executable evidence.
-    _option_mid(setup.get("option_symbol", ""))
-    quote = _execution_quote_fields(setup.get("option_symbol", ""))
+    # Candidate contracts must be announced before an authoritative websocket
+    # quote can exist. This closes the prior subscribe-after-fill deadlock.
+    option_symbol = str(setup.get("option_symbol") or "")
+    paper_exploration_snapshot_allowed = (
+        PAPER
+        and not LIVE_EXECUTION_ENABLED
+        and setup.get("execution_lane") == "exploration"
+    )
+    opra_required_for_setup = (
+        REQUIRE_OPRA_EXECUTION_QUOTES and not paper_exploration_snapshot_allowed
+    )
+    if opra_required_for_setup:
+        request_option_quote(
+            option_symbol,
+            ttl_seconds=max(30.0, OPRA_ENTRY_QUOTE_WAIT_SECONDS + 10.0),
+        )
+        deadline = time.monotonic() + OPRA_ENTRY_QUOTE_WAIT_SECONDS
+        while True:
+            streamed = _stream_option_quote(option_symbol)
+            if streamed.get("quote_authority") == "opra":
+                _OPTION_QUOTE_TELEMETRY[option_symbol] = streamed
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
+
+    # Force a new broker-data snapshot here. REST remains diagnostic only and
+    # cannot satisfy an OPRA-authority requirement.
+    _option_mid(option_symbol)
+    quote = _execution_quote_fields(option_symbol)
     try:
         current_ask = float(quote.get("selection_ask") or 0.0)
     except (TypeError, ValueError):
@@ -367,7 +526,7 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "quote_age_seconds": quote_age,
             "max_quote_age_seconds": MAX_ENTRY_QUOTE_AGE_SECONDS,
         }
-    if REQUIRE_OPRA_EXECUTION_QUOTES and quote.get("quote_authority") != "opra":
+    if opra_required_for_setup and quote.get("quote_authority") != "opra":
         return {
             "reason": "opra_execution_quote_required",
             "quote_authority": quote.get("quote_authority"),
@@ -384,6 +543,14 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
             "max_slippage_pct": MAX_ENTRY_SLIPPAGE_PCT,
             "quote_age_seconds": quote.get("quote_age_seconds"),
         }
+    execution_quality = _entry_execution_quality(setup, quote)
+    if not execution_quality["eligible"]:
+        return {
+            "reason": execution_quality["reason"],
+            "execution_quality": execution_quality,
+            "limit_price": limit_price,
+            "current_ask": round(current_ask, 3),
+        }
     setup["entry_limit_price"] = limit_price
     setup["entry_live_ask_at_submit"] = round(current_ask, 3)
     setup["entry_quote_timestamp_at_submit"] = quote.get("quote_timestamp")
@@ -391,7 +558,14 @@ def _entry_slippage_blocker(setup: dict) -> dict | None:
     setup["entry_quote_feed_at_submit"] = quote.get("quote_feed")
     setup["entry_quote_authority_at_submit"] = quote.get("quote_authority")
     setup["entry_quote_transport_at_submit"] = quote.get("quote_transport")
+    setup["entry_quote_policy"] = (
+        "bounded_paper_snapshot_allowed"
+        if paper_exploration_snapshot_allowed
+        else "opra_required" if opra_required_for_setup
+        else "configured_quote_policy"
+    )
     setup["entry_slippage_guard_max_pct"] = MAX_ENTRY_SLIPPAGE_PCT
+    setup["entry_execution_quality"] = execution_quality
     return None
 
 
@@ -539,13 +713,41 @@ def _load() -> list[dict]:
         raise RuntimeError(f"Could not read Flip Bot state file {STATE_FILE}: {exc}") from exc
 
 
-def _save(trades: list[dict]) -> None:
-    """Durable-state write: atomic temp+replace under an exclusive lock."""
+def _atomic_save(path: Path, payload: list[dict]) -> None:
     try:
         from options_state import atomic_save_json
     except ModuleNotFoundError:
         from strategies.options_state import atomic_save_json
-    atomic_save_json(STATE_FILE, trades)
+    atomic_save_json(path, payload)
+
+
+def _save(trades: list[dict]) -> None:
+    """Persist one authoritative trade book and its exploration evidence mirror."""
+    _atomic_save(STATE_FILE, trades)
+    exploration_path = EXPLORATION_STATE_FILE
+    if STATE_FILE.parent != EXPLORATION_STATE_FILE.parent:
+        # Tests and isolated runs commonly redirect STATE_FILE. Keep their
+        # mirror beside that redirected state so production evidence is untouched.
+        exploration_path = STATE_FILE.with_name("flip-exploration-trades.json")
+    exploration_rows = [
+        trade for trade in trades if trade.get("execution_lane") == "exploration"
+    ]
+    if exploration_rows or exploration_path.exists():
+        _atomic_save(exploration_path, exploration_rows)
+
+
+def _load_exploration() -> list[dict]:
+    if not EXPLORATION_STATE_FILE.exists():
+        return []
+    try:
+        return json.loads(EXPLORATION_STATE_FILE.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        raise RuntimeError(f"Could not read exploration state file: {exc}") from exc
+
+
+def _save_exploration(trades: list[dict]) -> None:
+    """Compatibility writer for read-only exploration tooling."""
+    _atomic_save(EXPLORATION_STATE_FILE, trades)
 
 
 @contextmanager
@@ -576,6 +778,37 @@ def _monitor_authority_lock(stale_seconds: float = 180.0):
         if acquired:
             try:
                 MONITOR_LOCK_PATH.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+@contextmanager
+def _exploration_authority_lock(stale_seconds: float = 600.0):
+    """Serialize scheduled and monitor-triggered exploration entry scans."""
+    lock_path = STATE_FILE.with_name("flip-exploration-entry.lock")
+    acquired = False
+    for _attempt in range(2):
+        try:
+            descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                if time.time() - lock_path.stat().st_mtime > stale_seconds:
+                    lock_path.unlink(missing_ok=True)
+                    continue
+            except OSError:
+                pass
+            break
+        else:
+            with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+                handle.write(f"pid={os.getpid()} ts={_utc_now_text()}\n")
+            acquired = True
+            break
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            try:
+                lock_path.unlink(missing_ok=True)
             except OSError:
                 pass
 
@@ -713,6 +946,8 @@ def _vix_term_structure_regime(vix: float, vix3m: float) -> dict:
 
 
 def _vix_term_structure_direction_ok(direction: str, regime: dict) -> bool:
+    if regime.get("blocked"):
+        return False
     name = str(regime.get("regime") or "unknown")
     if direction == "bull" and name == "backwardation":
         return False
@@ -798,8 +1033,8 @@ def _fetch_vix_term_structure() -> dict:
         )
         return regime
     except Exception as exc:
-        log.warning(f"VIX term structure fetch failed: {exc} - proceeding without filter")
-        return {"regime": "unknown", "ratio": 0.0}
+        log.error(f"VIX term structure fetch failed: {exc} - blocking entry (fail-closed)")
+        return {"regime": "blocked", "ratio": 0.0, "blocked": True}
 
 
 def _intraday_bars(sym: str):
@@ -1177,6 +1412,91 @@ def _option_bid_ask_spread_cents(occ_symbol: str) -> int | None:
         return None
 
 
+def _quote_age_seconds(value: object) -> float | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds())
+
+
+def _spread_entry_quote_fields(long_symbol: str, short_symbol: str) -> dict:
+    """Return the current executable market for buying a vertical debit spread."""
+    snapshots = _option_snapshot_map([long_symbol, short_symbol])
+    long_quote = _snapshot_quote_and_delta(snapshots.get(long_symbol, {}))
+    short_quote = _snapshot_quote_and_delta(snapshots.get(short_symbol, {}))
+    long_bid = float(long_quote.get("bid") or 0.0)
+    long_ask = float(long_quote.get("ask") or 0.0)
+    short_bid = float(short_quote.get("bid") or 0.0)
+    short_ask = float(short_quote.get("ask") or 0.0)
+    if min(long_bid, long_ask, short_bid, short_ask) <= 0:
+        return {"available": False, "reason": "spread_leg_quote_unavailable"}
+    if long_ask < long_bid or short_ask < short_bid:
+        return {"available": False, "reason": "spread_leg_quote_crossed"}
+
+    executable_bid = max(0.0, long_bid - short_ask)
+    executable_ask = max(0.0, long_ask - short_bid)
+    if executable_ask <= 0 or executable_ask < executable_bid:
+        return {"available": False, "reason": "spread_market_invalid"}
+    width_cents = int(math.ceil(max(0.0, executable_ask - executable_bid) * 100 - 1e-9))
+    ages = [
+        age
+        for age in (
+            _quote_age_seconds(long_quote.get("quote_timestamp")),
+            _quote_age_seconds(short_quote.get("quote_timestamp")),
+        )
+        if age is not None
+    ]
+    return {
+        "available": True,
+        "selection_bid": round(executable_bid, 3),
+        "selection_ask": round(executable_ask, 3),
+        "spread_cents": width_cents,
+        "quote_age_seconds": round(max(ages), 3) if len(ages) == 2 else None,
+        "quote_timestamp": min(
+            str(long_quote.get("quote_timestamp") or ""),
+            str(short_quote.get("quote_timestamp") or ""),
+        ) or None,
+        "quote_authority": "unverified_rest_snapshot",
+        "quote_transport": "rest_batch",
+        "long_leg_bid": long_bid,
+        "long_leg_ask": long_ask,
+        "short_leg_bid": short_bid,
+        "short_leg_ask": short_ask,
+    }
+
+
+def _hydrate_spread_entry_quote(setup: dict) -> dict | None:
+    """Refresh a vertical's debit and width immediately before risk evaluation."""
+    short_symbol = str(setup.get("short_option_symbol") or "")
+    if not short_symbol:
+        return None
+    quote = _spread_entry_quote_fields(str(setup.get("option_symbol") or ""), short_symbol)
+    setup["spread_execution_quote"] = quote
+    if not quote.get("available"):
+        setup["spread_cents"] = None
+        return quote
+    executable_ask = float(quote["selection_ask"])
+    setup.update(
+        {
+            "selection_bid": quote["selection_bid"],
+            "selection_ask": executable_ask,
+            "spread_cents": quote["spread_cents"],
+            "quote_age_seconds": quote.get("quote_age_seconds"),
+            "quote_timestamp": quote.get("quote_timestamp"),
+            "entry_price_est": executable_ask,
+            "entry_limit_price": executable_ask,
+        }
+    )
+    contracts = int(setup.get("contracts") or 0)
+    setup["max_loss"] = round(executable_ask * contracts * 100, 2)
+    return quote
+
+
 def _extract_underlying(sym: str) -> str:
     """Return underlying ticker from OCC option symbol or equity symbol as-is."""
     for i, ch in enumerate(sym):
@@ -1282,6 +1602,138 @@ def _atm_option(sym: str, right: str) -> tuple[str, float, float, str]:
         return occ, strike, px, exp
     except Exception:
         return "", 0.0, 0.0, ""
+
+
+def _finite_nonnegative_int(value: object) -> int:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(number) or number <= 0:
+        return 0
+    return int(number)
+
+
+def _rank_convex_option_candidates(candidates: list[dict]) -> list[dict]:
+    """Rank executable long-option candidates after hard liquidity filters."""
+    ranked: list[dict] = []
+    for raw in candidates:
+        bid = float(raw.get("bid") or 0.0)
+        ask = float(raw.get("ask") or 0.0)
+        delta = raw.get("delta")
+        dte = int(raw.get("dte") or 0)
+        open_interest = _finite_nonnegative_int(raw.get("open_interest"))
+        volume = _finite_nonnegative_int(raw.get("volume"))
+        if delta is None or bid <= 0 or ask < bid:
+            continue
+        absolute_delta = abs(float(delta))
+        mid = (bid + ask) / 2.0
+        spread_pct = (ask - bid) / mid if mid > 0 else math.inf
+        if not GAP_OPTION_MIN_DTE <= dte <= GAP_OPTION_MAX_DTE:
+            continue
+        if not GAP_OPTION_MIN_ABS_DELTA <= absolute_delta <= GAP_OPTION_MAX_ABS_DELTA:
+            continue
+        if spread_pct > GAP_OPTION_MAX_SPREAD_PCT:
+            continue
+        if open_interest < GAP_OPTION_MIN_OPEN_INTEREST or volume < GAP_OPTION_MIN_VOLUME:
+            continue
+
+        delta_quality = 1.0 - min(
+            1.0,
+            abs(absolute_delta - GAP_OPTION_TARGET_ABS_DELTA)
+            / max(GAP_OPTION_MAX_ABS_DELTA - GAP_OPTION_MIN_ABS_DELTA, 0.01),
+        )
+        spread_quality = 1.0 - min(1.0, spread_pct / max(GAP_OPTION_MAX_SPREAD_PCT, 0.01))
+        liquidity_quality = min(1.0, math.log10(max(open_interest, 1)) / 4.0)
+        activity_quality = min(1.0, math.log10(max(volume, 1)) / 3.0)
+        score = (
+            0.45 * delta_quality
+            + 0.30 * spread_quality
+            + 0.15 * liquidity_quality
+            + 0.10 * activity_quality
+        )
+        ranked.append({
+            **raw,
+            "bid": round(bid, 3),
+            "ask": round(ask, 3),
+            "mid": round(mid, 3),
+            "entry_ask": round(ask, 3),
+            "abs_delta": round(absolute_delta, 4),
+            "spread_cents": int(math.ceil(max(0.0, ask - bid) * 100 - 1e-9)),
+            "spread_pct": round(spread_pct, 6),
+            "open_interest": open_interest,
+            "volume": volume,
+            "selection_score": round(score, 6),
+            "selection_method": "delta_liquidity_executable_ask_v1",
+        })
+    return sorted(
+        ranked,
+        key=lambda row: (
+            -float(row["selection_score"]),
+            float(row["spread_pct"]),
+            -int(row["open_interest"]),
+            -int(row["volume"]),
+            int(row["dte"]),
+            str(row.get("option_symbol") or ""),
+        ),
+    )
+
+
+def _select_convex_gap_option(sym: str, right: str) -> dict | None:
+    """Select a liquid 1-7 DTE contract using live delta and executable ask."""
+    try:
+        ticker = yf.Ticker(sym)
+        spot = _spot(sym)
+        if spot <= 0:
+            return None
+        today = date.today()
+        expiry_rows: list[tuple[str, int]] = []
+        for expiry in ticker.options:
+            try:
+                dte = (date.fromisoformat(str(expiry)) - today).days
+            except ValueError:
+                continue
+            if GAP_OPTION_MIN_DTE <= dte <= GAP_OPTION_MAX_DTE:
+                expiry_rows.append((str(expiry), dte))
+        if not expiry_rows:
+            return None
+
+        chain_rows: list[dict] = []
+        for expiry, dte in expiry_rows:
+            chain = ticker.option_chain(expiry)
+            frame = chain.calls if right == "CALL" else chain.puts
+            if frame.empty:
+                continue
+            nearest = frame.assign(distance=(frame["strike"].astype(float) - spot).abs()).nsmallest(12, "distance")
+            for _, row in nearest.iterrows():
+                strike = float(row["strike"])
+                chain_rows.append({
+                    "option_symbol": _occ(sym, expiry, right, strike),
+                    "strike": strike,
+                    "expiry": expiry,
+                    "dte": dte,
+                    "open_interest": _finite_nonnegative_int(row.get("openInterest")),
+                    "volume": _finite_nonnegative_int(row.get("volume")),
+                })
+        if not chain_rows:
+            return None
+
+        snapshots = _option_snapshot_map([str(row["option_symbol"]) for row in chain_rows])
+        candidates: list[dict] = []
+        for row in chain_rows:
+            details = _snapshot_quote_and_delta(snapshots.get(str(row["option_symbol"]), {}))
+            candidates.append({
+                **row,
+                "bid": details.get("bid"),
+                "ask": details.get("ask"),
+                "delta": details.get("delta"),
+                "quote_timestamp": details.get("quote_timestamp"),
+            })
+        ranked = _rank_convex_option_candidates(candidates)
+        return ranked[0] if ranked else None
+    except Exception as exc:
+        log.warning(f"Convex option selection [{sym}] unavailable: {exc}")
+        return None
 
 
 def _orb_otm_option(
@@ -2000,7 +2452,12 @@ def _tick_signal() -> dict:
     TICK > +1000 = extreme buying -- all stocks ticking up -- exhaustion top.
     TICK < -1000 = extreme selling -- all stocks ticking down -- exhaustion bottom.
     Fail open on unavailability: never blocks entries on missing data.
+    Note: ^TICK returns 404 on yfinance free API -- suppressed silently like ADD/TRIN.
     """
+    import logging as _logging
+    _yf_log = _logging.getLogger("yfinance")
+    _prev = _yf_log.level
+    _yf_log.setLevel(_logging.CRITICAL)  # suppress 404 spam -- ^TICK unavailable on free API
     try:
         data = yf.download("^TICK", period="1d", interval="1m", progress=False, auto_adjust=True)
         if data is None or data.empty:
@@ -2019,6 +2476,8 @@ def _tick_signal() -> dict:
     except Exception as exc:
         log.debug(f"TICK fetch failed: {exc}")
         return {"status": "unavailable", "error": str(exc)[:100]}
+    finally:
+        _yf_log.setLevel(_prev)
 
 
 def _market_internals_signal() -> dict:
@@ -2103,15 +2562,26 @@ def _max_pain_level(sym: str) -> float | None:
 
 
 def _gex_profile_yf(sym: str) -> dict:
-    """Compute GEX profile from yfinance options chain using Black-Scholes gamma.
+    """Compute an unqualified gamma/open-interest proxy from a Yahoo chain.
 
-    Positive net GEX = dealers long gamma = range-bound (ORB breakouts more likely to fail).
-    Negative net GEX = dealers short gamma = trending/amplified (ORB breakouts more likely to hold).
-    Gamma flip = strike where dealer positioning switches — key intraday level.
-    Fail-open: returns status='unavailable' on any error.
+    The chain does not reveal dealer inventory or trade direction. Calls-positive
+    and puts-negative is therefore an explicit sign assumption, while the
+    cumulative strike crossing is not a spot-revalued gamma flip. This output is
+    shadow telemetry only and cannot change confidence or block execution.
     """
     import math as _math
-    result = {"status": "unavailable", "sym": sym}
+    result = {
+        "status": "unavailable",
+        "sym": sym,
+        "authority": "unqualified_proxy",
+        "dealer_positioning_observed": False,
+        "sign_assumption": "calls_positive_puts_negative",
+        "gamma_flip_method": "cumulative_strike_gamma_oi_crossing_not_spot_revaluation",
+        "gamma_flip_regime": "unavailable_without_spot_revaluation",
+        "price_role": "unclassified",
+        "execution_enabled": False,
+        "can_block_execution": False,
+    }
     try:
         t_obj = yf.Ticker(sym)
         spot_p = _spot(sym)
@@ -2166,7 +2636,8 @@ def _gex_profile_yf(sym: str) -> dict:
         net_gex = sum(strike_gex.values())
         sorted_strikes = sorted(strike_gex.items())
 
-        # Gamma flip: strike where cumulative GEX crosses zero
+        # Cumulative strike crossing proxy. This is not a true gamma flip,
+        # which requires aggregate gamma to be revalued across hypothetical spots.
         gamma_flip = None
         cum = 0.0
         for i, (s, g) in enumerate(sorted_strikes):
@@ -2178,16 +2649,19 @@ def _gex_profile_yf(sym: str) -> dict:
                 gamma_flip = round(ps + (s - ps) * abs(prev) / denom, 2) if denom > 0 else s
                 break
 
-        # 4-profile classification
+        # Descriptive proxy buckets only. They carry no pinning, support,
+        # resistance, volatility, or dealer-positioning interpretation.
         above_flip = gamma_flip is not None and spot_p >= gamma_flip
-        if net_gex > 0 and above_flip:
-            profile = "positive_pinned"      # dealers long gamma, price above flip = max pinning
+        if gamma_flip is None:
+            profile = "positive_proxy_no_cross" if net_gex > 0 else "negative_proxy_no_cross"
+        elif net_gex > 0 and above_flip:
+            profile = "positive_proxy_above_cross"
         elif net_gex > 0:
-            profile = "positive_mild"        # dealers long gamma but below flip = mild dampening
+            profile = "positive_proxy_below_cross"
         elif net_gex < 0 and not above_flip:
-            profile = "negative_amplify"     # dealers short gamma, price below flip = explosive moves
+            profile = "negative_proxy_below_cross"
         else:
-            profile = "negative_partial"     # dealers short gamma but above flip = partial amplification
+            profile = "negative_proxy_above_cross"
 
         result.update({
             "status": "ok",
@@ -2196,6 +2670,7 @@ def _gex_profile_yf(sym: str) -> dict:
             "gamma_flip": gamma_flip,
             "above_flip": above_flip,
             "profile": profile,
+            "profile_interpretation": "descriptive_only_not_a_pin_or_direction_signal",
             "spot": round(spot_p, 2),
         })
     except Exception as exc:
@@ -2237,12 +2712,11 @@ def _prior_day_hl_context(sym: str, spot: float) -> dict:
 
 
 def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
-    """Block 0DTE entry when spot is pinned at a positive GEX wall.
+    """Return a non-authoritative proximity advisory for the GEX proxy.
 
-    Positive net GEX = dealers long gamma = buy dips, sell rips = price pinned.
-    Negative net GEX = dealers short gamma = amplify moves = favorable for directional.
-    Only blocks when BOTH conditions true: net_gex > 0 AND spot within GEX_WALL_PROXIMITY_PCT.
-    Missing GEX data → no block (fail open, not fail closed).
+    The legacy function name is retained for compatibility. Its result cannot
+    block execution, and no dealer inventory, pinning, support, resistance, or
+    directional claim is inferred from public open interest.
     """
     try:
         from scripts.market_conviction import _latest_gex
@@ -2254,12 +2728,12 @@ def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
         net_gex = sym_gex.get("net_gex")
         gamma_flip = sym_gex.get("gamma_flip")
 
-        # Below gamma flip = dealers short gamma = amplify moves = favorable for directional
+        # Preserve the historical selection rule for shadow comparison only.
         if gamma_flip is not None and float(spot) < float(gamma_flip):
             return None
 
         if net_gex is None or float(net_gex) <= 0:
-            return None  # negative GEX = move amplification = good for 0DTE directional
+            return None
         wall = sym_gex.get("gex_wall") or {}
         wall_strike = wall.get("strike")
         if not wall_strike or spot <= 0:
@@ -2267,7 +2741,7 @@ def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
         proximity_pct = abs(float(spot) - float(wall_strike)) / float(spot)
         if proximity_pct <= GEX_WALL_PROXIMITY_PCT:
             return {
-                "reason": "gex_wall_pin",
+                "reason": "positive_gamma_oi_proxy_near_max_abs_strike",
                 "net_gex": net_gex,
                 "gamma_flip": gamma_flip,
                 "gex_wall_strike": wall_strike,
@@ -2275,7 +2749,10 @@ def _gex_wall_blocker(sym: str, spot: float) -> dict | None:
                 "spot": spot,
                 "proximity_pct": round(proximity_pct * 100, 3),
                 "threshold_pct": round(GEX_WALL_PROXIMITY_PCT * 100, 2),
-                "interpretation": "positive_net_gex_spot_at_wall_range_bound_expected",
+                "authority": "shadow_telemetry_only",
+                "dealer_positioning_observed": False,
+                "can_block_execution": False,
+                "interpretation": "unqualified_proximity_proxy_no_pin_or_direction_claim",
             }
     except Exception as exc:
         log.debug(f"GEX wall check [{sym}] skipped: {exc}")
@@ -2454,6 +2931,9 @@ def _find_0dte_for_symbol(
     # Use vix_over_vix3m key: >1.0 means VIX > VIX3M = backwardation = stress
     # Bug fix: was using "ratio" (= vix3m_over_vix = 1.234 in calm contango) which fired backwards
     _vts = _fetch_vix_term_structure()
+    if _vts.get("blocked"):
+        log.error(f"0DTE [{sym}]: VIX term structure unavailable - treating as backwardation (fail-closed)")
+        _vts = {"regime": "backwardation", "ratio": 0.0, "vix_over_vix3m": 1.0}
     if _vts.get("regime") and use_orb and not catalyst:
         if right == "CALL" and _vts.get("regime") == "backwardation":
             _vts_ratio = _vts.get("vix_over_vix3m", 0.0) or 0.0
@@ -2507,6 +2987,12 @@ def _find_0dte_for_symbol(
 
     max_risk  = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
+    shadow_only_candidate = (
+        not require_orb_retest
+        or str(confidence_basis or "").endswith("shadow_only")
+    )
+    if contracts < 1 and shadow_only_candidate:
+        contracts = 1
     if momentum_continuation:
         contracts = min(contracts, 1)  # hard 1-contract cap -- no retest = lower conviction
     if contracts < 1:
@@ -2550,6 +3036,10 @@ def _find_0dte_for_symbol(
         "day_type_router_authority": day_type.get("authority"),
         "underlying_spot_at_selection": price,
         "underlying_structure_level": _breakout_level or None,
+        "tick_context": tick,
+        "prior_day_context": pdhl,
+        "market_internals_context": internals,
+        "vix_term_structure_context": _vts,
         "gex_profile_advisory": {
             **_gex,
             "wall": _gex_wall_advisory,
@@ -2664,6 +3154,392 @@ def find_paper_challenger_0dte(account: float) -> list[dict]:
     return setups
 
 
+def _evaluate_gap_continuation(
+    bars: pd.DataFrame,
+    *,
+    previous_close: float,
+    benchmark_bars: pd.DataFrame,
+    symbol: str,
+    benchmark_symbol: str,
+) -> dict:
+    """Evaluate an opening-gap continuation using completed bars only.
+
+    The gap must remain unfilled, pull back to VWAP/EMA20, then resume with
+    relative strength and local volume expansion. This remains a paper
+    hypothesis until executable fills establish positive OOS expectancy.
+    """
+    unavailable = {
+        "eligible": False,
+        "score": 0.0,
+        "symbol": symbol,
+        "benchmark_symbol": benchmark_symbol,
+    }
+    if previous_close <= 0 or bars is None or benchmark_bars is None:
+        return {**unavailable, "reason": "market_data_unavailable"}
+
+    def normalize(frame: pd.DataFrame) -> pd.DataFrame:
+        clean = frame.copy()
+        clean.columns = [str(column).lower() for column in clean.columns]
+        required = ["open", "high", "low", "close", "volume"]
+        if not set(required).issubset(clean.columns):
+            return pd.DataFrame()
+        return clean[required].apply(pd.to_numeric, errors="coerce").dropna()
+
+    frame = normalize(bars)
+    benchmark = normalize(benchmark_bars)
+    if len(frame) < GAP_CONTINUATION_MIN_BARS or len(benchmark) < GAP_CONTINUATION_MIN_BARS:
+        return {
+            **unavailable,
+            "reason": "insufficient_completed_bars",
+            "bars": len(frame),
+            "benchmark_bars": len(benchmark),
+        }
+
+    session_open = float(frame["open"].iloc[0])
+    close = float(frame["close"].iloc[-1])
+    benchmark_open = float(benchmark["open"].iloc[0])
+    benchmark_close = float(benchmark["close"].iloc[-1])
+    if min(session_open, close, benchmark_open, benchmark_close) <= 0:
+        return {**unavailable, "reason": "invalid_price_data"}
+
+    gap_return = session_open / previous_close - 1.0
+    direction = "bull" if gap_return > 0 else "bear"
+    direction_sign = 1.0 if direction == "bull" else -1.0
+    gap_magnitude = abs(gap_return)
+    gap_valid = GAP_CONTINUATION_MIN_GAP_PCT <= gap_magnitude <= GAP_CONTINUATION_MAX_GAP_PCT
+
+    cumulative_volume = frame["volume"].cumsum().replace(0, float("nan"))
+    typical = (frame["high"] + frame["low"] + frame["close"]) / 3.0
+    vwap_series = (typical * frame["volume"]).cumsum() / cumulative_volume
+    vwap = float(vwap_series.iloc[-1])
+    ema20 = float(frame["close"].ewm(span=20, adjust=False).mean().iloc[-1])
+    if min(vwap, ema20) <= 0:
+        return {**unavailable, "reason": "indicator_unavailable"}
+
+    if direction == "bull":
+        gap_held = float(frame["low"].min()) > previous_close
+        trend_aligned = close > vwap and close > ema20
+    else:
+        gap_held = float(frame["high"].max()) < previous_close
+        trend_aligned = close < vwap and close < ema20
+
+    recent = frame.iloc[-8:]
+    trigger = frame.iloc[-4:]
+    retest_reference = max(vwap, ema20) if direction == "bull" else min(vwap, ema20)
+    tolerance = retest_reference * 0.0015
+    if direction == "bull":
+        pullback_touched = float(recent["low"].min()) <= retest_reference + tolerance
+        resumed = close >= float(trigger["high"].iloc[:-1].max())
+    else:
+        pullback_touched = float(recent["high"].max()) >= retest_reference - tolerance
+        resumed = close <= float(trigger["low"].iloc[:-1].min())
+    pullback_confirmed = pullback_touched and resumed and trend_aligned
+
+    benchmark_return = benchmark_close / benchmark_open - 1.0
+    session_return = close / session_open - 1.0
+    directional_relative = direction_sign * (session_return - benchmark_return)
+    relative_confirmed = directional_relative >= GAP_CONTINUATION_MIN_RELATIVE_PCT
+
+    baseline_volume = frame["volume"].iloc[5:-5]
+    recent_volume = float(frame["volume"].iloc[-3:].mean())
+    baseline_median = float(baseline_volume.median()) if not baseline_volume.empty else 0.0
+    volume_ratio = recent_volume / baseline_median if baseline_median > 0 else 0.0
+    volume_confirmed = volume_ratio >= GAP_CONTINUATION_MIN_VOLUME_RATIO
+
+    vwap_extension = abs(close - vwap) / vwap
+    not_extended = vwap_extension <= GAP_CONTINUATION_MAX_VWAP_EXTENSION_PCT
+    checks = [
+        (gap_valid, 2.0, "opening_gap_in_range"),
+        (gap_held, 1.0, "gap_unfilled"),
+        (trend_aligned, 2.0, "vwap_ema20_aligned"),
+        (pullback_confirmed, 2.0, "pullback_retest_resumed"),
+        (relative_confirmed, 1.0, "relative_strength_confirmed"),
+        (volume_confirmed, 1.0, "local_volume_expansion"),
+        (not_extended, 1.0, "not_extended_from_vwap"),
+    ]
+    reasons = [reason for passed, _points, reason in checks if passed]
+    failed = [reason for passed, _points, reason in checks if not passed]
+    score = sum(points for passed, points, _reason in checks if passed)
+    eligible = not failed and score >= 10.0
+    return {
+        "eligible": eligible,
+        "reason": "qualified" if eligible else "confluence_incomplete",
+        "score": score,
+        "symbol": symbol,
+        "benchmark_symbol": benchmark_symbol,
+        "direction": direction,
+        "right": "CALL" if direction == "bull" else "PUT",
+        "previous_close": round(previous_close, 4),
+        "session_open": round(session_open, 4),
+        "close": round(close, 4),
+        "gap_pct": round(gap_return * 100.0, 4),
+        "session_return_pct": round(session_return * 100.0, 4),
+        "benchmark_return_pct": round(benchmark_return * 100.0, 4),
+        "directional_relative_pct": round(directional_relative * 100.0, 4),
+        "vwap": round(vwap, 4),
+        "ema20": round(ema20, 4),
+        "vwap_extension_pct": round(vwap_extension * 100.0, 4),
+        "intraday_volume_pace_proxy": round(volume_ratio, 4),
+        "pullback_touched": pullback_touched,
+        "resumed": resumed,
+        "reasons": reasons,
+        "failed_checks": failed,
+        "bars_observed": len(frame),
+        "formula_version": "gap_hold_vwap_ema20_retest_relative_volume_v1",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _gap_continuation_context(symbol: str, benchmark_symbol: str) -> dict:
+    now_et = _now_et()
+    if not GAP_CONTINUATION_ENTRY_START_ET <= now_et.time() <= GAP_CONTINUATION_ENTRY_END_ET:
+        return {
+            "eligible": False,
+            "score": 0.0,
+            "symbol": symbol,
+            "reason": "outside_entry_window",
+            "entry_window_et": [
+                GAP_CONTINUATION_ENTRY_START_ET.isoformat(timespec="minutes"),
+                GAP_CONTINUATION_ENTRY_END_ET.isoformat(timespec="minutes"),
+            ],
+        }
+    bars = _intraday_bars(symbol)
+    benchmark_bars = _intraday_bars(benchmark_symbol)
+    if bars is None or benchmark_bars is None:
+        return {
+            "eligible": False,
+            "score": 0.0,
+            "symbol": symbol,
+            "reason": "intraday_data_unavailable",
+        }
+    return _evaluate_gap_continuation(
+        _completed_intraday_bars(bars, now_et=now_et),
+        previous_close=_prev_close(symbol),
+        benchmark_bars=_completed_intraday_bars(benchmark_bars, now_et=now_et),
+        symbol=symbol,
+        benchmark_symbol=benchmark_symbol,
+    )
+
+
+def find_gap_continuation(account: float) -> list[dict]:
+    """Build one-contract Alpaca paper candidates from causal gap signals."""
+    if not PAPER or LIVE_EXECUTION_ENABLED:
+        return []
+    max_notional = min(float(account), EXPLORATION_MAX_NOTIONAL_DOLLARS)
+    if max_notional <= 0:
+        return []
+
+    setups: list[dict] = []
+    for symbol in GAP_CONTINUATION_PAPER_SYMBOLS:
+        authorization = _execution_authorization(symbol, 1)
+        if not authorization.get("allowed"):
+            continue
+        benchmark_symbol = "QQQ" if symbol == "SPY" else "SPY"
+        signal = _gap_continuation_context(symbol, benchmark_symbol)
+        _decision(
+            symbol,
+            "gap_continuation",
+            "candidate" if signal.get("eligible") else "skipped",
+            str(signal.get("reason") or "unknown"),
+            signal=signal,
+        )
+        if not signal.get("eligible"):
+            continue
+
+        right = str(signal["right"])
+        selected = _select_convex_gap_option(symbol, right)
+        if not selected:
+            _strategy_skip(symbol, "gap_continuation", "convex_option_unavailable", right=right)
+            continue
+        occ = str(selected["option_symbol"])
+        strike = float(selected["strike"])
+        expiry = str(selected["expiry"])
+        option_ask = float(selected["entry_ask"])
+        common = {
+            "symbol": symbol,
+            "right": right,
+            "expiry": expiry,
+            "contracts": 1,
+            "confidence": float(signal["score"]),
+            "hard_close_date": str(date.today()),
+            "hard_close_time": "13:45",
+            "paper_only": True,
+            "execution_lane": "exploration",
+            "promotion_source": "causal_gap_continuation_convex_contract_v2",
+            "catalyst": (
+                f"{signal['direction'].upper()} GAP {signal['gap_pct']:+.2f}% held; "
+                f"relative={signal['directional_relative_pct']:+.2f}% "
+                f"volume={signal['intraday_volume_pace_proxy']:.2f}x"
+            ),
+            "signal_snapshot": signal,
+            "contract_selection": selected,
+        }
+        if option_ask * 100 <= max_notional:
+            setups.append({
+                **common,
+                "strategy": "gap_continuation",
+                "option_symbol": occ,
+                "strike": strike,
+                "entry_price_est": option_ask,
+                "entry_limit_price": option_ask,
+                "spread_cents": selected.get("spread_cents"),
+                "selection_bid": selected.get("bid"),
+                "selection_ask": option_ask,
+                "quote_timestamp": selected.get("quote_timestamp"),
+                "quote_age_seconds": _quote_age_seconds(selected.get("quote_timestamp")),
+            })
+            continue
+
+        spread = (
+            _bull_call_spread(symbol, expiry, strike, max_notional)
+            if right == "CALL"
+            else _bear_put_spread(symbol, expiry, strike, max_notional)
+        )
+        if not spread:
+            _strategy_skip(
+                symbol,
+                "gap_continuation",
+                "budget_or_spread_unavailable",
+                option_price=option_ask,
+                max_notional=max_notional,
+            )
+            continue
+        net_debit, long_strike, short_strike = spread
+        long_occ = _occ(symbol, expiry, right, long_strike)
+        short_occ = _occ(symbol, expiry, right, short_strike)
+        width = abs(short_strike - long_strike)
+        setups.append({
+            **common,
+            "strategy": "gap_continuation_spread",
+            "option_symbol": long_occ,
+            "short_option_symbol": short_occ,
+            "strike": long_strike,
+            "short_strike": short_strike,
+            "entry_price_est": net_debit,
+            "max_loss": round(net_debit * 100.0, 2),
+            "max_gain": round((width - net_debit) * 100.0, 2),
+            "spread_cents": None,
+        })
+    return setups
+
+
+def _prior_date_universe_report(
+    path: Path = DAILY_UNIVERSE_LOG_PATH,
+    *,
+    today: date | None = None,
+) -> dict:
+    """Return the latest universe report strictly before today.
+
+    Exploration routing must not use outcomes generated earlier in the same
+    session. The append-only daily log gives the router a clean prior-date
+    cutoff while leaving every execution gate unchanged.
+    """
+    today = today or _now_et().date()
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return {}
+    eligible: list[tuple[date, dict]] = []
+    for raw in lines:
+        try:
+            row = json.loads(raw)
+            report_date = date.fromisoformat(str(row.get("date") or "")[:10])
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        if isinstance(row, dict) and report_date < today:
+            eligible.append((report_date, row))
+    if not eligible:
+        return {}
+    return max(eligible, key=lambda item: item[0])[1]
+
+
+def _select_exploration_candidate(
+    setups: list[dict],
+    *,
+    universe_log_path: Path = DAILY_UNIVERSE_LOG_PATH,
+    today: date | None = None,
+) -> dict | None:
+    """Prioritize bounded paper evidence without granting execution authority."""
+    candidates = [
+        dict(setup)
+        for setup in setups
+        if isinstance(setup, dict)
+        and setup.get("execution_mode") != "shadow_only"
+        and setup.get("live_execution_allowed") is not False
+        and not str(setup.get("confidence_basis") or "").endswith("shadow_only")
+    ]
+    if not candidates:
+        return None
+    today = today or _now_et().date()
+    report = _prior_date_universe_report(universe_log_path, today=today)
+    rankings = {
+        str(row.get("symbol") or "").upper(): row
+        for row in report.get("rankings") or []
+        if isinstance(row, dict) and row.get("symbol")
+    }
+    def screen_allows(setup: dict) -> bool:
+        symbol = str(setup.get("symbol") or "").upper()
+        if symbol == "SPY":
+            return True
+        row = rankings.get(symbol, {})
+        # Legacy reports did not contain the screen. Preserve their behavior;
+        # once the field exists, non-benchmark candidates fail closed.
+        if "stock_screen_checked" not in row:
+            return True
+        if not row.get("stock_screen_checked") or row.get("stock_screen_veto"):
+            return False
+        # The causal daily lab found no 1d, 5d, or 20d directional survivor
+        # after costs. Direction remains recorded context; only the
+        # liquidity/data-quality veto has paper-routing authority.
+        return True
+
+    candidates = [setup for setup in candidates if screen_allows(setup)]
+    if not candidates:
+        return None
+    tier_priority = {
+        "promotion_review": 4,
+        "execution_benchmark": 3,
+        "shadow_challenger": 2,
+        "blocked": 0,
+    }
+
+    def priority(setup: dict) -> tuple[float, float, float, float, float, float]:
+        row = rankings.get(str(setup.get("symbol") or "").upper(), {})
+        signal_strength = float(setup.get("confidence", setup.get("score")) or 0.0)
+        spread_cents = float(setup.get("spread_cents") or 1_000_000.0)
+        return (
+            float(tier_priority.get(str(row.get("tier") or ""), 1)),
+            1.0 if row.get("out_of_sample_positive") else 0.0,
+            float(row.get("rank_score") or 0.0),
+            float(row.get("shadow_completed_count") or 0.0),
+            signal_strength,
+            -spread_cents,
+        )
+
+    selected = max(enumerate(candidates), key=lambda item: (priority(item[1]), -item[0]))[1]
+    row = rankings.get(str(selected.get("symbol") or "").upper(), {})
+    selected["exploration_routing"] = {
+        "authority": "paper_research_priority_only",
+        "can_bypass_execution_gates": False,
+        "can_enable_live_execution": False,
+        "evidence_cutoff": "strictly_prior_trading_date",
+        "evidence_report_date": report.get("date"),
+        "universe_tier": row.get("tier"),
+        "rank_score": row.get("rank_score"),
+        "out_of_sample_positive": row.get("out_of_sample_positive"),
+        "out_of_sample_expectancy_return_pct": row.get("out_of_sample_expectancy_return_pct"),
+        "stock_screen_status": row.get("stock_screen_status"),
+        "stock_screen_score": row.get("stock_screen_score"),
+        "stock_screen_direction": row.get("stock_screen_direction"),
+        "stock_screen_formula_version": row.get("stock_screen_formula_version"),
+        "stock_screen_directional_authority": "blocked_failed_1d_5d_20d_walk_forward",
+        "candidate_symbols": [str(item.get("symbol") or "").upper() for item in candidates],
+        "candidate_strategies": [str(item.get("strategy") or "unknown") for item in candidates],
+    }
+    return selected
+
+
 def _read_shadow_candidate_rows(path: Path = SHADOW_CANDIDATE_LOG_PATH) -> list[dict]:
     if not path.exists():
         return []
@@ -2733,7 +3609,11 @@ def _build_shadow_challenger_setup(account: float, sym: str, signal: dict) -> di
     max_risk = account * MAX_RISK_PCT
     contracts = min(int(max_risk // (px * 100)), MAX_CONTRACTS)
     if contracts < 1:
-        return None
+        # This builder is observation-only and cannot submit orders. Preserve a
+        # one-contract counterfactual even when the live account risk budget
+        # would reject the contract, so tighter execution limits do not erase
+        # the evidence needed to evaluate the signal.
+        contracts = 1
     strategy = str(signal.get("strategy") or "shadow_challenger")
     trigger_at = signal.get("retest_at") or signal.get("confirmation_at") or signal.get("breakout_at")
     return {
@@ -2780,6 +3660,191 @@ def _build_shadow_challenger_setup(account: float, sym: str, signal: dict) -> di
         "execution_enabled": False,
         "can_submit_orders": False,
         **_selection_quote_fields(occ),
+    }
+
+
+def _matched_opposite_option(
+    sym: str,
+    opposite_right: str,
+    source_setup: dict,
+) -> tuple[str, float, str, float] | None:
+    """Select the strike opposite the source at symmetric log-moneyness."""
+    try:
+        spot = _spot(sym)
+        source_strike = float(source_setup.get("strike") or 0.0)
+        expiry = str(source_setup.get("expiry") or "")
+        if spot <= 0 or source_strike <= 0 or not expiry:
+            return None
+        target_strike = spot * spot / source_strike
+        chain = yf.Ticker(sym).option_chain(expiry)
+        frame = chain.calls if opposite_right == "CALL" else chain.puts
+        if frame.empty:
+            return None
+        row = frame.iloc[(frame["strike"] - target_strike).abs().argsort()[:1]]
+        strike = float(row["strike"].values[0])
+        option_symbol = _occ(sym, expiry, opposite_right, strike)
+        symmetry_error = abs(math.log(source_strike / spot) + math.log(strike / spot))
+        return option_symbol, strike, expiry, symmetry_error
+    except Exception:
+        return None
+
+
+def _quote_timestamp(value: object) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
+def _synchronized_direction_quotes(
+    source_symbol: str,
+    opposite_symbol: str,
+    diagnostics: dict | None = None,
+) -> dict[str, dict] | None:
+    """Fetch both contracts in one snapshot request and reject stale or skewed pairs."""
+    diagnostics = diagnostics if diagnostics is not None else {}
+    diagnostics["quote_symbols"] = [source_symbol, opposite_symbol]
+    collected_at = datetime.now(timezone.utc)
+    snapshots = _option_snapshot_map([source_symbol, opposite_symbol])
+    if not snapshots:
+        diagnostics.update(status="rejected", reason="snapshot_batch_unavailable")
+        return None
+    result: dict[str, dict] = {}
+    timestamps: list[datetime] = []
+    for option_symbol in (source_symbol, opposite_symbol):
+        parsed = _snapshot_quote_and_delta(snapshots.get(option_symbol) or {})
+        bid = float(parsed.get("bid") or 0.0)
+        ask = float(parsed.get("ask") or 0.0)
+        timestamp = _quote_timestamp(parsed.get("quote_timestamp"))
+        if bid <= 0 or ask < bid or timestamp is None:
+            diagnostics.update(
+                status="rejected",
+                reason="two_sided_timestamped_quote_unavailable",
+                failed_option_symbol=option_symbol,
+            )
+            return None
+        age = max(0.0, (collected_at - timestamp).total_seconds())
+        if age > SHADOW_PAIR_MAX_QUOTE_AGE_SECONDS:
+            diagnostics.update(
+                status="rejected",
+                reason="quote_too_stale",
+                failed_option_symbol=option_symbol,
+                observed_quote_age_seconds=round(age, 3),
+                maximum_quote_age_seconds=SHADOW_PAIR_MAX_QUOTE_AGE_SECONDS,
+            )
+            return None
+        timestamps.append(timestamp)
+        result[option_symbol] = {
+            "selection_bid": bid,
+            "selection_ask": ask,
+            "entry_price_est": round((bid + ask) / 2.0, 3),
+            "quote_timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+            "quote_age_seconds": round(age, 3),
+            "selection_delta": parsed.get("delta"),
+        }
+    skew = abs((timestamps[0] - timestamps[1]).total_seconds())
+    if skew > SHADOW_PAIR_MAX_QUOTE_SKEW_SECONDS:
+        diagnostics.update(
+            status="rejected",
+            reason="quote_timestamp_skew_exceeded",
+            observed_quote_skew_seconds=round(skew, 3),
+            maximum_quote_skew_seconds=SHADOW_PAIR_MAX_QUOTE_SKEW_SECONDS,
+        )
+        return None
+    for row in result.values():
+        row["pair_quote_skew_seconds"] = round(skew, 3)
+        row["pair_quote_batch_at"] = collected_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    diagnostics.update(
+        status="quote_quality_passed",
+        reason="synchronized_two_sided_quotes",
+        observed_quote_skew_seconds=round(skew, 3),
+        maximum_observed_quote_age_seconds=round(max(row["quote_age_seconds"] for row in result.values()), 3),
+    )
+    return result
+
+
+def _build_paired_direction_shadow_setup(
+    account: float,
+    sym: str,
+    source_setup: dict | None,
+    decision_pair_id: str = "",
+    diagnostics: dict | None = None,
+) -> dict | None:
+    """Attach a synchronized, log-moneyness-matched opposite contract."""
+    diagnostics = diagnostics if diagnostics is not None else {}
+    del account  # The paired lifecycle is non-executable and always normalized to one contract.
+    if not SHADOW_PAIRED_DIRECTION_ENABLED or not source_setup:
+        diagnostics.update(status="not_attempted", reason="paired_collection_disabled_or_source_missing")
+        return None
+    source_right = str(source_setup.get("right") or "").upper()
+    if source_right not in {"CALL", "PUT"}:
+        diagnostics.update(status="rejected", reason="source_direction_invalid")
+        return None
+    right = "PUT" if source_right == "CALL" else "CALL"
+    matched = _matched_opposite_option(sym, right, source_setup)
+    source_symbol = str(source_setup.get("option_symbol") or "")
+    if not matched or not source_symbol:
+        diagnostics.update(status="rejected", reason="symmetric_opposite_contract_unavailable")
+        return None
+    occ, strike, expiry, symmetry_error = matched
+    diagnostics.update(
+        source_option_symbol=source_symbol,
+        opposite_option_symbol=occ,
+        pair_moneyness_symmetry_error=round(symmetry_error, 8),
+    )
+    quotes = _synchronized_direction_quotes(source_symbol, occ, diagnostics=diagnostics)
+    if not quotes:
+        return None
+    source_quote = quotes[source_symbol]
+    opposite_quote = quotes[occ]
+    pair_id = decision_pair_id or f"{date.today()}|{sym}|{uuid4().hex}"
+    diagnostics.update(
+        status="accepted",
+        reason="synchronized_pair_created",
+        decision_pair_id=pair_id,
+        pair_construction_method="symmetric_log_moneyness_single_snapshot",
+    )
+    source_setup.update({
+        **source_quote,
+        "spread_cents": int(round(
+            (float(source_quote["selection_ask"]) - float(source_quote["selection_bid"])) * 100
+        )),
+        "decision_pair_id": pair_id,
+        "decision_lattice_role": "source_direction",
+        "pair_construction_method": "symmetric_log_moneyness_single_snapshot",
+        "pair_sync_status": "synchronized_forward",
+        "pair_moneyness_symmetry_error": round(symmetry_error, 8),
+        "paired_option_symbol": occ,
+    })
+    return {
+        "strategy": "paired_direction_shadow",
+        "symbol": sym,
+        "right": right,
+        "option_symbol": occ,
+        "strike": strike,
+        "expiry": expiry,
+        "contracts": 1,
+        "entry_price_est": opposite_quote["entry_price_est"],
+        "catalyst": f"SHADOW paired opposite of {source_setup.get('strategy', 'unknown')} {source_right}",
+        "hard_close_date": str(date.today()),
+        "hard_close_time": "13:45",
+        "spread_cents": int(round(
+            (float(opposite_quote["selection_ask"]) - float(opposite_quote["selection_bid"])) * 100
+        )),
+        "shadow_setup_authority": "paired_direction_counterfactual_only",
+        "decision_lattice_role": "opposite_direction",
+        "decision_pair_id": pair_id,
+        "pair_construction_method": "symmetric_log_moneyness_single_snapshot",
+        "pair_sync_status": "synchronized_forward",
+        "pair_moneyness_symmetry_error": round(symmetry_error, 8),
+        "paired_source_strategy": source_setup.get("strategy"),
+        "paired_source_right": source_right,
+        "paired_source_option_symbol": source_setup.get("option_symbol"),
+        "live_execution_allowed": False,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+        **opposite_quote,
     }
 
 
@@ -2981,6 +4046,30 @@ def _parse_shadow_time(value: object) -> datetime | None:
     return parsed
 
 
+def _is_first_shadow_mark(rows: list[dict]) -> bool:
+    """Return whether the pending observation is the first post-entry mark."""
+    return not any(
+        row.get("event_type") in {"shadow_mark", "shadow_exit"}
+        for row in rows[1:]
+    )
+
+
+def _first_shadow_mark_within_window(
+    rows: list[dict],
+    now_et: datetime,
+    *,
+    maximum_minutes: float = 10.0,
+) -> bool:
+    if not _is_first_shadow_mark(rows):
+        return False
+    entered_at = _parse_shadow_time(rows[0].get("scanned_at"))
+    if entered_at is None:
+        return False
+    now_utc = now_et.astimezone(timezone.utc) if now_et.tzinfo else now_et.replace(tzinfo=timezone.utc)
+    elapsed_minutes = (now_utc - entered_at.astimezone(timezone.utc)).total_seconds() / 60.0
+    return 0.0 <= elapsed_minutes < maximum_minutes
+
+
 def _shadow_exit_reason(rows: list[dict], mark_price: float, now_et: datetime) -> tuple[str, float, float]:
     first = rows[0]
     entry = float(first.get("entry_price_est") or 0.0)
@@ -2990,6 +4079,13 @@ def _shadow_exit_reason(rows: list[dict], mark_price: float, now_et: datetime) -
     current_return = (mark_price - entry) / entry * 100
     prior_returns = [(price - entry) / entry * 100 for price in prices]
     best_return = max([current_return, *prior_returns])
+    if (
+        _first_shadow_mark_within_window(rows, now_et)
+        and first.get("execution_mode") == "shadow_only"
+        and first.get("live_execution_allowed") is False
+        and current_return <= 0.0
+    ):
+        return "first_mark_momentum_not_confirmed", current_return, best_return
     if current_return <= -30.0:
         return "stop_30_hit", current_return, best_return
     if current_return >= 75.0 and not SHADOW_CONTINUE_AFTER_TARGET:
@@ -3036,11 +4132,38 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
 
     observations: list[dict] = []
     underlying_marks: dict[str, dict] = {}
+    market_contexts: dict[str, dict] = {}
 
     def _underlying_for(symbol: str) -> dict:
         if symbol not in underlying_marks:
             underlying_marks[symbol] = _underlying_mark_snapshot(symbol, now_et=now_et)
         return underlying_marks[symbol]
+
+    def _market_context_for(symbol: str) -> dict:
+        if symbol not in market_contexts:
+            market_contexts[symbol] = _market_context_shadow_snapshot(symbol, scanned_dt)
+        return market_contexts[symbol]
+
+    all_pair_contracts: dict[str, list[str]] = {}
+    active_pair_contracts: dict[str, list[str]] = {}
+    for key, latest in latest_by_key.items():
+        first = first_by_key[key]
+        pair_id = str(first.get("decision_pair_id") or "")
+        option_symbol = str(first.get("option_symbol") or "")
+        if pair_id and option_symbol:
+            all_pair_contracts.setdefault(pair_id, []).append(option_symbol)
+            if latest.get("event_type") != "shadow_exit":
+                active_pair_contracts.setdefault(pair_id, []).append(option_symbol)
+    paired_mark_quotes: dict[str, dict] = {}
+    synchronized_pair_ids: set[str] = set()
+    for pair_id, option_symbols in active_pair_contracts.items():
+        unique = list(dict.fromkeys(option_symbols))
+        if len(unique) != 2:
+            continue
+        quotes = _synchronized_direction_quotes(unique[0], unique[1])
+        if quotes:
+            paired_mark_quotes.update(quotes)
+            synchronized_pair_ids.add(pair_id)
 
     for key, latest in latest_by_key.items():
         if latest.get("event_type") == "shadow_exit":
@@ -3048,9 +4171,35 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
         first = first_by_key[key]
         underlying_symbol = str(first.get("symbol") or "")
         option_symbol = str(first.get("option_symbol") or "")
-        mark_price = _option_mid(option_symbol)
+        pair_id = str(first.get("decision_pair_id") or "")
+        if pair_id:
+            if pair_id in synchronized_pair_ids:
+                quote_fields = paired_mark_quotes.get(option_symbol) or {}
+                mark_price = float(quote_fields.get("entry_price_est") or 0.0)
+                spread_cents = int(round(
+                    (float(quote_fields.get("selection_ask") or 0.0)
+                     - float(quote_fields.get("selection_bid") or 0.0)) * 100
+                ))
+            elif (
+                len(set(all_pair_contracts.get(pair_id) or [])) == 2
+                and len(set(active_pair_contracts.get(pair_id) or [])) == 1
+            ):
+                # One policy path has already closed. The surviving path may
+                # continue independently because its mate's outcome is fixed.
+                mark_price = _option_mid(option_symbol)
+                quote_fields = _selection_quote_fields(option_symbol)
+                spread_cents = _option_bid_ask_spread_cents(option_symbol)
+            else:
+                continue
+        else:
+            mark_price = _option_mid(option_symbol)
+            quote_fields = _selection_quote_fields(option_symbol)
+            spread_cents = _option_bid_ask_spread_cents(option_symbol)
         if mark_price <= 0:
             continue
+        first_mark_gate_evaluated = _first_shadow_mark_within_window(
+            rows_by_key.get(key, [first]), now_et
+        )
         exit_reason, return_pct, best_return_pct = _shadow_exit_reason(
             rows_by_key.get(key, [first]), mark_price, now_et
         )
@@ -3059,8 +4208,6 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             for row in rows_by_key.get(key, [first])
         )
         target_hit = prior_target_hit or return_pct >= 75.0
-        quote_fields = _selection_quote_fields(option_symbol)
-        spread_cents = _option_bid_ask_spread_cents(option_symbol)
         observations.append({
             **first,
             **market_force_snapshot,
@@ -3069,11 +4216,19 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             "mark_price": mark_price,
             "spread_cents": spread_cents,
             **quote_fields,
+            "pair_mark_sync_status": (
+                "synchronized_batch" if pair_id in synchronized_pair_ids
+                else "mate_already_closed" if pair_id
+                else "not_applicable"
+            ),
             "event_type": "shadow_exit" if exit_reason else "shadow_mark",
             "action": "exit_shadow" if exit_reason else "hold_shadow",
             "mark_reason": exit_reason or "lifecycle_mark",
             "return_pct_at_mark": round(return_pct, 2),
             "best_return_pct_at_mark": round(best_return_pct, 2),
+            "first_mark_gate_evaluated": first_mark_gate_evaluated,
+            "first_mark_momentum_confirmed": return_pct > 0.0 if first_mark_gate_evaluated else None,
+            "first_mark_gate_authority": "shadow_exit_only",
             "target_75_hit_at_or_before_mark": target_hit,
             "post_target_observation": prior_target_hit,
             "contract_selection_challengers": _mark_shadow_contract_challengers(first),
@@ -3091,10 +4246,24 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             strategy_key = (symbol, strategy)
             active_by_symbol_strategy[strategy_key] = active_by_symbol_strategy.get(strategy_key, 0) + 1
     seen_ids = {str(row.get("lifecycle_id") or "") for row in prior_rows}
+    pair_collection_attempts: list[dict] = []
     for sym in symbols:
         if now_et.time() >= dtime(13, 45):
             break
         if active_by_symbol.get(sym, 0) >= SHADOW_MAX_ACTIVE_PER_SYMBOL:
+            if SHADOW_PAIRED_DIRECTION_ENABLED:
+                pair_collection_attempts.append({
+                    "observed_at": scanned_at,
+                    "date": today_s,
+                    "symbol": sym,
+                    "episode_bucket_et": bucket,
+                    "status": "not_attempted",
+                    "reason": "symbol_shadow_capacity_full",
+                    "active_symbol_lifecycles": active_by_symbol.get(sym, 0),
+                    "maximum_active_symbol_lifecycles": SHADOW_MAX_ACTIVE_PER_SYMBOL,
+                    "execution_enabled": False,
+                    "can_submit_orders": False,
+                })
             continue
         setup = _find_0dte_for_symbol(
             account,
@@ -3102,9 +4271,103 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             allow_calendar_catalyst=False,
             require_orb_retest=False,
         )
-        # Give independent challenger strategies first access to research
-        # capacity. Generic 0DTE episodes must not starve a reversal signal.
-        candidate_setups = _shadow_setup_challenger_candidates(account, sym) + ([setup] if setup else [])
+        decision_pair_id = f"{today_s}|{sym}|{bucket}|{scanned_at}"
+        pair_diagnostics = {
+            "observed_at": scanned_at,
+            "date": today_s,
+            "symbol": sym,
+            "episode_bucket_et": bucket,
+            "decision_pair_id": decision_pair_id,
+            "source_setup_available": setup is not None,
+            "source_strategy": setup.get("strategy") if setup else None,
+            "source_right": setup.get("right") if setup else None,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "automatic_parameter_changes": False,
+        }
+        pair_capacity_available = (
+            SHADOW_MAX_ACTIVE_PER_SYMBOL - active_by_symbol.get(sym, 0) >= 2
+            and active_by_symbol_strategy.get((sym, "0dte"), 0) == 0
+            and active_by_symbol_strategy.get((sym, "paired_direction_shadow"), 0) == 0
+        )
+        paired_setup = (
+            _build_paired_direction_shadow_setup(
+                account,
+                sym,
+                setup,
+                decision_pair_id=decision_pair_id,
+                diagnostics=pair_diagnostics,
+            )
+            if pair_capacity_available
+            else None
+        )
+        if not pair_capacity_available:
+            pair_diagnostics.update(
+                status="not_attempted",
+                reason="atomic_pair_capacity_or_strategy_slot_unavailable",
+                active_symbol_lifecycles=active_by_symbol.get(sym, 0),
+            )
+        challengers = _shadow_setup_challenger_candidates(account, sym)
+        remaining_capacity = SHADOW_MAX_ACTIVE_PER_SYMBOL - active_by_symbol.get(sym, 0)
+        if setup and paired_setup:
+            pair_bundle = [setup, paired_setup]
+            bundle_eligible = remaining_capacity >= 2
+            for pair_candidate in pair_bundle:
+                pair_strategy = str(pair_candidate.get("strategy") or "unknown")
+                pair_strategy_key = (sym, pair_strategy)
+                pair_lifecycle_id = _shadow_episode_id(today_s, pair_candidate, bucket)
+                if (
+                    active_by_symbol_strategy.get(pair_strategy_key, 0)
+                    >= SHADOW_MAX_ACTIVE_PER_SYMBOL_STRATEGY
+                    or pair_lifecycle_id in seen_ids
+                ):
+                    bundle_eligible = False
+            if bundle_eligible:
+                challenger_slots = max(0, remaining_capacity - 2)
+                candidate_setups = challengers[:challenger_slots] + pair_bundle
+            else:
+                # Never create a one-sided "pair" when capacity or lifecycle
+                # state cannot accept both contracts atomically.
+                pair_diagnostics.update(
+                    status="rejected",
+                    reason="atomic_pair_lifecycle_conflict",
+                )
+                candidate_setups = challengers[:max(0, remaining_capacity)]
+        else:
+            candidate_setups = challengers + ([setup] if setup else [])
+        if setup and paired_setup:
+            sealed_context = {
+                "date": today_s,
+                "symbol": sym,
+                "episode_bucket_et": bucket,
+                "observed_at": scanned_at,
+                "market_force": market_force_snapshot,
+                "market_context": _market_context_for(sym),
+                "source_quote": {
+                    key: setup.get(key)
+                    for key in (
+                        "option_symbol", "strike", "selection_bid", "selection_ask",
+                        "quote_timestamp", "quote_age_seconds",
+                    )
+                },
+                "opposite_quote": {
+                    key: paired_setup.get(key)
+                    for key in (
+                        "option_symbol", "strike", "selection_bid", "selection_ask",
+                        "quote_timestamp", "quote_age_seconds",
+                    )
+                },
+            }
+            context_hash = hashlib.sha256(
+                json.dumps(sealed_context, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()
+            for pair_candidate in (setup, paired_setup):
+                pair_candidate.update({
+                    "decision_context_sha256": context_hash,
+                    "paired_direction_policy_version": PAIRED_DIRECTION_POLICY_VERSION,
+                    "paired_direction_policy_spec_sha256": PAIRED_DIRECTION_POLICY_SPEC_HASH,
+                    "paired_direction_policy_execution_authority": "none_shadow_research_only",
+                })
         for candidate_setup in candidate_setups:
             if active_by_symbol.get(sym, 0) >= SHADOW_MAX_ACTIVE_PER_SYMBOL:
                 break
@@ -3118,9 +4381,14 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             expires_et = now_et + timedelta(minutes=SHADOW_EPISODE_HORIZON_MINUTES)
             expires_at = expires_et.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
             candidate_setup.update(market_force_snapshot)
-            candidate_setup.update(_market_context_shadow_snapshot(sym, scanned_dt))
+            candidate_setup.update(_market_context_for(sym))
+            _attach_pattern_memory_advisory(candidate_setup, observed_at=now_et)
             feature_snapshot = _entry_feature_snapshot(candidate_setup)
+            feature_snapshot_hash = hashlib.sha256(
+                json.dumps(feature_snapshot, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()
             contract_selection_challengers = _shadow_contract_challengers(candidate_setup)
+            entry_execution_quality = _entry_execution_quality(candidate_setup)
             entry = {
                 "scanned_at": scanned_at,
                 "date": today_s,
@@ -3139,15 +4407,22 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
                 "learner_tracks": ["flip_entry_exit", "options_directional_contract_selection"],
                 "contract_selection_challengers": contract_selection_challengers,
                 "contract_challenger_evidence_use": "research_only_excluded_from_promotion_counts",
+                "entry_execution_quality": entry_execution_quality,
+                "execution_quality_eligible": entry_execution_quality["eligible"],
+                "execution_quality_rejection_reason": (
+                    None if entry_execution_quality["eligible"] else entry_execution_quality["reason"]
+                ),
                 "options_playbook": "directional_long_call" if candidate_setup.get("right") == "CALL" else "directional_long_put",
                 "entry_reasoning": {
                     "catalyst": candidate_setup.get("catalyst"),
                     "signal_snapshot": candidate_setup.get("signal_snapshot"),
                     "feature_snapshot": feature_snapshot,
+                    "pattern_memory_advisory": candidate_setup.get("pattern_memory_advisory"),
                     "spread_cents": candidate_setup.get("spread_cents"),
                     "quote_age_seconds": candidate_setup.get("quote_age_seconds"),
                 },
                 "feature_snapshot": feature_snapshot,
+                "feature_snapshot_sha256": feature_snapshot_hash,
                 **market_force_snapshot,
                 "promotion_required": "accelerated gate: 100 completed episodes, 10 trading days, 30 chronological holdout episodes, human approval",
                 **candidate_setup,
@@ -3157,6 +4432,8 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             seen_ids.add(lifecycle_id)
             active_by_symbol[sym] = active_by_symbol.get(sym, 0) + 1
             active_by_symbol_strategy[strategy_key] = active_by_symbol_strategy.get(strategy_key, 0) + 1
+        if SHADOW_PAIRED_DIRECTION_ENABLED:
+            pair_collection_attempts.append(pair_diagnostics)
 
     if observations:
         SHADOW_CANDIDATE_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -3169,6 +4446,11 @@ def _log_shadow_0dte_candidates_unlocked(account: float, symbols: list[str] | No
             f"Logged shadow lifecycles: entries={entry_count} marks={mark_count} "
             f"to {SHADOW_CANDIDATE_LOG_PATH}"
         )
+    if pair_collection_attempts:
+        PAIRED_DIRECTION_COLLECTION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with PAIRED_DIRECTION_COLLECTION_LOG_PATH.open("a", encoding="utf-8") as handle:
+            for attempt in pair_collection_attempts:
+                handle.write(json.dumps(attempt, sort_keys=True) + "\n")
     return observations
 
 
@@ -3375,6 +4657,7 @@ def find_bear_trend_day(account: float) -> dict | None:
             "contracts": contracts,
             "entry_price_est": px,
             "confidence": signal["score"],
+            "breadth_confirmed": sorted(valid.keys()),
             "hard_close_date": str(date.today()),
             "hard_close_time": "13:45",
             "catalyst": f"VWAP/50EMA bear trend {signal['score']}/10: {reason_text} | ORB={orb_dir}",
@@ -3421,6 +4704,7 @@ def find_bear_trend_day(account: float) -> dict | None:
                 "max_loss": round(net_debit * spread_contracts * 100, 2),
                 "max_gain": round((long_strike - short_strike - net_debit) * spread_contracts * 100, 2),
                 "confidence": signal["score"],
+                "breadth_confirmed": sorted(valid.keys()),
                 "hard_close_date": str(date.today()),
                 "hard_close_time": "13:45",
                 "catalyst": f"VWAP/50EMA bear spread {signal['score']}/10: {reason_text} | ORB={orb_dir}",
@@ -3863,6 +5147,7 @@ def _entry_quality_snapshot(
         "signal_snapshot": setup.get("signal_snapshot"),
         "feature_snapshot": _entry_feature_snapshot(setup),
         "gex_profile_advisory": setup.get("gex_profile_advisory"),
+        "pattern_memory_advisory": setup.get("pattern_memory_advisory"),
         "executable_ev_gate": setup.get("executable_ev_gate"),
     }
 
@@ -3985,6 +5270,31 @@ def _entry_feature_snapshot(setup: dict) -> dict:
     }
 
 
+def _attach_pattern_memory_advisory(setup: dict, *, observed_at: datetime | None = None) -> dict:
+    """Attach strictly prior-date analog evidence without changing execution."""
+    try:
+        advisory = pattern_memory_advice(
+            setup,
+            feature_snapshot=_entry_feature_snapshot(setup),
+            as_of=observed_at or _now_et(),
+        )
+    except Exception as exc:
+        log.warning(f"PATTERN MEMORY {setup.get('symbol', 'SPY')}: unavailable: {exc}")
+        advisory = {
+            "schema_version": 1,
+            "status": "unavailable",
+            "reason": str(exc)[:240],
+            "strictly_prior_date_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "can_change_size": False,
+            "can_block_entry": False,
+            "authority": "shadow_advisory_only",
+        }
+    setup["pattern_memory_advisory"] = advisory
+    return advisory
+
+
 def _update_pnl_extremes(trade: dict, pnl_pct: float) -> bool:
     """Track MFE (best) and MAE (worst) P&L percent. Returns True if changed."""
     changed = False
@@ -4021,6 +5331,80 @@ def _path_telemetry_baseline() -> dict:
             "worst_pnl_pct": "observed_monitor_and_exit_quotes",
         },
     }
+
+
+def _trade_shape_snapshot(
+    trade: dict,
+    *,
+    mid: float,
+    executable_price: float | None,
+    observed_at: datetime,
+) -> dict:
+    """Classify the observed path using executable prices only.
+
+    The label is telemetry, not an exit command. It makes the repeatable
+    distinction between trades that never confirmed, recovered, expanded, or
+    surrendered an earlier gain so later exit studies can use causal marks.
+    """
+    entry = float(trade.get("entry_price") or 0.0)
+    current = (
+        (float(executable_price) - entry) / entry * 100.0
+        if executable_price is not None and executable_price > 0 and entry > 0
+        else None
+    )
+    best = float(trade.get("best_pnl_pct") or 0.0)
+    worst = float(trade.get("worst_pnl_pct") or 0.0)
+    giveback = max(0.0, best - current) if current is not None else None
+    friction = (
+        max(0.0, (float(mid) - float(executable_price)) / entry * 100.0)
+        if executable_price is not None and entry > 0 and mid > 0
+        else None
+    )
+    entered_at = _parse_timestamp(trade.get("entry_at"))
+    elapsed_minutes = (
+        max(0.0, (observed_at.astimezone(timezone.utc) - entered_at).total_seconds() / 60.0)
+        if entered_at is not None else None
+    )
+
+    if current is None:
+        state = "executable_quote_unavailable"
+    elif current <= 0 and best <= 0:
+        state = "loser_never_confirmed"
+    elif current <= 0 and best > 0:
+        state = "failed_after_positive_excursion"
+    elif current > 0 and worst < 0:
+        state = "recovered_from_adverse_excursion"
+    elif giveback is not None and giveback >= PROFIT_PROTECT_GIVEBACK_PCT:
+        state = "winner_giveback"
+    else:
+        state = "winner_expanding_or_holding"
+
+    if current is not None and trade.get("first_executable_mark_pnl_pct") is None:
+        trade["first_executable_mark_pnl_pct"] = round(current, 3)
+        trade["first_executable_mark_at"] = observed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        trade["first_executable_mark_delay_minutes"] = (
+            round(elapsed_minutes, 3) if elapsed_minutes is not None else None
+        )
+        trade["first_executable_mark_confirmation"] = "green" if current > 0 else "not_green"
+
+    snapshot = {
+        "schema_version": 1,
+        "authority": "telemetry_only",
+        "can_submit_orders": False,
+        "observed_at": observed_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "state": state,
+        "elapsed_minutes": round(elapsed_minutes, 3) if elapsed_minutes is not None else None,
+        "mid_pnl_pct": round((mid - entry) / entry * 100.0, 3) if entry > 0 and mid > 0 else None,
+        "executable_pnl_pct": round(current, 3) if current is not None else None,
+        "best_executable_pnl_pct": round(best, 3),
+        "worst_executable_pnl_pct": round(worst, 3),
+        "giveback_from_best_pct_points": round(giveback, 3) if giveback is not None else None,
+        "mid_to_executable_friction_pct_of_entry": round(friction, 3) if friction is not None else None,
+        "first_mark_confirmation": trade.get("first_executable_mark_confirmation"),
+    }
+    trade["monitor_observation_count"] = int(trade.get("monitor_observation_count") or 0) + 1
+    trade["last_trade_shape"] = snapshot
+    return snapshot
 
 
 def _profit_protect_lock_floor(best_pnl_pct: float) -> float:
@@ -4196,6 +5580,7 @@ def _submit_resting_take_profit(trade: dict) -> str:
         qty,
         "sell",
         limit_price=resting_price,
+        client_order_id=_stable_client_order_id("target", str(trade.get("id") or "")),
     )
     if not response or not response.get("id"):
         trade["resting_tp_status"] = "submission_failed"
@@ -4483,6 +5868,13 @@ def _capture_point_in_time(
     return workers
 
 
+def _stable_client_order_id(purpose: str, identity: str) -> str:
+    """Return a deterministic Alpaca client ID that survives process restarts."""
+    clean_purpose = "".join(ch for ch in purpose.lower() if ch.isalnum())[:6] or "order"
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+    return f"vt-{clean_purpose}-{digest}"[:48]
+
+
 def _submit(
     occ_symbol: str,
     qty: int,
@@ -4490,8 +5882,9 @@ def _submit(
     max_notional: float = 0.0,
     *,
     limit_price: float | None = None,
+    client_order_id: str | None = None,
 ) -> dict | None:
-    if qty > MAX_CONTRACTS:
+    if side == "buy" and qty > MAX_CONTRACTS:
         log.error(f"ORDER BLOCKED: {qty} contracts exceeds MAX_CONTRACTS={MAX_CONTRACTS}")
         _alert(f"ORDER BLOCKED {occ_symbol}: {qty} contracts > hard cap {MAX_CONTRACTS}")
         return None
@@ -4518,6 +5911,10 @@ def _submit(
         # positive limit, never a market order. Normal monitor paths pass bid.
         protective_mark = _option_mid(occ_symbol)
         limit_price = round(protective_mark, 2) if protective_mark > 0 else 0.01
+    if not client_order_id:
+        minute_bucket = int(time.time()) // 60
+        identity = f"{occ_symbol}:{side}:{qty}:{float(limit_price):.2f}:{minute_bucket}"
+        client_order_id = _stable_client_order_id(side, identity)
     body = {
         "symbol": occ_symbol,
         "qty": str(qty),
@@ -4525,6 +5922,7 @@ def _submit(
         "time_in_force": "day",
         "type": "limit",
         "limit_price": str(round(float(limit_price), 2)),
+        "client_order_id": client_order_id,
     }
     for attempt in range(3):
         try:
@@ -4534,6 +5932,34 @@ def _submit(
             return resp
         except Exception as exc:
             status = getattr(getattr(exc, 'response', None), 'status_code', 0)
+            # A timeout or 5xx can occur after Alpaca accepted the order. Resolve
+            # by deterministic client ID before considering another POST.
+            try:
+                existing = _get(
+                    f"/v2/orders:by_client_order_id?client_order_id={client_order_id}"
+                )
+            except Exception:
+                existing = None
+            if isinstance(existing, dict) and existing.get("id"):
+                log.warning(
+                    f"Recovered accepted order by client_order_id={client_order_id}: "
+                    f"{existing.get('id')}"
+                )
+                return existing
+            transient_network_error = isinstance(
+                exc,
+                (req.exceptions.Timeout, req.exceptions.ConnectionError),
+            )
+            if transient_network_error:
+                log.error(
+                    f"Ambiguous order transport failure; no second POST sent for "
+                    f"client_order_id={client_order_id}: {exc}"
+                )
+                _alert(
+                    f"ORDER STATUS UNKNOWN {occ_symbol} x{qty} {side}\n"
+                    f"client_order_id={client_order_id}\nManual reconciliation required."
+                )
+                return None
             if status in (429, 500, 502, 503) and attempt < 2:
                 wait = 2 ** attempt * 3
                 log.warning(f"Attempt {attempt+1} failed ({status}), retry in {wait}s")
@@ -4572,7 +5998,17 @@ def _submit_entry_ladder(setup: dict, max_notional: float) -> dict | None:
     }
     if not prices:
         return None
-    response = _submit(occ, qty, "buy", max_notional=max_notional, limit_price=prices[0])
+    response = _submit(
+        occ,
+        qty,
+        "buy",
+        max_notional=max_notional,
+        limit_price=prices[0],
+        client_order_id=_stable_client_order_id(
+            "entry",
+            str(setup.get("telemetry_trade_id") or "") or f"{occ}:{_utc_now_text()}",
+        ),
+    )
     if not response:
         return None
     setup["entry_execution_ladder"]["submitted_prices"].append(prices[0])
@@ -4605,19 +6041,60 @@ def _submit_entry_ladder(setup: dict, max_notional: float) -> dict | None:
     return latest
 
 
-def _submit_exit_limit(occ_symbol: str, qty: int) -> dict | None:
-    """Submit an executable sell limit at the observed bid, never market."""
+def _submit_exit_limit(
+    occ_symbol: str,
+    qty: int,
+    *,
+    client_order_id: str | None = None,
+) -> dict | None:
+    """Submit exit sell limit starting at bid; escalate through concession ladder if unfilled."""
     midpoint = _option_mid(occ_symbol)
     quote = _selection_quote_fields(occ_symbol)
     bid = float(quote.get("selection_bid") or 0.0)
-    prices = marketable_exit_limits(bid, concessions=0)
+    prices = marketable_exit_limits(bid, concessions=2)
     if not prices:
-        if midpoint <= 0:
-            log.error(f"EXIT BLOCKED: executable bid unavailable for {occ_symbol}")
-            return None
-        # _submit converts this compatibility call into a limit at midpoint.
-        return _submit(occ_symbol, qty, "sell")
-    return _submit(occ_symbol, qty, "sell", limit_price=prices[0])
+        log.error(
+            f"EXIT BLOCKED: executable bid unavailable for {occ_symbol}; "
+            f"midpoint=${midpoint:.3f} is not an executable substitute"
+        )
+        _alert(f"EXIT QUOTE FAILURE {occ_symbol}\nExecutable bid unavailable; protection will retry.")
+        return None
+    latest = _submit(
+        occ_symbol,
+        qty,
+        "sell",
+        limit_price=prices[0],
+        client_order_id=client_order_id,
+    )
+    if latest is None or len(prices) == 1:
+        return latest
+    initial_status = str(latest.get("status") or "").strip().lower()
+    if initial_status == "filled" or _parse_filled_qty(latest) >= qty:
+        return latest
+    order_id = str(latest.get("id") or "")
+    for step, price in enumerate(prices[1:], start=1):
+        time.sleep(8)
+        if not order_id:
+            break
+        try:
+            check = _get(f"/v2/orders/{order_id}")
+        except Exception:
+            check = {}
+        status = str(check.get("status") or "").lower()
+        if status == "filled" or _parse_filled_qty(check) >= qty:
+            return check
+        if status and status not in _ACTIVE_ENTRY_ORDER_STATUSES:
+            return check
+        try:
+            replaced = _patch(f"/v2/orders/{order_id}", {"limit_price": str(round(price, 2))})
+            if isinstance(replaced, dict) and replaced.get("id"):
+                latest = replaced
+                order_id = str(replaced["id"])
+                log.info(f"Exit ladder step {step}: {occ_symbol} concession to ${price:.2f}")
+        except Exception as exc:
+            log.warning(f"Exit ladder step {step} replacement failed: {exc}")
+            break
+    return latest
 
 
 def _submit_spread(setup: dict, max_notional: float = 0.0) -> dict | None:
@@ -4646,6 +6123,11 @@ def _submit_spread(setup: dict, max_notional: float = 0.0) -> dict | None:
         "type": "limit",
         "limit_price": str(round(debit, 2)),
         "time_in_force": "day",
+        "client_order_id": _stable_client_order_id(
+            "spread-entry",
+            str(setup.get("telemetry_trade_id") or "")
+            or f"{setup.get('option_symbol')}:{setup.get('short_option_symbol')}:{_utc_now_text()}",
+        ),
         "legs": [
             {"symbol": setup["option_symbol"], "side": "buy", "ratio_qty": "1"},
             {"symbol": setup["short_option_symbol"], "side": "sell", "ratio_qty": "1"},
@@ -4670,6 +6152,19 @@ def _spread_mid(long_symbol: str, short_symbol: str) -> float:
     if long_mid <= 0 or short_mid < 0:
         return 0.0
     return round(max(0.0, long_mid - short_mid), 3)
+
+
+def _spread_executable_close_credit(long_symbol: str, short_symbol: str) -> float:
+    """Return the immediately executable close credit for a long debit spread."""
+    _option_mid(long_symbol)
+    _option_mid(short_symbol)
+    long_quote = _selection_quote_fields(long_symbol)
+    short_quote = _selection_quote_fields(short_symbol)
+    long_bid = float(long_quote.get("selection_bid") or 0.0)
+    short_ask = float(short_quote.get("selection_ask") or 0.0)
+    if long_bid <= 0 or short_ask <= 0:
+        return 0.0
+    return round(max(0.0, long_bid - short_ask), 3)
 
 
 def _close_spread(trade: dict) -> dict | None:
@@ -4715,6 +6210,64 @@ def _close_spread(trade: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 # Entry run
 # ---------------------------------------------------------------------------
+
+def _attach_fibonacci_pretrade_analysis(setup: dict) -> dict:
+    """Attach mandatory, non-authoritative Fibonacci structure telemetry."""
+    symbol = str(setup.get("symbol") or "").upper()
+    try:
+        raw_bars = _intraday_bars(symbol)
+        if raw_bars is None or len(raw_bars) == 0:
+            analysis = {
+                "version": "causal-fibonacci-v1",
+                "status": "unavailable",
+                "reason": "intraday_bars_unavailable",
+                "execution_authority": "analysis_only_pending_out_of_sample_validation",
+                "can_submit_orders": False,
+            }
+        else:
+            analysis = analyze_fibonacci_structure(
+                _fibonacci_completed_bars(raw_bars),
+                direction_from_option_right(setup.get("right")),
+            )
+    except Exception as exc:
+        analysis = {
+            "version": "causal-fibonacci-v1",
+            "status": "error",
+            "reason": f"analysis_failed:{type(exc).__name__}",
+            "execution_authority": "analysis_only_pending_out_of_sample_validation",
+            "can_submit_orders": False,
+        }
+        log.exception(
+            "FIBONACCI ANALYSIS FAILED %s %s",
+            symbol,
+            setup.get("strategy"),
+        )
+    analysis["execution_plan"] = build_fibonacci_execution_plan(analysis)
+    analysis["shadow_plan_id"] = record_fibonacci_shadow_plan(setup, analysis)
+    setup["fibonacci_structure"] = analysis
+    return analysis
+
+
+def _fibonacci_completed_bars(raw_bars: pd.DataFrame) -> pd.DataFrame:
+    """Return completed five-minute bars, matching the preregistered lab."""
+    frame = _completed_intraday_bars(raw_bars)
+    if frame is None or frame.empty or not isinstance(frame.index, pd.DatetimeIndex):
+        return frame
+    spacing = frame.index.to_series().diff().dropna().dt.total_seconds()
+    if not spacing.empty and float(spacing.median()) >= 240.0:
+        return frame
+    normalized = frame.rename(columns={column: str(column).lower() for column in frame.columns})
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(normalized.columns):
+        return frame.iloc[0:0]
+    aggregation = {"open": "first", "high": "max", "low": "min", "close": "last"}
+    if "volume" in normalized.columns:
+        aggregation["volume"] = "sum"
+    grouped = normalized.resample("5min", label="right", closed="left")
+    bars = grouped.agg(aggregation)
+    counts = grouped["close"].count()
+    return bars.loc[counts >= 5].dropna(subset=["open", "high", "low", "close"])
+
 
 def run_entry(account: float, *, intraday_only: bool = False) -> None:
     lane = "INTRADAY SPY" if intraday_only else "FULL"
@@ -4976,6 +6529,8 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 "alpha_advisory_only": consensus.get("alpha_advisory_only", False),
                 "reasons": consensus.get("reasons", []),
             }
+        if is_spread:
+            _hydrate_spread_entry_quote(setup)
         estimated_notional = float(setup.get("entry_price_est", 0.0) or 0.0) * int(setup.get("contracts", 0) or 0) * 100
         confidence = setup.get("confidence", setup.get("score"))
         local_open_symbols = {t.get("symbol", "") for t in open_trades + trades if t.get("status") == "open"}
@@ -4994,7 +6549,10 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             spread_cents=setup.get("spread_cents"),
             daily_loss_pct=daily_loss_pct,
             open_symbols=local_open_symbols | broker_symbols,
-            config=ExecutionGuardConfig(max_spread_cents=MAX_ENTRY_SPREAD_CENTS),
+            config=ExecutionGuardConfig(
+                max_spread_cents=MAX_ENTRY_SPREAD_CENTS,
+                max_daily_loss_pct=MAX_DAILY_LOSS_PCT,
+            ),
         )
         if not decision.allowed:
             log.warning(
@@ -5068,6 +6626,76 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 executable_ev_gate=ev_block,
             )
             continue
+        # Mandatory point-in-time structure analysis. Fibonacci has no order,
+        # sizing, or directional authority until its OOS placebo gate passes.
+        fibonacci_analysis = _attach_fibonacci_pretrade_analysis(setup)
+        if FIBONACCI_ANALYSIS_REQUIRED and fibonacci_analysis.get("status") == "error":
+            _decision(
+                setup_symbol,
+                setup.get("strategy", "unknown"),
+                "blocked",
+                "fibonacci_analysis_error",
+                fibonacci_structure=fibonacci_analysis,
+            )
+            continue
+        setup["profit_target_multiplier"] = PROFIT_MULT
+        setup["stop_multiplier"] = STOP_MULT
+        _attach_pattern_memory_advisory(setup)
+        if METHODICAL_DECISION_ENABLED:
+            try:
+                methodical_context = load_methodical_context(setup_symbol)
+            except Exception as exc:
+                log.warning(
+                    f"METHODICAL CONTEXT {setup_symbol}: load failed; "
+                    f"routing to bounded paper exploration: {exc}"
+                )
+                methodical_context = {
+                    "portfolio_kill_switch_active": False,
+                    "source_health": {},
+                    "context_error": str(exc)[:240],
+                }
+            methodical = evaluate_methodical_entry(setup, methodical_context, paper=PAPER)
+            setup["methodical_decision"] = methodical
+            if not methodical.get("allowed") and METHODICAL_DECISION_ENFORCEMENT_ENABLED:
+                log.warning(
+                    f"METHODICAL POLICY BLOCKED {setup_symbol} {setup.get('strategy')}: "
+                    f"{methodical.get('hard_blockers')}"
+                )
+                _decision(
+                    setup_symbol,
+                    setup.get("strategy", "unknown"),
+                    "blocked",
+                    "methodical_policy_block",
+                    methodical_decision=methodical,
+                )
+                continue
+            if not methodical.get("allowed"):
+                log.info(
+                    f"METHODICAL ADVISORY {setup_symbol} {setup.get('strategy')}: "
+                    f"would_block={methodical.get('hard_blockers')} enforcement=disabled"
+                )
+            original_contracts = int(setup.get("contracts", 0) or 0)
+            adjusted_contracts = int(
+                methodical.get("adjusted_contracts", original_contracts) or 0
+            )
+            if adjusted_contracts < 1 and METHODICAL_DECISION_ENFORCEMENT_ENABLED:
+                _decision(
+                    setup_symbol,
+                    setup.get("strategy", "unknown"),
+                    "blocked",
+                    "methodical_contract_count_zero",
+                    methodical_decision=methodical,
+                )
+                continue
+            setup["methodical_lane"] = methodical.get("status")
+            if METHODICAL_DECISION_ENFORCEMENT_ENABLED:
+                setup["contracts"] = min(original_contracts, adjusted_contracts)
+            if METHODICAL_DECISION_ENFORCEMENT_ENABLED and setup["contracts"] < original_contracts:
+                log.info(
+                    f"METHODICAL SIZE {setup_symbol} {setup.get('strategy')}: "
+                    f"{original_contracts} -> {setup['contracts']} "
+                    f"lane={methodical.get('status')}"
+                )
         _capture_point_in_time(
             "signal",
             setup,
@@ -5077,6 +6705,9 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 "entry_price_est": setup.get("entry_price_est"),
                 "spread_cents_at_signal": setup.get("spread_cents"),
                 "entry_evidence_gate": setup.get("entry_evidence_gate"),
+                "methodical_decision": setup.get("methodical_decision"),
+                "fibonacci_structure": setup.get("fibonacci_structure"),
+                "pattern_memory_advisory": setup.get("pattern_memory_advisory"),
             },
         )
         entry_order_submitted_at = _utc_now_text()
@@ -5164,6 +6795,10 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             "noise_area_structural_stop": setup.get("noise_area_structural_stop"),
             "noise_area_formula_version": setup.get("noise_area_formula_version"),
             "shadow_consensus": setup.get("shadow_consensus"),
+            "methodical_lane": setup.get("methodical_lane"),
+            "methodical_decision": setup.get("methodical_decision"),
+            "fibonacci_structure": setup.get("fibonacci_structure"),
+            "pattern_memory_advisory": setup.get("pattern_memory_advisory"),
             "entry_quality":   _entry_quality_snapshot(setup, filled_price, fill_price_source),
             **_path_telemetry_baseline(),
         }
@@ -5305,16 +6940,52 @@ def _monitor_pass() -> bool:
             log.warning(f"No price for {occ}")
             continue
 
+        # Use executable bid for protective comparisons; mid is display-only benchmark.
+        if not is_spread:
+            _eq = _selection_quote_fields(occ)
+            _bid = float(_eq.get("selection_bid") or 0.0)
+        else:
+            _bid = _spread_executable_close_credit(occ, str(trade["short_option_symbol"]))
+
         pnl_pct = (mid - entry) / entry * 100
-        if _update_pnl_extremes(trade, pnl_pct):
+        exec_price = _bid if _bid > 0 else None
+        exec_pnl_pct = ((exec_price - entry) / entry * 100) if exec_price is not None else None
+        if exec_pnl_pct is not None:
+            if _update_pnl_extremes(trade, exec_pnl_pct):
+                changed = True
+            trade.pop("missing_exit_bid_alerted", None)
+        elif not trade.get("missing_exit_bid_alerted"):
+            trade["missing_exit_bid_alerted"] = _utc_now_text()
             changed = True
-        best_pnl_pct = float(trade.get("best_pnl_pct", pnl_pct))
+            quote_name = "spread close credit" if is_spread else "executable bid"
+            message = f"EXIT QUOTE FAILURE {trade.get('symbol')} {occ}: {quote_name} unavailable"
+            log.error(message)
+            _alert(message)
+        best_pnl_pct = float(trade.get("best_pnl_pct", exec_pnl_pct or 0.0))
+        trade_shape = _trade_shape_snapshot(
+            trade,
+            mid=mid,
+            executable_price=exec_price,
+            observed_at=now_et,
+        )
+        changed = True
         _capture_point_in_time(
             "monitor",
             trade,
-            context={"mid": mid, "pnl_pct": round(pnl_pct, 2)},
+            context={
+                "mid": mid,
+                "bid": round(exec_price, 4) if exec_price is not None else None,
+                "pnl_pct": round(pnl_pct, 2),
+                "exec_pnl_pct": round(exec_pnl_pct, 2) if exec_pnl_pct is not None else None,
+                "trade_shape": trade_shape,
+            },
         )
-        log.info(f"{occ}  mid=${mid:.3f}  P&L={pnl_pct:+.1f}%  target=${target:.3f}  stop=${stop:.3f}")
+        bid_note = f"${exec_price:.3f}" if exec_price is not None else "unavailable"
+        exec_note = f"{exec_pnl_pct:+.1f}%" if exec_pnl_pct is not None else "n/a"
+        log.info(
+            f"{occ}  mid=${mid:.3f}  bid={bid_note}  P&L={pnl_pct:+.1f}% "
+            f"(bid:{exec_note})  target=${target:.3f}  stop=${stop:.3f}"
+        )
 
         reason = None
         consensus_exit = shadow_exit_advice(trade.get("symbol", ""), trade.get("right"))
@@ -5350,19 +7021,23 @@ def _monitor_pass() -> bool:
         else:
             reason = _noise_area_structural_exit_reason(trade, now_et=now_et)
             if not reason:
-                reason = _underlying_structure_exit_reason(trade, pnl_pct, now_et=now_et)
+                reason = _underlying_structure_exit_reason(
+                    trade,
+                    exec_pnl_pct if exec_pnl_pct is not None else pnl_pct,
+                    now_et=now_et,
+                )
                 changed = True
-            if not reason and mid <= stop:
-                reason = f"STOP LOSS (EMERGENCY OPTION FAILSAFE) {pnl_pct:.1f}%"
-            if not reason:
+            if not reason and exec_price is not None and exec_price <= stop:
+                reason = f"STOP LOSS (EMERGENCY OPTION FAILSAFE) {exec_pnl_pct:.1f}% [bid-based]"
+            if not reason and exec_pnl_pct is not None:
                 lock_floor = _profit_protect_lock_floor(best_pnl_pct)
                 if (
                     best_pnl_pct >= PROFIT_PROTECT_ARM_PCT
-                    and pnl_pct <= lock_floor
+                    and exec_pnl_pct <= lock_floor
                 ):
                     reason = (
-                        f"PROFIT PROTECT {pnl_pct:+.1f}% "
-                        f"(best +{best_pnl_pct:.1f}%, lock +{lock_floor:.1f}%)"
+                        f"PROFIT PROTECT {exec_pnl_pct:+.1f}% [bid] "
+                        f"(mid {pnl_pct:+.1f}%, best +{best_pnl_pct:.1f}%, lock +{lock_floor:.1f}%)"
                     )
         if not reason:
             reason = _shadow_defensive_exit_reason(consensus_exit, pnl_pct)
@@ -5419,7 +7094,11 @@ def _monitor_pass() -> bool:
                     log.error(msg)
                     _alert(msg)
                     continue
-            resp = _close_spread(trade) if is_spread else _submit_exit_limit(occ, qty)
+            resp = _close_spread(trade) if is_spread else _submit_exit_limit(
+                occ,
+                qty,
+                client_order_id=_stable_client_order_id("exit", str(trade.get("id") or "")),
+            )
             if resp:
                 exit_state = _stage_exit_order(trade, resp, reason, mid)
                 changed = True
@@ -5499,6 +7178,9 @@ def run_monitor(protect_loop: bool = False) -> None:
         log.info("Market is closed - skip flip monitor")
         return
 
+    had_open_before_pass = any(
+        trade.get("status") == "open" for trade in _load()
+    )
     open_remaining = _serialized_monitor_pass()
 
     # Research collection must never delay or block protection of open trades.
@@ -5511,23 +7193,37 @@ def run_monitor(protect_loop: bool = False) -> None:
     # Entry re-scan: catch ORB breakouts that develop after the initial 9:35 scan.
     # Today's bear move (ORB neutral at 9:35, broke bearish at 10:00-10:15) is the exact case.
     # Runs on every 5-min monitor cycle when slot is open and within the entry window.
-    if not protect_loop:
+    if not protect_loop and not had_open_before_pass:
         _rescan_trades = _load()
         _open_now = [t for t in _rescan_trades if t.get("status") == "open"]
         _now_rescan = _now_et()
         _rescan_start = dtime(9, 37)   # 2 min after primary entry task — avoid race
-        if (not _open_now
-                and _now_rescan.time() >= _rescan_start
-                and _now_rescan.time() <= ORB_ENTRY_CUTOFF_ET):
-            log.info(
-                f"MONITOR ENTRY RESCAN {_now_rescan.strftime('%H:%M')} ET: "
-                f"no open trades, within ORB window -- scanning"
-            )
+        if not _open_now and _now_rescan.time() >= _rescan_start:
             try:
                 _rescan_account = resolve_account_size(allow_research_fallback=True)
-                run_entry(_rescan_account, intraday_only=True)
+                if _now_rescan.time() <= ORB_ENTRY_CUTOFF_ET:
+                    log.info(
+                        f"MONITOR ENTRY RESCAN {_now_rescan.strftime('%H:%M')} ET: "
+                        f"no open trades, within ORB window -- scanning"
+                    )
+                    run_entry(_rescan_account, intraday_only=True)
+                    if not any(trade.get("status") == "open" for trade in _load()):
+                        log.info(
+                            f"MONITOR EXPLORATION RESCAN {_now_rescan.strftime('%H:%M')} ET: "
+                            "primary scan left the slot empty -- scanning bounded challengers"
+                        )
+                        run_exploration_entry(_rescan_account)
+                elif _now_rescan.time() < BEAR_TREND_ENTRY_CUTOFF_ET:
+                    log.info(
+                        f"MONITOR EXPLORATION RESCAN {_now_rescan.strftime('%H:%M')} ET: "
+                        f"no open trades, within trend window -- scanning"
+                    )
+                    run_exploration_entry(_rescan_account)
             except Exception as exc:
                 log.warning(f"Monitor entry rescan failed: {exc}")
+        return
+
+    if not protect_loop:
         return
 
     deadline = time.monotonic() + MONITOR_PROTECT_WINDOW_MINUTES * 60
@@ -5580,7 +7276,9 @@ def close_all() -> None:
                 )
                 continue
         resp = _close_spread(t) if t.get("short_option_symbol") else _submit_exit_limit(
-            t["option_symbol"], t["contracts"]
+            t["option_symbol"],
+            t["contracts"],
+            client_order_id=_stable_client_order_id("manual", str(t.get("id") or "")),
         )
         if resp:
             mid = _option_mid(t["option_symbol"])
@@ -5590,6 +7288,379 @@ def close_all() -> None:
             else:
                 log.info(f"Close submitted for {t['option_symbol']}; awaiting broker fill")
     _save(trades)
+
+
+# ---------------------------------------------------------------------------
+# Exploration lane — paper-only, 1 contract max, EV gate bypassed
+# ---------------------------------------------------------------------------
+
+def run_exploration_entry(account: float) -> None:
+    """Run one serialized exploration scan from any scheduler authority."""
+    with _exploration_authority_lock() as acquired:
+        if not acquired:
+            log.info("Exploration entry scan already running; skipping overlapping invocation")
+            return
+        _run_exploration_entry_unlocked(account)
+
+
+def _run_exploration_entry_unlocked(account: float) -> None:
+    """Submit one daily exploration trade to gather broker-fill evidence.
+
+    Bypasses the executable-EV gate only. All other quality and slippage
+    gates still apply. Never eligible for live promotion. Paper-only.
+    """
+    if not PAPER or LIVE_EXECUTION_ENABLED:
+        log.error("EXPLORATION BLOCKED: paper endpoint with live execution disabled is required")
+        return
+
+    if not _market_open():
+        log.info("Exploration: market closed - skip")
+        return
+
+    today = _now_et().date().isoformat()
+    trades = _load()
+    exploration_trades = [
+        trade for trade in trades if trade.get("execution_lane") == "exploration"
+    ]
+    daily = sum(1 for trade in exploration_trades if trade.get("entry_date") == today)
+    open_exp = [trade for trade in exploration_trades if trade.get("status") == "open"]
+
+    if daily >= EXPLORATION_MAX_DAILY:
+        log.info(f"Exploration: daily limit reached ({daily}/{EXPLORATION_MAX_DAILY}) - skip")
+        return
+    if len(open_exp) >= EXPLORATION_MAX_OPEN:
+        log.info(f"Exploration: open limit reached ({len(open_exp)}/{EXPLORATION_MAX_OPEN}) - skip")
+        return
+
+    log.info(f"=== FLIP EXPLORATION ENTRY  ${account:.0f}  PAPER  daily={daily}/{EXPLORATION_MAX_DAILY} ===")
+
+    # Build every authorized one-contract research candidate, then prioritize
+    # with a strictly prior-date universe report. Same-day outcomes can never
+    # influence today's exploration selection.
+    candidates = []
+    bear_setup = find_bear_trend_day(account)
+    if bear_setup:
+        candidates.append(bear_setup)
+    bull_setup = find_bull_trend_day(account)
+    if bull_setup:
+        candidates.append(bull_setup)
+    primary_setup = find_0dte(account)
+    if primary_setup:
+        candidates.append(primary_setup)
+    candidates.extend(find_paper_challenger_0dte(account))
+    candidates.extend(find_gap_continuation(account))
+    setup = _select_exploration_candidate(candidates, today=_now_et().date())
+    if not setup:
+        log.info("Exploration: no qualifying trend, 0DTE, or gap-continuation setup found")
+        return
+
+    # Hard cap: 1 contract regardless of account-based sizing.
+    setup["contracts"] = 1
+    setup["lane"] = "exploration"
+    setup["execution_lane"] = "exploration"
+    setup["paper_only"] = True
+    setup["telemetry_trade_id"] = setup.get("telemetry_trade_id") or str(uuid4())
+    setup_symbol = setup.get("symbol", "SPY")
+
+    authorization = _execution_authorization(setup_symbol, 1)
+    if not authorization.get("allowed"):
+        _decision(
+            setup_symbol,
+            setup.get("strategy", "unknown"),
+            "blocked",
+            "symbol_not_promoted",
+            lane="exploration",
+        )
+        return
+
+    broker_symbols = _fetch_broker_open_symbols()
+    if broker_symbols is None:
+        _decision("PORTFOLIO", "exploration", "blocked", "broker_positions_unknown")
+        return
+
+    reentry_block = _same_day_reentry_blocker(setup, trades)
+    if reentry_block:
+        _decision(
+            setup_symbol,
+            setup.get("strategy", "unknown"),
+            "blocked",
+            "same_day_reentry",
+            lane="exploration",
+            blocker=reentry_block,
+        )
+        return
+
+    setup_playbook = (
+        "directional_long_call" if str(setup.get("right") or "").upper() == "CALL"
+        else "directional_long_put" if str(setup.get("right") or "").upper() == "PUT"
+        else None
+    )
+    try:
+        consensus = shadow_entry_advice(
+            setup_symbol,
+            1,
+            requested_playbook=setup_playbook,
+        )
+    except TypeError as exc:
+        if "requested_playbook" not in str(exc):
+            raise
+        consensus = shadow_entry_advice(setup_symbol, 1)
+    if consensus.get("enabled"):
+        if not consensus.get("allowed"):
+            _decision(
+                setup_symbol,
+                setup.get("strategy", "unknown"),
+                "blocked",
+                "shadow_consensus_block",
+                lane="exploration",
+                blockers=consensus.get("blockers", []),
+            )
+            return
+        setup["shadow_consensus"] = {
+            "recommendation": consensus.get("recommendation"),
+            "options_playbook": consensus.get("options_playbook"),
+            "blockers": consensus.get("blockers", []),
+            "hard_blockers": consensus.get("hard_blockers", []),
+            "reasons": consensus.get("reasons", []),
+        }
+        if str(consensus.get("recommendation") or "").lower() == "stand_aside":
+            log.info(
+                f"EXPLORATION CONSENSUS ADVISORY {setup_symbol} "
+                f"{setup.get('strategy')}: {consensus.get('blockers', [])}"
+            )
+        exploration_caution = _exploration_consensus_caution_blocker(consensus)
+        if exploration_caution:
+            log.warning(
+                f"EXPLORATION BLOCKED {setup_symbol} {setup.get('strategy')}: "
+                f"{exploration_caution['caution_count']} stacked stand-aside warnings"
+            )
+            _decision(
+                setup_symbol,
+                setup.get("strategy", "unknown"),
+                "blocked",
+                exploration_caution["reason"],
+                lane="exploration",
+                **{key: value for key, value in exploration_caution.items() if key != "reason"},
+            )
+            return
+
+    if setup.get("short_option_symbol"):
+        _hydrate_spread_entry_quote(setup)
+
+    # Exploration exists to gather real paper-fill evidence. Keep it bounded
+    # independently from production percentage sizing, which can be smaller
+    # than the minimum cost of one option contract on a micro-account model.
+    max_notional = min(account, EXPLORATION_MAX_NOTIONAL_DOLLARS)
+    estimated_notional = float(setup.get("entry_price_est") or 0.0) * 100
+    local_open_symbols = {
+        str(trade.get("symbol") or "").upper()
+        for trade in trades
+        if trade.get("status") == "open"
+    }
+    guard = evaluate_execution(
+        bot="flip-exploration",
+        symbol=setup_symbol,
+        action="entry",
+        paper=PAPER,
+        live_enabled=LIVE_EXECUTION_ENABLED,
+        confidence=float(setup.get("confidence", setup.get("score")) or 0.0),
+        estimated_notional=estimated_notional,
+        max_notional=max_notional,
+        contracts=1,
+        max_contracts=1,
+        block_file=DEFAULT_BLOCK_FILE,
+        spread_cents=setup.get("spread_cents"),
+        daily_loss_pct=_today_realized_loss_pct(trades, account),
+        open_symbols=local_open_symbols | broker_symbols,
+        config=ExecutionGuardConfig(
+            max_spread_cents=MAX_ENTRY_SPREAD_CENTS,
+            max_daily_loss_pct=MAX_DAILY_LOSS_PCT,
+        ),
+    )
+    if not guard.allowed:
+        _decision(
+            setup_symbol,
+            setup.get("strategy", "unknown"),
+            "blocked",
+            "execution_guard_block",
+            lane="exploration",
+            guard_reason=guard.reason,
+            guard_details=guard.details,
+        )
+        return
+
+    # Quality gate: slippage (keep). Evidence gate: keep. EV gate: skip only.
+    slippage_block = _entry_slippage_blocker(setup)
+    if slippage_block:
+        log.warning(f"Exploration blocked by slippage gate: {slippage_block['reason']}")
+        _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked",
+                  slippage_block["reason"], lane="exploration", slippage_guard=slippage_block)
+        return
+
+    entry_cap = float(setup.get("entry_limit_price") or setup.get("entry_price_est") or 0.0)
+    if entry_cap <= 0 or entry_cap * 100 > max_notional + 1e-9:
+        _decision(
+            setup_symbol,
+            setup.get("strategy", "unknown"),
+            "blocked",
+            "exploration_risk_budget_exceeded",
+            lane="exploration",
+            entry_cap=entry_cap,
+            estimated_notional=round(entry_cap * 100, 2),
+            max_notional=round(max_notional, 2),
+        )
+        return
+
+    evidence_block = _entry_evidence_blocker(setup)
+    if evidence_block:
+        log.warning(f"Exploration blocked by evidence gate: {evidence_block['reason']}")
+        _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked",
+                  evidence_block["reason"], lane="exploration", entry_evidence=evidence_block)
+        return
+
+    fibonacci_analysis = _attach_fibonacci_pretrade_analysis(setup)
+    if FIBONACCI_ANALYSIS_REQUIRED and fibonacci_analysis.get("status") == "error":
+        _decision(
+            setup_symbol,
+            setup.get("strategy", "unknown"),
+            "blocked",
+            "fibonacci_analysis_error",
+            lane="exploration",
+            fibonacci_structure=fibonacci_analysis,
+        )
+        return
+    _attach_pattern_memory_advisory(setup)
+
+    # EV gate intentionally skipped — this is what generates the fill evidence.
+    log.info(f"Exploration: EV gate bypassed for {setup_symbol} {setup.get('option_symbol')}")
+
+    _capture_point_in_time(
+        "signal",
+        setup,
+        context={
+            "strategy": setup.get("strategy"),
+            "confidence": setup.get("confidence", setup.get("score")),
+            "entry_price_est": setup.get("entry_price_est"),
+            "spread_cents_at_signal": setup.get("spread_cents"),
+            "entry_evidence_gate": setup.get("entry_evidence_gate"),
+            "execution_lane": "exploration",
+            "ev_gate_bypassed": True,
+            "fibonacci_structure": setup.get("fibonacci_structure"),
+            "pattern_memory_advisory": setup.get("pattern_memory_advisory"),
+            "exploration_routing": setup.get("exploration_routing"),
+        },
+    )
+
+    entry_order_submitted_at = _utc_now_text()
+    setup["entry_order_submitted_at"] = entry_order_submitted_at
+
+    if setup.get("short_option_symbol"):
+        resp = _submit_spread(setup, max_notional=max_notional)
+    else:
+        resp = _submit_entry_ladder(setup, max_notional=max_notional)
+    if not resp:
+        log.warning("Exploration: order submission failed")
+        _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked",
+                  "order_submission_failed", lane="exploration")
+        return
+
+    time.sleep(6)
+    entry_fill = _resolve_entry_fill(resp, setup)
+    if not entry_fill.get("track"):
+        log.warning(f"Exploration entry not filled: order={resp.get('id')} status={entry_fill.get('order_status')}")
+        _alert(
+            f"EXPLORATION NOT FILLED {setup_symbol} {setup.get('right')}\n"
+            f"Order {resp.get('id')} unconfirmed — not tracked."
+        )
+        return
+
+    filled_price = float(entry_fill["entry_price"])
+    tracked_contracts = int(entry_fill["contracts"])
+    execution_evidence = _entry_execution_snapshot(setup, entry_fill, entry_order_submitted_at)
+
+    fill_price_source = str(entry_fill.get("entry_price_source") or "unknown")
+    trade = {
+        "id": setup["telemetry_trade_id"],
+        "alpaca_order_id": resp.get("id"),
+        "lane": "exploration",
+        "execution_lane": "exploration",
+        "paper_only": True,
+        "live_eligible": False,
+        "strategy": setup["strategy"],
+        "symbol": setup["symbol"],
+        "right": setup["right"],
+        "option_symbol": setup["option_symbol"],
+        "short_option_symbol": setup.get("short_option_symbol"),
+        "strike": setup["strike"],
+        "short_strike": setup.get("short_strike"),
+        "expiry": setup["expiry"],
+        "contracts": tracked_contracts,
+        "requested_contracts": entry_fill.get("requested_contracts", 1),
+        "entry_price": filled_price,
+        "entry_price_source": fill_price_source,
+        "entry_order_status": entry_fill.get("entry_order_status") or "unknown",
+        "entry_filled_qty": entry_fill.get("entry_filled_qty", 0.0),
+        "entry_fill_confirmed": bool(entry_fill.get("entry_fill_confirmed")),
+        "entry_partial_fill": bool(entry_fill.get("entry_partial_fill")),
+        "entry_remainder_status": entry_fill.get("entry_remainder_status"),
+        "entry_execution_evidence": execution_evidence,
+        "target_price": round(filled_price * PROFIT_MULT, 3),
+        "stop_price": round(filled_price * STOP_MULT, 3),
+        "max_loss": setup.get("max_loss"),
+        "max_gain": setup.get("max_gain"),
+        "catalyst": setup.get("catalyst", ""),
+        "hard_close_date": setup.get("hard_close_date"),
+        "hard_close_time": setup.get("hard_close_time"),
+        "entry_date": today,
+        "entry_at": _utc_now_text(),
+        "entry_underlying_price": setup.get("underlying_spot_at_selection") or (setup.get("signal_snapshot") or {}).get("close"),
+        "underlying_structure_level": setup.get("underlying_structure_level") or (setup.get("signal_snapshot") or {}).get("vwap"),
+        "signal_snapshot": setup.get("signal_snapshot"),
+        "gex_profile_advisory": setup.get("gex_profile_advisory"),
+        "shadow_consensus": setup.get("shadow_consensus"),
+        "fibonacci_structure": setup.get("fibonacci_structure"),
+        "pattern_memory_advisory": setup.get("pattern_memory_advisory"),
+        "exploration_routing": setup.get("exploration_routing"),
+        "entry_quality": _entry_quality_snapshot(setup, filled_price, fill_price_source),
+        "status": "open",
+        "ev_gate_bypassed": True,
+        **_path_telemetry_baseline(),
+    }
+    trades.append(trade)
+    _save(trades)
+    _capture_point_in_time(
+        "fill",
+        trade,
+        context={
+            "filled_price": filled_price,
+            "fill_price_source": fill_price_source,
+            "tracked_contracts": tracked_contracts,
+            "entry_execution_evidence": execution_evidence,
+            "execution_lane": "exploration",
+            "ev_gate_bypassed": True,
+        },
+    )
+    resting_tp_result = _submit_resting_take_profit(trade)
+    _save(trades)
+
+    _alert(
+        f"EXPLORATION ENTRY {setup_symbol} {setup.get('right')} {setup.get('option_symbol')}\n"
+        f"fill=${filled_price:.2f} x{tracked_contracts} | paper-only | never-live-eligible\n"
+        f"EV gate bypassed to gather fill evidence."
+    )
+    _decision(
+        setup_symbol,
+        setup.get("strategy", "unknown"),
+        "submitted",
+        "exploration_candidate_passed_non_ev_filters",
+        lane="exploration",
+        order_id=resp.get("id"),
+        resting_take_profit=resting_tp_result,
+    )
+    log.info(
+        f"Exploration entry recorded in monitored state: "
+        f"{setup.get('option_symbol')} @{filled_price:.2f} resting_tp={resting_tp_result}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -5608,6 +7679,8 @@ def main() -> None:
                          "minutes so exits fire near their designed levels.")
     ap.add_argument("--status",    action="store_true")
     ap.add_argument("--close-all", action="store_true")
+    ap.add_argument("--explore",   action="store_true",
+                    help="Run one exploration entry (paper-only, 1 contract, EV gate bypassed).")
     ap.add_argument("--account",   type=float, default=None,
                     help="Account size to simulate for this run. Overrides FLIP_ACCOUNT_SIZE_OVERRIDE / ACCOUNT_SIZE_OVERRIDE.")
     args = ap.parse_args()
@@ -5621,6 +7694,8 @@ def main() -> None:
             print_status()
         elif args.close_all:
             close_all()
+        elif args.explore:
+            run_exploration_entry(resolve_account_size(args.account))
         elif args.entry:
             run_entry(resolve_account_size(args.account))
         elif args.intraday_entry:

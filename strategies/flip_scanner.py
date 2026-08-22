@@ -56,8 +56,8 @@ CATALYST_DAYS = [
 
 DEFAULT_SYMBOLS = ["SPY", "QQQ", "TSLA", "NVDA", "AAPL", "META", "AMZN", "AMD", "PLTR", "COIN"]
 
-MAX_RISK_PCT      = 0.02
-MAX_CONTRACTS     = 5
+MAX_RISK_PCT      = float(os.getenv("FLIP_MAX_RISK_PCT", "0.0025"))
+MAX_CONTRACTS     = max(1, int(os.getenv("FLIP_MAX_CONTRACTS", "1")))
 PROFIT_TARGET_PCT = 0.75
 STOP_LOSS_PCT     = 0.50
 GAP_THRESHOLD     = 0.0075

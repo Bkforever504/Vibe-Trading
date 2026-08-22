@@ -35,6 +35,7 @@ except ImportError:
     sys.exit("yfinance not installed. Run: pip install yfinance")
 
 from strategies.shadow_ai_signals import ShadowSignal, append_shadow_signal
+from strategies.assisted_shadow_desk import AssistedShadowError, create_packet
 from strategies.topstep_prop_bot import (
     OpeningRangeConfig,
     build_first_pullback_signal,
@@ -456,14 +457,52 @@ def run_scanner(symbol: str = "MNQ", discord: bool = False) -> dict:
     )
     append_shadow_signal(shadow)
 
+    try:
+        review_packet = create_packet(
+            {
+                "symbol": symbol,
+                "strategy": "first_pullback_1h",
+                "side": signal.side,
+                "entry": signal.entry,
+                "stop": signal.stop,
+                "target": signal.target,
+                "quantity": 1,
+                "point_value": contract.point_value,
+                "estimated_round_trip_cost": 2.48,
+                "observed_at": now_et.astimezone(timezone.utc).isoformat(),
+                "context": sig_dict,
+            },
+            decision_window_seconds=180,
+        )
+        status["assisted_shadow_packet"] = {
+            "packet_id": review_packet["packet_id"],
+            "candidate_digest": review_packet["candidate_digest"],
+            "expires_at": review_packet["expires_at"],
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+    except (AssistedShadowError, OSError) as exc:
+        review_packet = None
+        status["assisted_shadow_packet_error"] = str(exc)
+
     if discord:
         webhook = os.environ.get("DISCORD_WEBHOOK_URL", "")
         if webhook:
+            review_text = ""
+            if review_packet is not None:
+                packet_id = review_packet["packet_id"]
+                digest = review_packet["candidate_digest"]
+                review_text = (
+                    f"\nPacket: `{packet_id}` (expires `{review_packet['expires_at']}`)\n"
+                    f"Approve: `python scripts/assisted_shadow_desk.py approve {packet_id} --digest {digest}`\n"
+                    f"Skip: `python scripts/assisted_shadow_desk.py skip {packet_id} --digest {digest}`"
+                )
             msg = (
                 f"**NQ Pullback Signal** {side_emoji}\n"
                 f"Entry: `{signal.entry:.2f}` | Stop: `{signal.stop:.2f}` | Target: `{signal.target:.2f}`\n"
                 f"Risk: **${risk_dollars:.2f}** MNQ | Reward: **${risk_dollars * BEST_CONFIG.reward_risk:.2f}** MNQ\n"
-                f"_Shadow only — paper observation_"
+                f"_Shadow only - approve/skip records evidence and does not place an order_"
+                f"{review_text}"
             )
             _discord_notify(webhook, msg)
         else:
