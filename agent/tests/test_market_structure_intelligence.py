@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from scripts.market_structure_intelligence import (
     PATTERN_CATALOG,
+    _ny_0800_0900_range_context,
     analyze_market_structure,
     confirmed_swings,
     detect_cisd_universal_model,
@@ -119,6 +120,72 @@ def test_participation_and_macro_context_are_labeled_non_execution_context() -> 
     assert participation["can_submit_orders"] is False
     assert result["macro_context"]["status"] == "context_only_unvalidated"
     assert result["macro_context"]["active_window"] == "ny_am_0950_1010"
+
+
+def test_strat_context_classifies_completed_bars_and_requires_four_frames_for_ftfc() -> None:
+    rows = _bars([100.0, 100.2, 100.1, 100.3, 100.25, 100.4, 100.35, 100.6])
+    rows[-2].update({"o": 100.2, "h": 100.55, "l": 100.05, "c": 100.35})
+    rows[-1].update({"o": 100.35, "h": 100.75, "l": 100.10, "c": 100.60})
+    higher = {
+        "15m": _bars([100.0, 100.4, 100.8, 101.2]),
+        "60m": _bars([99.0, 100.0, 101.0, 102.0]),
+        "1d": _bars([95.0, 97.0, 99.0, 103.0]),
+    }
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 100.59, "ask": 100.61, "freshness": "live", "spread_bps": 1.99},
+        higher_timeframes=higher,
+    )
+
+    context = result["strat_context"]
+    assert context["current_scenario"] == "2u"
+    assert context["ftfc"]["state"] == "bullish"
+    assert context["ftfc"]["strict"] is True
+    assert context["ftfc"]["frame_count"] == 4
+    assert context["probability"]["value"] is None
+    assert context["score_effect"] == "none_until_local_validation"
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
+
+
+def test_ny_0800_0900_range_context_tracks_first_sweep_without_accepting_social_probability() -> None:
+    start = datetime(2026, 8, 21, 12, 0, tzinfo=timezone.utc)  # 08:00 ET
+    rows: list[dict[str, float | str]] = []
+    for index in range(18):
+        stamp = start + timedelta(minutes=5 * index)
+        rows.append({
+            "t": stamp.isoformat().replace("+00:00", "Z"),
+            "o": 100.0,
+            "h": 100.8 if index < 12 else 101.2,
+            "l": 99.2 if index < 12 else 99.7,
+            "c": 100.1 if index < 12 else 100.4,
+            "v": 100_000,
+        })
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 100.39, "ask": 100.41, "freshness": "live", "spread_bps": 2.0},
+    )
+
+    context = result["ny_0800_0900_range_context"]
+    assert context["status"] == "sweep_observed_waiting_cisd"
+    assert context["range"] == {"high": 100.8, "low": 99.2, "bar_count": 12}
+    assert context["first_sweep"]["side"] == "buy_side"
+    assert context["target"] == 99.2
+    assert context["historical_probability"]["value"] is None
+    assert context["external_claim_status"] == "excluded_until_independently_reproduced"
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
+
+    stale_cisd = [{
+        "trigger_state": "confirmed",
+        "direction": "bearish",
+        "model_sequence": {"stages": [{"name": "cisd", "timestamp": "2026-08-21T12:55:00Z"}]},
+    }]
+    chronology = _ny_0800_0900_range_context(rows, stale_cisd)
+    assert chronology["status"] == "sweep_observed_waiting_cisd"
+    assert chronology["cisd"]["confirmed"] is False
 
 
 def _cisd_bullish_fixture(*, confirmed: bool) -> tuple[list[dict[str, float | str]], dict[str, list[dict[str, float | str]]]]:
@@ -339,6 +406,8 @@ def test_insufficient_bars_fails_closed_with_provenance() -> None:
         "cbc_strong_flip_v1",
         "session_liquidity_levels_v1",
         "ohlcv_participation_curvature_proxy_v1",
+        "completed_ohlcv_strat_scenarios_v1",
+        "completed_0800_0900_et_bars",
     } == set(result["source_labels"])
     assert result["execution_enabled"] is False
     assert result["can_submit_orders"] is False

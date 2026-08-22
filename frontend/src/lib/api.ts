@@ -1251,6 +1251,40 @@ export interface MacroTimingContext {
   can_submit_orders: false;
 }
 
+export interface StratContext {
+  status: string;
+  current_scenario: "1" | "2u" | "2d" | "3" | null;
+  sequence: string[];
+  ftfc: {
+    state: "bullish" | "bearish" | "conflict" | "incomplete" | "unavailable" | string;
+    strict: boolean;
+    frame_count: number;
+    frames: Record<string, string>;
+  };
+  magnitude: { direction: string; target_label: string | null; target: number | null };
+  probability: { status: string; value: number | null };
+  score_effect: "none_until_local_validation" | string;
+  source_labels: string[];
+  closed_bar_only?: true;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface NyBalanceRangeContext {
+  status: string;
+  range: { high: number; low: number; bar_count: number } | null;
+  first_sweep: { side: string; timestamp: string } | null;
+  cisd: { direction: string | null; confirmed: boolean } | null;
+  target: number | null;
+  historical_probability: { status: string; value: number | null };
+  external_claim_status: "excluded_until_independently_reproduced" | string;
+  source_labels: string[];
+  closed_bar_only?: true;
+  score_effect?: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface MarketStructureAnalysis {
   schema_version?: number;
   decision: "READY_TO_REVIEW" | "WAIT" | "REJECT" | "STAND_ASIDE";
@@ -1273,6 +1307,8 @@ export interface MarketStructureAnalysis {
   liquidity_level_context?: LiquidityLevelContext;
   participation_context?: ParticipationContext;
   macro_context?: MacroTimingContext;
+  strat_context?: StratContext;
+  ny_0800_0900_range_context?: NyBalanceRangeContext;
   freshness: "live" | "recent" | "stale" | "missing" | string;
   source_labels: string[];
   factor_scores?: Record<string, number | null>;

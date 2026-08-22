@@ -223,6 +223,50 @@
       "source_labels": ["research/pattern_detection_rules_smc_wyckoff.md"]
     },
     {
+      "id": "strat_completed_bar_ftfc_context",
+      "family": "multi_timeframe_context",
+      "timeframes": ["5m", "15m", "1h", "1d"],
+      "direction": "both",
+      "implementation_status": "live_context_only_unvalidated",
+      "research_prior": null,
+      "entry_trigger": "No standalone trigger. Classify each completed bar as 1, 2u, 2d, or 3 and expose strict FTFC only when at least four completed frames point in the same direction.",
+      "invalidation": "Unavailable as a standalone setup; use the independently detected setup invalidation.",
+      "targets": ["nearest causal liquidity level in the 2-direction"],
+      "anti_pattern": ["forming-bar classification", "fewer than four directional frames labeled strict FTFC", "presenting context as win probability"],
+      "required_data": ["completed OHLCV on at least four timeframes", "causal liquidity map"],
+      "source_labels": [
+        "completed_ohlcv_strat_scenarios_v1",
+        "https://thestrat.ai/docs/the-3-universal-truths-that-govern-price/",
+        "user_supplied_social_screenshot_2026-08-22"
+      ],
+      "authority": {
+        "execution_enabled": false,
+        "can_submit_orders": false
+      }
+    },
+    {
+      "id": "ny_0800_0900_range_cisd",
+      "family": "session_liquidity_delivery",
+      "timeframes": ["1m", "3m", "5m"],
+      "direction": "both",
+      "implementation_status": "live_context_only_unvalidated",
+      "research_prior": null,
+      "entry_trigger": "After the completed 08:00-09:00 ET range, record the first external sweep and require the existing chronological, completed-body CISD detector to confirm the reversal direction.",
+      "invalidation": "The sweep extreme; ambiguous same-bar sweeps of both sides remain context only.",
+      "targets": ["opposite 08:00-09:00 ET range boundary"],
+      "anti_pattern": ["missing extended-hours bars", "range measured before 09:00 ET", "CISD opposite the expected reversal", "unreproduced social probability claim"],
+      "required_data": ["session-aware completed OHLCV including 08:00-09:00 ET", "existing CISD sequence output", "local forward outcome ledger"],
+      "source_labels": [
+        "completed_0800_0900_et_bars",
+        "ict_cisd_sequence_v1",
+        "user_supplied_social_screenshot_2026-08-22"
+      ],
+      "authority": {
+        "execution_enabled": false,
+        "can_submit_orders": false
+      }
+    },
+    {
       "id": "ict_cisd_universal_model",
       "family": "liquidity_delivery",
       "timeframes": ["1m", "3m", "5m", "15m"],

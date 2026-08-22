@@ -1,6 +1,6 @@
-import { Activity, Clock3, Crosshair } from "lucide-react";
+import { Activity, Clock3, Crosshair, Layers3, Target } from "lucide-react";
 
-import type { LiquidityLevelContext, MacroTimingContext, ParticipationContext } from "@/lib/api";
+import type { LiquidityLevelContext, MacroTimingContext, NyBalanceRangeContext, ParticipationContext, StratContext } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 function words(value: string): string {
@@ -15,16 +15,20 @@ export function StructureContextRail({
   liquidity,
   participation,
   macro,
+  strat,
+  balanceRange,
 }: {
   liquidity?: LiquidityLevelContext;
   participation?: ParticipationContext;
   macro?: MacroTimingContext;
+  strat?: StratContext;
+  balanceRange?: NyBalanceRangeContext;
 }) {
-  if (!liquidity && !participation && !macro) return null;
+  if (!liquidity && !participation && !macro && !strat && !balanceRange) return null;
   const levels = liquidity?.levels.slice(0, 6) ?? [];
 
   return (
-    <div className="grid gap-px border-b border-border bg-border lg:grid-cols-3" aria-label="Structure context">
+    <div className="grid gap-px border-b border-border bg-border md:grid-cols-2 xl:grid-cols-5" aria-label="Structure context">
       <div className="bg-card px-3 py-3">
         <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
           <Crosshair className="h-3.5 w-3.5" />Liquidity map
@@ -55,6 +59,29 @@ export function StructureContextRail({
         </span>
         <p className={cn("mt-2 text-sm font-bold", macro?.active ? "text-warning" : "text-foreground")}>{macro?.label ?? "Timing unavailable"}</p>
         <p className="mt-1 text-xs text-muted-foreground">Context only · no score effect until locally validated</p>
+      </div>
+      <div className="bg-card px-3 py-3">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
+          <Layers3 className="h-3.5 w-3.5" />STRAT context
+        </span>
+        <p className="mt-2 text-sm font-bold uppercase">
+          {strat?.current_scenario ? `${strat.current_scenario} · ${strat.ftfc.state} FTFC` : "Unavailable"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {strat?.ftfc.strict ? `${strat.ftfc.frame_count} completed frames aligned` : `Need 4 aligned completed frames · have ${strat?.ftfc.frame_count ?? 0}`}
+          {strat?.magnitude.target == null ? "" : ` · ${strat.magnitude.target_label ?? "target"} ${price(strat.magnitude.target)}`}
+        </p>
+      </div>
+      <div className="bg-card px-3 py-3">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+          <Target className="h-3.5 w-3.5" />8–9 AM range
+        </span>
+        <p className={cn("mt-2 text-sm font-bold", balanceRange?.cisd?.confirmed ? "text-success" : "text-foreground")}>{words(balanceRange?.status ?? "unavailable")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {balanceRange?.range ? `${price(balanceRange.range.low)}–${price(balanceRange.range.high)}` : "Completed premarket bars unavailable"}
+          {balanceRange?.target == null ? "" : ` · target ${price(balanceRange.target)}`}
+          {" · claimed rate excluded"}
+        </p>
       </div>
     </div>
   );

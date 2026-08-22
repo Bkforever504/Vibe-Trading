@@ -149,6 +149,8 @@ describe("trading primitives", () => {
         },
         participation_context: { status: "buy_pressure_accelerating", direction: "bullish", method: "ohlcv_participation_curvature_proxy_v1", true_order_flow: false, score: 71, reason: "Completed-bar participation is accelerating.", probability: { status: "unavailable_pending_local_outcomes", value: null }, source_labels: ["completed_ohlcv_proxy", "not_true_order_flow"], execution_enabled: false, can_submit_orders: false },
         macro_context: { status: "context_only_unvalidated", active_window: "ny_am_0950_1010", active: true, label: "NY AM 09:50–10:10 ET", source_label: "public_ict_macro_schedule_context", score_effect: "none_until_validated", execution_enabled: false, can_submit_orders: false },
+        strat_context: { status: "context_available", current_scenario: "2u", sequence: ["1", "2d", "2u"], ftfc: { state: "bullish", strict: true, frame_count: 4, frames: { "5m": "bullish", "15m": "bullish", "60m": "bullish", "1d": "bullish" } }, magnitude: { direction: "bullish", target_label: "PDH", target: 182.4 }, probability: { status: "unavailable_pending_local_outcomes", value: null }, score_effect: "none_until_local_validation", source_labels: ["completed_ohlcv_strat_scenarios_v1"], execution_enabled: false, can_submit_orders: false },
+        ny_0800_0900_range_context: { status: "cisd_confirmed_after_sweep", range: { high: 181.8, low: 179.2, bar_count: 12 }, first_sweep: { side: "sell_side", timestamp: "2026-08-21T13:05:00Z" }, cisd: { direction: "bullish", confirmed: true }, target: 181.8, historical_probability: { status: "unavailable_pending_local_outcomes", value: null }, external_claim_status: "excluded_until_independently_reproduced", source_labels: ["completed_0800_0900_et_bars", "ict_cisd_sequence_v1"], execution_enabled: false, can_submit_orders: false },
       }],
       feed: { provider: "alpaca", feed: "iex", transport: "websocket", entitlement: "configured_not_verified", label: "alpaca_iex_stock_stream", execution_enabled: false, can_submit_orders: false },
       candidates: [{ candidate_id: "one", symbol: "NVDA", asset_class: "equity", setup_family: "opening_range_break_retest", direction: "bullish", reason: "completed retest", decision_score: 88, grade: "A", state: "READY_TO_REVIEW", freshness: "live", entry: 181.2, invalidation: 179.8, targets: [{ name: "target_2r", price: 184 }], reward_risk_after_friction: 1.91, rvol_time_of_day: 2.1, source_labels: ["alpaca_iex_stream"], blockers: [], execution_enabled: false, can_submit_orders: false }],
@@ -180,6 +182,11 @@ describe("trading primitives", () => {
     expect(screen.getByText("182.40")).toBeInTheDocument();
     expect(screen.getByText(/OHLCV proxy · not true order flow/i)).toBeInTheDocument();
     expect(screen.getByText(/NY AM 09:50/)).toBeInTheDocument();
+    expect(screen.getByText(/STRAT context/i)).toBeInTheDocument();
+    expect(screen.getByText(/2U · bullish FTFC/i)).toBeInTheDocument();
+    expect(screen.getByText(/8–9 AM range/i)).toBeInTheDocument();
+    expect(screen.getByText(/CISD confirmed after sweep/i)).toBeInTheDocument();
+    expect(screen.getByText(/claimed rate excluded/i)).toBeInTheDocument();
     expect(screen.getByText(/probability unmeasured/i)).toBeInTheDocument();
     expect(screen.getByText(/manual review only/i)).toBeInTheDocument();
   });

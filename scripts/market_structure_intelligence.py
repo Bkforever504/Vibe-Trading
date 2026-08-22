@@ -409,6 +409,156 @@ def _macro_context(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _strat_scenario(prior: Mapping[str, Any], current: Mapping[str, Any]) -> str:
+    took_high = float(current["h"]) > float(prior["h"])
+    took_low = float(current["l"]) < float(prior["l"])
+    if took_high and took_low:
+        return "3"
+    if took_high:
+        return "2u"
+    if took_low:
+        return "2d"
+    return "1"
+
+
+def _strat_context(
+    rows: Sequence[Mapping[str, Any]],
+    higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+    liquidity_levels: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Describe completed-bar STRAT scenarios without treating them as edge."""
+    base = {
+        "probability": {"status": "unavailable_pending_local_outcomes", "value": None},
+        "score_effect": "none_until_local_validation",
+        "source_labels": ["completed_ohlcv_strat_scenarios_v1", "public_strat_framework_description"],
+        "closed_bar_only": True,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+    if len(rows) < 2:
+        return {
+            **base,
+            "status": "unavailable_insufficient_completed_bars",
+            "current_scenario": None,
+            "sequence": [],
+            "ftfc": {"state": "unavailable", "strict": False, "frame_count": 0, "frames": {}},
+            "magnitude": {"direction": "neutral", "target_label": None, "target": None},
+        }
+
+    sequence = [_strat_scenario(rows[index - 1], rows[index]) for index in range(1, len(rows))][-4:]
+    frame_rows: dict[str, list[dict[str, Any]]] = {"5m": [dict(row) for row in rows]}
+    for name, supplied_rows in (higher_timeframes or {}).items():
+        normalized = _normalize(supplied_rows)
+        if normalized:
+            frame_rows[str(name)] = normalized
+
+    frames: dict[str, str] = {}
+    for name, values in frame_rows.items():
+        latest = values[-1]
+        close, open_price = float(latest["c"]), float(latest["o"])
+        frames[name] = "bullish" if close > open_price else "bearish" if close < open_price else "neutral"
+    directional = [value for value in frames.values() if value != "neutral"]
+    strict = len(directional) >= 4 and len(directional) == len(frames) and len(set(directional)) == 1
+    ftfc_state = directional[0] if strict else "incomplete" if len(directional) < 4 else "conflict"
+
+    current_scenario = sequence[-1]
+    direction = "bullish" if current_scenario == "2u" else "bearish" if current_scenario == "2d" else "neutral"
+    current_price = float(rows[-1]["c"])
+    if direction == "bullish":
+        targets = [level for level in liquidity_levels if float(level["price"]) > current_price]
+        target = min(targets, key=lambda level: float(level["price"]), default=None)
+    elif direction == "bearish":
+        targets = [level for level in liquidity_levels if float(level["price"]) < current_price]
+        target = max(targets, key=lambda level: float(level["price"]), default=None)
+    else:
+        target = None
+    return {
+        **base,
+        "status": "context_available",
+        "current_scenario": current_scenario,
+        "sequence": sequence,
+        "ftfc": {"state": ftfc_state, "strict": strict, "frame_count": len(frames), "frames": frames},
+        "magnitude": {
+            "direction": direction,
+            "target_label": target.get("label") if target else None,
+            "target": _round(float(target["price"])) if target else None,
+        },
+    }
+
+
+def _ny_0800_0900_range_context(
+    rows: Sequence[Mapping[str, Any]], cisd_patterns: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    """Track the NY 08:00-09:00 ET balance range and later causal events."""
+    base = {
+        "historical_probability": {"status": "unavailable_pending_local_outcomes", "value": None},
+        "external_claim_status": "excluded_until_independently_reproduced",
+        "source_labels": ["completed_0800_0900_et_bars", "ict_cisd_sequence_v1"],
+        "closed_bar_only": True,
+        "score_effect": "none_until_local_validation",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+    stamped = [(row, _timestamp(row.get("t"))) for row in rows]
+    stamped = [(row, stamp) for row, stamp in stamped if stamp is not None]
+    if not stamped:
+        return {**base, "status": "unavailable_missing_timestamps", "range": None, "first_sweep": None, "cisd": None, "target": None}
+    latest_local = stamped[-1][1].astimezone(MARKET_TZ)
+    range_rows = [
+        row for row, stamp in stamped
+        if stamp.astimezone(MARKET_TZ).date() == latest_local.date()
+        and wall_time(8, 0) <= stamp.astimezone(MARKET_TZ).time() < wall_time(9, 0)
+    ]
+    if latest_local.time() < wall_time(9, 0) or not range_rows:
+        return {**base, "status": "unavailable_range_not_complete", "range": None, "first_sweep": None, "cisd": None, "target": None}
+    range_high = max(float(row["h"]) for row in range_rows)
+    range_low = min(float(row["l"]) for row in range_rows)
+    later = [
+        (row, stamp) for row, stamp in stamped
+        if stamp.astimezone(MARKET_TZ).date() == latest_local.date()
+        and stamp.astimezone(MARKET_TZ).time() >= wall_time(9, 0)
+    ]
+    first_sweep: dict[str, Any] | None = None
+    for row, stamp in later:
+        took_high = float(row["h"]) > range_high
+        took_low = float(row["l"]) < range_low
+        if not (took_high or took_low):
+            continue
+        side = "both_sides_same_bar" if took_high and took_low else "buy_side" if took_high else "sell_side"
+        first_sweep = {"side": side, "timestamp": stamp.isoformat().replace("+00:00", "Z")}
+        break
+
+    expected_direction = None
+    if first_sweep and first_sweep["side"] == "buy_side":
+        expected_direction = "bearish"
+    elif first_sweep and first_sweep["side"] == "sell_side":
+        expected_direction = "bullish"
+    sweep_timestamp = _timestamp(first_sweep.get("timestamp")) if first_sweep else None
+
+    def _confirmed_after_sweep(pattern: Mapping[str, Any]) -> bool:
+        if pattern.get("trigger_state") != "confirmed" or pattern.get("direction") != expected_direction:
+            return False
+        stages = pattern.get("model_sequence", {}).get("stages", [])
+        cisd_stage = next((stage for stage in stages if stage.get("name") == "cisd"), {})
+        confirmation_timestamp = _timestamp(cisd_stage.get("timestamp"))
+        return sweep_timestamp is not None and confirmation_timestamp is not None and confirmation_timestamp >= sweep_timestamp
+
+    confirmed = next(
+        (pattern for pattern in cisd_patterns if _confirmed_after_sweep(pattern)),
+        None,
+    )
+    status = "range_complete_waiting_sweep" if first_sweep is None else "sweep_observed_waiting_cisd" if confirmed is None else "cisd_confirmed_after_sweep"
+    target = range_low if expected_direction == "bearish" else range_high if expected_direction == "bullish" else None
+    return {
+        **base,
+        "status": status,
+        "range": {"high": _round(range_high), "low": _round(range_low), "bar_count": len(range_rows)},
+        "first_sweep": first_sweep,
+        "cisd": ({"direction": confirmed.get("direction"), "confirmed": True} if confirmed else {"direction": expected_direction, "confirmed": False}),
+        "target": _round(target),
+    }
+
+
 def _range_events(rows: Sequence[Mapping[str, Any]], atr: float) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     positives: list[dict[str, Any]] = []
     negatives: list[dict[str, Any]] = []
@@ -834,7 +984,7 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
         evidence={"base_rate": "unavailable_insufficient_bars"},
     )
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "decision": "STAND_ASIDE",
         "grade": pattern_grade["grade"],
         "score": pattern_grade["final_score"],
@@ -848,13 +998,15 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
         "liquidity_level_context": {"status": "unavailable", "levels": [], "active_sweeps": [], "probability_status": "unavailable_pending_local_outcomes", "execution_enabled": False, "can_submit_orders": False},
         "participation_context": _participation_context([]),
         "macro_context": _macro_context([]),
+        "strat_context": _strat_context([], None, []),
+        "ny_0800_0900_range_context": _ny_0800_0900_range_context([], []),
         "entry_plan": {"status": "unavailable", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "instruction": f"Need at least {MIN_BARS} completed bars; received {bars}."},
         "exit_plan": {"status": "unavailable", "targets": [], "time_stop_bars": None, "management": "No entry, so no exit plan."},
         "factor_scores": {},
         "hard_blockers": ["insufficient_completed_bars"],
         "warnings": ["Pattern recognition is descriptive research, not a guarantee of future returns."],
         "freshness": str(quote.get("freshness") or "missing"),
-        "source_labels": ["completed_5m_bars", "latest_quote", "pattern_grade_v1", "ict_cisd_sequence_v1", "cbc_strong_flip_v1", "session_liquidity_levels_v1", "ohlcv_participation_curvature_proxy_v1"],
+        "source_labels": ["completed_5m_bars", "latest_quote", "pattern_grade_v1", "ict_cisd_sequence_v1", "cbc_strong_flip_v1", "session_liquidity_levels_v1", "ohlcv_participation_curvature_proxy_v1", "completed_ohlcv_strat_scenarios_v1", "completed_0800_0900_et_bars"],
         "bar_count": bars,
         "closed_bar_only": True,
         "execution_enabled": False,
@@ -889,7 +1041,8 @@ def analyze_market_structure(
     liquidity_levels = _derive_liquidity_levels(rows, higher_timeframes)
     liquidity_patterns = _session_liquidity_patterns(rows, liquidity_levels, atr)
     positive.extend(liquidity_patterns)
-    positive.extend(detect_cisd_universal_model(rows, higher_timeframes=higher_timeframes))
+    cisd_patterns = detect_cisd_universal_model(rows, higher_timeframes=higher_timeframes)
+    positive.extend(cisd_patterns)
     negatives = range_negatives + swing_negatives + _anti_patterns(rows, atr, quote_data)
 
     direction = str(direction_hint or "").lower()
@@ -1018,7 +1171,7 @@ def analyze_market_structure(
     if any(row["pattern_id"] in {"midrange_chop", "broadening_instability"} for row in negatives):
         regime = "chop_or_instability"
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "decision": decision,
         "grade": pattern_grade["grade"],
         "score": score,
@@ -1044,6 +1197,8 @@ def analyze_market_structure(
         },
         "participation_context": _participation_context(rows),
         "macro_context": _macro_context(rows),
+        "strat_context": _strat_context(rows, higher_timeframes, liquidity_levels),
+        "ny_0800_0900_range_context": _ny_0800_0900_range_context(rows, cisd_patterns),
         "entry_plan": entry_plan,
         "exit_plan": exit_plan,
         "factor_scores": {
@@ -1060,7 +1215,7 @@ def analyze_market_structure(
             "Scores rank observable setup quality; they are not win probabilities.",
         ],
         "freshness": freshness,
-        "source_labels": ["completed_5m_bars", "latest_quote", "pattern_grade_v1", "ict_cisd_sequence_v1", "cbc_strong_flip_v1", "session_liquidity_levels_v1", "ohlcv_participation_curvature_proxy_v1"],
+        "source_labels": ["completed_5m_bars", "latest_quote", "pattern_grade_v1", "ict_cisd_sequence_v1", "cbc_strong_flip_v1", "session_liquidity_levels_v1", "ohlcv_participation_curvature_proxy_v1", "completed_ohlcv_strat_scenarios_v1", "completed_0800_0900_et_bars"],
         "bar_count": len(rows),
         "closed_bar_only": True,
         "execution_enabled": False,

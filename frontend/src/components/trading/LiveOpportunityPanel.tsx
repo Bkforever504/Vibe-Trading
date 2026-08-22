@@ -112,6 +112,8 @@ export function LiveOpportunityPanel({
           liquidity={bestStructure.liquidity_level_context}
           participation={bestStructure.participation_context}
           macro={bestStructure.macro_context}
+          strat={bestStructure.strat_context}
+          balanceRange={bestStructure.ny_0800_0900_range_context}
         />
         {canonicalGrade ? (
           <div className="border-b border-border bg-card px-3 py-3">

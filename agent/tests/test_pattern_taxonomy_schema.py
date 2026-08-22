@@ -11,8 +11,11 @@ def test_pattern_taxonomy_is_manual_only_and_labels_data_availability() -> None:
     payload = json.loads((ROOT / "research" / "pattern_taxonomy.json").read_text(encoding="utf-8"))
 
     assert payload["authority"] == {"execution_enabled": False, "can_submit_orders": False}
-    assert len(payload["patterns"]) == 18
-    assert len({row["id"] for row in payload["patterns"]}) == 18
+    assert len(payload["patterns"]) == 20
+    assert len({row["id"] for row in payload["patterns"]}) == 20
+    assert {"strat_completed_bar_ftfc_context", "ny_0800_0900_range_cisd"} <= {
+        row["id"] for row in payload["patterns"]
+    }
     for row in payload["patterns"]:
         assert row["family"]
         assert row["implementation_status"]
