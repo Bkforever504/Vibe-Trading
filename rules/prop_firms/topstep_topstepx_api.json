@@ -1,7 +1,7 @@
 {
   "firm": "Topstep",
-  "account_type": "TopstepX API / evaluation-style profile",
-  "verified_as_of": "2026-06-21",
+  "account_type": "50K TopstepX Trading Combine research profile",
+  "verified_as_of": "2026-08-09",
   "automation": {
     "allowed": true,
     "status": "allowed_with_conditions",
@@ -11,7 +11,10 @@
   "risk": {
     "max_daily_loss": 1000,
     "max_trailing_drawdown": 2000,
-    "max_contracts": 5
+    "max_contracts": 5,
+    "max_micro_contracts": 50,
+    "profit_target": 3000,
+    "notes": "The $1,000 daily limit is the optional 50K DLL. The simulator and bot impose stricter self-limits; the core Combine rule is the $2,000 MLL."
   },
   "consistency": {
     "enabled": true,
@@ -21,6 +24,8 @@
   "unknown_rules_block": true,
   "sources": [
     "https://help.topstep.com/en/articles/11187768-topstepx-api-access",
-    "https://www.topstep.com/express-funded-account-rules"
+    "https://help.topstep.com/en/articles/8284197-trading-combine-parameters",
+    "https://help.topstep.com/en/articles/8284204-what-is-the-maximum-loss-limit",
+    "https://help.topstep.com/en/articles/8284208-consistency-at-topstep"
   ]
 }

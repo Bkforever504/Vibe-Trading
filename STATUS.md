@@ -1,7 +1,7 @@
 # Vibe-Trading STATUS
 
-Updated: 2026-07-18T01:05:01.981609Z
-Date: 2026-07-17
+Updated: 2026-08-22T01:05:34.521174Z
+Date: 2026-08-21
 Verdict: action_required
 
 ## Headline
@@ -15,26 +15,25 @@ Max active tasks: 1
 ## Next Safe Task
 
 - Priority: P0
-- Title: Reconcile options broker positions with trade state
-- Reason: Missing active legs=0; untracked broker legs=1.
-- Suggested action: Inspect broker positions and bot-status-snapshot.json; keep entries blocked and do not auto-close or rewrite state.
+- Title: Investigate unhealthy scheduled outputs
+- Reason: Health summary is {'disabled': 1, 'error': 0, 'missing': 0, 'ok': 60, 'stale': 1}.
+- Suggested action: Open signal-stack-health.json, inspect failing rows, fix only task/log/report plumbing.
 - Allowed scope: read_only_or_tests_docs_reports
 
 ## Backlog
 
-- [P0] Investigate unhealthy scheduled outputs: Health summary is {'error': 0, 'missing': 0, 'ok': 61, 'stale': 1}.
-- [P0] Fix market schedule alignment: Schedule alignment issues=1.
-- [P1] Review guard-block queue: Needs Review Queue has 4 item(s).
-- [P1] Inspect weak operational grades: 2 component(s) have weak ops grade/freshness.
-- [P1] Run formal promotion review: 1 component(s) are promotion-ready by grades.
+- [P0] Fix execution audit issue: Execution audit issues=3.
+- [P1] Review guard-block queue: Needs Review Queue has 5 item(s).
+- [P1] Inspect weak operational grades: 4 component(s) have weak ops grade/freshness.
+- [P1] Run formal promotion review: 6 component(s) are promotion-ready by grades.
 
 ## Current State
 
-- Health: {'error': 0, 'missing': 0, 'ok': 61, 'stale': 1}
-- Grades: {'ops': {'A': 32, 'B': 5, 'D': 2}, 'evidence': {'B': 2, 'C': 11, 'D': 22, 'F': 4}, 'maturity': {'needs_more_signals': 31, 'mature': 1, 'review_eligible': 3, 'log_building': 4}, 'promotion_ready_count': 1}
-- Schedule: {'passed': False, 'aligned_count': 54, 'task_count': 55, 'issue_count': 1}
-- Audit: {'passed': True, 'issue_count': 0, 'warning_count': 1}
-- Needs review: {'queue_count': 4, 'by_priority': {'medium': 4}, 'by_reason': {'contracts_above_limit': 2, 'notional_above_limit': 2}}
+- Health: {'disabled': 1, 'error': 0, 'missing': 0, 'ok': 60, 'stale': 1}
+- Grades: {'ops': {'A': 30, 'B': 5, 'D': 4}, 'evidence': {'A': 2, 'B': 8, 'C': 23, 'F': 6}, 'maturity': {'mature': 6, 'needs_more_signals': 27, 'review_eligible': 2, 'log_building': 4}, 'promotion_ready_count': 6}
+- Schedule: {'passed': True, 'aligned_count': 76, 'task_count': 76, 'issue_count': 0}
+- Audit: {'passed': False, 'issue_count': 3, 'warning_count': 7}
+- Needs review: {'queue_count': 5, 'by_priority': {'medium': 4, 'low': 1}, 'by_reason': {'contracts_above_limit': 2, 'notional_above_limit': 2, 'spread_quote_unavailable': 1}}
 
 ## Forbidden Actions
 

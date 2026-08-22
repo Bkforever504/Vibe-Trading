@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Accumulation and Prop-Firm Roadmap</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5d6873;
+      --line: #d9dee3;
+      --paper: #ffffff;
+      --soft: #f4f6f7;
+      --green: #176b4d;
+      --green-soft: #e6f3ed;
+      --blue: #235b8c;
+      --blue-soft: #eaf2f8;
+      --amber: #8a5b00;
+      --amber-soft: #fff4d8;
+      --red: #9b2c2c;
+      --red-soft: #faeaea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    header, section, footer { width: 100%; }
+    header { border-bottom: 1px solid var(--line); background: var(--soft); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 34px 24px; }
+    h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.15; letter-spacing: 0; }
+    h2 { margin: 0 0 16px; font-size: 23px; letter-spacing: 0; }
+    h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: 0; }
+    p { margin: 0 0 14px; }
+    .subhead { max-width: 760px; color: var(--muted); font-size: 17px; }
+    .meta { margin-top: 18px; color: var(--muted); font-size: 13px; }
+    .band { border-bottom: 1px solid var(--line); }
+    .decision { border-left: 5px solid var(--green); background: var(--green-soft); padding: 18px 20px; }
+    .warning { border-left: 5px solid var(--amber); background: var(--amber-soft); padding: 18px 20px; }
+    .stop { border-left: 5px solid var(--red); background: var(--red-soft); padding: 18px 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .panel { border: 1px solid var(--line); border-radius: 6px; padding: 18px; background: var(--paper); }
+    .panel strong { display: block; margin-bottom: 6px; color: var(--blue); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--soft); color: #34404b; font-weight: 700; }
+    .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+    .accumulate { color: var(--green); background: var(--green-soft); }
+    .research { color: var(--blue); background: var(--blue-soft); }
+    .wait { color: var(--amber); background: var(--amber-soft); }
+    .avoid { color: var(--red); background: var(--red-soft); }
+    ol, ul { margin: 8px 0 0; padding-left: 22px; }
+    li { margin: 7px 0; }
+    code { background: var(--soft); padding: 2px 5px; border-radius: 3px; }
+    a { color: var(--blue); }
+    footer { color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      .wrap { padding: 26px 18px; }
+      h1 { font-size: 28px; }
+      .grid { grid-template-columns: 1fr; }
+      table { font-size: 13px; }
+      th, td { padding: 10px 7px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>AI Accumulation and Prop-Firm Roadmap</h1>
+      <p class="subhead">A capital-growth plan for a small account and a separate, evidence-gated route to autonomous futures trading.</p>
+      <p class="meta">Prepared August 9, 2026. Assumption: emergency savings are separate and invested capital has a five-year or longer horizon.</p>
+    </div>
+  </header>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="decision">
+        <h2>Decision</h2>
+        <p><strong>Use investing to build capital and use the bot to prove a trading edge.</strong> Do not ask the same $1,000 to provide diversification, AI upside, and weekly income. Those are conflicting jobs.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Starting Allocation Framework</h2>
+      <div class="grid">
+        <div class="panel"><strong>60% Broad core</strong><span>VTI or a comparable total-market fund. This already contains substantial technology exposure while reducing single-company failure risk.</span></div>
+        <div class="panel"><strong>25% AI overlay</strong><span>15% semiconductor ETF such as SMH or SOXX, plus 10% split between two profitable AI platforms such as GOOGL and AMZN.</span></div>
+        <div class="panel"><strong>15% reserve</strong><span>Hold for scheduled future purchases, not impulsive dips. No leverage, margin, inverse ETFs, or 3x semiconductor products.</span></div>
+      </div>
+      <div class="warning" style="margin-top:16px">
+        <h3>Deployment rule</h3>
+        <p>Invest one quarter of the planned amount every two weeks over eight weeks. Add new money automatically to the broad core. A falling price alone is not a buy signal; the business thesis must remain intact.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>AI and Technology Radar</h2>
+      <table>
+        <thead><tr><th>Tier</th><th>Names</th><th>Why they matter</th><th>First rejection risk</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td>Profitable platforms</td><td>GOOGL, AMZN, MSFT</td><td>Cloud distribution, AI workloads, enterprise customers, and existing cash-generating businesses.</td><td>AI capital spending outruns monetization; cloud growth slows; regulatory action.</td><td><span class="tag accumulate">Staged research buys</span></td></tr>
+          <tr><td>Compute leaders</td><td>NVDA, TSM</td><td>Accelerators and advanced-node manufacturing remain central to AI infrastructure.</td><td>Customer concentration, export controls, custom silicon, cyclicality, Taiwan risk.</td><td><span class="tag research">Accumulate only by schedule</span></td></tr>
+          <tr><td>Networking and custom silicon</td><td>AVGO, ANET</td><td>AI clusters require high-speed switching, networking, and custom accelerators.</td><td>High expectations and valuation leave little room for an earnings miss.</td><td><span class="tag wait">Watch for reset</span></td></tr>
+          <tr><td>Power and cooling</td><td>VRT, ETN, PWR, CEG</td><td>Data-center buildout also requires electrical equipment, cooling, construction, and power generation.</td><td>Capacity additions, regulation, project delays, and crowded valuations.</td><td><span class="tag research">Next diligence</span></td></tr>
+          <tr><td>Speculative application layer</td><td>PLTR and unprofitable AI labels</td><td>Potential operating leverage if durable enterprise demand emerges.</td><td>Story-driven valuation, dilution, customer concentration, or no free-cash-flow proof.</td><td><span class="tag avoid">No FOMO purchases</span></td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px">Current company evidence is real but expectations are already high. NVIDIA reported fiscal Q1 2027 revenue growth of 85%; Broadcom reported 143% growth in AI semiconductor revenue; Microsoft reported a $37 billion AI annual revenue run rate; and Amazon reported strong AWS operating income. These facts support the theme, but they do not guarantee that every current share price is attractive.</p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Twelve-Month Capital Roadmap</h2>
+      <ol>
+        <li><strong>Weeks 1-8:</strong> Build the allocation in four equal installments. Record every purchase, thesis, and expected holding period.</li>
+        <li><strong>Monthly:</strong> Automatically add whatever amount is sustainable. Direct at least 70% of contributions to the broad core until the account exceeds $5,000.</li>
+        <li><strong>Quarterly:</strong> Review revenue growth, free cash flow, margins, AI capital intensity, guidance, and thesis disconfirmers. Do not react to daily charts.</li>
+        <li><strong>At a 20% drawdown:</strong> Recheck the thesis. Continue scheduled purchases only when fundamentals remain intact; never double position size merely because price fell.</li>
+        <li><strong>At $5,000:</strong> Permit individual stocks to reach no more than 7.5% each. Keep total semiconductor exposure visible across both ETFs and direct holdings.</li>
+        <li><strong>At $10,000:</strong> Reassess whether the AI overlay exceeds 35% of the portfolio. Rebalance with new contributions before selling taxable positions.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Why the Current Bot Is Not Prop-Ready</h2>
+      <div class="stop">
+        <p>The current production thesis trades SPY options through Alpaca. Most retail prop evaluations trade futures. Moving the ORB signal to <code>MES</code> or <code>MNQ</code> changes tick value, session behavior, fills, volatility, and drawdown mechanics. It is a new strategy requiring new evidence.</p>
+      </div>
+      <div class="grid" style="margin-top:16px">
+        <div class="panel"><strong>Low risk is not enough</strong><span>A positive payoff ratio still fails if the win rate, costs, or losing streak exceed assumptions.</span></div>
+        <div class="panel"><strong>Drawdown is path-dependent</strong><span>A profitable strategy can breach a trailing maximum loss before its edge appears.</span></div>
+        <div class="panel"><strong>Rules change behavior</strong><span>Consistency, position limits, payout conditions, and prohibited conduct must be modeled as part of the strategy.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Prop-Firm Validation Roadmap</h2>
+      <ol>
+        <li><strong>Choose one ruleset:</strong> Prefer a firm that explicitly permits automation and publishes maximum-loss, consistency, payout, and prohibited-strategy rules. Do not optimize across multiple firms.</li>
+        <li><strong>Build an MES-only adapter:</strong> One micro contract, no averaging down, no overnight exposure, bracket order required, duplicate-order protection required.</li>
+        <li><strong>Backtest correctly:</strong> Use futures data, exact exchange session, commissions, at least one tick of adverse entry and exit slippage, walk-forward splits, and locked holdout data.</li>
+        <li><strong>Shadow the exact evaluation:</strong> Apply the firm's profit target, maximum loss, daily loss, consistency, and permitted hours inside the simulator.</li>
+        <li><strong>Pass three consecutive simulated evaluations:</strong> No resets, no rule exceptions, at least 100 total trades, positive net expectancy, and no single day supplying more than 30% of profits.</li>
+        <li><strong>Buy one evaluation:</strong> Risk no more than 5% of the available drawdown per trade, stop for the day after two losses, and take no more than two qualified entries.</li>
+        <li><strong>Scale after payout evidence:</strong> Do not add accounts or a trade copier until two real payouts have cleared and live slippage matches simulation.</li>
+      </ol>
+      <div class="warning" style="margin-top:16px">
+        <p>Topstep currently says automated strategies are allowed with conditions, but it provides no exception for malfunctions. Its evaluation also uses a maximum-loss rule and a consistency target. Those constraints must exist in the bot before paying an evaluation fee.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Promotion Gates</h2>
+      <table>
+        <thead><tr><th>Lane</th><th>Minimum evidence</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>AI investing</td><td>Five-year horizon, emergency fund separate, no borrowed money, automatic contributions enabled.</td><td>Begin staged accumulation.</td></tr>
+          <tr><td>Futures shadow</td><td>100+ trades, positive net expectancy after stress costs, locked holdout positive, three simulated combines passed.</td><td>Eligible for one paid evaluation.</td></tr>
+          <tr><td>Prop live scaling</td><td>Two cleared payouts, zero rule violations, measured live slippage within model, drawdown within limits.</td><td>Eligible for measured scale review.</td></tr>
+          <tr><td>Options production</td><td>Existing scorecard evidence gates remain satisfied; no substitution from prop or stock results.</td><td>Separate approval process.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>Primary Sources</h2>
+      <ul>
+        <li><a href="https://investor.vanguard.com/investment-products/etfs/profile/vti">Vanguard Total Stock Market ETF</a></li>
+        <li><a href="https://www.vaneck.com/us/en/investments/semiconductor-etf-smh">VanEck Semiconductor ETF</a></li>
+        <li><a href="https://investor.nvidia.com/news/press-release-details/2026/NVIDIA-Announces-Financial-Results-for-First-Quarter-Fiscal-2027/default.aspx">NVIDIA fiscal Q1 2027 results</a></li>
+        <li><a href="https://investors.broadcom.com/news-releases/news-release-details/broadcom-inc-announces-second-quarter-fiscal-year-2026-financial">Broadcom fiscal Q2 2026 results</a></li>
+        <li><a href="https://www.microsoft.com/en-us/investor/events/fy-2026/earnings-fy-2026-q3">Microsoft fiscal Q3 2026 earnings call</a></li>
+        <li><a href="https://www.aboutamazon.com/news/company-news/amazon-earnings-q2-2026-report">Amazon Q2 2026 results</a></li>
+        <li><a href="https://investor.tsmc.com/english/monthly-revenue/2026">TSMC 2026 monthly revenue</a></li>
+        <li><a href="https://investors.vertiv.com/news/news-details/2026/Vertiv-Reports-Strong-Second-Quarter-2026-with-Diluted-EPS-Growth-of-53-Adjusted-Diluted-EPS-Growth-of-60-Raises-Full-Year-2026-Guidance-Across-All-Key-Metrics/default.aspx">Vertiv Q2 2026 results</a></li>
+        <li><a href="https://help.topstep.com/en/articles/8284197-trading-combine-parameters">Topstep Trading Combine parameters</a></li>
+        <li><a href="https://help.topstep.com/en/articles/10305426-prohibited-trading-strategies-at-topstep">Topstep prohibited strategies</a></li>
+        <li><a href="https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AITradingBots.html">CFTC advisory on AI trading bots</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <p>This is a research roadmap, not a guarantee or individualized fiduciary recommendation. Prices, valuations, company results, ETF holdings, and prop-firm rules change. Verify them before acting.</p>
+    </div>
+  </footer>
+</body>
+</html>

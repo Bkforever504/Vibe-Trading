@@ -12,6 +12,7 @@
     "max_daily_loss": 100,
     "max_trailing_drawdown": 2000,
     "max_contracts": 1,
+    "max_micro_contracts": 1,
     "notes": "Self-imposed pilot limits model the eventual 50K Combine rather than the larger 150K Practice account."
   },
   "consistency": {

@@ -1,6 +1,6 @@
 # Topstep Prop Bot Playbook
 
-Last updated: 2026-06-21
+Last updated: 2026-08-09
 
 This is a separate arena from the Alpaca options bot. The Alpaca bot can keep running and being tracked. The Topstep prop bot is futures-first, paper/shadow-first, and rule-gated before any order can become executable.
 
@@ -38,7 +38,7 @@ Opening-range + VWAP is not magic. It is the first candidate because it is:
 
 The goal is not to prove this is the final edge yet. The goal is to create a clean machine for testing edge.
 
-## Current Confidence Scores
+## Current Evidence
 
 Compliance/rule-gate confidence: 9.5/10
 
@@ -49,13 +49,45 @@ Reason:
 - Daily loss, trailing drawdown, max contracts, consistency, and remote-server/VPS checks exist.
 - Sample Topstep-style MNQ paper signal passes only after the rule gate.
 
-Strategy-profit confidence: 4/10
+Strategy-profit confidence: 2/10
 
 Reason:
 
-- The strategy is clean and testable, but not yet statistically proven.
-- We need 50+ closed paper trades or a realistic replay/backtest before increasing confidence.
-- We need fees, slippage, session filters, and no-trade news windows.
+- Licensed MES replay now covers 1,148 sessions with chronological development,
+  selection, and untouched final partitions.
+- The frozen 5-minute gap ORB produced $12 across 22 untouched-final trades,
+  profit factor 1.016, and $336 maximum drawdown.
+- Doubled execution costs produced -$76 and profit factor 0.906.
+- ORB, pullback, VWAP fade, SMC/FVG, momentum, reversal, quote imbalance,
+  quote exhaustion, and failed-breakdown families have not passed the locked
+  evidence gates.
+
+## Exact Combine Simulation
+
+`strategies/topstep_combine_simulator.py` applies the current 50K rules:
+
+- $3,000 base profit target.
+- 50% best-day consistency target, including target expansion.
+- $2,000 end-of-day trailing Maximum Loss Limit that locks at starting balance.
+- Circular block bootstrap over untouched daily P&L, including no-trade days.
+- Base and doubled-cost contract grids from one through ten MES contracts.
+
+Run:
+
+```powershell
+.\scripts\run_topstep_combine_simulation.ps1
+```
+
+Current 5,000-path result:
+
+- 1 MES: 0% base and stressed pass rate over 252 sessions.
+- 2 MES: 0% base and stressed pass rate; stressed MLL failure 1.34%.
+- 5 MES: 2.48% stressed pass rate and 54.0% MLL failure rate.
+- 10 MES: 17.56% stressed pass rate and 80.94% MLL failure rate.
+
+Decision: `do_not_purchase_combine`. More contracts increase account failure,
+not edge. The Practice adapter remains the next venue only after a fresh MES
+candidate passes untouched and doubled-cost evidence gates.
 
 ## CLI Example
 
@@ -104,17 +136,20 @@ paper_order_ready
    - Writes to `shadow-ai-signals.jsonl`.
 
 5. Practice-account workflow
-   - After local replay proves positive expectancy.
-   - Run in Topstep Practice Account or Trading Combine shadow/semi-auto mode.
+   - Topstep offers a 150K Practice Account with an active Combine subscription.
+   - The ProjectX API has no separate sandbox, but the existing adapter permits
+     only an API-returned, explicitly allowlisted PRACTICE account.
+   - No Combine, XFA, or LFA order bridge exists or may be enabled from Practice.
 
 ## Promotion Rule
 
 Do not move this bot from paper/shadow to funded-account automation until:
 
-- 50+ closed paper/replay trades.
+- 100+ untouched closed paper/replay trades.
 - Profit factor above 1.3 after fees/slippage.
 - Positive expectancy.
+- Positive expectancy and profit factor above 1.2 at doubled costs.
 - Max drawdown stays inside Topstep limits with a 30-50% buffer.
 - No prop-rule violations.
+- At least 60% simulated Combine pass rate at one or two MES contracts.
 - Manual-reset kill switch is active.
-
