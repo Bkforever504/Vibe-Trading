@@ -1,0 +1,3 @@
+external_id,trader_id,platform,event_type,source_timestamp,symbol,asset_class,action,direction,quantity,price,fees,realized_pnl,position_id,strategy
+example-fill-1,consenting-trader-1,example-broker,fill,2026-07-25T14:35:00Z,SPY,equity,BUY,LONG,1,640.25,0.01,,example-position-1,example-only
+example-outcome-1,consenting-trader-1,example-broker,outcome,2026-07-25T15:05:00Z,SPY,equity,SELL,LONG,1,641.00,0.01,0.73,example-position-1,example-only

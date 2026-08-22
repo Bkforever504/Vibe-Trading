@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""Uniform, shadow-only statistical evaluation for frozen research lanes.
+
+Input rows are already-resolved executable outcomes. Required fields are
+``candidate_id``, ``session`` and ``outcome_r``. Placebo testing additionally
+requires the frozen ``signal`` (-1/1) and the corresponding unsigned
+``forward_return_r``; missing evidence remains unavailable rather than passing.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import itertools
+import json
+import math
+import random
+import statistics
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INPUT = ROOT / "data" / "shadow_outcomes.jsonl"
+DEFAULT_FAMILY = ROOT / "data" / "experiment_family.jsonl"
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            rows.append(value)
+    return rows
+
+
+def _mean(values: list[float]) -> float:
+    return statistics.fmean(values) if values else 0.0
+
+
+def _sharpe(values: list[float]) -> float | None:
+    if len(values) < 2:
+        return None
+    deviation = statistics.stdev(values)
+    return _mean(values) / deviation * math.sqrt(252) if deviation > 0 else None
+
+
+def _moving_block_samples(values: list[float], *, seed: str, count: int = 1000) -> list[list[float]]:
+    if not values:
+        return []
+    block = max(5, math.ceil(math.sqrt(len(values))))
+    rng = random.Random(int(hashlib.sha256(seed.encode("utf-8")).hexdigest()[:16], 16))
+    samples: list[list[float]] = []
+    for _ in range(count):
+        selected: list[float] = []
+        while len(selected) < len(values):
+            start = rng.randrange(len(values))
+            selected.extend(values[(start + offset) % len(values)] for offset in range(block))
+        samples.append(selected[: len(values)])
+    return samples
+
+
+def _quantile(values: list[float], probability: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[max(0, min(len(ordered) - 1, int(probability * (len(ordered) - 1))))]
+
+
+def _normal_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def _walk_forward(values: list[float], *, folds: int = 5, purge: int = 1) -> list[dict[str, Any]]:
+    if len(values) < 10:
+        return []
+    fold_size = max(2, len(values) // folds)
+    windows: list[dict[str, Any]] = []
+    for start in range(fold_size, len(values), fold_size):
+        test = values[start:min(len(values), start + fold_size)]
+        train = values[:max(0, start - purge)]
+        if train and test:
+            windows.append({"train_n": len(train), "test_n": len(test), "train_expectancy": round(_mean(train), 6), "test_expectancy": round(_mean(test), 6)})
+    return windows
+
+
+def _placebo(rows: list[dict[str, Any]], *, candidate_id: str, family_size: int, count: int = 500) -> dict[str, Any]:
+    try:
+        signals = [float(row["signal"]) for row in rows]
+        returns = [float(row["forward_return_r"]) for row in rows]
+    except (KeyError, TypeError, ValueError):
+        return {"status": "unavailable", "reason": "signal_or_forward_return_missing", "p_value": None}
+    observed = _mean([signal * result for signal, result in zip(signals, returns)])
+    rng = random.Random(int(hashlib.sha256((candidate_id + "|placebo").encode()).hexdigest()[:16], 16))
+    exceed = 0
+    shuffled = signals[:]
+    for _ in range(count):
+        rng.shuffle(shuffled)
+        if _mean([signal * result for signal, result in zip(shuffled, returns)]) >= observed:
+            exceed += 1
+    p_value = (exceed + 1) / (count + 1)
+    threshold = 0.05 / max(1, family_size)
+    return {"status": "pass" if observed > 0 and p_value <= threshold else "fail", "p_value": round(p_value, 6), "bonferroni_alpha": round(threshold, 8), "permutations": count}
+
+
+def _family_pbo(groups: dict[str, list[dict[str, Any]]], *, folds: int = 6) -> float | None:
+    if len(groups) < 2:
+        return None
+    sessions = sorted({str(row["session"]) for rows in groups.values() for row in rows})
+    if len(sessions) < folds:
+        return None
+    fold_by_session = {session: min(folds - 1, index * folds // len(sessions)) for index, session in enumerate(sessions)}
+    failures = 0
+    trials = 0
+    for train_folds in itertools.combinations(range(folds), folds // 2):
+        train_set = set(train_folds)
+        train_means: dict[str, float] = {}
+        test_means: dict[str, float] = {}
+        for candidate_id, rows in groups.items():
+            train = [float(row["outcome_r"]) for row in rows if fold_by_session[str(row["session"])] in train_set]
+            test = [float(row["outcome_r"]) for row in rows if fold_by_session[str(row["session"])] not in train_set]
+            if train and test:
+                train_means[candidate_id] = _mean(train)
+                test_means[candidate_id] = _mean(test)
+        if len(train_means) < 2:
+            continue
+        selected = max(train_means, key=train_means.get)
+        ordered_test = sorted(test_means, key=test_means.get, reverse=True)
+        failures += int(ordered_test.index(selected) >= math.ceil(len(ordered_test) / 2))
+        trials += 1
+    return round(failures / trials, 6) if trials else None
+
+
+def evaluate_replay(
+    rows: Iterable[dict[str, Any]], *, family_size: int, now: datetime | None = None
+) -> dict[str, Any]:
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    skipped = 0
+    for raw in rows:
+        candidate_id = str(raw.get("candidate_id") or raw.get("setup_family") or "").strip()
+        session = str(raw.get("session") or raw.get("resolved_at") or "")[:10]
+        try:
+            outcome = float(raw.get("outcome_r"))
+        except (TypeError, ValueError):
+            outcome = float("nan")
+        if not candidate_id or not session or not math.isfinite(outcome):
+            skipped += 1
+            continue
+        groups[candidate_id].append({**raw, "candidate_id": candidate_id, "session": session, "outcome_r": outcome})
+    pbo = _family_pbo(groups)
+    results: list[dict[str, Any]] = []
+    for candidate_id, candidate_rows in sorted(groups.items()):
+        candidate_rows.sort(key=lambda row: str(row["session"]))
+        values = [float(row["outcome_r"]) for row in candidate_rows]
+        bootstraps = _moving_block_samples(values, seed=candidate_id)
+        means = [_mean(sample) for sample in bootstraps]
+        sharpes = [value for sample in bootstraps if (value := _sharpe(sample)) is not None]
+        point_sharpe = _sharpe(values)
+        psr = _normal_cdf((point_sharpe or 0.0) * math.sqrt(max(1, len(values) - 1)) / math.sqrt(252)) if point_sharpe is not None else None
+        alpha = 0.05 / max(1, family_size)
+        tail = values[max(0, math.floor(len(values) * 0.8)):]
+        stressed: list[float] = []
+        stress_available = True
+        for row in candidate_rows:
+            try:
+                stressed.append(float(row["doubled_cost_outcome_r"]))
+            except (KeyError, TypeError, ValueError):
+                stress_available = False
+                break
+        result = {
+            "candidate_id": candidate_id,
+            "n_resolved": len(values),
+            "distinct_sessions": len({row["session"] for row in candidate_rows}),
+            "expectancy": round(_mean(values), 6),
+            "expectancy_lower_95_ci": round(_quantile(means, 0.025), 6) if means else None,
+            "expectancy_upper_95_ci": round(_quantile(means, 0.975), 6) if means else None,
+            "sharpe": round(point_sharpe, 6) if point_sharpe is not None else None,
+            "dsr": round(psr, 6) if psr is not None else None,
+            "dsr_lower_bound": round(_quantile(sharpes, alpha), 6) if sharpes else None,
+            "bonferroni_alpha": round(alpha, 8),
+            "pbo": pbo,
+            "pbo_status": "unavailable_single_lane" if pbo is None else "measured_cpcv_family",
+            "decay": {"full_expectancy": round(_mean(values), 6), "last_20_percent_expectancy": round(_mean(tail), 6), "same_sign": _mean(values) > 0 and _mean(tail) > 0},
+            "placebo": _placebo(candidate_rows, candidate_id=candidate_id, family_size=family_size),
+            "cost_stress": {"status": "pass" if stress_available and _mean(stressed) > 0 else "fail" if stress_available else "unavailable", "doubled_cost_expectancy": round(_mean(stressed), 6) if stress_available else None},
+            "purged_walk_forward": _walk_forward(values),
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+        results.append(result)
+    return {
+        "schema_version": 1,
+        "provider": "multi_lane_replay",
+        "generated_at": (now or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "family_size": family_size,
+        "method": "purged_walk_forward_cpcv_family_pbo_moving_block_bootstrap_bonferroni",
+        "skipped_rows": skipped,
+        "results": results,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--outcomes", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument("--family-ledger", type=Path, default=DEFAULT_FAMILY)
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    family_size = len({row.get("spec_hash") for row in _read_jsonl(args.family_ledger) if row.get("spec_hash")})
+    report = evaluate_replay(_read_jsonl(args.outcomes), family_size=family_size)
+    output = args.output or ROOT / "data" / f"multi_lane_replay_{datetime.now().date().isoformat().replace('-', '')}.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"multi_lane_replay candidates={len(report['results'])} family_size={family_size} output={output}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

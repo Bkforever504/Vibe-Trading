@@ -1,0 +1,29 @@
+{
+  "topic": "mechanical SPY QQQ MES trading sequences with exact public rules from YouTube X Reddit Chinese-language and Africa-based traders",
+  "query_type": "GENERAL",
+  "subqueries": [
+    {
+      "query": "SPY QQQ MES exact mechanical strategy entry stop target rules YouTube X Reddit",
+      "purpose": "Find reproducible intraday and swing sequences with complete rules"
+    },
+    {
+      "query": "美股 SPY QQQ 量化 交易策略 明确规则 回测 均线 突破 回踩",
+      "purpose": "Find Chinese-language strategies with explicit causal rules"
+    },
+    {
+      "query": "African trader South Africa Nigeria Kenya mechanical trading strategy liquidity sweep market structure exact rules",
+      "purpose": "Find Africa-based educators whose public setups specify entry invalidation and exit"
+    },
+    {
+      "query": "trading strategy forward test failure live results repaint slippage ORB VWAP liquidity sweep",
+      "purpose": "Collect adverse evidence and avoid selecting promotional backtests"
+    }
+  ],
+  "ranking_criteria": [
+    "Exact entry stop target and time or regime rules",
+    "Rules can be implemented causally without proprietary indicators",
+    "Forward results or independently reproducible data outrank screenshots",
+    "Penalize affiliate links courses hindsight charts and omitted losing trades",
+    "Prefer sequences distinct from existing ORB VWAP and liquidity-sweep tests"
+  ]
+}

@@ -2056,6 +2056,358 @@
       ],
       "evidence_gate": "Promotion requires 60 dev outcomes + 30 chronological holdout outcomes, all under doubled fees. Evidence collection begins 2026-08-05. Conviction score tracked per outcome for win-rate vs score analysis. Promotion requires explicit human approval.",
       "notes": "2-5 DTE call debit spreads on SPY/QQQ/NVDA. Same base gates as trend_participation_shadow but 3x faster evidence collection. Adds conviction scorer (0-6 points) from 6 idle context signals: distribution_day, market_breadth, HMM regime, Hurst regime, sector_rotation, GEX. MIN_CONVICTION=2 required to enter. Max debit 50. 75% profit target, 40% stop. Generates training data for future ML gate."
+    },
+    {
+      "id": "0dte_time_window_gate",
+      "name": "0DTE Prime Entry Window Gate",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/0dte_time_window_gate.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/0dte_time_window_gate_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "none",
+      "feeds": [
+        "context_only"
+      ],
+      "evidence_gate": "Trivial filter \u00e2\u20ac\u201d log 30 days of entry times vs outcomes before gating.",
+      "verdict": "REAL EDGE",
+      "edge_clarity": 4,
+      "implementation_complexity": 1,
+      "data_availability": 5,
+      "stack_fit": 5,
+      "source": "SSRN 5223127 (Bozovic 2025) \u00e2\u20ac\u201d intraday jump intensity clusters at open/close; practitioner backtest 11:09am SPX condor = 132% R/R",
+      "notes": "Restrict all 0DTE entries to 10:00-11:30 ET. Jump risk premium peaks at open (too dangerous for sellers) and decays by 10am. Lunch doldrums 11:30-13:30 have worst fills. Gamma acceleration after 13:30 is dangerous for new short-gamma entries. No paid data needed."
+    },
+    {
+      "id": "vwap_deviation_filter",
+      "name": "VWAP Deviation Entry Filter",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/vwap_deviation_filter.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/vwap_deviation_filter_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "yfinance",
+      "feeds": [
+        "context_only"
+      ],
+      "evidence_gate": "30 trading days shadow observation before gating any entry.",
+      "verdict": "REAL EDGE (conditional)",
+      "edge_clarity": 4,
+      "implementation_complexity": 2,
+      "data_availability": 5,
+      "stack_fit": 5,
+      "source": "EdgeForAlpha Q1-2025 SPY backtest: Sharpe 2.8, +8.6% vs SPY -5.0%, max DD -3.4%, 63 days. Institutional basis: VWAP is actual execution benchmark (Almgren & Chriss 2000).",
+      "notes": "Use VWAP deviation as entry filter for 0DTE PM spread and iron condor \u00e2\u20ac\u201d prefer entries when SPY is within +-0.75 sigma of VWAP (near fair value). Avoid entries when price is already at +-2 sigma (overextended, mean-reversion risk). Computable with yfinance 1-min download + pandas volume-weighted calc. Anchored VWAP from last FOMC date also valuable for FOMC IV crush strategy."
+    },
+    {
+      "id": "iv_term_structure_slope",
+      "name": "IV Term Structure Slope (0DTE vs 5-day)",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/iv_term_structure_slope.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/iv_term_structure_slope_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "yfinance",
+      "feeds": [
+        "context_only"
+      ],
+      "evidence_gate": "30 trading days shadow before adding to entry gate.",
+      "verdict": "REAL EDGE",
+      "edge_clarity": 4,
+      "implementation_complexity": 2,
+      "data_availability": 5,
+      "stack_fit": 5,
+      "source": "Bandi, Fusari, Reno SSRN 4503344 (2024) \u00e2\u20ac\u201d 0DTE variance risk premium exists but conditional timing required. yfinance options chain provides multiple expiry IVs for free.",
+      "notes": "When 0DTE median IV > 5-day median IV (inverted term structure), 0DTE premium is overpriced vs realized vol \u00e2\u20ac\u201d better edge for sellers. When term structure is flat/normal, skip or reduce size. Use yfinance Ticker.options to get nearest two expiries, compare median call IV. Positive slope (0DTE > next expiry) = green light for theta harvest."
+    },
+    {
+      "id": "vix_contango_gate",
+      "name": "VIX Contango / Backwardation Gate",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/vix_contango_gate.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/vix_contango_gate_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "yfinance",
+      "feeds": [
+        "context_only"
+      ],
+      "evidence_gate": "30 days observation before gating.",
+      "verdict": "REAL EDGE",
+      "edge_clarity": 4,
+      "implementation_complexity": 2,
+      "data_availability": 4,
+      "stack_fit": 4,
+      "source": "Standard volatility risk premium literature. VXX contango/backwardation is observable from yfinance (^VIX vs VXX price trend as proxy).",
+      "notes": "When VIX spot < VIX front-month futures (contango) = vol risk premium is positive = better edge for premium selling. When VIX spot > front-month (backwardation) = skip or reduce premium selling. Proxy: use yfinance ^VIX and compare to VXX rolling change as contango proxy. CBOE publishes exact VX settlement for free."
+    },
+    {
+      "id": "camarilla_pivot_context",
+      "name": "Camarilla Pivot Points S/R Context",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/camarilla_pivot_context.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/camarilla_pivot_context_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "yfinance",
+      "feeds": [
+        "context_only"
+      ],
+      "evidence_gate": "Context and confluence use only \u00e2\u20ac\u201d not a standalone signal. 30 days observation.",
+      "verdict": "TIMING TOOL ONLY",
+      "edge_clarity": 2,
+      "implementation_complexity": 1,
+      "data_availability": 5,
+      "stack_fit": 3,
+      "source": "Nick Stott (bond trader). No peer-reviewed SPY/ES edge quantification found as of 2026-08-11. Practitioner use is widespread.",
+      "notes": "Use H3/L3 as mean-reversion zones for condor wing placement guidance (avoid placing short strikes near H3/L3 \u00e2\u20ac\u201d higher probability of test). H4/L4 as hard stop context for 0DTE spreads. CPR width as daily regime flag: narrow CPR = trending day, wide CPR = ranging day. Computed purely from previous day OHLC via yfinance \u00e2\u20ac\u201d zero cost. No standalone edge evidence."
+    },
+    {
+      "id": "ict_killzones",
+      "name": "ICT Killzones",
+      "type": "research_intake",
+      "script": "",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "",
+      "status": "rejected",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "none",
+      "feeds": [],
+      "evidence_gate": "Rejected \u00e2\u20ac\u201d no build.",
+      "verdict": "TIMING TOOL ONLY (patterns rejected)",
+      "edge_clarity": 1,
+      "implementation_complexity": 4,
+      "data_availability": 5,
+      "stack_fit": 1,
+      "source": "offbeatforex.com backtest: 24,908 candles, 125 trades, win rate 29.6%, profit factor 0.81, result -45% on $10k. EURUSD only \u00e2\u20ac\u201d no SPY/ES data.",
+      "notes": "Mechanical ICT pattern trading has negative expectancy (PF 0.81). The session windows themselves (NY open, PM session) correspond to real volume clusters and are worth using as time filters, but the ICT entry patterns within them (displacement candles, FVGs, etc.) have no documented mechanical edge. The AI-assisted version (PF 1.99) required rejecting 92% of setups \u00e2\u20ac\u201d edge is in discretionary filtering, not the pattern. Rejected for automation."
+    },
+    {
+      "id": "smc_order_blocks_fvg",
+      "name": "SMC Order Blocks / Fair Value Gaps",
+      "type": "research_intake",
+      "script": "",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "",
+      "status": "rejected",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "none",
+      "feeds": [],
+      "evidence_gate": "Rejected \u00e2\u20ac\u201d no build.",
+      "verdict": "NO EVIDENCE",
+      "edge_clarity": 1,
+      "implementation_complexity": 5,
+      "data_availability": 5,
+      "stack_fit": 1,
+      "source": "Medium/@space.garaa 2,600-trade backtest (Jan 2024-Mar 2026): 61.2% WR, PF 2.17 \u00e2\u20ac\u201d but no individual concept isolation, no SPY/ES data, no methodology audit. Zero peer-reviewed papers on SMC/order blocks/FVG as of 2026-08-11.",
+      "notes": "SMC is useful as a conceptual framework for reading market structure but fails automation requirements: patterns require subjective identification, no falsifiable mechanical rules, no peer-reviewed evidence. The '70% FVG fill rate' claim circulates without any published methodology. Rejected. Exception: liquidity sweeps (stop hunts above/below swing highs) are a real phenomenon worth a separate shadow scanner."
+    },
+    {
+      "id": "liquidity_sweep_scanner",
+      "name": "Liquidity Sweep (Stop Hunt) Shadow Scanner",
+      "type": "research_intake",
+      "script": "research/shadow_scanners/liquidity_sweep_scanner.py",
+      "runner": "",
+      "scheduled_tasks": [],
+      "log_path": "data/liquidity_sweep_scanner_log.jsonl",
+      "status": "intake_shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "broker_or_venue": "yfinance",
+      "feeds": [
+        "yfinance_1min",
+        "yfinance_daily"
+      ],
+      "evidence_gate": "30-day shadow observation, minimum 10 qualifying sweep events. Decision gate: if observed win rate (price reaches VWAP within 2h) > 70% AND false breakdown rate < 20%, promote to debit-spread consideration. Credit spread entry requires ~88% WR \u00e2\u20ac\u201d do not promote for credit spreads unless that threshold is confirmed.",
+      "verdict": "TIMING TOOL \u00e2\u20ac\u201d insufficient evidence for options entry, sufficient for negative filter use",
+      "edge_clarity": 2,
+      "implementation_complexity": 3,
+      "data_availability": 5,
+      "stack_fit": 3,
+      "research_eval": "research/repo_eval_liquidity_sweeps_0dte_2026-08-11.md",
+      "last_reviewed": "2026-08-11",
+      "academic_refs": [
+        "Vlasiuk & Smirnov (2025) arXiv 2511.06177 \u00e2\u20ac\u201d push-response anomalies in SPY NBBO data, 1,500 trading days. Large directional pushes yield non-random responses. Supports reversal hypothesis at microstructure level.",
+        "Zarattini, Aziz & Barbon (2024) SSRN 4824172 \u00e2\u20ac\u201d intraday momentum on SPY 2007-2024, Sharpe 1.33, 19.6% annualized. Abnormal supply/demand imbalance signal conceptually adjacent to sweep detection.",
+        "No peer-reviewed paper directly backtests PDH/PDL sweep reversal on SPY with clean entry/exit rules. This is the central evidence gap."
+      ],
+      "practitioner_stats": {
+        "spy_opens_inside_range_tags_pdh_or_pdl": "86% of days (TradeThatSwing.com)",
+        "spy_opens_below_pdl_returns_above_pdl": "71% (TradeThatSwing.com)",
+        "sfp_plus_volume_confirm_win_rate": "55-68% (QuantVPS, 2022-2025, multi-asset)",
+        "orb_failure_spy_win_rate": "~50% (TOS Indicators 30-day backtest \u00e2\u20ac\u201d near coin-flip)",
+        "orb_credit_spread_in_direction_win_rate": "88.8% (Quantish.io, SPX 0DTE, Sept 2025 \u00e2\u20ac\u201d MOMENTUM direction, NOT reversal)"
+      },
+      "options_math": {
+        "credit_spread_break_even_win_rate": "~88% required at 1:7.3 reward-to-risk (typical 0DTE $5-wide spread at $0.60 credit)",
+        "debit_spread_ev_at_60pct_win": "+$0.80 per spread (positive EV \u00e2\u20ac\u201d preferred approach if signal validates)",
+        "catastrophic_risk": "Max loss on 0DTE credit spread if sweep continues: all three Greeks (delta, vega, gamma) move against position simultaneously"
+      },
+      "mechanical_definition": {
+        "bullish_sweep": "bar.Low < PDL AND bar.Close > PDL AND volume_ratio >= 1.2 AND next_bar.Close > bar.Close",
+        "bearish_sweep": "bar.High > PDH AND bar.Close < PDH AND volume_ratio >= 1.2 AND next_bar.Close < bar.Close",
+        "time_window": "09:35-10:30 ET",
+        "sweep_excess_range_pct": "0.03% to 0.30% (larger = likely real breakdown)",
+        "volume_baseline": "20-bar average from session open"
+      },
+      "parameter_ranges_to_optimize": {
+        "sweep_window_start": [
+          "09:35",
+          "09:40",
+          "09:45"
+        ],
+        "sweep_window_end": [
+          "10:00",
+          "10:15",
+          "10:30",
+          "11:00"
+        ],
+        "volume_ratio_threshold": [
+          1.0,
+          1.2,
+          1.5,
+          2.0
+        ],
+        "sweep_excess_min_pct": [
+          0.03,
+          0.05,
+          0.1
+        ],
+        "sweep_excess_max_pct": [
+          0.15,
+          0.2,
+          0.3
+        ],
+        "confirmation_bars": [
+          1,
+          2,
+          3
+        ],
+        "vix_max": [
+          20,
+          25,
+          30
+        ]
+      },
+      "recommended_integration": {
+        "immediate": "Negative filter only \u00e2\u20ac\u201d if bearish sweep of PDH occurred within 2h, skip condor entry for current session. No new code path, add as veto check in existing entry filters.",
+        "after_30day_shadow_if_wr_gt_70pct": "0DTE debit spread (long call spread on bullish sweep, long put spread on bearish sweep). NOT credit spread.",
+        "do_not_do": "Do not use as 0DTE put credit spread entry signal \u00e2\u20ac\u201d credit spread payoff structure requires ~88% WR which is unvalidated."
+      },
+      "risk_flags": [
+        "0DTE gamma amplification: 0.3% adverse move can cause near-max-loss on credit spread",
+        "IV expansion during sweep hurts short vega before confirmation",
+        "Double-tap pattern (sweep, false reclaim, second sweep) causes immediate max loss on fresh position",
+        "VIX > 25: sweeps more likely to be genuine breakouts, not false. Tighten VIX gate for sweep entries vs. current bot gate of VIX < 40",
+        "Bid-ask spreads on 0DTE options widen during sweep \u00e2\u20ac\u201d slippage at worst possible moment"
+      ],
+      "source": "Deep research 2026-08-11. Phenomenon supported by microstructure theory and practitioner data. No peer-reviewed SPY-specific quantification of PDH/PDL sweep reversal edge. Upgraded from deferred to intake_shadow.",
+      "notes": "Build shadow scanner using yfinance 1-min data. Log daily: sweep_type, time, level, vol_ratio, sweep_excess_pct, vwap_reached_within_2h. After 30 days minimum 10 events: if WR > 70% consider debit spread integration, if WR < 65% reject for automation. Use immediately as negative veto filter on existing condor/spread entries with zero code risk."
+    },
+    {
+      "id": "mes_reopen_vix_shadow",
+      "name": "MES Reopen-to-Open Drift + VIX Filter",
+      "script": "strategies/mes_reopen_vix_shadow_logger.py",
+      "runner": "scripts/setup_task_scheduler.ps1",
+      "scheduled_tasks": [
+        "MESReopenVixShadowEntry",
+        "MESReopenVixShadowExit"
+      ],
+      "log_path": "data/mes_reopen_vix_shadow_log.jsonl",
+      "status": "shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "can_read_order_history": false,
+      "broker_or_venue": "yfinance_proxy; Databento BBO validation",
+      "feeds": [
+        "profitability_evidence"
+      ],
+      "evidence_gate": "At least 30 newly resolved forward shadows; median dollar P&L > $6, win_rate >= 55%, profit factor >= 1.10, max shadow DD > -$3000 per contract, and positive 90% block-bootstrap lower bound before promotion review",
+      "preregistration": "research/MES_REOPEN_VIX_FILTER_PREREGISTRATION_2026-08-17.md",
+      "holdout_result": {
+        "train_2022_2024": {
+          "trades": 267,
+          "sharpe": 1.72,
+          "avg_dollar": 12.36,
+          "PF": 1.36
+        },
+        "test_2025_2026": {
+          "trades": 171,
+          "sharpe": 1.75,
+          "avg_dollar": 12.12,
+          "PF": 1.32,
+          "win_rate": 0.591
+        }
+      },
+      "notes": "Long MES from the 5 PM CT reopen to the next 9:30 AM ET open when final same-day VIX<=18 and the 4 PM ET MES close-to-close move>=-1%. Corrects the non-causal 3:55 PM ET proposal and stays inside one Topstep session. The independent test block-bootstrap CI crosses zero (90%: -$2.05 to $26.11; 95%: -$5.00 to $29.02), so this is supportive shadow evidence only, not a statistically confirmed edge. No practice or live authority."
+    },
+    {
+      "id": "qqq_mean_reversion_shadow",
+      "name": "QQQ Double 7 and RSI2 Mean-Reversion Shadow",
+      "script": "scripts/qqq_mean_reversion_shadow.py",
+      "runner": "scripts/run_rsi2_shadow_logger.ps1",
+      "scheduled_tasks": [
+        "RSI2ShadowLogger"
+      ],
+      "log_path": "data/qqq_mean_reversion_shadow_log.jsonl",
+      "status": "shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "can_read_order_history": false,
+      "broker_or_venue": "alpaca_market_data_with_yfinance_fallback",
+      "feeds": [
+        "profitability_evidence",
+        "resolved_forward_outcomes"
+      ],
+      "evidence_gate": "At least 30 newly logged trading days and 10 completed forward trades per reviewed variant, positive expectancy after costs, PF > 1, controlled drawdown, and explicit human approval. Development results cannot promote.",
+      "preregistration": "research/QQQ_MEAN_REVERSION_CHALLENGER_SPEC_2026-08-19.md",
+      "notes": "Tracks exact QQQ Double 7 and RSI2 baselines plus SMA5 and prior-high exit challengers. Development tests improved drawdown and holding time but failed experiment-wide multiple-test correction. Read-only shadow evidence; no order authority."
+    },
+    {
+      "id": "opportunity_intelligence_pipeline",
+      "name": "Opportunity Intelligence and Regime Allocation Pipeline",
+      "script": "scripts/opportunity_intelligence_pipeline.py",
+      "runner": "scripts/run_opportunity_intelligence_pipeline.ps1",
+      "scheduled_tasks": [
+        "Opportunity-Intelligence-Pipeline"
+      ],
+      "log_path": "data/opportunity_intelligence_ledger.jsonl",
+      "status": "shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "can_read_order_history": false,
+      "broker_or_venue": "none_read_only_artifact_aggregation",
+      "feeds": [
+        "gate_attribution",
+        "placebo_testing",
+        "edge_decay",
+        "probability_calibration",
+        "portfolio_simulation",
+        "execution_ab",
+        "operational_slo"
+      ],
+      "evidence_gate": "No execution promotion. Each underlying strategy retains its own forward evidence and explicit-approval contract.",
+      "preregistration": "research/OPPORTUNITY_INTELLIGENCE_PROTOCOL_2026-08-19.md",
+      "notes": "Writes every considered and rejected lane plus explicit cash. Produces uncertainty-adjusted research weights only; it cannot alter production gates, sizes, or orders."
     }
   ]
 }

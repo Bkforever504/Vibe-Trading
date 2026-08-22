@@ -1,0 +1,757 @@
+{
+  "experiment": "GLOBAL-SOCIAL-SEQUENCE-2026-08-19",
+  "specification": "research/GLOBAL_SOCIAL_SEQUENCE_TOURNAMENT_SPEC_2026-08-19.md",
+  "source_ledger": "research/social_strategy_intake/global_social_sequence_sources_2026-08-19.json",
+  "source_ledger_sha256": "cf808f3c267cd0d68d5082529af640ee4bd4504174f91cd85e8e9e79a235545c",
+  "prior_effective_attempts": 803,
+  "trial_count": 106,
+  "effective_attempts": 909,
+  "bonferroni_alpha": 5.500550055005501e-05,
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "trials": [
+    {
+      "trial_id": "GSS-001",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-002",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-003",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-004",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-005",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-006",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-007",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "prior_day_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-008",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "prior_day_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-009",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-010",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-011",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-012",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-013",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-014",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-015",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-016",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-017",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "gap_continuation",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-018",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "gap_continuation",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-019",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "gap_continuation",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-020",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "gap_continuation",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-021",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-022",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-023",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-024",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-025",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-026",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-027",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-028",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-029",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-030",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-031",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-032",
+      "horizon": "intraday_5m",
+      "market": "SPY",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-033",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-034",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-035",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-036",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-037",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-038",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-039",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "prior_day_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-040",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "prior_day_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-041",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-042",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-043",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-044",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-045",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-046",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-047",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-048",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-049",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "gap_continuation",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-050",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "gap_continuation",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-051",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "gap_continuation",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-052",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "gap_continuation",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-053",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-054",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-055",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-056",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-057",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-058",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-059",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-060",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-061",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-062",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-063",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-064",
+      "horizon": "intraday_5m",
+      "market": "QQQ",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-065",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-066",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-067",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-068",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_range_breakout_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-069",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-070",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "prior_day_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-071",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "prior_day_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-072",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "prior_day_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-073",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-074",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-075",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-076",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "liquidity_sweep_mss_fvg",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-077",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-078",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-079",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-080",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "first_touch_rsi_fade",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-081",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "gap_continuation",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-082",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "gap_continuation",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-083",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "gap_continuation",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-084",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "gap_continuation",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-085",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-086",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-087",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-088",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "ema_8_21_break_retest",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-089",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-090",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-091",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-092",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "opening_drive_vwap_pullback",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-093",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.0
+    },
+    {
+      "trial_id": "GSS-094",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 1.5
+    },
+    {
+      "trial_id": "GSS-095",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 2.0
+    },
+    {
+      "trial_id": "GSS-096",
+      "horizon": "intraday_5m",
+      "market": "MES",
+      "family": "multi_indicator_reversal",
+      "reward_risk": 3.0
+    },
+    {
+      "trial_id": "GSS-097",
+      "horizon": "daily",
+      "market": "SPY",
+      "family": "sma200_long_cash",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-098",
+      "horizon": "daily",
+      "market": "SPY",
+      "family": "sma5_20_cross",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-099",
+      "horizon": "daily",
+      "market": "SPY",
+      "family": "double7",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-100",
+      "horizon": "daily",
+      "market": "SPY",
+      "family": "rsi2_200d",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-101",
+      "horizon": "daily",
+      "market": "SPY",
+      "family": "multi_ma_majority",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-102",
+      "horizon": "daily",
+      "market": "QQQ",
+      "family": "sma200_long_cash",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-103",
+      "horizon": "daily",
+      "market": "QQQ",
+      "family": "sma5_20_cross",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-104",
+      "horizon": "daily",
+      "market": "QQQ",
+      "family": "double7",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-105",
+      "horizon": "daily",
+      "market": "QQQ",
+      "family": "rsi2_200d",
+      "reward_risk": null
+    },
+    {
+      "trial_id": "GSS-106",
+      "horizon": "daily",
+      "market": "QQQ",
+      "family": "multi_ma_majority",
+      "reward_risk": null
+    }
+  ],
+  "registry_sha256": "835d6105d320ae5b2dc609ba4bd2084e5bcddafa977d4176e835f1b81e10f7b1"
+}

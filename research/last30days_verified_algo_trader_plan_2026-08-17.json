@@ -1,0 +1,56 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "systematic algorithmic trading reproducible rules transaction costs",
+      "ranking_query": "Which automated trading practitioners are sharing complete reproducible rules, realistic execution assumptions, and verifiable forward results?",
+      "sources": [
+        "reddit",
+        "x",
+        "youtube",
+        "tiktok",
+        "instagram",
+        "hackernews",
+        "polymarket"
+      ],
+      "weight": 1.0
+    },
+    {
+      "label": "options",
+      "search_query": "systematic options volatility risk premium put spread exact rules",
+      "ranking_query": "Which systematic options-selling teachings disclose complete entry, sizing, exit, tail-risk, and execution rules that can be independently replicated?",
+      "sources": [
+        "youtube",
+        "reddit",
+        "x"
+      ],
+      "weight": 0.8
+    },
+    {
+      "label": "trend",
+      "search_query": "trend following momentum algorithm walk forward exact rules",
+      "ranking_query": "Which trend and momentum systems have reproducible rules and evidence that survives walk-forward testing and transaction costs?",
+      "sources": [
+        "youtube",
+        "reddit",
+        "x",
+        "hackernews"
+      ],
+      "weight": 0.8
+    },
+    {
+      "label": "validation",
+      "search_query": "algo trading backtest bias slippage live results audit",
+      "ranking_query": "What validation failures are experienced algorithmic traders reporting when moving from backtests to live execution?",
+      "sources": [
+        "reddit",
+        "youtube",
+        "x"
+      ],
+      "weight": 0.7
+    }
+  ]
+}

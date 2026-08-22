@@ -1,0 +1,58 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "TradingView indicators paid automated strategy backtest",
+      "ranking_query": "Which TradingView indicator methodologies have reproducible evidence for automated liquid equity, options, or futures strategies?",
+      "sources": [
+        "reddit",
+        "x",
+        "youtube",
+        "tiktok",
+        "instagram",
+        "hackernews",
+        "polymarket"
+      ],
+      "weight": 1.0
+    },
+    {
+      "label": "commercial",
+      "search_query": "LuxAlgo Market Cipher ChartPrime AlgoAlpha indicator methodology",
+      "ranking_query": "What public, testable rules underlie prominent commercial TradingView indicator suites?",
+      "sources": [
+        "x",
+        "youtube",
+        "reddit",
+        "tiktok",
+        "instagram"
+      ],
+      "weight": 0.8
+    },
+    {
+      "label": "requested",
+      "search_query": "TradingView killzone pivot points Heikin Ashi failed 2 strategy",
+      "ranking_query": "How are killzones, pivot points, Heikin Ashi, and failed breakout patterns used without repainting or look-ahead bias?",
+      "sources": [
+        "youtube",
+        "reddit",
+        "x"
+      ],
+      "weight": 0.8
+    },
+    {
+      "label": "opensource",
+      "search_query": "open source Pine Script non repaint strategy indicators",
+      "ranking_query": "Which open-source Pine strategies are sufficiently explicit to reproduce and test independently?",
+      "sources": [
+        "reddit",
+        "x",
+        "youtube",
+        "hackernews"
+      ],
+      "weight": 0.7
+    }
+  ]
+}

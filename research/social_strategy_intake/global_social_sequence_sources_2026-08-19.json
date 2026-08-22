@@ -1,0 +1,104 @@
+{
+  "as_of": "2026-08-19",
+  "warning": "Public claims and selected screenshots are hypotheses, not verified track records.",
+  "included": [
+    {
+      "family": "opening_range_breakout_retest",
+      "channel": "reddit",
+      "source": "https://www.reddit.com/r/Daytrading/comments/1rw66le/is_there_a_strategy_for_trading_spy_that_actually/",
+      "public_rule": "Mark the first 5-15 minute range, require a close outside, wait for a retest that closes outside, target 2R.",
+      "translation": "Use the completed 15-minute range and a completed 5-minute retest; test exit sensitivity separately."
+    },
+    {
+      "family": "prior_day_break_retest",
+      "channel": "x",
+      "source": "conversation attachment from @RealJGBanks, 2026-08-16",
+      "public_rule": "Mark prior-day high/low, require a one-hour close beyond it, enter the five-minute retest.",
+      "translation": "Require 12 completed five-minute bars before the break and use the first completed retest."
+    },
+    {
+      "family": "liquidity_sweep_mss_fvg",
+      "channel": "youtube",
+      "source": "https://www.youtube.com/watch?v=LivWGyobZcA",
+      "public_rule": "Liquidity level sweep, close back in range, market-structure shift, then FVG entry in the main-trend/time window.",
+      "translation": "Prior-day level, three-bar swing break, classic three-candle FVG, and midpoint retest."
+    },
+    {
+      "family": "liquidity_sweep_mss_fvg",
+      "channel": "reddit",
+      "source": "https://www.reddit.com/r/FuturesTrading/comments/1ihg6ge",
+      "public_rule": "Sweep support/resistance, reverse with FVG, confirm MSS, enter FVG retracement, stop beyond sweep.",
+      "translation": "Corroborating source for the same frozen detector; not counted as a second family."
+    },
+    {
+      "family": "first_touch_rsi_fade",
+      "channel": "x",
+      "source": "conversation attachment from @shentrades, 2026-08-10",
+      "public_rule": "Mark PDH/PDL, trade only the first touch, confirm RSI above 70 for puts or below 30 for calls.",
+      "translation": "Fade the first prior-day boundary touch only after the bar closes back inside with RSI(14) extreme."
+    },
+    {
+      "family": "gap_continuation",
+      "channel": "x",
+      "source": "conversation attachment from @visionstocks, 2026-08-16",
+      "public_rule": "Strong gap, premarket plan, entry level holds, continuation.",
+      "translation": "Gap beyond the prior-day range, first 15 minutes hold, then first EMA8 pullback and rejection."
+    },
+    {
+      "family": "ema_8_21_break_retest",
+      "channel": "x",
+      "source": "conversation attachment from @RealJGBanks, 2026-08-18",
+      "public_rule": "8/21 control, major key level, trend, break and retest, momentum.",
+      "translation": "EMA8/EMA21 direction plus prior-day high/low break and retest."
+    },
+    {
+      "family": "opening_drive_vwap_pullback",
+      "channel": "public_web",
+      "source": "https://www.nexural.io/blog/es-futures-trading-strategies",
+      "public_rule": "Opening drive followed by first VWAP pullback.",
+      "translation": "Efficient directional first 15 minutes, then the first VWAP touch that closes with the drive."
+    },
+    {
+      "family": "multi_indicator_reversal",
+      "channel": "chinese_language_video",
+      "source": "https://www.bilibili.com/video/BV1aKMuzUEPP/",
+      "public_rule": "Five-minute reversal decision from a score of moving averages, RSI, stochastic, CCI, momentum, and MACD.",
+      "translation": "Require five of seven causal extreme votes followed by a break of the prior bar."
+    },
+    {
+      "family": "sma200_long_cash",
+      "channel": "chinese_language_video",
+      "source": "https://www.bilibili.com/video/BV1B72hBNERv/",
+      "public_rule": "QQQ trend allocation controlled by the 200-day moving average, otherwise a cash-like asset.",
+      "translation": "Long the tested index when its close is above SMA200, otherwise cash."
+    },
+    {
+      "family": "sma5_20_cross",
+      "channel": "chinese_language_video",
+      "source": "https://www.bilibili.com/video/BV19m4y1Z762/",
+      "public_rule": "Five-day/twenty-day double moving-average strategy.",
+      "translation": "Long after SMA5 exceeds SMA20; exit after it falls below."
+    },
+    {
+      "family": "double7",
+      "channel": "book_and_x_discussion",
+      "source": "Larry Connors and Cesar Alvarez, Short Term Trading Strategies That Work (2008)",
+      "public_rule": "Above SMA200, buy a seven-day closing low and exit a seven-day closing high.",
+      "translation": "Exact daily close rule with next-open execution."
+    }
+  ],
+  "excluded": [
+    {
+      "source": "South African personalities returned by web search, including Ref Wayne, Kgopotso Mmutlane, and Sandile Shezi",
+      "reason": "Search results exposed promotion, courses, or wealth claims but no complete reproducible entry, stop, exit, and timing rule. Geography and claimed wealth are not evidence."
+    },
+    {
+      "source": "https://chanlun-pro.readthedocs.io/",
+      "reason": "Chinese Chan-theory implementation is a framework with substantial state and interpretation, not a single source-faithful sequence suitable for this fixed tournament."
+    },
+    {
+      "source": "Social screenshots showing only winning option PnL",
+      "reason": "No losing ledger, timestamps, fills, or complete rules; option returns cannot be reconstructed from underlying candles."
+    }
+  ]
+}

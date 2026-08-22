@@ -1,0 +1,35 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "Fibonacci retracement trading execution golden pocket",
+      "ranking_query": "How are active traders executing Fibonacci retracement setups, and which rules do they use to avoid false entries?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "entry",
+      "search_query": "0.618 Fibonacci limit entry confirmation retest",
+      "ranking_query": "Do traders report better execution from resting limit orders or waiting for price-action confirmation and a retest near 0.618?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram"],
+      "weight": 0.8
+    },
+    {
+      "label": "structure",
+      "search_query": "Fibonacci market structure break impulse swing ATR VWAP",
+      "ranking_query": "Which market-structure, volatility, trend, and VWAP conditions are used to qualify a Fibonacci pullback?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.7
+    },
+    {
+      "label": "risk",
+      "search_query": "Fibonacci retracement stop invalidation target no chase order expiry",
+      "ranking_query": "How do systematic traders define stops, targets, order expiry, and no-chase rules for Fibonacci entries?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.7
+    }
+  ]
+}

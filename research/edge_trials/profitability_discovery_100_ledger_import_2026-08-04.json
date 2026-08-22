@@ -1,0 +1,2802 @@
+[
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-001",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 776,
+      "expectancy": -6.0093,
+      "profit_factor": 0.6004,
+      "max_drawdown": 4738.49,
+      "t_stat": -7.0823,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.9893
+    },
+    "parameters": {
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-002",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 774,
+      "expectancy": -3.7833,
+      "profit_factor": 0.7908,
+      "max_drawdown": 3146.58,
+      "t_stat": -3.1109,
+      "p_value": 0.99906726,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.7633
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-003",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 769,
+      "expectancy": -3.0684,
+      "profit_factor": 0.8475,
+      "max_drawdown": 2390.0,
+      "t_stat": -2.0826,
+      "p_value": 0.98135666,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.0484
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-004",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 766,
+      "expectancy": -2.214,
+      "profit_factor": 0.8957,
+      "max_drawdown": 1941.24,
+      "t_stat": -1.3255,
+      "p_value": 0.90749359,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.194
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-005",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 759,
+      "expectancy": -1.9332,
+      "profit_factor": 0.9133,
+      "max_drawdown": 1968.84,
+      "t_stat": -1.0504,
+      "p_value": 0.85323911,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.9132
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-006",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 688,
+      "expectancy": -4.2823,
+      "profit_factor": 0.7233,
+      "max_drawdown": 3067.77,
+      "t_stat": -4.1209,
+      "p_value": 0.99998113,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.2623
+    },
+    "parameters": {
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-007",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 685,
+      "expectancy": -2.3504,
+      "profit_factor": 0.8721,
+      "max_drawdown": 1944.32,
+      "t_stat": -1.6368,
+      "p_value": 0.94916697,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.3304
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-008",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 676,
+      "expectancy": -0.9952,
+      "profit_factor": 0.9494,
+      "max_drawdown": 1130.58,
+      "t_stat": -0.5864,
+      "p_value": 0.72118751,
+      "development_survivor": false,
+      "double_cost_expectancy": -5.9752
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-009",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 667,
+      "expectancy": -1.0482,
+      "profit_factor": 0.9497,
+      "max_drawdown": 1301.98,
+      "t_stat": -0.5549,
+      "p_value": 0.7105313,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.0282
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_breakout",
+    "hypothesis": "orb_breakout variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-010",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 664,
+      "expectancy": -0.0045,
+      "profit_factor": 0.9998,
+      "max_drawdown": 1301.95,
+      "t_stat": -0.0022,
+      "p_value": 0.50086991,
+      "development_survivor": false,
+      "double_cost_expectancy": -4.9845
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-011",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 523,
+      "expectancy": -4.4207,
+      "profit_factor": 0.6901,
+      "max_drawdown": 2462.36,
+      "t_stat": -4.2102,
+      "p_value": 0.99998724,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.4007
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-012",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 512,
+      "expectancy": -5.3291,
+      "profit_factor": 0.7147,
+      "max_drawdown": 2828.71,
+      "t_stat": -3.6186,
+      "p_value": 0.99985192,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.3091
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-013",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 474,
+      "expectancy": -7.4114,
+      "profit_factor": 0.6727,
+      "max_drawdown": 3721.06,
+      "t_stat": -3.9635,
+      "p_value": 0.99996307,
+      "development_survivor": false,
+      "double_cost_expectancy": -12.3914
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-014",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 438,
+      "expectancy": -6.2585,
+      "profit_factor": 0.7409,
+      "max_drawdown": 3241.74,
+      "t_stat": -2.7875,
+      "p_value": 0.99734431,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.2385
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-015",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 394,
+      "expectancy": -8.9426,
+      "profit_factor": 0.6759,
+      "max_drawdown": 3840.1,
+      "t_stat": -3.4083,
+      "p_value": 0.99967321,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.9226
+    },
+    "parameters": {
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-016",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 265,
+      "expectancy": -3.9611,
+      "profit_factor": 0.7414,
+      "max_drawdown": 1104.8,
+      "t_stat": -2.3534,
+      "p_value": 0.99069965,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.9411
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-017",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 257,
+      "expectancy": -6.1716,
+      "profit_factor": 0.6874,
+      "max_drawdown": 1701.25,
+      "t_stat": -2.7417,
+      "p_value": 0.99694406,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.1516
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-018",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 236,
+      "expectancy": -5.9228,
+      "profit_factor": 0.7354,
+      "max_drawdown": 1637.94,
+      "t_stat": -2.0767,
+      "p_value": 0.98108587,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.9028
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-019",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 204,
+      "expectancy": -4.1344,
+      "profit_factor": 0.8343,
+      "max_drawdown": 1337.76,
+      "t_stat": -1.1165,
+      "p_value": 0.86790167,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.1144
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_orb_failed_break",
+    "hypothesis": "orb_failed_break variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-020",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 179,
+      "expectancy": -5.8599,
+      "profit_factor": 0.7878,
+      "max_drawdown": 1474.57,
+      "t_stat": -1.3463,
+      "p_value": 0.91090368,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.8399
+    },
+    "parameters": {
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-021",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 609,
+      "expectancy": -6.7144,
+      "profit_factor": 0.566,
+      "max_drawdown": 4089.19,
+      "t_stat": -7.0219,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.6944
+    },
+    "parameters": {
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-022",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 605,
+      "expectancy": -6.0688,
+      "profit_factor": 0.6844,
+      "max_drawdown": 3686.77,
+      "t_stat": -4.4672,
+      "p_value": 0.99999604,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.0488
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-023",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 603,
+      "expectancy": -7.1566,
+      "profit_factor": 0.6753,
+      "max_drawdown": 4315.44,
+      "t_stat": -4.3858,
+      "p_value": 0.99999422,
+      "development_survivor": false,
+      "double_cost_expectancy": -12.1366
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-024",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 596,
+      "expectancy": -6.0895,
+      "profit_factor": 0.7316,
+      "max_drawdown": 3699.35,
+      "t_stat": -3.3099,
+      "p_value": 0.99953337,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.0695
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-025",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 590,
+      "expectancy": -6.1643,
+      "profit_factor": 0.7419,
+      "max_drawdown": 3730.63,
+      "t_stat": -3.0666,
+      "p_value": 0.99891758,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.1443
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-026",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 532,
+      "expectancy": -6.0326,
+      "profit_factor": 0.6301,
+      "max_drawdown": 3334.5,
+      "t_stat": -5.1942,
+      "p_value": 0.9999999,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.0126
+    },
+    "parameters": {
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-027",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 527,
+      "expectancy": -5.5682,
+      "profit_factor": 0.7183,
+      "max_drawdown": 3091.07,
+      "t_stat": -3.5036,
+      "p_value": 0.99977049,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.5482
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-028",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 525,
+      "expectancy": -6.2514,
+      "profit_factor": 0.7134,
+      "max_drawdown": 3517.72,
+      "t_stat": -3.4043,
+      "p_value": 0.99966829,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.2314
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-029",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 514,
+      "expectancy": -6.8307,
+      "profit_factor": 0.7109,
+      "max_drawdown": 4111.59,
+      "t_stat": -3.2858,
+      "p_value": 0.9994915,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.8107
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_breakout",
+    "hypothesis": "prior_day_breakout variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-030",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 508,
+      "expectancy": -6.2891,
+      "profit_factor": 0.7401,
+      "max_drawdown": 4007.94,
+      "t_stat": -2.7894,
+      "p_value": 0.99735933,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.2691
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-031",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 362,
+      "expectancy": -5.4841,
+      "profit_factor": 0.6315,
+      "max_drawdown": 2010.32,
+      "t_stat": -4.3535,
+      "p_value": 0.9999933,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.4641
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-032",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 355,
+      "expectancy": -5.7723,
+      "profit_factor": 0.7046,
+      "max_drawdown": 2254.29,
+      "t_stat": -3.1873,
+      "p_value": 0.99928191,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.7523
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-033",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 330,
+      "expectancy": -3.3095,
+      "profit_factor": 0.8497,
+      "max_drawdown": 1614.82,
+      "t_stat": -1.3815,
+      "p_value": 0.9164396,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.2895
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-034",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 304,
+      "expectancy": -3.1831,
+      "profit_factor": 0.8708,
+      "max_drawdown": 1268.07,
+      "t_stat": -1.0915,
+      "p_value": 0.86246458,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.1631
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-035",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 269,
+      "expectancy": -3.2932,
+      "profit_factor": 0.8766,
+      "max_drawdown": 1256.71,
+      "t_stat": -0.9545,
+      "p_value": 0.83008915,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.2732
+    },
+    "parameters": {
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-036",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 186,
+      "expectancy": -5.8335,
+      "profit_factor": 0.6447,
+      "max_drawdown": 1085.03,
+      "t_stat": -2.9258,
+      "p_value": 0.99828224,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.8135
+    },
+    "parameters": {
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-037",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 181,
+      "expectancy": -3.2604,
+      "profit_factor": 0.8393,
+      "max_drawdown": 821.36,
+      "t_stat": -1.1028,
+      "p_value": 0.8649397,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.2404
+    },
+    "parameters": {
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-038",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 164,
+      "expectancy": -2.7925,
+      "profit_factor": 0.8816,
+      "max_drawdown": 754.85,
+      "t_stat": -0.7251,
+      "p_value": 0.76580416,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.7725
+    },
+    "parameters": {
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-039",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 150,
+      "expectancy": -3.1383,
+      "profit_factor": 0.8789,
+      "max_drawdown": 854.99,
+      "t_stat": -0.6825,
+      "p_value": 0.75254512,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.1183
+    },
+    "parameters": {
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_prior_day_reclaim",
+    "hypothesis": "prior_day_reclaim variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-040",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 129,
+      "expectancy": -11.0847,
+      "profit_factor": 0.6361,
+      "max_drawdown": 1575.22,
+      "t_stat": -2.1707,
+      "p_value": 0.98502125,
+      "development_survivor": false,
+      "double_cost_expectancy": -16.0647
+    },
+    "parameters": {
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-041",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 516,
+      "expectancy": -4.5464,
+      "profit_factor": 0.6815,
+      "max_drawdown": 2427.03,
+      "t_stat": -4.3075,
+      "p_value": 0.99999174,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.5264
+    },
+    "parameters": {
+      "threshold": 0.0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-042",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 542,
+      "expectancy": -3.7346,
+      "profit_factor": 0.7919,
+      "max_drawdown": 2594.09,
+      "t_stat": -2.5773,
+      "p_value": 0.9950214,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.7146
+    },
+    "parameters": {
+      "threshold": 0.1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-043",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 569,
+      "expectancy": -5.3579,
+      "profit_factor": 0.7467,
+      "max_drawdown": 3090.13,
+      "t_stat": -3.1637,
+      "p_value": 0.99922116,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.3379
+    },
+    "parameters": {
+      "threshold": 0.2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-044",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 593,
+      "expectancy": -3.9155,
+      "profit_factor": 0.819,
+      "max_drawdown": 2466.1,
+      "t_stat": -2.1081,
+      "p_value": 0.98248938,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.8955
+    },
+    "parameters": {
+      "threshold": 0.3,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-045",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 636,
+      "expectancy": -2.7768,
+      "profit_factor": 0.8742,
+      "max_drawdown": 2563.71,
+      "t_stat": -1.414,
+      "p_value": 0.92132139,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.7568
+    },
+    "parameters": {
+      "threshold": 0.5,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-046",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 167,
+      "expectancy": -5.9306,
+      "profit_factor": 0.6341,
+      "max_drawdown": 1060.69,
+      "t_stat": -2.8603,
+      "p_value": 0.99788354,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.9106
+    },
+    "parameters": {
+      "threshold": 0.0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-047",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 180,
+      "expectancy": -4.3064,
+      "profit_factor": 0.7771,
+      "max_drawdown": 990.49,
+      "t_stat": -1.5627,
+      "p_value": 0.94093331,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.2864
+    },
+    "parameters": {
+      "threshold": 0.1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-048",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 200,
+      "expectancy": -1.805,
+      "profit_factor": 0.9097,
+      "max_drawdown": 753.03,
+      "t_stat": -0.5873,
+      "p_value": 0.72150762,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.785
+    },
+    "parameters": {
+      "threshold": 0.2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-049",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 217,
+      "expectancy": -0.6828,
+      "profit_factor": 0.969,
+      "max_drawdown": 903.87,
+      "t_stat": -0.1975,
+      "p_value": 0.57826968,
+      "development_survivor": false,
+      "double_cost_expectancy": -5.6628
+    },
+    "parameters": {
+      "threshold": 0.3,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_trend_pullback",
+    "hypothesis": "vwap_trend_pullback variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-050",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 256,
+      "expectancy": -1.7622,
+      "profit_factor": 0.9226,
+      "max_drawdown": 1019.68,
+      "t_stat": -0.5278,
+      "p_value": 0.70119721,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.7422
+    },
+    "parameters": {
+      "threshold": 0.5,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-051",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 802,
+      "expectancy": -5.7453,
+      "profit_factor": 0.6114,
+      "max_drawdown": 4898.45,
+      "t_stat": -6.9006,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.7253
+    },
+    "parameters": {
+      "threshold": 0.75,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-052",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 794,
+      "expectancy": -8.4529,
+      "profit_factor": 0.583,
+      "max_drawdown": 6877.26,
+      "t_stat": -7.2974,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.4329
+    },
+    "parameters": {
+      "threshold": 1.0,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-053",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 785,
+      "expectancy": -8.3048,
+      "profit_factor": 0.631,
+      "max_drawdown": 7222.58,
+      "t_stat": -5.8742,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.2848
+    },
+    "parameters": {
+      "threshold": 1.25,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-054",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 763,
+      "expectancy": -9.9194,
+      "profit_factor": 0.6028,
+      "max_drawdown": 8321.75,
+      "t_stat": -6.1331,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -14.8994
+    },
+    "parameters": {
+      "threshold": 1.5,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-055",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 692,
+      "expectancy": -6.3203,
+      "profit_factor": 0.7382,
+      "max_drawdown": 4967.02,
+      "t_stat": -3.3645,
+      "p_value": 0.99961658,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.3003
+    },
+    "parameters": {
+      "threshold": 2.0,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-056",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 564,
+      "expectancy": -7.285,
+      "profit_factor": 0.5596,
+      "max_drawdown": 4108.72,
+      "t_stat": -6.7011,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -12.265
+    },
+    "parameters": {
+      "threshold": 0.75,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-057",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 527,
+      "expectancy": -8.7229,
+      "profit_factor": 0.5908,
+      "max_drawdown": 4697.16,
+      "t_stat": -5.6076,
+      "p_value": 0.99999999,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.7029
+    },
+    "parameters": {
+      "threshold": 1.0,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-058",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 485,
+      "expectancy": -9.8382,
+      "profit_factor": 0.6015,
+      "max_drawdown": 4835.54,
+      "t_stat": -4.9847,
+      "p_value": 0.99999969,
+      "development_survivor": false,
+      "double_cost_expectancy": -14.8182
+    },
+    "parameters": {
+      "threshold": 1.25,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-059",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 444,
+      "expectancy": -9.31,
+      "profit_factor": 0.637,
+      "max_drawdown": 4267.02,
+      "t_stat": -4.0364,
+      "p_value": 0.99997286,
+      "development_survivor": false,
+      "double_cost_expectancy": -14.29
+    },
+    "parameters": {
+      "threshold": 1.5,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_vwap_deviation_fade",
+    "hypothesis": "vwap_deviation_fade variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-060",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 375,
+      "expectancy": -9.29,
+      "profit_factor": 0.6515,
+      "max_drawdown": 3541.29,
+      "t_stat": -3.433,
+      "p_value": 0.99970156,
+      "development_survivor": false,
+      "double_cost_expectancy": -14.27
+    },
+    "parameters": {
+      "threshold": 2.0,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-061",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 792,
+      "expectancy": -5.9143,
+      "profit_factor": 0.6063,
+      "max_drawdown": 4759.42,
+      "t_stat": -7.0156,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.8943
+    },
+    "parameters": {
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-062",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 780,
+      "expectancy": -5.4752,
+      "profit_factor": 0.7156,
+      "max_drawdown": 4270.65,
+      "t_stat": -4.498,
+      "p_value": 0.99999657,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.4552
+    },
+    "parameters": {
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-063",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 751,
+      "expectancy": -5.481,
+      "profit_factor": 0.7506,
+      "max_drawdown": 4116.23,
+      "t_stat": -3.626,
+      "p_value": 0.9998561,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.461
+    },
+    "parameters": {
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-064",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 679,
+      "expectancy": -4.367,
+      "profit_factor": 0.8142,
+      "max_drawdown": 2995.25,
+      "t_stat": -2.3657,
+      "p_value": 0.99100285,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.347
+    },
+    "parameters": {
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-065",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 593,
+      "expectancy": -3.2515,
+      "profit_factor": 0.871,
+      "max_drawdown": 2023.26,
+      "t_stat": -1.464,
+      "p_value": 0.92840327,
+      "development_survivor": false,
+      "double_cost_expectancy": -8.2315
+    },
+    "parameters": {
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-066",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 764,
+      "expectancy": -4.9538,
+      "profit_factor": 0.6872,
+      "max_drawdown": 3830.02,
+      "t_stat": -5.0398,
+      "p_value": 0.99999977,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.9338
+    },
+    "parameters": {
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-067",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 731,
+      "expectancy": -2.6869,
+      "profit_factor": 0.8579,
+      "max_drawdown": 2368.85,
+      "t_stat": -1.9107,
+      "p_value": 0.97197967,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.6669
+    },
+    "parameters": {
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-068",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 684,
+      "expectancy": -2.0012,
+      "profit_factor": 0.9033,
+      "max_drawdown": 1828.24,
+      "t_stat": -1.1692,
+      "p_value": 0.87883775,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.9812
+    },
+    "parameters": {
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-069",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 594,
+      "expectancy": -2.7536,
+      "profit_factor": 0.8787,
+      "max_drawdown": 1953.25,
+      "t_stat": -1.3403,
+      "p_value": 0.90992642,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.7336
+    },
+    "parameters": {
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_continuation",
+    "hypothesis": "opening_impulse_continuation variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-070",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 502,
+      "expectancy": -1.4043,
+      "profit_factor": 0.9412,
+      "max_drawdown": 1502.89,
+      "t_stat": -0.5621,
+      "p_value": 0.71297301,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.3843
+    },
+    "parameters": {
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-071",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 792,
+      "expectancy": -5.4314,
+      "profit_factor": 0.6343,
+      "max_drawdown": 4476.96,
+      "t_stat": -6.3828,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.4114
+    },
+    "parameters": {
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-072",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 780,
+      "expectancy": -5.714,
+      "profit_factor": 0.7031,
+      "max_drawdown": 4628.61,
+      "t_stat": -4.72,
+      "p_value": 0.99999882,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.694
+    },
+    "parameters": {
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-073",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 751,
+      "expectancy": -5.7972,
+      "profit_factor": 0.7439,
+      "max_drawdown": 4878.07,
+      "t_stat": -3.7684,
+      "p_value": 0.99991784,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.7772
+    },
+    "parameters": {
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-074",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 679,
+      "expectancy": -5.4531,
+      "profit_factor": 0.7747,
+      "max_drawdown": 4689.92,
+      "t_stat": -2.9465,
+      "p_value": 0.99839312,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.4331
+    },
+    "parameters": {
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-075",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 593,
+      "expectancy": -5.2688,
+      "profit_factor": 0.7982,
+      "max_drawdown": 4056.31,
+      "t_stat": -2.3906,
+      "p_value": 0.99159031,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.2488
+    },
+    "parameters": {
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-076",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 764,
+      "expectancy": -5.605,
+      "profit_factor": 0.6495,
+      "max_drawdown": 4360.16,
+      "t_stat": -5.7893,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.585
+    },
+    "parameters": {
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-077",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 731,
+      "expectancy": -6.8028,
+      "profit_factor": 0.6656,
+      "max_drawdown": 5204.37,
+      "t_stat": -5.1003,
+      "p_value": 0.99999983,
+      "development_survivor": false,
+      "double_cost_expectancy": -11.7828
+    },
+    "parameters": {
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-078",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 684,
+      "expectancy": -8.8981,
+      "profit_factor": 0.6337,
+      "max_drawdown": 6487.77,
+      "t_stat": -5.3414,
+      "p_value": 0.99999995,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.8781
+    },
+    "parameters": {
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-079",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 594,
+      "expectancy": -10.2893,
+      "profit_factor": 0.6157,
+      "max_drawdown": 6357.17,
+      "t_stat": -5.124,
+      "p_value": 0.99999985,
+      "development_survivor": false,
+      "double_cost_expectancy": -15.2693
+    },
+    "parameters": {
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_opening_impulse_reversal",
+    "hypothesis": "opening_impulse_reversal variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-080",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 502,
+      "expectancy": -9.7908,
+      "profit_factor": 0.6495,
+      "max_drawdown": 5369.91,
+      "t_stat": -4.043,
+      "p_value": 0.99997361,
+      "development_survivor": false,
+      "double_cost_expectancy": -14.7708
+    },
+    "parameters": {
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-081",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.5,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-082",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.65,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-083",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.8,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-084",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 9,
+      "expectancy": 14.7422,
+      "profit_factor": 1.8776,
+      "max_drawdown": 96.19,
+      "t_stat": 0.8209,
+      "p_value": 0.20585334,
+      "development_survivor": false,
+      "double_cost_expectancy": 9.7622
+    },
+    "parameters": {
+      "threshold": 1.0,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-085",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 75,
+      "expectancy": 4.6533,
+      "profit_factor": 1.2357,
+      "max_drawdown": 357.32,
+      "t_stat": 0.7643,
+      "p_value": 0.2223577,
+      "development_survivor": false,
+      "double_cost_expectancy": -0.3267
+    },
+    "parameters": {
+      "threshold": 1.2,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-086",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.5,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-087",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.65,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-088",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 0,
+      "expectancy": null,
+      "profit_factor": null,
+      "max_drawdown": null,
+      "t_stat": null,
+      "p_value": null,
+      "development_survivor": false,
+      "double_cost_expectancy": null
+    },
+    "parameters": {
+      "threshold": 0.8,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-089",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 4,
+      "expectancy": 5.645,
+      "profit_factor": 1.2053,
+      "max_drawdown": 54.98,
+      "t_stat": 0.1529,
+      "p_value": 0.43923496,
+      "development_survivor": false,
+      "double_cost_expectancy": 0.665
+    },
+    "parameters": {
+      "threshold": 1.0,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_compression_breakout",
+    "hypothesis": "compression_breakout variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-090",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 23,
+      "expectancy": 6.3787,
+      "profit_factor": 1.3217,
+      "max_drawdown": 227.3,
+      "t_stat": 0.5485,
+      "p_value": 0.29168972,
+      "development_survivor": false,
+      "double_cost_expectancy": 1.3987
+    },
+    "parameters": {
+      "threshold": 1.2,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 0 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-091",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 640,
+      "expectancy": -5.6421,
+      "profit_factor": 0.6158,
+      "max_drawdown": 3661.11,
+      "t_stat": -6.0654,
+      "p_value": 1.0,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.6221
+    },
+    "parameters": {
+      "threshold": 1.2,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 1 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-092",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 293,
+      "expectancy": -2.2027,
+      "profit_factor": 0.8645,
+      "max_drawdown": 924.71,
+      "t_stat": -1.1584,
+      "p_value": 0.87665196,
+      "development_survivor": false,
+      "double_cost_expectancy": -7.1827
+    },
+    "parameters": {
+      "threshold": 1.5,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 2 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-093",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 152,
+      "expectancy": -7.1264,
+      "profit_factor": 0.6582,
+      "max_drawdown": 1294.68,
+      "t_stat": -2.2985,
+      "p_value": 0.98923287,
+      "development_survivor": false,
+      "double_cost_expectancy": -12.1064
+    },
+    "parameters": {
+      "threshold": 1.8,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 3 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-094",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 66,
+      "expectancy": -11.3436,
+      "profit_factor": 0.5558,
+      "max_drawdown": 1000.11,
+      "t_stat": -2.0537,
+      "p_value": 0.97999796,
+      "development_survivor": false,
+      "double_cost_expectancy": -16.3236
+    },
+    "parameters": {
+      "threshold": 2.2,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 4 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-095",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 25,
+      "expectancy": -1.68,
+      "profit_factor": 0.9354,
+      "max_drawdown": 349.74,
+      "t_stat": -0.1432,
+      "p_value": 0.55694701,
+      "development_survivor": false,
+      "double_cost_expectancy": -6.66
+    },
+    "parameters": {
+      "threshold": 2.8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 5 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-096",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 472,
+      "expectancy": -5.7003,
+      "profit_factor": 0.6426,
+      "max_drawdown": 2805.66,
+      "t_stat": -4.656,
+      "p_value": 0.99999839,
+      "development_survivor": false,
+      "double_cost_expectancy": -10.6803
+    },
+    "parameters": {
+      "threshold": 1.2,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 6 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-097",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 265,
+      "expectancy": -4.7725,
+      "profit_factor": 0.7363,
+      "max_drawdown": 1526.25,
+      "t_stat": -2.2445,
+      "p_value": 0.98760038,
+      "development_survivor": false,
+      "double_cost_expectancy": -9.7525
+    },
+    "parameters": {
+      "threshold": 1.5,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 7 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-098",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 148,
+      "expectancy": -8.3161,
+      "profit_factor": 0.6222,
+      "max_drawdown": 1422.16,
+      "t_stat": -2.4893,
+      "p_value": 0.99360062,
+      "development_survivor": false,
+      "double_cost_expectancy": -13.2961
+    },
+    "parameters": {
+      "threshold": 1.8,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 8 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-099",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 61,
+      "expectancy": -15.1644,
+      "profit_factor": 0.4508,
+      "max_drawdown": 1125.09,
+      "t_stat": -2.6082,
+      "p_value": 0.99544927,
+      "development_survivor": false,
+      "double_cost_expectancy": -20.1444
+    },
+    "parameters": {
+      "threshold": 2.2,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  },
+  {
+    "edge_id": "discovery100_range_expansion_reversal",
+    "hypothesis": "range_expansion_reversal variant 9 has stable positive MES expectancy after costs.",
+    "variant": "DISC100-100",
+    "stage": "in_sample",
+    "dataset_start": "2022-01-03",
+    "dataset_end": "2025-02-28",
+    "cost_model": "MES one contract; $1.24 commission plus one tick slippage per side; doubled-cost stress also evaluated",
+    "metrics": {
+      "trade_count": 24,
+      "expectancy": -0.2925,
+      "profit_factor": 0.9892,
+      "max_drawdown": 289.74,
+      "t_stat": -0.0218,
+      "p_value": 0.50869568,
+      "development_survivor": false,
+      "double_cost_expectancy": -5.2725
+    },
+    "parameters": {
+      "threshold": 2.8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "max_hold_bars_5m": 12
+    },
+    "source": "data/profitability_discovery_100_results.json",
+    "code_version": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db"
+  }
+]

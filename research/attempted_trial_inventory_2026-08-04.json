@@ -1,0 +1,21 @@
+{
+  "inventory_date": "2026-08-04",
+  "documented_minimum_attempt_count": 520,
+  "complete_individual_ledger_backfill": false,
+  "prior_documented_minimum_attempt_count": 415,
+  "new_groups": [
+    {
+      "name": "profitability_discovery_100",
+      "attempt_count": 100,
+      "evidence": "research/PROFITABILITY_DISCOVERY_100_PREREGISTRATION_2026-08-04.md"
+    },
+    {
+      "name": "cross_asset_lead_lag_5",
+      "attempt_count": 5,
+      "evidence": "research/CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04.md"
+    }
+  ],
+  "policy": "All 105 trials count permanently, including failures. Never reduce the denominator.",
+  "execution_enabled": false,
+  "can_submit_orders": false
+}

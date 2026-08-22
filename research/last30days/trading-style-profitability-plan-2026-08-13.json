@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "systematic trading swing scalping mean reversion momentum transaction costs",
+      "ranking_query": "Which systematic trading styles remain profitable after realistic transaction costs and slippage?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "scalping",
+      "search_query": "scalping algorithm slippage spread commissions live results",
+      "ranking_query": "What execution constraints separate profitable scalping systems from misleading backtests?",
+      "sources": ["reddit", "x", "youtube", "tiktok"],
+      "weight": 0.8
+    },
+    {
+      "label": "swing",
+      "search_query": "swing trading momentum mean reversion systematic live results",
+      "ranking_query": "Which swing-trading signals and regime filters have the strongest recent practitioner evidence?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.8
+    },
+    {
+      "label": "validation",
+      "search_query": "algorithmic trading walk forward costs overfitting strategy validation",
+      "ranking_query": "How are credible traders validating strategies without overfitting?",
+      "sources": ["reddit", "youtube", "hackernews"],
+      "weight": 0.6
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "source_type": "x_api",
+    "source_id": "x-api-paid-research",
+    "consent_ref": null,
+    "purpose": "candidate discovery only",
+    "enabled": true
+  },
+  {
+    "source_type": "tradingview_webhook",
+    "source_id": "cooperating-trader-alias",
+    "consent_ref": "signed-agreement-id",
+    "purpose": "forward shadow signals",
+    "enabled": false
+  },
+  {
+    "source_type": "snaptrade_activity",
+    "source_id": "consented-broker-connection-alias",
+    "consent_ref": "signed-agreement-id",
+    "purpose": "historical fill verification",
+    "enabled": false
+  }
+]

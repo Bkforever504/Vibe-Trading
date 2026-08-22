@@ -1,0 +1,35 @@
+{
+  "edge_id": "multi_asset_intraday_market_scenario_policy",
+  "hypothesis": "A point-in-time SPY, QQQ, and IWM state policy can select long, short, or abstain with positive unseen 60-minute directional expectancy after stressed costs.",
+  "variant": "v1_vwap_ema5_12_opening_range_range_regime",
+  "stage": "out_of_sample",
+  "dataset_start": "2020-07-27",
+  "dataset_end": "2026-07-17",
+  "oos_start": "2022-07-27",
+  "oos_end": "2025-01-30",
+  "cost_model": "4_bps_underlying_round_trip_base_8_bps_double_12_bps_triple",
+  "parameters": {
+    "checkpoints_et": ["10:30", "11:00", "12:00", "13:00", "14:00", "15:00"],
+    "horizon_minutes": 60,
+    "train_sessions": 504,
+    "test_sessions": 126,
+    "locked_holdout_sessions": 252,
+    "minimum_train_episodes": 30
+  },
+  "metrics": {
+    "oos_trade_count": 680,
+    "oos_expectancy": -2.7429,
+    "oos_profit_factor": 0.7978,
+    "oos_max_drawdown": 2043.7525,
+    "double_cost_expectancy": -6.7429,
+    "triple_cost_expectancy": -10.7429,
+    "top5_removed_expectancy": -7.0377,
+    "profitable_fold_count": 0,
+    "fold_count": 5,
+    "locked_holdout_trade_count": 113,
+    "locked_holdout_expectancy": -2.796
+  },
+  "source": "research/MARKET_SCENARIO_CURRICULUM_PREREGISTRATION_2026-08-03.md; research/market_scenario_curriculum.py; data/market_scenario_curriculum_results.json",
+  "code_version": "market_scenario_curriculum_v1",
+  "verdict": "rejected_all_walk_forward_folds_and_locked_holdout_negative"
+}

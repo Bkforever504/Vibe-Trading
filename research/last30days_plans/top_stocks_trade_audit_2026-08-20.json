@@ -1,0 +1,29 @@
+{
+  "topic": "August 20 2026 stock and options trade calls for WMT AAP MRNA TSLA MSTR HUT AU CF AGCO MANH and major technology stocks",
+  "query_type": "NEWS",
+  "subqueries": [
+    {
+      "query": "August 20 2026 WMT AAP MRNA TSLA MSTR HUT options entry calls puts",
+      "purpose": "Find timestamped same-day entries and exits in the largest liquid moves"
+    },
+    {
+      "query": "August 20 2026 AAPL NVDA META AMZN GOOGL AMD QQQ options trade alerts",
+      "purpose": "Audit whether mega-cap technology opportunities were called before their moves"
+    },
+    {
+      "query": "August 20 2026 CF AU AGCO MANH SPCX stock options trade",
+      "purpose": "Check less-followed liquid names highlighted by public traders"
+    },
+    {
+      "query": "August 20 2026 stock options winners Reddit YouTube TikTok X",
+      "purpose": "Cross-check public winner claims and locate timestamped pre-move evidence"
+    }
+  ],
+  "ranking_criteria": [
+    "Timestamped entry or alert before the reported move",
+    "Exact symbol direction strike entry and exit outrank recap screenshots",
+    "Liquid executable names outrank warrants and sub-three-dollar stocks",
+    "Independent corroboration outranks promotional claims",
+    "Penalize hindsight-only posts omitted losses and unverifiable percentage returns"
+  ]
+}

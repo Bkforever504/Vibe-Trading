@@ -1,0 +1,126 @@
+{
+  "schema_version": 2,
+  "provider": "agent_reach_trading_research",
+  "youtube_queries": [
+    "systematic SPY options gap continuation exact entry exit rules",
+    "SPY 0DTE options full trade recap entry stop exit",
+    "MES futures systematic strategy exact rules transaction costs",
+    "options selling implied volatility realized volatility exact rules"
+  ],
+  "x_queries": [
+    "SPY options exact entry stop exit",
+    "MES futures exact entry stop target",
+    "options strategy full trade recap loss"
+  ],
+  "web_sources": [
+    {
+      "title": "Cboe Options Institute research",
+      "url": "https://www.cboe.com/optionsinstitute/research"
+    },
+    {
+      "title": "Cboe options market insights",
+      "url": "https://www.cboe.com/insights/tags/options/"
+    },
+    {
+      "title": "LLM and multi-agent systems in algorithmic trading taxonomy",
+      "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7017418"
+    }
+  ],
+  "social_sources": [
+    {
+      "platform": "x",
+      "author": "Dan1ro0",
+      "url": "https://x.com/Dan1ro0/status/2090102415210971442",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Claims to rank ten Polymarket trading bots after analyzing ten million executions. The visible post did not provide complete entry, exit, risk, cost, or out-of-sample rules. Research lead only."
+    },
+    {
+      "platform": "x",
+      "author": "zostaff",
+      "url": "https://x.com/zostaff/status/2042985089122931176",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Promotes a trading bot built in 34 minutes without code. The visible post supplied no exact entry, exit, risk, friction, loss history, or holdout evidence."
+    },
+    {
+      "platform": "x",
+      "author": "shmidtqq",
+      "url": "https://x.com/shmidtqq/status/2074222761598415041",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Claims a quant trading stack with regime detection, backtesting, risk, and broker layers. The visible post supplied no reproducible strategy rules or independently verified complete track record."
+    },
+    {
+      "platform": "tiktok",
+      "author": "sayysooflyy",
+      "url": "https://www.tiktok.com/@sayysooflyy/video/7673577386889235725",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Demonstrates backtesting an automated existing strategy, but the visible video metadata supplied no complete entry, exit, risk, cost, and holdout specification."
+    },
+    {
+      "platform": "tiktok",
+      "author": "andydemi",
+      "url": "https://www.tiktok.com/@andydemi/video/7675426300693073174",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Claims a 1.8 percent FTMO result in 13 seconds using a build, test, and execute workflow. No complete rules, loss history, friction model, or independent verification were visible."
+    },
+    {
+      "platform": "tiktok",
+      "author": "4xhashim",
+      "url": "https://www.tiktok.com/@4xhashim/video/7667879267136539925",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Promotes backtesting five years in five minutes. The visible material did not disclose the strategy rules, transaction costs, walk-forward split, drawdown, or all losing trades."
+    },
+    {
+      "platform": "threads",
+      "author": "ryanaisolo",
+      "url": "https://www.threads.com/@ryanaisolo/post/DIyz9qZSVEm",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Promotes a daily money-making machine built with prompts. No exact entry, exit, risk, timeframe, cost, or complete loss record was visible."
+    },
+    {
+      "platform": "threads",
+      "author": "quantscience_",
+      "url": "https://www.threads.com/@quantscience_/post/DZc5zNcEb-u",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Mentions an open-source Python algorithmic trading system with AI, real-time data, and risk controls. The visible post did not expose a complete reproducible strategy or validated performance record."
+    },
+    {
+      "platform": "instagram",
+      "author": "risingbull.xau",
+      "url": "https://www.instagram.com/p/DYcZOvAowbQ/",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Educational post titled What is algorithmic trading. The visible caption contained no exact entry condition, exit rule, risk rule, timeframe, transaction-cost model, or out-of-sample evidence."
+    },
+    {
+      "platform": "instagram",
+      "author": "algobottrading",
+      "url": "https://www.instagram.com/p/DZ7FDpADdMa/",
+      "access_mode": "authenticated_browser_snapshot",
+      "text": "Promotes ten closed winning crypto trades and roughly 100 percent total profit on margin using proprietary trigger-based entries, DCA management, and automated trailing-stop exits. Exact triggers, sizing limits, all losses, friction, and holdout evidence were not disclosed."
+    },
+    {
+      "platform": "reddit",
+      "author": "r/algotrading contributor",
+      "url": "https://www.reddit.com/r/algotrading/comments/1v56b7h/built_my_own_copy_trading_bot_for_hyperliquid_10/",
+      "access_mode": "public_web_result",
+      "text": "Copy-trading post reports that exit synchronization, fragmented positions, and correct net-flat handling materially changed copied results. It discusses fees, slippage, losses, and backtest comparisons, but is a process hypothesis rather than a complete SPY, QQQ, or MES entry and exit strategy."
+    },
+    {
+      "platform": "reddit",
+      "author": "r/algotrading contributor",
+      "url": "https://www.reddit.com/r/algotrading/comments/1s90wgr/built_a_crypto_futures_bot_now_stuck_and_can_not/",
+      "access_mode": "public_web_result",
+      "text": "Discussion of selection bias after testing many configurations, with suggestions for walk-forward validation, purging, embargo, and combinatorial cross-validation. It supplies validation lessons but no complete transferable SPY, QQQ, or MES rule set."
+    }
+  ],
+  "limits": {
+    "youtube_results_per_query": 2,
+    "x_results_per_query": 10,
+    "maximum_text_characters": 6000
+  },
+  "governance": {
+    "automatic_promotion": false,
+    "execution_enabled": false,
+    "can_submit_orders": false,
+    "social_claims_are_edge_evidence": false
+  }
+}

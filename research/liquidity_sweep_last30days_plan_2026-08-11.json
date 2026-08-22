@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "liquidity sweep trading stop run prior day high low",
+      "ranking_query": "What mechanical liquidity-sweep definitions, confirmations, failure modes, and evidence are traders using?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "index",
+      "search_query": "SPY SPX ES liquidity sweep order flow",
+      "ranking_query": "How are liquidity sweeps applied to SPY, SPX, and ES, and which claims are testable with point-in-time data?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.8
+    },
+    {
+      "label": "validation",
+      "search_query": "liquidity sweep strategy backtest failed breakout",
+      "ranking_query": "What backtests or event studies support or contradict liquidity-sweep trading claims after costs?",
+      "sources": ["reddit", "youtube", "hackernews"],
+      "weight": 0.8
+    },
+    {
+      "label": "implementation",
+      "search_query": "liquidity sweep algorithm volume confirmation market structure",
+      "ranking_query": "Which features make a liquidity-sweep detector reproducible without lookahead bias?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.6
+    }
+  ]
+}

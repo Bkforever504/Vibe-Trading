@@ -1,0 +1,35 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "validation",
+      "search_query": "algorithmic trading bot walk forward slippage forward test exact rules",
+      "ranking_query": "Which automated traders publish reproducible validation, execution, and risk controls rather than screenshots?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "execution",
+      "search_query": "trading automation execution fills slippage exits kill switch",
+      "ranking_query": "What concrete execution and exit practices separate robust trading automation from attractive backtests?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram"],
+      "weight": 0.8
+    },
+    {
+      "label": "track_record",
+      "search_query": "systematic trader verified track record losing months drawdown risk",
+      "ranking_query": "Which creators disclose losses, drawdowns, forward results, and normalized risk well enough to support further research?",
+      "sources": ["x", "youtube", "reddit", "tiktok", "instagram"],
+      "weight": 0.7
+    },
+    {
+      "label": "markets",
+      "search_query": "SPY QQQ MES automated strategy entry exit stop transaction costs",
+      "ranking_query": "Which public SPY, QQQ, or MES strategies contain exact entry, exit, stop, timing, and cost assumptions?",
+      "sources": ["reddit", "x", "youtube", "tiktok"],
+      "weight": 0.7
+    }
+  ]
+}

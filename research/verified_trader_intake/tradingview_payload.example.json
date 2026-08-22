@@ -1,0 +1,16 @@
+{
+  "external_id": "replace-with-unique-alert-id",
+  "event_type": "signal",
+  "trader_id": "cooperating-trader-id",
+  "handle": "cooperating-trader-handle",
+  "platform": "tradingview",
+  "source_timestamp": "2026-07-25T14:35:00Z",
+  "symbol": "SPY",
+  "asset_class": "equity",
+  "direction": "LONG",
+  "price": 640.25,
+  "observed_market_price": 640.30,
+  "stop_price": 639.75,
+  "target_price": 641.25,
+  "strategy": "frozen-strategy-name"
+}

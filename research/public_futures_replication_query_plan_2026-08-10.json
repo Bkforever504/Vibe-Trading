@@ -1,0 +1,35 @@
+{
+  "intent": "how_to",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "MES ES futures exact strategy rules profitable trader",
+      "ranking_query": "Which public MES or ES futures strategies disclose exact entries, invalidations, exits, and losing conditions?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "initial_balance",
+      "search_query": "ES futures initial balance failed breakout VWAP reclaim strategy",
+      "ranking_query": "What exact initial-balance failure and VWAP reclaim rules do public futures traders use?",
+      "sources": ["reddit", "youtube", "x"],
+      "weight": 0.8
+    },
+    {
+      "label": "auction",
+      "search_query": "ES futures failed auction value area POC volume profile strategy",
+      "ranking_query": "How do public auction-market traders define a failed auction, entry confirmation, stop, and target?",
+      "sources": ["youtube", "reddit", "x"],
+      "weight": 0.8
+    },
+    {
+      "label": "opening_drive",
+      "search_query": "ES futures opening drive pullback strategy VWAP volume",
+      "ranking_query": "What mechanical opening-drive pullback rules are publicly disclosed and reproducible?",
+      "sources": ["youtube", "reddit", "tiktok"],
+      "weight": 0.7
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "none",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "systematic SPY SPX QQQ options edge execution exits",
+      "ranking_query": "Which repeatable systematic options processes are traders using, and what evidence exists after realistic execution costs?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "exit_quality",
+      "search_query": "0DTE options exit quality underlying stop MFE MAE time stop",
+      "ranking_query": "How are systematic traders distinguishing failed trades from temporary adverse movement and improving exit capture?",
+      "sources": ["reddit", "x", "youtube"],
+      "weight": 0.8
+    },
+    {
+      "label": "market_weaknesses",
+      "search_query": "options volatility risk premium dealer gamma intraday seasonality order flow",
+      "ranking_query": "Which market weaknesses are structurally motivated and measurable rather than retrospective chart patterns?",
+      "sources": ["reddit", "x", "youtube", "hackernews"],
+      "weight": 0.8
+    },
+    {
+      "label": "validation",
+      "search_query": "algorithmic options walk forward overfitting slippage transaction costs",
+      "ranking_query": "What validation and execution practices prevent apparent options edges from disappearing in forward trading?",
+      "sources": ["reddit", "youtube", "hackernews"],
+      "weight": 0.7
+    }
+  ]
+}

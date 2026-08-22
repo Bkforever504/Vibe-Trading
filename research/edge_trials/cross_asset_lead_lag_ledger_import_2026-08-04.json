@@ -1,0 +1,67 @@
+[
+  {
+    "edge_id": "cross_asset_lead_lag_spy",
+    "hypothesis": "A delayed extreme SPY five-minute return predicts the next MES five-minute return in the same direction after costs.",
+    "variant": "XLEAD-SPY-001",
+    "stage": "in_sample",
+    "dataset_start": "2026-05-08",
+    "dataset_end": "2026-08-04",
+    "cost_model": "Observed MES BBO plus $2.48 round-trip commission; doubled commission and one tick per side stress",
+    "metrics": {"trade_count": 292, "expectancy": -2.732568, "profit_factor": 0.80111, "p_value": 0.9044798156, "development_survivor": false, "double_cost_expectancy": -7.712568},
+    "parameters": {"leader": "SPY", "relation": 1, "bar_minutes": 5, "lag_bars": 1, "z_threshold": 1.5},
+    "source": "data/cross_asset_lead_lag_results.json",
+    "code_version": "CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04"
+  },
+  {
+    "edge_id": "cross_asset_lead_lag_qqq",
+    "hypothesis": "A delayed extreme QQQ five-minute return predicts the next MES five-minute return in the same direction after costs.",
+    "variant": "XLEAD-QQQ-001",
+    "stage": "in_sample",
+    "dataset_start": "2026-05-08",
+    "dataset_end": "2026-08-04",
+    "cost_model": "Observed MES BBO plus $2.48 round-trip commission; doubled commission and one tick per side stress",
+    "metrics": {"trade_count": 293, "expectancy": -4.41686, "profit_factor": 0.697296, "p_value": 0.9837547417, "development_survivor": false, "double_cost_expectancy": -9.39686},
+    "parameters": {"leader": "QQQ", "relation": 1, "bar_minutes": 5, "lag_bars": 1, "z_threshold": 1.5},
+    "source": "data/cross_asset_lead_lag_results.json",
+    "code_version": "CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04"
+  },
+  {
+    "edge_id": "cross_asset_lead_lag_hyg",
+    "hypothesis": "A delayed extreme HYG five-minute return predicts the next MES five-minute return in the same direction after costs.",
+    "variant": "XLEAD-HYG-001",
+    "stage": "in_sample",
+    "dataset_start": "2026-05-08",
+    "dataset_end": "2026-08-04",
+    "cost_model": "Observed MES BBO plus $2.48 round-trip commission; doubled commission and one tick per side stress",
+    "metrics": {"trade_count": 290, "expectancy": -3.846379, "profit_factor": 0.712175, "p_value": 0.9782162997, "development_survivor": false, "double_cost_expectancy": -8.826379},
+    "parameters": {"leader": "HYG", "relation": 1, "bar_minutes": 5, "lag_bars": 1, "z_threshold": 1.5},
+    "source": "data/cross_asset_lead_lag_results.json",
+    "code_version": "CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04"
+  },
+  {
+    "edge_id": "cross_asset_lead_lag_tlt",
+    "hypothesis": "A delayed extreme TLT five-minute return predicts the next MES five-minute return in the opposite direction after costs.",
+    "variant": "XLEAD-TLT-001",
+    "stage": "in_sample",
+    "dataset_start": "2026-05-08",
+    "dataset_end": "2026-08-04",
+    "cost_model": "Observed MES BBO plus $2.48 round-trip commission; doubled commission and one tick per side stress",
+    "metrics": {"trade_count": 265, "expectancy": -0.281887, "profit_factor": 0.976441, "p_value": 0.5492835738, "development_survivor": false, "double_cost_expectancy": -5.261887},
+    "parameters": {"leader": "TLT", "relation": -1, "bar_minutes": 5, "lag_bars": 1, "z_threshold": 1.5},
+    "source": "data/cross_asset_lead_lag_results.json",
+    "code_version": "CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04"
+  },
+  {
+    "edge_id": "cross_asset_lead_lag_vix",
+    "hypothesis": "A delayed extreme VIX five-minute return predicts the next MES five-minute return in the opposite direction after costs.",
+    "variant": "XLEAD-VIX-001",
+    "stage": "in_sample",
+    "dataset_start": "2026-05-08",
+    "dataset_end": "2026-08-04",
+    "cost_model": "Observed MES BBO plus $2.48 round-trip commission; doubled commission and one tick per side stress",
+    "metrics": {"trade_count": 609, "expectancy": -3.795681, "profit_factor": 0.678292, "p_value": 0.9991424736, "development_survivor": false, "double_cost_expectancy": -8.775681},
+    "parameters": {"leader": "^VIX", "relation": -1, "bar_minutes": 5, "lag_bars": 1, "z_threshold": 1.5},
+    "source": "data/cross_asset_lead_lag_results.json",
+    "code_version": "CROSS_ASSET_LEAD_LAG_PREREGISTRATION_2026-08-04"
+  }
+]

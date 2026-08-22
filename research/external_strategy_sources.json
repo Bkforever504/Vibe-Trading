@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-08-17",
+  "sources": [
+    {
+      "source_id": "cboe_putwrite_methodology",
+      "name": "Cboe S&P 500 PutWrite Index Methodology",
+      "source_kind": "index_methodology",
+      "role": "benchmark",
+      "replication_scope": "exact",
+      "primary_urls": [
+        "https://cdn.cboe.com/api/global/us_indices/governance/Cboe_SP_500_PutWrite_Indices_Methodology.pdf",
+        "https://cdn.cboe.com/resources/indices/factsheet/CboeGlobalIndices_PUT-Index.pdf"
+      ],
+      "evidence": {
+        "rules_exact": true,
+        "rule_completeness": 1.0,
+        "independent_verification": 0.9,
+        "transaction_cost_realism": 0.7,
+        "holdout_quality": 0.7,
+        "point_in_time_data": 0.9,
+        "license_clarity": 0.8,
+        "complete_loss_history": 1.0
+      },
+      "licensing": {
+        "license": "published_index_methodology",
+        "implementation_permission": "research_only",
+        "notes": "Use as a transparent benchmark; Cboe names and index values are not bot marketing assets."
+      },
+      "track_record": {
+        "status": "official_index_history_with_backtested_prelaunch_period",
+        "caveat": "The index launched in 2007; earlier values are backtested and index execution is not a retail fill record."
+      },
+      "teachings": [
+        "Benchmark short-volatility systems against collateralized, mechanically priced put writing.",
+        "Use a documented quote window and collateral return instead of assuming midpoint fills."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "options_stack",
+          "use": "benchmark_only",
+          "implementation_mode": "read_only_comparison",
+          "artifact": "research/spx_weekly_atr_put_spread_lab.py"
+        }
+      ],
+      "forbidden_uses": ["direct_live_signal", "performance_guarantee", "automatic_promotion"]
+    },
+    {
+      "source_id": "aqr_century_trend_following",
+      "name": "A Century of Evidence on Trend-Following Investing",
+      "source_kind": "peer_reviewed_research",
+      "role": "research_hypothesis",
+      "replication_scope": "exact",
+      "primary_urls": [
+        "https://www.aqr.com/insights/research/journal-article/a-century-of-evidence-on-trend-following-investing",
+        "https://w4.stern.nyu.edu/facdir/lpederse/papers/TimeSeriesMomentum.pdf"
+      ],
+      "evidence": {
+        "rules_exact": true,
+        "rule_completeness": 0.85,
+        "independent_verification": 1.0,
+        "transaction_cost_realism": 0.7,
+        "holdout_quality": 0.8,
+        "point_in_time_data": 0.8,
+        "license_clarity": 0.5,
+        "complete_loss_history": 0.9
+      },
+      "licensing": {
+        "license": "paper_methodology",
+        "implementation_permission": "research_only",
+        "notes": "Reimplement the public idea; do not copy paper text or proprietary AQR products."
+      },
+      "track_record": {
+        "status": "long_horizon_research_backtest",
+        "caveat": "A later Journal of Financial Economics paper disputes asset-level time-series predictability; treat the result as a hypothesis, not settled law."
+      },
+      "teachings": [
+        "Diversified trend signals are more defensible across markets and horizons than one intraday breakout rule.",
+        "Volatility scaling and portfolio diversification are part of the strategy, not optional packaging."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "swing_cash_sleeve",
+          "use": "trend_challenger",
+          "implementation_mode": "cost_aware_shadow_replay",
+          "artifact": "research/pyquant_strategy_family_lab.py"
+        }
+      ],
+      "forbidden_uses": ["claiming_a_unique_edge", "leverage_without_clustered_risk_review", "automatic_promotion"]
+    },
+    {
+      "source_id": "jegadeesh_titman_momentum",
+      "name": "Returns to Buying Winners and Selling Losers",
+      "source_kind": "peer_reviewed_research",
+      "role": "research_hypothesis",
+      "replication_scope": "exact",
+      "primary_urls": [
+        "https://onlinelibrary.wiley.com/doi/10.1111/j.1540-6261.1993.tb04702.x"
+      ],
+      "evidence": {
+        "rules_exact": true,
+        "rule_completeness": 0.9,
+        "independent_verification": 1.0,
+        "transaction_cost_realism": 0.55,
+        "holdout_quality": 0.8,
+        "point_in_time_data": 0.85,
+        "license_clarity": 0.5,
+        "complete_loss_history": 0.9
+      },
+      "licensing": {
+        "license": "paper_methodology",
+        "implementation_permission": "research_only",
+        "notes": "Public factor definition may be independently reimplemented."
+      },
+      "track_record": {
+        "status": "peer_reviewed_factor_evidence",
+        "caveat": "Factor evidence does not establish profitability for a small, concentrated ETF universe after modern costs."
+      },
+      "teachings": [
+        "Measure medium-horizon relative strength and execute after signal formation.",
+        "Expect momentum crashes and long drawdowns; use cash and breadth overlays rather than tight per-trade stops."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "swing_cash_sleeve",
+          "use": "cross_sectional_momentum_challenger",
+          "implementation_mode": "cost_aware_shadow_replay",
+          "artifact": "research/swing_cash_sleeve_lab.py"
+        }
+      ],
+      "forbidden_uses": ["lookahead_constituents", "ignoring_delistings", "automatic_promotion"]
+    },
+    {
+      "source_id": "huang_li_zhou_tsmom_challenge",
+      "name": "Time Series Momentum: Is It There?",
+      "source_kind": "peer_reviewed_research",
+      "role": "falsification_evidence",
+      "replication_scope": "none",
+      "primary_urls": [
+        "https://doi.org/10.1016/j.jfineco.2019.08.004"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.8,
+        "independent_verification": 1.0,
+        "transaction_cost_realism": 0.6,
+        "holdout_quality": 0.8,
+        "point_in_time_data": 0.8,
+        "license_clarity": 0.5,
+        "complete_loss_history": 0.8
+      },
+      "licensing": {
+        "license": "paper_findings",
+        "implementation_permission": "research_only",
+        "notes": "Use to challenge trend attribution, not as a signal."
+      },
+      "track_record": {
+        "status": "contrary_peer_reviewed_evidence",
+        "caveat": "The paper argues much of time-series momentum profitability resembles the assets' unconditional mean returns."
+      },
+      "teachings": [
+        "Compare a trend strategy with unconditional long exposure and matched-volatility benchmarks.",
+        "Do not label beta or historical drift as timing alpha."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "research_pipeline",
+          "use": "mandatory_falsification_benchmark",
+          "implementation_mode": "diagnostic_only",
+          "artifact": "research/pyquant_strategy_family_lab.py"
+        }
+      ],
+      "forbidden_uses": ["signal_generation", "automatic_promotion"]
+    },
+    {
+      "source_id": "alpha_architect_quality_momentum",
+      "name": "Alpha Architect Quantitative Momentum Methodology",
+      "source_kind": "published_investment_process",
+      "role": "research_hypothesis",
+      "replication_scope": "proxy",
+      "primary_urls": [
+        "https://funds.alphaarchitect.com/wp-content/uploads/compliance/etf/education/investment_case_qmom.pdf"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.75,
+        "independent_verification": 0.7,
+        "transaction_cost_realism": 0.7,
+        "holdout_quality": 0.65,
+        "point_in_time_data": 0.7,
+        "license_clarity": 0.6,
+        "complete_loss_history": 0.8
+      },
+      "licensing": {
+        "license": "published_process_summary",
+        "implementation_permission": "proxy_research_only",
+        "notes": "The repo implements a labeled smooth-momentum proxy, not the fund or its proprietary portfolio."
+      },
+      "track_record": {
+        "status": "live_fund_plus_published_research_case",
+        "caveat": "Fund returns mix methodology, portfolio construction, fees, and implementation; they do not verify the repo proxy."
+      },
+      "teachings": [
+        "Prefer persistent momentum built from many small gains over one discontinuous price jump.",
+        "Separate signal strength from signal quality and test both out of sample."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "swing_cash_sleeve",
+          "use": "smooth_momentum_proxy_challenger",
+          "implementation_mode": "shadow_research_only",
+          "artifact": "research/pyquant_strategy_family_lab.py"
+        }
+      ],
+      "forbidden_uses": ["calling_proxy_qmom", "fund_track_record_attribution", "automatic_promotion"]
+    },
+    {
+      "source_id": "robert_carver_systematic_trading",
+      "name": "Robert Carver Systematic Trading and pysystemtrade",
+      "source_kind": "book_and_open_source_framework",
+      "role": "process_control",
+      "replication_scope": "process",
+      "primary_urls": [
+        "https://www.harriman-house.com/systematic-trading",
+        "https://github.com/pst-group/pysystemtrade"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.85,
+        "independent_verification": 0.7,
+        "transaction_cost_realism": 0.9,
+        "holdout_quality": 0.7,
+        "point_in_time_data": 0.7,
+        "license_clarity": 1.0,
+        "complete_loss_history": 0.6
+      },
+      "licensing": {
+        "license": "GPL-3.0 for pysystemtrade",
+        "implementation_permission": "concepts_and_compatible_code_only",
+        "notes": "No pysystemtrade code is copied into this repo. GPL compatibility must be reviewed before any code reuse."
+      },
+      "track_record": {
+        "status": "practitioner_process_not_signal_track_record",
+        "caveat": "The value is portfolio engineering, not a promise that a particular forecast is profitable."
+      },
+      "teachings": [
+        "Forecast scaling, volatility targeting, diversification, and trading costs must be modeled together.",
+        "Slow the strategy when turnover costs consume the forecast."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "portfolio_governor",
+          "use": "clustered_risk_and_cost_control",
+          "implementation_mode": "adopted_process_control",
+          "artifact": "scripts/clustered_portfolio_monte_carlo.py"
+        }
+      ],
+      "forbidden_uses": ["performance_claim", "unreviewed_gpl_code_copy", "automatic_promotion"]
+    },
+    {
+      "source_id": "quantconnect_lean_reality_models",
+      "name": "QuantConnect LEAN Reality Modeling",
+      "source_kind": "official_open_source_documentation",
+      "role": "engineering_reference",
+      "replication_scope": "process",
+      "primary_urls": [
+        "https://github.com/QuantConnect/Lean",
+        "https://www.quantconnect.com/docs/v2/writing-algorithms/reality-modeling/slippage/key-concepts",
+        "https://www.quantconnect.com/docs/v2/writing-algorithms/live-trading/reconciliation"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 1.0,
+        "independent_verification": 0.8,
+        "transaction_cost_realism": 1.0,
+        "holdout_quality": 0.6,
+        "point_in_time_data": 0.8,
+        "license_clarity": 1.0,
+        "complete_loss_history": 0.5
+      },
+      "licensing": {
+        "license": "Apache-2.0",
+        "implementation_permission": "permissive_with_attribution",
+        "notes": "Use documented concepts or separately reviewed code with required notices."
+      },
+      "track_record": {
+        "status": "engineering_framework_not_trader_track_record",
+        "caveat": "Default fill and slippage settings are not proof of executable performance."
+      },
+      "teachings": [
+        "Backtests must use explicit slippage, fees, stale-quote handling, and order-state reconciliation.",
+        "A zero-slippage default is a configuration hazard, not a conservative assumption."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "all_bots",
+          "use": "execution_reality_model",
+          "implementation_mode": "adopted_process_control",
+          "artifact": "research/options_limit_execution_lab.py"
+        },
+        {
+          "bot_id": "all_bots",
+          "use": "live_shadow_reconciliation",
+          "implementation_mode": "read_only_diagnostic",
+          "artifact": "scripts/execution_seasonality_report.py"
+        }
+      ],
+      "forbidden_uses": ["zero_slippage_backtest", "instant_fill_assumption", "automatic_promotion"]
+    },
+    {
+      "source_id": "euan_sinclair_volatility_trading",
+      "name": "Euan Sinclair Volatility Trading",
+      "source_kind": "practitioner_book",
+      "role": "process_control",
+      "replication_scope": "process",
+      "primary_urls": [
+        "https://onlinelibrary.wiley.com/doi/book/10.1002/9781118662724"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.75,
+        "independent_verification": 0.7,
+        "transaction_cost_realism": 0.9,
+        "holdout_quality": 0.6,
+        "point_in_time_data": 0.7,
+        "license_clarity": 0.7,
+        "complete_loss_history": 0.7
+      },
+      "licensing": {
+        "license": "copyrighted_book",
+        "implementation_permission": "concepts_only",
+        "notes": "Use concepts and original implementation; do not reproduce book text."
+      },
+      "track_record": {
+        "status": "practitioner_education",
+        "caveat": "A sound framework for volatility forecasting does not establish that this bot's premium estimate is accurate."
+      },
+      "teachings": [
+        "Compare maturity-matched implied volatility with a forward realized-volatility forecast net of friction.",
+        "Measure edge after skew, event risk, transaction costs, and position sizing."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "options_stack",
+          "use": "volatility_premium_measurement",
+          "implementation_mode": "adopted_read_only_measurement",
+          "artifact": "scripts/options_vol_premium_report.py"
+        }
+      ],
+      "forbidden_uses": ["iv_rank_as_atm_iv", "unmatched_horizon_comparison", "automatic_promotion"]
+    },
+    {
+      "source_id": "ernest_chan_algorithmic_trading",
+      "name": "Ernest Chan Algorithmic Trading and Quantitative Trading",
+      "source_kind": "practitioner_books",
+      "role": "process_control",
+      "replication_scope": "process",
+      "primary_urls": [
+        "https://onlinelibrary.wiley.com/doi/book/10.1002/9781118676998",
+        "https://onlinelibrary.wiley.com/doi/book/10.1002/9781119203377"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.8,
+        "independent_verification": 0.7,
+        "transaction_cost_realism": 0.85,
+        "holdout_quality": 0.8,
+        "point_in_time_data": 0.7,
+        "license_clarity": 0.7,
+        "complete_loss_history": 0.6
+      },
+      "licensing": {
+        "license": "copyrighted_books",
+        "implementation_permission": "concepts_only",
+        "notes": "Use validation principles and original code only."
+      },
+      "track_record": {
+        "status": "practitioner_education",
+        "caveat": "Examples are teaching material and require independent, current-regime replication."
+      },
+      "teachings": [
+        "Separate development, selection, and final test data and include realistic trading costs.",
+        "Prefer simple rules that survive walk-forward and parameter perturbation."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "research_pipeline",
+          "use": "frozen_public_rule_replication",
+          "implementation_mode": "adopted_process_control",
+          "artifact": "scripts/public_strategy_replication.py"
+        }
+      ],
+      "forbidden_uses": ["same_sample_optimization", "selective_result_reporting", "automatic_promotion"]
+    },
+    {
+      "source_id": "darwinex_sersan_discovery",
+      "name": "Darwinex Risk Engine and Sersan Sistemas Public Record",
+      "source_kind": "platform_verified_track_record_and_practitioner_media",
+      "role": "verified_track_record_discovery",
+      "replication_scope": "opaque",
+      "primary_urls": [
+        "https://help.darwinex.com/risk-adjustment-attribute",
+        "https://www.sersansistemas.com/syo-preguntas-y-respuestas/",
+        "https://www.sersansistemas.com/nuevo-algoritmo-de-money-management/",
+        "https://music.youtube.com/podcast/hYzRW3LsLzw"
+      ],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.25,
+        "independent_verification": 0.8,
+        "transaction_cost_realism": 0.8,
+        "holdout_quality": 0.65,
+        "point_in_time_data": 0.6,
+        "license_clarity": 0.6,
+        "complete_loss_history": 0.75
+      },
+      "licensing": {
+        "license": "proprietary_strategy_and_public_platform_controls",
+        "implementation_permission": "teachings_only",
+        "notes": "Exact entries are proprietary. Never infer or scrape private rules."
+      },
+      "track_record": {
+        "status": "platform_verified_but_strategy_opaque",
+        "caveat": "Darwinex risk-normalizes investor exposure; provider pages describe history but do not expose exact reproducible entries."
+      },
+      "teachings": [
+        "Normalize risk across strategies and reduce exposure when correlated positions increase portfolio leverage.",
+        "Track system changes as versioned regimes instead of presenting one stitched historical edge."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "portfolio_governor",
+          "use": "risk_normalization_reference",
+          "implementation_mode": "discovery_and_process_comparison",
+          "artifact": "scripts/clustered_portfolio_monte_carlo.py"
+        }
+      ],
+      "forbidden_uses": ["copy_trading_without_consent", "reverse_engineering_private_rules", "performance_guarantee"]
+    },
+    {
+      "source_id": "milkman_spx_atr_weekly",
+      "name": "Milkman Trades Weekly SPX -1 ATR Put Spread",
+      "source_kind": "public_practitioner_rule_set",
+      "role": "research_hypothesis",
+      "replication_scope": "exact",
+      "primary_urls": [
+        "https://milkmantrades.com/#strategies"
+      ],
+      "evidence": {
+        "rules_exact": true,
+        "rule_completeness": 0.95,
+        "independent_verification": 0.35,
+        "transaction_cost_realism": 0.45,
+        "holdout_quality": 0.45,
+        "point_in_time_data": 0.5,
+        "license_clarity": 0.7,
+        "complete_loss_history": 0.8
+      },
+      "licensing": {
+        "license": "public_rules_copyrighted_writeup",
+        "implementation_permission": "independent_research_replication",
+        "notes": "Rules may be independently tested; do not reproduce the article or charts."
+      },
+      "track_record": {
+        "status": "author_backtest_with_disclosed_losses",
+        "caveat": "The repo has not obtained historical executable SPX option quotes, so underlying settlement frequency cannot establish spread profitability."
+      },
+      "teachings": [
+        "Test whether downside option prices overcharge an adaptive weekly ATR boundary.",
+        "Cap tail loss with a long wing and report full-width losses, not just win rate."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "options_stack",
+          "use": "weekly_atr_spread_hypothesis",
+          "implementation_mode": "shadow_only_until_exact_quotes",
+          "artifact": "research/spx_weekly_atr_put_spread_lab.py"
+        }
+      ],
+      "forbidden_uses": ["constant_credit_backtest", "micro_account_live_trade", "automatic_promotion"]
+    },
+    {
+      "source_id": "social_trader_screenshots",
+      "name": "Social Media P&L Screenshots and Selective Trade Posts",
+      "source_kind": "youtube_reddit_x_social_claims",
+      "role": "social_claim",
+      "replication_scope": "none",
+      "primary_urls": [],
+      "evidence": {
+        "rules_exact": false,
+        "rule_completeness": 0.1,
+        "independent_verification": 0.0,
+        "transaction_cost_realism": 0.1,
+        "holdout_quality": 0.0,
+        "point_in_time_data": 0.1,
+        "license_clarity": 0.2,
+        "complete_loss_history": 0.0
+      },
+      "licensing": {
+        "license": "unknown",
+        "implementation_permission": "none_without_explicit_public_rules",
+        "notes": "Use only to discover a claim that can be restated as frozen public rules."
+      },
+      "track_record": {
+        "status": "unverified_and_selective",
+        "caveat": "Screenshots do not establish deposits, withdrawals, hidden losses, survivorship, fills, or reproducibility."
+      },
+      "teachings": [
+        "Translate any interesting claim into exact rules before testing it.",
+        "Require broker exports, complete history, costs, and consent before studying a trader record."
+      ],
+      "bot_mappings": [
+        {
+          "bot_id": "verified_trader_pipeline",
+          "use": "discovery_intake_only",
+          "implementation_mode": "quarantine_until_verified",
+          "artifact": "scripts/verified_trader_intake.py"
+        }
+      ],
+      "forbidden_uses": ["copy_trade", "training_label", "performance_claim", "automatic_promotion"]
+    }
+  ]
+}
