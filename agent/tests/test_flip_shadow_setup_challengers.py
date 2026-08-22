@@ -152,3 +152,52 @@ def test_flip_builder_attaches_option_contract_but_keeps_shadow_authority(monkey
     assert setup["live_execution_allowed"] is False
     assert setup["execution_enabled"] is False
     assert setup["can_submit_orders"] is False
+
+
+def test_paired_direction_builder_attaches_opposite_contract_without_authority(monkeypatch) -> None:
+    from strategies import flip_bot
+
+    monkeypatch.setattr(flip_bot, "SHADOW_PAIRED_DIRECTION_ENABLED", True)
+    monkeypatch.setattr(
+        flip_bot,
+        "_matched_opposite_option",
+        lambda symbol, right, source: (f"{symbol}260716P00095000", 95.0, "2026-07-16", 0.001),
+    )
+    monkeypatch.setattr(
+        flip_bot,
+        "_synchronized_direction_quotes",
+        lambda source, opposite, diagnostics=None: {
+            source: {
+                "selection_bid": 0.49, "selection_ask": 0.51, "entry_price_est": 0.50,
+                "quote_timestamp": "2026-07-16T14:00:00Z", "quote_age_seconds": 1.0,
+            },
+            opposite: {
+                "selection_bid": 0.39, "selection_ask": 0.41, "entry_price_est": 0.40,
+                "quote_timestamp": "2026-07-16T14:00:00Z", "quote_age_seconds": 1.0,
+            },
+        },
+    )
+
+    source = {
+        "strategy": "0dte", "right": "CALL", "option_symbol": "source-call",
+        "strike": 105.0, "expiry": "2026-07-16",
+    }
+    setup = flip_bot._build_paired_direction_shadow_setup(
+        10_000,
+        "SPY",
+        source,
+        decision_pair_id="pair-1",
+    )
+
+    assert setup is not None
+    assert setup["right"] == "PUT"
+    assert setup["contracts"] == 1
+    assert setup["decision_lattice_role"] == "opposite_direction"
+    assert setup["paired_source_right"] == "CALL"
+    assert setup["decision_pair_id"] == "pair-1"
+    assert setup["pair_sync_status"] == "synchronized_forward"
+    assert source["decision_pair_id"] == "pair-1"
+    assert source["entry_price_est"] == 0.50
+    assert setup["live_execution_allowed"] is False
+    assert setup["execution_enabled"] is False
+    assert setup["can_submit_orders"] is False

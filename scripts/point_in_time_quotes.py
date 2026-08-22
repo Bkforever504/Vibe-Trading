@@ -21,6 +21,8 @@ Providers:
 - alpaca_options_snapshot_v1beta1 (default): latest quote/trade, greeks,
   implied volatility, open interest and daily volume where the API returns
   them.
+- tradier_marketdata_quotes_v1: production consolidated US option quotes for
+  Tradier brokerage account holders. This adapter has no order endpoints.
 - Additional vendors implement `fetch_fn(occ_symbol) -> (payload, meta)` and
   a parser; the record schema stays identical.
 """
@@ -35,12 +37,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from scripts.tradier_options_data import (
+    PROVIDER_TRADIER,
+    TRADIER_QUOTE_SCOPE,
+    configured_quote_provider,
+    fetch_option_snapshot as fetch_tradier_option_snapshot,
+    fetch_underlying_price as fetch_tradier_underlying_price,
+)
+
 log = logging.getLogger("point-in-time-quotes")
 
 SCHEMA_VERSION = 1
 LIFECYCLE_EVENTS = ("signal", "fill", "monitor", "exit")
 PROVIDER_ALPACA = "alpaca_options_snapshot_v1beta1"
-ALPACA_OPTIONS_FEED = "indicative"
+ALPACA_OPTIONS_FEED = os.getenv("ALPACA_OPTIONS_FEED", "indicative").strip().lower()
+if ALPACA_OPTIONS_FEED not in {"indicative", "opra"}:
+    ALPACA_OPTIONS_FEED = "indicative"
 ALPACA_STOCK_FEED = "iex"
 ALPACA_OPTIONS_SNAPSHOT_URL = "https://data.alpaca.markets/v1beta1/options/snapshots"
 ALPACA_STOCK_TRADE_LATEST_URL = "https://data.alpaca.markets/v2/stocks/{symbol}/trades/latest"
@@ -54,6 +66,13 @@ DEFAULT_SAMPLES_PATH = Path(
 _QUOTE_FIELDS = ("bid", "ask", "bid_size", "ask_size", "quote_timestamp")
 _GREEK_FIELDS = ("delta", "gamma", "theta", "vega", "rho")
 _APPEND_LOCK = threading.Lock()
+
+
+def option_quote_scope(feed: str | None = None, *, provider: str | None = None) -> str:
+    if provider == "tradier" or (provider is None and feed is None and configured_quote_provider() == "tradier"):
+        return TRADIER_QUOTE_SCOPE
+    selected = str(feed or ALPACA_OPTIONS_FEED).strip().lower()
+    return "alpaca_opra_nbbo" if selected == "opra" else "indicative_modified_not_opra_nbbo"
 
 
 def _utc_now() -> datetime:
@@ -186,7 +205,7 @@ def parse_alpaca_option_snapshot(
         "provenance": {
             "provider": PROVIDER_ALPACA,
             "feed": ALPACA_OPTIONS_FEED,
-            "quote_scope": "indicative_modified_not_opra_nbbo",
+            "quote_scope": option_quote_scope(provider="alpaca"),
             "status": status,
             "missing_fields": missing,
         },
@@ -205,7 +224,7 @@ def fetch_alpaca_option_snapshot(
     meta: dict[str, Any] = {
         "endpoint": ALPACA_OPTIONS_SNAPSHOT_URL,
         "feed": ALPACA_OPTIONS_FEED,
-        "quote_scope": "indicative_modified_not_opra_nbbo",
+        "quote_scope": option_quote_scope(provider="alpaca"),
         "http_status": None,
     }
     try:
@@ -328,19 +347,36 @@ def capture_lifecycle_sample(
     """
     try:
         captured_at = _utc_now()
+        selected_provider = configured_quote_provider()
+        parsed = None
         if fetch_fn is not None:
             try:
                 payload, meta = fetch_fn(occ_symbol)
             except Exception as exc:
                 payload, meta = None, {"error": str(exc)[:200]}
+        elif selected_provider == "tradier":
+            try:
+                parsed, meta = fetch_tradier_option_snapshot(occ_symbol)
+            except Exception as exc:
+                parsed, meta = None, {
+                    "provider": PROVIDER_TRADIER,
+                    "feed": "production_consolidated",
+                    "quote_scope": TRADIER_QUOTE_SCOPE,
+                    "error": str(exc)[:200],
+                }
+            payload = None
         elif headers:
             payload, meta = fetch_alpaca_option_snapshot(occ_symbol, headers)
         else:
             payload, meta = None, {"error": "no_headers_and_no_fetch_fn"}
 
-        if payload is not None:
+        if parsed is not None:
+            pass
+        elif payload is not None:
             parsed = parse_alpaca_option_snapshot(occ_symbol, payload, captured_at)
         else:
+            unavailable_provider = PROVIDER_TRADIER if selected_provider == "tradier" else PROVIDER_ALPACA
+            unavailable_feed = "production_consolidated" if selected_provider == "tradier" else ALPACA_OPTIONS_FEED
             parsed = {
                 "quote": None,
                 "trade": None,
@@ -349,16 +385,26 @@ def capture_lifecycle_sample(
                 "open_interest": None,
                 "volume": None,
                 "provenance": {
-                    "provider": PROVIDER_ALPACA,
-                    "feed": ALPACA_OPTIONS_FEED,
-                    "quote_scope": "indicative_modified_not_opra_nbbo",
+                    "provider": unavailable_provider,
+                    "feed": unavailable_feed,
+                    "quote_scope": option_quote_scope(),
                     "status": "unavailable",
                     "missing_fields": ["all"],
                 },
             }
 
         underlying = None
-        if underlying_symbol and headers:
+        if underlying_symbol and selected_provider == "tradier":
+            try:
+                underlying = fetch_tradier_underlying_price(underlying_symbol)
+            except Exception:
+                underlying = {
+                    "symbol": underlying_symbol,
+                    "price": None,
+                    "price_timestamp": None,
+                    "source": PROVIDER_TRADIER,
+                }
+        elif underlying_symbol and headers:
             underlying = fetch_alpaca_underlying_price(underlying_symbol, headers)
         elif underlying_symbol:
             underlying = {"symbol": underlying_symbol, "price": None, "price_timestamp": None, "source": "unavailable"}

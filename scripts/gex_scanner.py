@@ -1,17 +1,17 @@
 """
-GEX (Gamma Exposure) Scanner — computes from Alpaca options chain.
+GEX (Gamma Exposure) Scanner - computes a research proxy from Alpaca options.
 
 No trading. Prints GEX levels to console and appends to data/gex_scan_log.jsonl
 
-GEX formula:
+Proxy formula:
   GEX per strike = gamma * open_interest * 100 (contract size)
-  Call GEX = positive (market makers long gamma → stabilizing)
-  Put GEX  = negative (market makers short gamma → amplifying)
+  Call GEX = positive and put GEX = negative by explicit sign assumption.
   Net GEX at strike = call_GEX - put_GEX
-  GEX wall = strike with largest |net GEX| = price magnet / bounce level
-  Total net GEX sign:
-    Positive = dealers long gamma → buy dips, sell rips → range-bound expected
-    Negative = dealers short gamma → amplify moves → trending/volatile expected
+  GEX wall proxy = strike with largest |net GEX|.
+
+Open interest does not identify dealer inventory or trade direction. The output
+is shadow-only context and must not describe a level as support/resistance or a
+net sign as observed dealer positioning.
 
 Run at market open (09:35 ET) to get key intraday levels.
 Symbols: SPY, QQQ, IWM
@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -179,8 +179,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
     sorted_strikes = sorted(strike_gex.items(), key=lambda x: x[0])
     net_gex = sum(strike_gex.values())
 
-    # Gamma flip: strike where cumulative net GEX crosses zero (dealers flip long <-> short)
-    # Below this price = dealers short gamma = amplify moves. Above = long gamma = pin/dampen.
+    # Cumulative strike proxy crossing. This is not a spot-revalued gamma flip:
+    # the calculation does not recompute every contract's gamma across spot levels.
     gamma_flip = None
     cum = 0.0
     for i, (s, g) in enumerate(sorted_strikes):
@@ -217,10 +217,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         "dealer_positioning_observed": False,
         "sign_assumption": "calls_positive_puts_negative",
         "gamma_flip": gamma_flip,
-        "gamma_flip_regime": (
-            "above_flip_range_bound" if gamma_flip and float(next(iter(sorted_strikes))[0]) > gamma_flip else
-            "below_flip_amplify" if gamma_flip else "unknown"
-        ),
+        "gamma_flip_method": "cumulative_strike_gex_crossing_proxy_not_spot_revaluation",
+        "gamma_flip_regime": "unavailable_without_spot_revaluation",
         "net_gex": round(net_gex, 2),
         "net_gex_regime": "positive" if net_gex > 0 else "negative",
         "net_gex_interpretation": (
@@ -231,7 +229,8 @@ def compute_gex(contracts: list[dict], *, as_of: date | None = None, min_oi_cove
         "gex_wall": {
             "strike": gex_wall_strike,
             "gex": round(gex_wall_value, 2),
-            "bias": "support" if gex_wall_value > 0 else "resistance",
+            "bias": "positive_proxy" if gex_wall_value > 0 else "negative_proxy",
+            "price_role": "unclassified",
         },
         "top_levels": top_levels,
     }
@@ -281,7 +280,11 @@ def main() -> int:
     print(f"Computing GEX from Alpaca options chain | {today}")
     results = [scan_symbol(sym) for sym in SYMBOLS]
     print_report(results)
-    entry = {"date": today, "timestamp": datetime.utcnow().isoformat() + "Z", "scans": results}
+    entry = {
+        "date": today,
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "scans": results,
+    }
     log_scan(entry)
     print(f"Logged to {LOG_PATH}")
     return 0

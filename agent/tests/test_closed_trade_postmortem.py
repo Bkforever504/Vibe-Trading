@@ -104,6 +104,29 @@ def test_score_flip_fast_stopout_labels_entry_regime_failure(monkeypatch) -> Non
     assert "consensus says stand_aside" in explanation["next_action"]
 
 
+def test_score_flip_accepts_broker_filled_average_price_as_fill_evidence(monkeypatch) -> None:
+    monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
+    trade = {
+        "id": "broker-fill",
+        "strategy": "bear_trend",
+        "symbol": "SPY",
+        "right": "PUT",
+        "contracts": 1,
+        "entry_price": 0.85,
+        "entry_price_source": "broker_fill",
+        "exit_price": 0.60,
+        "exit_price_source": "broker_filled_avg_price",
+        "pnl": -25.0,
+        "exit_reason": "STOP LOSS",
+        "exit_date": "2026-08-18",
+        "option_symbol": "SPYPUT",
+    }
+
+    explanation = post.score_flip_trade(trade)["pnl_explanation"]
+
+    assert explanation["pnl_source"] == "broker_fill"
+
+
 def test_score_iwm_trade_excludes_close_reason_estimate(monkeypatch) -> None:
     monkeypatch.setattr(post, "_latest_force_for_day", lambda day: {"classification": "bullish_confirmation"})
     trade = {

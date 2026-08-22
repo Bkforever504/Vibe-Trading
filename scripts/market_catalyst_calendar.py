@@ -26,6 +26,7 @@ REPORT_DIR = VIBE_HOME / "reports"
 REPORT_PATH = REPORT_DIR / "market-catalyst-calendar.json"
 LOG_PATH = ROOT / "data" / "market_catalyst_calendar_log.jsonl"
 DYNAMIC_RISK_PATH = REPORT_DIR / "geopolitical-risk-context.json"
+CALENDAR_COVERAGE_END = date(2026, 9, 30)
 
 # ---------------------------------------------------------------------------
 # Hardcoded 2026 macro calendar (July–December).
@@ -134,6 +135,83 @@ EVENTS_2026: list[dict[str, Any]] = [
         "caution_window_end": "09:30",
         "source": "https://www.bls.gov/schedule/news_release/cpi.htm",
         "notes": "Tentative. Confirm on BLS schedule closer to date.",
+    },
+    {
+        "date": "2026-08-13",
+        "time_et": "08:30",
+        "name": "PPI Release (July 2026)",
+        "impact": "high",
+        "veto_type": "pre_event",
+        "caution_window_start": "00:00",
+        "caution_window_end": "09:30",
+        "source": "https://www.bls.gov/schedule/news_release/ppi.htm",
+        "notes": "Official BLS release date. No new short premium before release.",
+    },
+    {
+        "date": "2026-08-26",
+        "time_et": "08:30",
+        "name": "GDP Second Estimate + Personal Income and Outlays (July 2026)",
+        "impact": "high",
+        "veto_type": "pre_event",
+        "caution_window_start": "00:00",
+        "caution_window_end": "09:30",
+        "source": "https://www.bea.gov/news/schedule/full",
+        "notes": "Official BEA release date. GDP and PCE data share the release window.",
+    },
+    {
+        "date": "2026-09-04",
+        "time_et": "08:30",
+        "name": "Employment Situation (August 2026)",
+        "impact": "high",
+        "veto_type": "pre_event",
+        "caution_window_start": "00:00",
+        "caution_window_end": "09:30",
+        "source": "https://www.bls.gov/schedule/2026/home.htm",
+        "notes": "Official BLS release date. No new short premium before release.",
+    },
+    {
+        "date": "2026-09-10",
+        "time_et": "08:30",
+        "name": "PPI Release (August 2026)",
+        "impact": "high",
+        "veto_type": "pre_event",
+        "caution_window_start": "00:00",
+        "caution_window_end": "09:30",
+        "source": "https://www.bls.gov/schedule/news_release/ppi.htm",
+        "notes": "Official BLS release date. No new short premium before release.",
+    },
+    {
+        "date": "2026-09-11",
+        "time_et": "08:30",
+        "name": "CPI Release (August 2026)",
+        "impact": "high",
+        "veto_type": "pre_event",
+        "caution_window_start": "00:00",
+        "caution_window_end": "09:30",
+        "source": "https://www.bls.gov/schedule/news_release/cpi.htm",
+        "notes": "Official BLS release date. Same-day short-premium expiry is prohibited.",
+    },
+    {
+        "date": "2026-09-15",
+        "time_et": "all_day",
+        "name": "FOMC Meeting Day 1",
+        "impact": "high",
+        "veto_type": "multi_day",
+        "caution_window_start": "00:00",
+        "caution_window_end": "23:59",
+        "source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+        "notes": "Official FOMC meeting date. No new short premium.",
+    },
+    {
+        "date": "2026-09-16",
+        "time_et": "14:00",
+        "name": "FOMC Decision + Powell Press Conference",
+        "impact": "high",
+        "veto_type": "multi_day",
+        "caution_window_start": "00:00",
+        "caution_window_end": "23:59",
+        "source": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+        "notes": "Official FOMC decision date. No new short premium.",
     },
 ]
 

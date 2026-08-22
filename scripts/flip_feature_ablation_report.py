@@ -29,6 +29,13 @@ CATEGORICAL_FEATURES = (
     "orb_direction",
     "ttm_state",
     "shadow_consensus_recommendation",
+    "day_type",
+    "market_force_classification",
+    "candlestick_bias",
+    "candlestick_primary_signal",
+    "htf_primary_bias",
+    "htf_intraday_alignment",
+    "catalyst_max_impact",
 )
 
 
@@ -63,6 +70,9 @@ def _feature_values(snapshot: dict[str, Any]) -> dict[str, bool]:
         value = snapshot.get(name)
         if value not in (None, ""):
             values[f"{name}__{_slug(value)}"] = True
+    for value in snapshot.get("candlestick_features") or []:
+        if value not in (None, ""):
+            values[f"candlestick_feature__{_slug(value)}"] = True
     breadth = _number(snapshot.get("breadth_count"))
     if breadth is not None:
         values["breadth_at_least_2"] = breadth >= 2
@@ -205,6 +215,7 @@ def build_report(trades_path: Path = TRADES_PATH, alpha: float = ALPHA) -> dict[
             "Legacy trades without schema-v1 entry feature telemetry remain insufficient and are never imputed.",
             "Review eligibility requires 30 known trades, 10 per group, positive lift, and Bonferroni significance.",
             "A review-eligible feature still requires an immutable OOS trial and explicit human approval before any behavior change.",
+            "Candlestick and market-structure categories are entry-time snapshots; stale or future context is never imputed.",
             "This report cannot promote features, change thresholds, or submit orders.",
         ],
     }

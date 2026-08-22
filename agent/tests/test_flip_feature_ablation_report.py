@@ -77,3 +77,21 @@ def test_categorical_feature_uses_other_known_category_as_absent(tmp_path: Path)
 
     assert bull["present_count"] == 20
     assert bull["absent_count"] == 20
+
+
+def test_market_structure_snapshot_expands_into_testable_categories() -> None:
+    values = report._feature_values({
+        "schema_version": 1,
+        "candlestick_bias": "bullish",
+        "candlestick_primary_signal": "bullish_liquidity_grab",
+        "candlestick_features": ["liquidity_sweep", "support_wick_rejection"],
+        "htf_primary_bias": "bullish",
+        "htf_intraday_alignment": "aligned",
+        "catalyst_max_impact": "none",
+    })
+
+    assert values["candlestick_bias__bullish"] is True
+    assert values["candlestick_primary_signal__bullish_liquidity_grab"] is True
+    assert values["candlestick_feature__liquidity_sweep"] is True
+    assert values["htf_intraday_alignment__aligned"] is True
+    assert values["catalyst_max_impact__none"] is True

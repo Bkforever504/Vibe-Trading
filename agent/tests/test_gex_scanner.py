@@ -61,5 +61,9 @@ def test_gex_reports_proxy_provenance_without_claiming_dealer_inventory() -> Non
     assert result["net_gex"] == 1500.0
     assert result["dealer_positioning_observed"] is False
     assert result["sign_assumption"] == "calls_positive_puts_negative"
+    assert result["gamma_flip_method"] == "cumulative_strike_gex_crossing_proxy_not_spot_revaluation"
+    assert result["gamma_flip_regime"] == "unavailable_without_spot_revaluation"
+    assert result["gex_wall"]["bias"] == "positive_proxy"
+    assert result["gex_wall"]["price_role"] == "unclassified"
     assert result["execution_enabled"] is False
     assert result["can_submit_orders"] is False

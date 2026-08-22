@@ -21,7 +21,12 @@ EXPECTED_MOVE_LOG = ROOT / "data" / "zero_dte_expected_move_context_log.jsonl"
 OPTIONS_HEATMAP_LOG = ROOT / "data" / "options_liquidation_heatmap_log.jsonl"
 LOG_PATH = ROOT / "data" / "adaptive_options_shadow_playbook_log.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "adaptive-options-shadow-playbook.json"
-DEFAULT_SYMBOLS = ["SPY", "QQQ"]
+# Match the union consumed by shadow consensus. Missing context must produce an
+# explicit stand-aside row instead of an ambiguous adaptive_playbook_missing.
+DEFAULT_SYMBOLS = [
+    "SPY", "QQQ", "IWM", "NVDA", "TSLA", "AAPL", "GOOGL", "META", "PLTR",
+    "RDDT", "MRNA", "HOOD", "COIN", "RIVN", "NFLX", "DDOG", "CRWD", "REGN",
+]
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -440,7 +445,7 @@ def evaluate_symbol_playbook(symbol: str, context: dict[str, Any]) -> dict[str, 
 
 
 def build_report(symbols: list[str] | None = None, contexts: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
-    symbols = symbols or DEFAULT_SYMBOLS
+    symbols = list(dict.fromkeys(symbol.upper() for symbol in (symbols or DEFAULT_SYMBOLS)))
     contexts = contexts if contexts is not None else build_contexts([symbol.upper() for symbol in symbols])
     rows = [evaluate_symbol_playbook(symbol, contexts.get(symbol.upper(), {})) for symbol in symbols]
     return {
@@ -452,6 +457,11 @@ def build_report(symbols: list[str] | None = None, contexts: dict[str, dict[str,
         "can_submit_orders": False,
         "symbol_count": len(rows),
         "actionable_shadow_count": sum(1 for row in rows if row.get("selected_playbook") != "none"),
+        "coverage": {
+            "requested_symbols": symbols,
+            "row_count": len(rows),
+            "missing_symbols": sorted(set(symbols) - {str(row.get("symbol")) for row in rows}),
+        },
         "rows": rows,
         "warnings": [
             "Read-only adaptive playbook selector. No broker orders are wired.",

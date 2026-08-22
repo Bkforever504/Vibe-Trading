@@ -25,7 +25,15 @@ sys.path.insert(0, str(ROOT))
 from scripts.point_in_time_quotes import (
     ALPACA_OPTIONS_FEED,
     ALPACA_OPTIONS_SNAPSHOT_URL,
+    option_quote_scope,
     parse_alpaca_option_snapshot,
+)
+from scripts.options_confluence import build_confluence_analysis
+from scripts.probability_calibration import chronological_holdout, probability_metrics
+from scripts.tradier_options_data import (
+    fetch_quotes as fetch_tradier_quotes,
+    quote_is_fresh as tradier_quote_is_fresh,
+    tradier_selected,
 )
 
 
@@ -34,8 +42,8 @@ DEFAULT_LOG_PATH = ROOT / "data" / "options_shadow_twin_log.jsonl"
 DEFAULT_REPORT_PATH = VIBE_HOME / "reports" / "options-shadow-twin.json"
 ENV_PATH = ROOT / "agent" / ".env"
 NY = ZoneInfo("America/New_York")
-SCHEMA_VERSION = 1
-SUPPORTED_STRATEGIES = {"put_spread", "call_spread", "iron_condor"}
+SCHEMA_VERSION = 2
+SUPPORTED_STRATEGIES = {"put_spread", "call_spread", "iron_condor", "iron_fly"}
 _APPEND_LOCK = threading.Lock()
 
 
@@ -130,6 +138,83 @@ def executable_close_debit(legs: Iterable[dict[str, Any]]) -> Optional[float]:
     return round(max(0.0, total), 4) if found else None
 
 
+def midpoint_close_debit(legs: Iterable[dict[str, Any]]) -> Optional[float]:
+    """Debit if closing each leg at mid price — the frictionless benchmark."""
+    total = 0.0
+    found = False
+    for leg in legs:
+        if not _valid_market(leg.get("bid"), leg.get("ask")):
+            return None
+        ratio = max(1, int(_number(leg.get("ratio_qty")) or 1))
+        side = str(leg.get("side") or "").lower()
+        mid = (float(leg["bid"]) + float(leg["ask"])) / 2
+        if side == "sell":
+            total += mid * ratio
+        elif side == "buy":
+            total -= mid * ratio
+        else:
+            return None
+        found = True
+    return round(max(0.0, total), 4) if found else None
+
+
+def iron_fly_structure_metrics(legs: Iterable[dict[str, Any]]) -> Optional[dict[str, float]]:
+    """Validate a symmetric short iron fly and derive its executable risk."""
+    rows = list(legs)
+    if len(rows) != 4:
+        return None
+
+    def right(row: dict[str, Any]) -> str:
+        value = str(row.get("right") or "").strip().lower()
+        return "put" if value in {"p", "put"} else "call" if value in {"c", "call"} else ""
+
+    def pick(side: str, option_right: str) -> Optional[dict[str, Any]]:
+        matches = [
+            row for row in rows
+            if str(row.get("side") or "").lower() == side and right(row) == option_right
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    short_put = pick("sell", "put")
+    short_call = pick("sell", "call")
+    long_put = pick("buy", "put")
+    long_call = pick("buy", "call")
+    if not all((short_put, short_call, long_put, long_call)):
+        return None
+    expiries = {str(row.get("expiry") or "") for row in rows}
+    if len(expiries) != 1 or not next(iter(expiries)):
+        return None
+
+    body_put = _number(short_put.get("strike"))
+    body_call = _number(short_call.get("strike"))
+    lower = _number(long_put.get("strike"))
+    upper = _number(long_call.get("strike"))
+    if None in {body_put, body_call, lower, upper}:
+        return None
+    if not math.isclose(body_put, body_call, rel_tol=0.0, abs_tol=1e-6):
+        return None
+    body = float(body_put)
+    lower_width = body - float(lower)
+    upper_width = float(upper) - body
+    if lower_width <= 0 or not math.isclose(lower_width, upper_width, rel_tol=0.0, abs_tol=1e-6):
+        return None
+
+    entry_credit = executable_entry_credit(rows)
+    if entry_credit is None or entry_credit <= 0 or entry_credit >= lower_width:
+        return None
+    return {
+        "body_strike": round(body, 4),
+        "lower_wing_strike": round(float(lower), 4),
+        "upper_wing_strike": round(float(upper), 4),
+        "wing_width": round(lower_width, 4),
+        "executable_entry_credit": round(entry_credit, 4),
+        "lower_breakeven_at_expiry": round(body - entry_credit, 4),
+        "upper_breakeven_at_expiry": round(body + entry_credit, 4),
+        "max_profit_per_contract": round(entry_credit * 100, 2),
+        "max_risk_per_contract": round((lower_width - entry_credit) * 100, 2),
+    }
+
+
 def _candidate_fingerprint(strategy: str, underlying: str, legs: list[dict[str, Any]]) -> str:
     structure = [
         {
@@ -145,6 +230,22 @@ def _candidate_fingerprint(strategy: str, underlying: str, legs: list[dict[str, 
         separators=(",", ":"),
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _policy_cohort(strategy: str, trade_meta: dict[str, Any]) -> str:
+    explicit = str(trade_meta.get("calibration_cohort") or trade_meta.get("strategy_version") or "").strip()
+    if explicit:
+        return explicit
+    policy = {
+        "strategy": strategy,
+        "profit_close_pct": _number(trade_meta.get("profit_close_pct")),
+        "stop_loss_pct": _number(trade_meta.get("stop_loss_pct")),
+        "outcome": "profit_target_before_stop_or_expiry_executable_quotes",
+    }
+    digest = hashlib.sha256(
+        json.dumps(policy, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:12]
+    return f"options-policy-{digest}"
 
 
 def _append(record: dict[str, Any], path: Path = DEFAULT_LOG_PATH) -> None:
@@ -202,11 +303,19 @@ def record_candidate(
         underlying = str(trade_meta.get("underlying") or "")
         if strategy not in SUPPORTED_STRATEGIES or not underlying:
             return None
+        contract_selected_at = _parse_ts(trade_meta.get("contract_selected_at")) or now
+        if contract_selected_at > now:
+            return None
         snapshots_by_symbol = {
             str(row.get("symbol")): row
             for row in (trade_meta.get("leg_market_snapshots") or [])
             if isinstance(row, dict) and row.get("symbol")
         }
+        if any(
+            (quote_at := _parse_ts(row.get("quote_timestamp"))) is not None and quote_at > now
+            for row in snapshots_by_symbol.values()
+        ):
+            return None
         legs: list[dict[str, Any]] = []
         for intent in legs_payload:
             symbol = str(intent.get("symbol") or "")
@@ -224,8 +333,17 @@ def record_candidate(
                     "strike": _number(market.get("strike")),
                     "right": market.get("right"),
                     "expiry": str(market.get("expiry") or trade_meta.get("expiry") or ""),
+                    "quote_provider": market.get("quote_provider") or "alpaca_options_snapshot_v1beta1",
+                    "quote_scope": market.get("quote_scope") or option_quote_scope(provider="alpaca"),
+                    "quote_timestamp": market.get("quote_timestamp"),
                 }
             )
+        structure_metrics: dict[str, float] = {}
+        if strategy == "iron_fly":
+            validated = iron_fly_structure_metrics(legs)
+            if validated is None:
+                return None
+            structure_metrics = validated
         fingerprint = _candidate_fingerprint(strategy, underlying, legs)
         existing = _recent_duplicate(read_records(path), fingerprint, now)
         if existing:
@@ -234,12 +352,27 @@ def record_candidate(
         candidate_id = hashlib.sha256(f"{created_at}|{fingerprint}".encode("utf-8")).hexdigest()[:24]
         entry_credit = executable_entry_credit(legs)
         confidence = trade_meta.get("candidate_confidence")
+        confidence = confidence if isinstance(confidence, dict) else {}
+        raw_probability = _number(
+            trade_meta.get("raw_probability", confidence.get("probability"))
+        )
+        if raw_probability is not None and not 0.0 <= raw_probability <= 1.0:
+            raw_probability = None
+        leg_scopes = sorted({str(leg.get("quote_scope") or "unknown") for leg in legs})
+        candidate_quote_scope = leg_scopes[0] if len(leg_scopes) == 1 else "mixed_or_unknown"
         record = {
             "schema_version": SCHEMA_VERSION,
             "type": "candidate",
             "candidate_id": candidate_id,
             "fingerprint": fingerprint,
             "created_at": created_at,
+            "contract_selected_at": _iso(contract_selected_at),
+            "evaluation_end_at": trade_meta.get("evaluation_end_at"),
+            "setup_id": trade_meta.get("setup_id"),
+            "parent_setup_id": trade_meta.get("parent_setup_id"),
+            "source_strategy": trade_meta.get("source_strategy") or strategy,
+            "expression_type": trade_meta.get("expression_type") or "primary",
+            "decision_hash": trade_meta.get("decision_hash"),
             "strategy": strategy,
             "underlying": underlying,
             "expiry": str(trade_meta.get("expiry") or ""),
@@ -248,16 +381,45 @@ def record_candidate(
             "quoted_mid_credit": _number(trade_meta.get("net_credit")),
             "executable_entry_credit": entry_credit,
             "entry_quote_complete": entry_credit is not None,
-            "max_risk_per_contract": _number(trade_meta.get("max_risk_per_contract")),
+            "max_risk_per_contract": structure_metrics.get("max_risk_per_contract")
+            if structure_metrics
+            else _number(trade_meta.get("max_risk_per_contract")),
             "profit_close_pct": _number(trade_meta.get("profit_close_pct")),
             "stop_loss_pct": _number(trade_meta.get("stop_loss_pct")),
-            "candidate_confidence": confidence if isinstance(confidence, dict) else {},
+            "stop_policy": str(trade_meta.get("stop_policy") or "credit_multiple"),
+            "setup_score": _number(confidence.get("score")),
+            "raw_probability": raw_probability,
+            "candidate_confidence": confidence,
+            "calibration_cohort": _policy_cohort(strategy, trade_meta),
+            "outcome_definition": "profit_target_before_stop_or_expiry_executable_quotes",
             "shadow_consensus": consensus if isinstance(consensus, dict) else {},
             "vix_at_entry": _number(trade_meta.get("vix_at_entry")),
             "vix_term_ratio": _number(trade_meta.get("vix_term_ratio")),
             "iv_rank_at_entry": _number(trade_meta.get("iv_rank_at_entry")),
+            "volatility_edge": trade_meta.get("volatility_edge")
+            if isinstance(trade_meta.get("volatility_edge"), dict)
+            else {},
+            "strategy_context": trade_meta.get("strategy_context")
+            if isinstance(trade_meta.get("strategy_context"), dict)
+            else {},
+            "gate_states": trade_meta.get("gate_states")
+            if isinstance(trade_meta.get("gate_states"), dict)
+            else {},
+            "warning_states": trade_meta.get("warning_states")
+            if isinstance(trade_meta.get("warning_states"), list)
+            else [],
+            "spot_at_entry": _number(trade_meta.get("spot_at_entry")),
+            "event_context": trade_meta.get("event_context")
+            if isinstance(trade_meta.get("event_context"), dict)
+            else {},
+            "regime_context": trade_meta.get("regime_context")
+            if isinstance(trade_meta.get("regime_context"), dict)
+            else {},
+            "evidence_authority": trade_meta.get("evidence_authority")
+            or "read_only_counterfactual_no_execution",
+            "structure_metrics": structure_metrics,
             "legs": legs,
-            "quote_scope": "alpaca_indicative_modified_not_opra_nbbo",
+            "quote_scope": candidate_quote_scope,
             "execution_enabled": False,
             "can_submit_orders": False,
         }
@@ -315,16 +477,29 @@ def _index(records: Iterable[dict[str, Any]]) -> tuple[dict[str, dict], dict[str
 
 def _default_quote_map(candidates: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Fetch current option snapshots in batches, never one request per leg."""
-    import requests
-
-    headers = _headers()
     symbols = sorted({
         str(leg.get("symbol") or "")
         for candidate in candidates
         for leg in (candidate.get("legs") or [])
         if leg.get("symbol")
     })
-    if not symbols or not all(headers.values()):
+    if not symbols:
+        return {}
+    if tradier_selected():
+        try:
+            quotes = fetch_tradier_quotes(symbols)
+        except Exception:
+            return {}
+        return {
+            symbol: parsed
+            for symbol, parsed in quotes.items()
+            if tradier_quote_is_fresh(parsed)
+        }
+
+    import requests
+
+    headers = _headers()
+    if not all(headers.values()):
         return {}
     captured_at = _utc_now()
     records: dict[str, dict[str, Any]] = {}
@@ -350,6 +525,9 @@ def _default_quote_map(candidates: Iterable[dict[str, Any]]) -> dict[str, dict[s
 
 
 def _expiry_close_due(candidate: dict[str, Any], now: datetime) -> bool:
+    explicit_end = _parse_ts(candidate.get("evaluation_end_at"))
+    if explicit_end is not None:
+        return now >= explicit_end
     try:
         expiry = date.fromisoformat(str(candidate.get("expiry")))
     except ValueError:
@@ -362,6 +540,12 @@ def _candidate_exit_thresholds(candidate: dict[str, Any], entry_credit: float) -
     profit_pct = _number(candidate.get("profit_close_pct"))
     stop_pct = _number(candidate.get("stop_loss_pct"))
     profit_pct = min(1.0, max(0.0, profit_pct if profit_pct is not None else 0.50))
+    if str(candidate.get("stop_policy") or "").lower() in {
+        "none",
+        "none_time_exit_only",
+        "time_exit_only",
+    }:
+        return entry_credit * (1.0 - profit_pct), float("inf")
     stop_pct = min(0.0, stop_pct if stop_pct is not None else -1.0)
     target_debit = entry_credit * (1.0 - profit_pct)
     stop_debit = entry_credit * (1.0 - stop_pct)
@@ -421,10 +605,15 @@ def mark_open_candidates(
                     "provenance_status": ((sample or {}).get("provenance") or {}).get("status")
                     if isinstance(sample, dict)
                     else "unavailable",
+                    "quote_scope": ((sample or {}).get("provenance") or {}).get("quote_scope")
+                    if isinstance(sample, dict)
+                    else "unavailable",
                 }
             )
         close_debit = executable_close_debit(marked_legs)
         quote_complete = close_debit is not None
+        leg_scopes = sorted({str(leg.get("quote_scope") or "unknown") for leg in marked_legs})
+        mark_scope = leg_scopes[0] if len(leg_scopes) == 1 else "mixed_or_unknown"
         mark = {
             "schema_version": SCHEMA_VERSION,
             "type": "mark",
@@ -433,7 +622,7 @@ def mark_open_candidates(
             "quote_complete": quote_complete,
             "executable_close_debit": close_debit,
             "legs": marked_legs,
-            "quote_scope": "alpaca_indicative_modified_not_opra_nbbo",
+            "quote_scope": mark_scope,
             "execution_enabled": False,
             "can_submit_orders": False,
         }
@@ -465,6 +654,7 @@ def mark_open_candidates(
                     "pnl_before_fees": pnl,
                     "win": pnl > 0,
                     "fees_included": False,
+                    "quote_scope": mark_scope,
                     "execution_enabled": False,
                     "can_submit_orders": False,
                 },
@@ -492,25 +682,268 @@ def _profit_factor(pnls: list[float]) -> Optional[float]:
     return gross_profit / gross_loss
 
 
-def _calibration(candidates: dict[str, dict], outcomes: dict[str, dict]) -> dict[str, Any]:
-    pairs: list[tuple[float, float]] = []
-    for candidate_id, outcome in outcomes.items():
-        confidence = candidates.get(candidate_id, {}).get("candidate_confidence") or {}
-        score = _number(confidence.get("score")) if isinstance(confidence, dict) else None
-        if score is not None:
-            pairs.append((max(0.0, min(1.0, score / 10.0)), 1.0 if outcome.get("win") else 0.0))
-    if not pairs:
-        return {"count": 0, "status": "insufficient_n", "brier": None, "constant_brier": None, "skill": None}
-    actual_rate = mean(actual for _, actual in pairs)
-    brier = mean((forecast - actual) ** 2 for forecast, actual in pairs)
-    constant = mean((actual_rate - actual) ** 2 for _, actual in pairs)
-    skill = None if constant == 0 else 1 - brier / constant
+def _loss_asymmetry_stats(pnls: list[float]) -> dict[str, Any]:
+    """Expose the win-rate hurdle created by average and tail loss severity."""
+    wins = [value for value in pnls if value > 0]
+    losses = [abs(value) for value in pnls if value < 0]
+    avg_win = mean(wins) if wins else None
+    avg_loss = mean(losses) if losses else None
+    observed_win_rate = len(wins) / len(pnls) if pnls else None
+    break_even = (
+        avg_loss / (avg_win + avg_loss)
+        if avg_win is not None and avg_loss is not None and avg_win + avg_loss > 0
+        else None
+    )
+    gross_loss = sum(losses)
+    largest_loss = max(losses) if losses else None
+    tail_count = max(1, math.ceil(len(losses) * 0.20)) if losses else 0
+    tail_cvar = mean(sorted(losses, reverse=True)[:tail_count]) if losses else None
+    margin = observed_win_rate - break_even if observed_win_rate is not None and break_even is not None else None
+    if len(pnls) < 10:
+        status = "insufficient_n"
+    elif break_even is None:
+        status = "degenerate_payoff_sample"
+    elif margin is not None and margin < 0:
+        status = "win_rate_below_payoff_hurdle"
+    elif gross_loss > 0 and largest_loss is not None and largest_loss / gross_loss >= 0.40:
+        status = "tail_loss_concentrated"
+    else:
+        status = "balanced_observed_sample"
     return {
-        "count": len(pairs),
-        "status": "ok" if len(pairs) >= 30 else "insufficient_n",
-        "brier": round(brier, 6),
-        "constant_brier": round(constant, 6),
-        "skill": round(skill, 6) if skill is not None else None,
+        "status": status,
+        "observation_count": len(pnls),
+        "winner_count": len(wins),
+        "loser_count": len(losses),
+        "average_win_before_fees": round(avg_win, 2) if avg_win is not None else None,
+        "average_loss_before_fees": round(avg_loss, 2) if avg_loss is not None else None,
+        "payoff_ratio": round(avg_win / avg_loss, 4) if avg_win is not None and avg_loss else None,
+        "observed_win_rate": round(observed_win_rate, 4) if observed_win_rate is not None else None,
+        "required_win_rate_to_break_even": round(break_even, 4) if break_even is not None else None,
+        "win_rate_margin_over_break_even": round(margin, 4) if margin is not None else None,
+        "largest_loss_before_fees": round(largest_loss, 2) if largest_loss is not None else None,
+        "largest_loss_share_of_gross_loss": round(largest_loss / gross_loss, 4) if largest_loss is not None and gross_loss else None,
+        "worst_20pct_loss_cvar_before_fees": round(tail_cvar, 2) if tail_cvar is not None else None,
+        "authority": "shadow_governance_only",
+    }
+
+
+def _calibration(candidates: dict[str, dict], outcomes: dict[str, dict]) -> dict[str, Any]:
+    probability_samples: list[dict[str, Any]] = []
+    legacy_setup_samples: list[dict[str, Any]] = []
+    for candidate_id, outcome in outcomes.items():
+        candidate = candidates.get(candidate_id, {})
+        confidence = candidate.get("candidate_confidence") or {}
+        score = _number(confidence.get("score")) if isinstance(confidence, dict) else None
+        raw_probability = _number(candidate.get("raw_probability"))
+        timestamp = candidate.get("created_at") or outcome.get("resolved_at")
+        actual = 1 if outcome.get("win") else 0
+        if raw_probability is not None and 0.0 <= raw_probability <= 1.0:
+            probability_samples.append(
+                {
+                    "id": candidate_id,
+                    "timestamp": timestamp,
+                    "probability": raw_probability,
+                    "outcome": actual,
+                    "strategy": candidate.get("strategy"),
+                    "cohort": candidate.get("calibration_cohort") or "legacy-unversioned",
+                }
+            )
+        if score is not None:
+            legacy_setup_samples.append(
+                {
+                    "id": candidate_id,
+                    "timestamp": timestamp,
+                    "probability": max(0.0, min(1.0, score / 10.0)),
+                    "outcome": actual,
+                }
+            )
+    overall = probability_metrics(probability_samples)
+    holdout = chronological_holdout(probability_samples)
+    legacy = probability_metrics(legacy_setup_samples)
+    by_strategy: dict[str, dict[str, Any]] = {}
+    by_cohort: dict[str, dict[str, Any]] = {}
+    for key, destination in (("strategy", by_strategy), ("cohort", by_cohort)):
+        names = sorted({str(sample.get(key) or "unknown") for sample in probability_samples})
+        for name in names:
+            destination[name] = probability_metrics(
+                sample for sample in probability_samples if str(sample.get(key) or "unknown") == name
+            )
+    return {
+        "count": overall["sample_count"],
+        "status": overall["status"],
+        "brier": overall["brier_score"],
+        "constant_brier": overall["base_rate_brier_score"],
+        "skill": overall["brier_skill_vs_base_rate"],
+        "raw_probability_metrics": overall,
+        "chronological_holdout": holdout,
+        "by_strategy": by_strategy,
+        "by_policy_cohort": by_cohort,
+        "legacy_setup_score_diagnostic": {
+            **legacy,
+            "authority": "diagnostic_only_setup_score_is_not_probability",
+        },
+        "probability_source_policy": "explicit_frozen_raw_probability_only",
+    }
+
+
+def _decision_funnel(
+    candidates: dict[str, dict],
+    decisions: dict[str, dict],
+) -> dict[str, Any]:
+    names = [str(row.get("decision") or "unknown").lower() for row in decisions.values()]
+    no_fill_tokens = ("no_fill", "unfilled", "canceled", "cancelled", "expired", "rejected", "submission_failed")
+    blocked = sum(name.startswith("blocked") or "manual_approval" in name for name in names)
+    no_fill = sum(any(token in name for token in no_fill_tokens) for name in names)
+    missing = max(0, len(candidates) - len(decisions))
+    by_strategy: dict[str, dict[str, int]] = {}
+    for strategy in sorted({str(row.get("strategy") or "unknown") for row in candidates.values()}):
+        ids = {candidate_id for candidate_id, row in candidates.items() if str(row.get("strategy") or "unknown") == strategy}
+        strategy_names = [
+            str(decisions[candidate_id].get("decision") or "unknown").lower()
+            for candidate_id in ids
+            if candidate_id in decisions
+        ]
+        by_strategy[strategy] = {
+            "candidates": len(ids),
+            "decisions": len(strategy_names),
+            "blocked": sum(name.startswith("blocked") or "manual_approval" in name for name in strategy_names),
+            "no_fill_or_submission_failure": sum(any(token in name for token in no_fill_tokens) for name in strategy_names),
+            "missing_decision": max(0, len(ids) - len(strategy_names)),
+        }
+    return {
+        "candidate_count": len(candidates),
+        "decision_count": len(decisions),
+        "decision_coverage": round(len(decisions) / len(candidates), 4) if candidates else 0.0,
+        "blocked_count": blocked,
+        "no_fill_or_submission_failure_count": no_fill,
+        "missing_decision_count": missing,
+        "by_strategy": by_strategy,
+        "warning": "Decision cohorts are descriptive; shadow outcomes remain counterfactual and are not broker fills.",
+    }
+
+
+def _normal_cdf(z: float) -> float:
+    return 0.5 * math.erfc(-z / math.sqrt(2))
+
+
+def _deflated_sharpe(pnls: list[float]) -> dict[str, Any]:
+    """Bailey/Lopez de Prado deflated Sharpe Ratio.
+
+    Accounts for non-normality (skewness, excess kurtosis) and converts the
+    sample Sharpe to a probability that the true edge is positive.
+    SR_benchmark = 0 (null: no edge).
+    """
+    n = len(pnls)
+    if n < 4:
+        return {"status": "insufficient_n", "n_observations": n, "dsr": None, "sr_per_trade": None}
+    mu = mean(pnls)
+    # Population moments for skewness/kurtosis; sample variance for SR std error.
+    m2_pop = sum((x - mu) ** 2 for x in pnls) / n
+    m3_pop = sum((x - mu) ** 3 for x in pnls) / n
+    m4_pop = sum((x - mu) ** 4 for x in pnls) / n
+    sigma_sample = math.sqrt(m2_pop * n / (n - 1))  # unbiased sample std
+    if sigma_sample == 0:
+        return {"status": "zero_variance", "n_observations": n, "dsr": None, "sr_per_trade": None}
+    sr = mu / sigma_sample
+    skew = m3_pop / (m2_pop ** 1.5) if m2_pop > 0 else 0.0
+    kurt_excess = (m4_pop / (m2_pop ** 2) - 3) if m2_pop > 0 else 0.0
+    # Variance of sample SR per Bailey/LdP (2014) eq. 8
+    var_sr = (1.0 - skew * sr + (kurt_excess / 4.0) * sr ** 2) / (n - 1)
+    se_sr = math.sqrt(max(0.0, var_sr))
+    z = sr / se_sr if se_sr > 0 else 0.0
+    dsr = _normal_cdf(z)
+    return {
+        "status": "ok" if n >= 30 else "low_n",
+        "n_observations": n,
+        "sr_per_trade": round(sr, 4),
+        "skewness": round(skew, 4),
+        "excess_kurtosis": round(kurt_excess, 4),
+        "standard_error": round(se_sr, 4),
+        "z_score": round(z, 4),
+        "dsr": round(dsr, 4),
+        "benchmark": "sr_benchmark_zero_null_no_edge",
+        "authority": "shadow_governance_only",
+    }
+
+
+def _drawdown_stats(pnls: list[float]) -> dict[str, Any]:
+    """Max consecutive losses and equity-curve drawdown from resolved P&L sequence."""
+    if not pnls:
+        return {"max_consecutive_losses": 0, "current_consecutive_losses": 0, "max_drawdown_before_fees": None}
+    max_consec = 0
+    cur_consec = 0
+    for p in pnls:
+        if p <= 0:
+            cur_consec += 1
+            max_consec = max(max_consec, cur_consec)
+        else:
+            cur_consec = 0
+    current_consec = 0
+    for p in reversed(pnls):
+        if p <= 0:
+            current_consec += 1
+        else:
+            break
+    equity = 0.0
+    peak = 0.0
+    max_dd = 0.0
+    for p in pnls:
+        equity += p
+        peak = max(peak, equity)
+        max_dd = max(max_dd, peak - equity)
+    return {
+        "max_consecutive_losses": max_consec,
+        "current_consecutive_losses": current_consec,
+        "max_drawdown_before_fees": round(max_dd, 2),
+    }
+
+
+def _close_cost_quality(mark_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Round-trip TCA: compare executable close debit vs midpoint close debit.
+
+    Pairs each mark's stored executable_close_debit against the midpoint
+    recomputed from the mark's leg bid/ask, then reports average friction.
+    """
+    paired: list[dict[str, float]] = []
+    for mark in mark_rows:
+        executable = _number(mark.get("executable_close_debit"))
+        if executable is None:
+            continue
+        legs = mark.get("legs") or []
+        mid_debit = midpoint_close_debit(legs)
+        if mid_debit is None:
+            continue
+        friction = max(0.0, executable - mid_debit)
+        friction_pct = friction / mid_debit if mid_debit > 0 else 0.0
+        paired.append({"executable": executable, "mid": mid_debit, "friction": friction, "friction_pct": friction_pct})
+    coverage = len(paired) / len(mark_rows) if mark_rows else 0.0
+    avg_friction = mean(item["friction"] for item in paired) if paired else None
+    avg_friction_pct = mean(item["friction_pct"] for item in paired) if paired else None
+    worst_friction_pct = max((item["friction_pct"] for item in paired), default=None)
+    blockers: list[str] = []
+    if not paired:
+        status = "no_complete_close_quotes"
+    elif coverage < 0.8:
+        status = "incomplete_close_coverage"
+        blockers.append("Close quote coverage below 80%.")
+    elif avg_friction_pct is not None and avg_friction_pct > 0.15:
+        status = "high_close_friction"
+        blockers.append("Average close midpoint-to-executable friction exceeds 15%.")
+    elif avg_friction_pct is not None and avg_friction_pct > 0.05:
+        status = "watch_close_friction"
+    else:
+        status = "ok"
+    return {
+        "status": status,
+        "mark_count": len(mark_rows),
+        "paired_count": len(paired),
+        "paired_coverage": round(coverage, 4),
+        "avg_close_friction_credit": round(avg_friction, 4) if avg_friction is not None else None,
+        "avg_close_friction_pct_of_mid": round(avg_friction_pct, 4) if avg_friction_pct is not None else None,
+        "worst_close_friction_pct_of_mid": round(worst_friction_pct, 4) if worst_friction_pct is not None else None,
+        "benchmark": "midpoint_close_debit_vs_buy_short_at_ask_sell_long_at_bid",
+        "authority": "shadow_governance_only",
+        "blockers": blockers,
     }
 
 
@@ -575,6 +1008,7 @@ def _earned_confidence(
     expectancy: Optional[float],
     profit_factor: Optional[float],
     calibration: dict[str, Any],
+    loss_asymmetry: dict[str, Any],
 ) -> dict[str, Any]:
     data_integrity = min(2.0, entry_coverage + mark_coverage)
     sample_support = min(2.0, resolved_count / 30 + distinct_dates / 20)
@@ -608,6 +1042,13 @@ def _earned_confidence(
     if expectancy is not None and expectancy < 0:
         cap = min(cap, 3.0)
         blockers.append("Conservative expectancy is negative.")
+    asymmetry_status = str(loss_asymmetry.get("status") or "")
+    if asymmetry_status == "win_rate_below_payoff_hurdle":
+        cap = min(cap, 3.0)
+        blockers.append("Observed win rate is below the break-even hurdle implied by average win/loss size.")
+    elif asymmetry_status == "tail_loss_concentrated":
+        cap = min(cap, 5.0)
+        blockers.append("Tail losses are too concentrated for promotion review.")
     if entry_coverage < 0.8 or mark_coverage < 0.8:
         cap = min(cap, 4.0)
         blockers.append("Executable-side quote coverage must reach 80% for entries and marks.")
@@ -639,7 +1080,13 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
     expectancy = mean(pnls) if pnls else None
     profit_factor = _profit_factor(pnls)
     calibration = _calibration(candidates, outcomes)
+    decision_funnel = _decision_funnel(candidates, decisions)
     execution_cost_quality = _execution_cost_quality(candidate_rows)
+    close_cost_quality = _close_cost_quality(marks)
+    deflated_sharpe = _deflated_sharpe(pnls)
+    drawdown = _drawdown_stats(pnls)
+    loss_asymmetry = _loss_asymmetry_stats(pnls)
+    confluence_analysis = build_confluence_analysis(candidates, outcomes)
     confidence = _earned_confidence(
         len(candidate_rows),
         len(pnls),
@@ -649,6 +1096,7 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
         expectancy,
         profit_factor,
         calibration,
+        loss_asymmetry,
     )
     decisions_by_name: dict[str, int] = {}
     for row in decisions.values():
@@ -664,6 +1112,7 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
         "candidate_count": len(candidate_rows),
         "decision_count": len(decisions),
         "decisions": decisions_by_name,
+        "decision_funnel": decision_funnel,
         "resolved_count": len(pnls),
         "open_count": max(0, len(candidate_rows) - len(outcomes)),
         "distinct_candidate_dates": len(distinct_dates),
@@ -682,6 +1131,11 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
         },
         "calibration": calibration,
         "execution_cost_quality": execution_cost_quality,
+        "close_cost_quality": close_cost_quality,
+        "deflated_sharpe": deflated_sharpe,
+        "drawdown": drawdown,
+        "loss_asymmetry": loss_asymmetry,
+        "timeframe_confluence": confluence_analysis,
         "earned_confidence": confidence,
         "promotion_eligible": False,
         "promotion_policy": "human_review_only_after_all_preregistered_gates",
@@ -689,6 +1143,8 @@ def build_report(records: Iterable[dict[str, Any]], now: Optional[datetime] = No
             "Alpaca indicative modified quotes are not OPRA NBBO.",
             "P&L excludes fees until broker-verified multi-leg fee evidence is available.",
             "Blocked-versus-submitted results are descriptive, not causal.",
+            "Setup scores are ranking features and are never converted into calibrated probabilities.",
+            "Timeframe and confluence cohorts are read-only attribution and cannot auto-promote a gate.",
             "This report cannot place orders or change strategy settings.",
         ],
     }

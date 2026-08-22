@@ -34,6 +34,17 @@ def test_compute_rankings_detects_risk_on_leadership() -> None:
     assert result["leadership"] == "risk_on_leadership"
     assert result["force_score"] == 1.5
     assert result["top5"][0]["symbol"] in {"QQQ", "SMH", "XLK"}
+    assert result["true_rrg_calculation"] is False
+    assert result["execution_authority"] == "context_only"
+    assert all("rotation_quadrant_proxy" in row for row in result["rankings"])
+
+
+def test_rotation_quadrant_proxy_uses_strength_and_momentum_signs() -> None:
+    assert ranker._rotation_quadrant("XLK", 1.0, 0.5) == "leading_proxy"
+    assert ranker._rotation_quadrant("XLK", 1.0, -0.5) == "weakening_proxy"
+    assert ranker._rotation_quadrant("XLV", -1.0, 0.5) == "improving_proxy"
+    assert ranker._rotation_quadrant("XLU", -1.0, -0.5) == "lagging_proxy"
+    assert ranker._rotation_quadrant("SPY", 1.0, 1.0) == "benchmark"
 
 
 def test_compute_rankings_detects_insufficient_data() -> None:

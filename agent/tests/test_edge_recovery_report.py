@@ -25,6 +25,15 @@ def test_extract_confidence_prefers_structured_snapshot() -> None:
     assert source == "structured_entry_snapshot"
 
 
+def test_extract_probability_requires_explicit_probability_field() -> None:
+    assert report.extract_probability({"entry_quality": {"feature_snapshot": {"confidence": 9.0}}}) == (None, "missing")
+    value, source = report.extract_probability({
+        "entry_quality": {"feature_snapshot": {"raw_probability": 0.63, "confidence": 9.0}},
+    })
+    assert value == 0.63
+    assert source == "structured_entry_snapshot.raw_probability"
+
+
 def test_saturated_confidence_fails_discrimination_and_calibration() -> None:
     result = report.calibration_summary([0.9] * 4, [1, 1, 0, 0])
     assert result["unique_prediction_count"] == 1
@@ -64,3 +73,6 @@ def test_build_report_keeps_pre_hardening_separate_and_marks_counterfactual_smal
     proxy = result["blocked_trade_proxy"]["reason_summaries"][0]
     assert proxy["blocked_direction_finished_adverse"] == 1
     assert result["can_submit_orders"] is False
+    assert result["probability_calibration"]["sample_count"] == 0
+    assert result["confidence_calibration"]["authority"] == "legacy_setup_score_diagnostic_only"
+    assert result["decision_denominator"]["taken_closed_count"] == 2

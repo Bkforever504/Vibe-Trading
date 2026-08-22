@@ -505,3 +505,36 @@ def test_accelerated_schema_requires_volume_days_and_large_holdout(tmp_path: Pat
     assert spy["out_of_sample_count"] == 30
     assert spy["executable_quote_coverage_rate"] == 1.0
     assert spy["promotion_eligible"] is True
+
+
+def test_execution_quality_summary_preserves_rejections_and_measures_drawdown() -> None:
+    trades = [
+        {
+            "date": "2026-08-10",
+            "entry_seen_at": "2026-08-10T14:00:00Z",
+            "status": "winner",
+            "executable_quote_coverage": True,
+            "execution_quality_eligible": True,
+            "cost_adjusted_exit_pnl": 10.0,
+            "evidence_exit_return_pct": 10.0,
+        },
+        {
+            "date": "2026-08-11",
+            "entry_seen_at": "2026-08-11T14:00:00Z",
+            "status": "loser",
+            "executable_quote_coverage": True,
+            "execution_quality_eligible": False,
+            "execution_quality_rejection_reason": "entry_relative_spread_too_wide",
+            "cost_adjusted_exit_pnl": -50.0,
+            "evidence_exit_return_pct": -50.0,
+        },
+    ]
+
+    summary = evaluator._execution_quality_summary(trades)
+
+    assert summary["all_executable"]["net_pnl"] == -40.0
+    assert summary["execution_quality_eligible"]["net_pnl"] == 10.0
+    assert summary["rejected_count"] == 1
+    assert summary["rejection_reasons"] == {"entry_relative_spread_too_wide": 1}
+    assert summary["drawdown_reduction_pct"] == 100.0
+    assert summary["authority"] == "shadow_attribution_only_no_auto_promotion"

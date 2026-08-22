@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -56,7 +58,7 @@ def test_noise_area_finder_is_one_contract_paper_only(monkeypatch) -> None:
     monkeypatch.setattr(flip_bot, "_option_bid_ask_spread_cents", lambda _symbol: 2)
     monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda _symbol: {"selection_bid": 0.99, "selection_ask": 1.01})
 
-    setup = flip_bot.find_noise_area_0dte(10_000)
+    setup = flip_bot.find_noise_area_0dte(100_000)
 
     assert setup is not None
     assert setup["strategy"] == "noise_area_vwap"
@@ -111,13 +113,14 @@ def _prepare_entry_run(monkeypatch, tmp_path: Path) -> list[dict]:
     monkeypatch.setattr(
         flip_bot,
         "_submit",
-        lambda symbol, qty, side, max_notional=0.0, limit_price=None: submitted.append(
+        lambda symbol, qty, side, max_notional=0.0, limit_price=None, client_order_id=None: submitted.append(
             {
                 "symbol": symbol,
                 "qty": qty,
                 "side": side,
                 "max_notional": max_notional,
                 "limit_price": limit_price,
+                "client_order_id": client_order_id,
             }
         ) or {"id": "paper-order"},
     )
@@ -153,6 +156,7 @@ def test_intraday_entry_prioritizes_orb_over_noise(monkeypatch, tmp_path: Path) 
     buys = [order for order in submitted if order["side"] == "buy"]
     assert len(buys) == 1
     assert buys[0]["qty"] == 1
+    assert buys[0]["client_order_id"].startswith("vt-entry-")
 
 
 def test_intraday_noise_fallback_is_capped_and_labeled(monkeypatch, tmp_path: Path) -> None:
@@ -169,6 +173,7 @@ def test_intraday_noise_fallback_is_capped_and_labeled(monkeypatch, tmp_path: Pa
     buys = [order for order in submitted if order["side"] == "buy"]
     assert len(buys) == 1
     assert buys[0]["qty"] == 1
+    assert buys[0]["client_order_id"].startswith("vt-entry-")
     saved = (tmp_path / "flip-trades.json").read_text(encoding="utf-8")
     assert '"execution_lane": "paper_research"' in saved
     assert '"paper_only": true' in saved
@@ -194,10 +199,72 @@ def test_noise_area_structural_exit_only_applies_to_paper_strategy(monkeypatch) 
     assert flip_bot._noise_area_structural_exit_reason({"strategy": "0dte", "right": "CALL"}) == ""
 
 
-def test_monitor_runner_enables_noise_and_recurring_intraday_scan() -> None:
-    runner = (Path(__file__).resolve().parents[2] / "scripts" / "run_flip_bot_monitor.ps1").read_text(encoding="utf-8")
+def test_monitor_runner_uses_single_in_process_intraday_scan() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_flip_bot_monitor.ps1").read_text(encoding="utf-8")
+    bot = (root / "strategies" / "flip_bot.py").read_text(encoding="utf-8")
 
     assert 'FLIP_NOISE_AREA_PAPER_ENABLED = "true"' in runner
     assert "--monitor" in runner
-    assert "--intraday-entry" in runner
-    assert runner.index("--monitor") < runner.index("--intraday-entry")
+    assert "--intraday-entry" not in runner
+    assert "MONITOR ENTRY RESCAN" in bot
+    assert "run_entry(_rescan_account, intraday_only=True)" in bot
+
+
+def test_market_context_snapshot_rejects_future_data_and_freezes_current_context(
+    tmp_path: Path,
+) -> None:
+    observed = datetime(2026, 8, 3, 15, 30, tzinfo=timezone.utc)
+    common = {
+        "generated_at": "2026-08-03T15:20:00Z",
+        "execution_enabled": False,
+    }
+    (tmp_path / "candlestick-context.json").write_text(
+        json.dumps({
+            **common,
+            "items": [{
+                "symbol": "SPY",
+                "bias": "bullish",
+                "primary_signal": "bullish_liquidity_grab",
+                "features": ["liquidity_sweep"],
+                "veto_reasons": [],
+                "volume_expansion": True,
+            }],
+        }),
+        encoding="utf-8",
+    )
+    (tmp_path / "higher-timeframe-market-map.json").write_text(
+        json.dumps({
+            **common,
+            "items": [{
+                "symbol": "SPY",
+                "primary_bias": "bullish",
+                "intraday_alignment": "aligned",
+                "veto_reasons": [],
+            }],
+        }),
+        encoding="utf-8",
+    )
+    (tmp_path / "market-catalyst-calendar.json").write_text(
+        json.dumps({
+            **common,
+            "today": {"max_impact": "none", "vetoes": [], "events": []},
+        }),
+        encoding="utf-8",
+    )
+
+    snapshot = flip_bot._market_context_shadow_snapshot(
+        "SPY", observed, report_dir=tmp_path
+    )
+
+    assert snapshot["market_context_snapshot_status"] == "current"
+    assert snapshot["candlestick_primary_signal"] == "bullish_liquidity_grab"
+    assert snapshot["htf_intraday_alignment"] == "aligned"
+    assert snapshot["catalyst_max_impact"] == "none"
+
+    future = {**common, "generated_at": "2026-08-03T16:30:00Z", "items": []}
+    (tmp_path / "candlestick-context.json").write_text(json.dumps(future), encoding="utf-8")
+    snapshot = flip_bot._market_context_shadow_snapshot("SPY", observed, report_dir=tmp_path)
+    assert snapshot["market_context_snapshot_status"] == "incomplete"
+    assert snapshot["candlestick_context_status"] == "future_timestamp"
+    assert snapshot["candlestick_primary_signal"] is None

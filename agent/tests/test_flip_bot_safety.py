@@ -8,6 +8,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+def _without_client_order_ids(submissions):
+    return [
+        (args, {key: value for key, value in kwargs.items() if key != "client_order_id"})
+        for args, kwargs in submissions
+    ]
+
+
 def test_flip_bot_submit_blocks_live_mid_above_risk_budget(monkeypatch) -> None:
     from strategies import flip_bot
 
@@ -33,19 +40,18 @@ def test_flip_bot_submit_supports_resting_sell_limit(monkeypatch) -> None:
     result = flip_bot._submit("SPY260720C00750000", 2, "sell", limit_price=1.75)
 
     assert result == {"id": "tp-1"}
-    assert posted == [
-        (
-            "/v2/orders",
-            {
-                "symbol": "SPY260720C00750000",
-                "qty": "2",
-                "side": "sell",
-                "time_in_force": "day",
-                "type": "limit",
-                "limit_price": "1.75",
-            },
-        )
-    ]
+    assert len(posted) == 1
+    _path, _body = posted[0]
+    assert _path == "/v2/orders"
+    assert _body.get("client_order_id", "").startswith("vt-")
+    assert {k: v for k, v in _body.items() if k != "client_order_id"} == {
+        "symbol": "SPY260720C00750000",
+        "qty": "2",
+        "side": "sell",
+        "time_in_force": "day",
+        "type": "limit",
+        "limit_price": "1.75",
+    }
 
 
 def test_manual_reset_blocks_new_buys_but_allows_protective_sells(monkeypatch) -> None:
@@ -58,16 +64,17 @@ def test_manual_reset_blocks_new_buys_but_allows_protective_sells(monkeypatch) -
 
     assert flip_bot._submit("SPY260720C00750000", 1, "buy") is None
     assert flip_bot._submit("SPY260720C00750000", 1, "sell") == {"id": "sell-1"}
-    assert posted == [
-        {
-            "symbol": "SPY260720C00750000",
-            "qty": "1",
-            "side": "sell",
-            "time_in_force": "day",
-            "type": "limit",
-            "limit_price": "0.01",
-        }
-    ]
+    assert len(posted) == 1
+    _body = posted[0]
+    assert _body.get("client_order_id", "").startswith("vt-")
+    assert {k: v for k, v in _body.items() if k != "client_order_id"} == {
+        "symbol": "SPY260720C00750000",
+        "qty": "1",
+        "side": "sell",
+        "time_in_force": "day",
+        "type": "limit",
+        "limit_price": "0.01",
+    }
 
 
 def test_flip_bot_entry_submits_bear_trend_spread_as_two_leg_order(monkeypatch, tmp_path) -> None:
@@ -130,7 +137,7 @@ def test_flip_bot_entry_submits_bear_trend_spread_as_two_leg_order(monkeypatch, 
     setup, max_notional = submitted_spreads[0]
     assert setup["option_symbol"] == "SPY260626P00735000"
     assert setup["short_option_symbol"] == "SPY260626P00730000"
-    assert max_notional == 1760.0
+    assert max_notional == 220.0
     saved = state_file.read_text(encoding="utf-8")
     assert '"strategy": "bear_trend_spread"' in saved
     assert '"short_option_symbol": "SPY260626P00730000"' in saved
@@ -206,12 +213,12 @@ def test_flip_scanner_uses_same_risk_and_contract_cap_as_bot(monkeypatch) -> Non
     monkeypatch.setattr(flip_scanner, "_atm_0dte_cost", lambda symbol: (0.01, 0.01, 500.0, "2026-06-24"))
     monkeypatch.setattr(flip_scanner, "_last_price", lambda symbol: 500.0)
 
-    result = flip_scanner.check_0dte(5000.0)
+    result = flip_scanner.check_0dte(1_000_000.0)
 
-    assert flip_scanner.MAX_RISK_PCT == 0.02
-    assert flip_scanner.MAX_CONTRACTS == 5
-    assert result["contracts_straddle"] == 5
-    assert result["contracts_directional"] == 5
+    assert flip_scanner.MAX_RISK_PCT == 0.0025
+    assert flip_scanner.MAX_CONTRACTS == 1
+    assert result["contracts_straddle"] == 1
+    assert result["contracts_directional"] == 1
 
 
 def test_flip_shadow_universe_adds_only_recent_qualified_allowlisted_symbols(tmp_path) -> None:
@@ -483,8 +490,8 @@ def test_flip_bot_allows_fresh_confirmed_same_day_reentry(monkeypatch, tmp_path)
 
     flip_bot.run_entry(88_000)
 
-    assert submitted == [
-        (("SPY260706C00752000", 5, "buy"), {"max_notional": 1760.0, "limit_price": 0.72}),
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260706C00752000", 5, "buy"), {"max_notional": 220.0, "limit_price": 0.72}),
         (("SPY260706C00752000", 5, "sell"), {"limit_price": 1.23}),
     ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
@@ -615,8 +622,8 @@ def test_flip_bot_tracks_only_broker_confirmed_partial_entry_quantity(monkeypatc
 
     flip_bot.run_entry(88_000)
 
-    assert submitted == [
-        (("SPY260706C00752000", 5, "buy"), {"max_notional": 1760.0, "limit_price": 0.72}),
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260706C00752000", 5, "buy"), {"max_notional": 220.0, "limit_price": 0.72}),
         (("SPY260706C00752000", 2, "sell"), {"limit_price": 1.24}),
     ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
@@ -696,6 +703,11 @@ def test_flip_bot_monitor_closes_both_spread_legs(monkeypatch, tmp_path) -> None
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_spread_mid", lambda long_symbol, short_symbol: 0.50)
+    monkeypatch.setattr(
+        flip_bot,
+        "_spread_executable_close_credit",
+        lambda long_symbol, short_symbol: 0.50,
+    )
     monkeypatch.setattr(flip_bot, "_submit", lambda *args, **kwargs: single_closes.append((args, kwargs)) or {"id": "single"})
     monkeypatch.setattr(
         flip_bot,
@@ -743,6 +755,7 @@ def test_flip_bot_monitor_profit_protects_fading_winner(monkeypatch, tmp_path) -
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 1.29)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 1.29})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -759,7 +772,9 @@ def test_flip_bot_monitor_profit_protects_fading_winner(monkeypatch, tmp_path) -
 
     flip_bot.run_monitor()
 
-    assert submitted == [(("SPY260701C00748000", 5, "sell"), {})]
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260701C00748000", 5, "sell"), {"limit_price": 1.29})
+    ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved[0]["status"] == "closed"
     assert saved[0]["exit_reason"].startswith("PROFIT PROTECT")
@@ -794,6 +809,7 @@ def test_flip_bot_exits_armed_winner_even_after_it_slips_negative(monkeypatch, t
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.95)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.95})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -805,7 +821,9 @@ def test_flip_bot_exits_armed_winner_even_after_it_slips_negative(monkeypatch, t
     flip_bot.run_monitor()
 
     saved = json.loads(state_file.read_text(encoding="utf-8"))
-    assert submitted == [(("SPY260710C00750000", 1, "sell"), {})]
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260710C00750000", 1, "sell"), {"limit_price": 0.95})
+    ]
     assert saved[0]["status"] == "closed"
     assert saved[0]["exit_reason"].startswith("PROFIT PROTECT -5.0%")
 
@@ -839,6 +857,7 @@ def test_flip_bot_monitor_defensively_exits_on_shadow_direction_flip(monkeypatch
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.98)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.98})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -861,7 +880,9 @@ def test_flip_bot_monitor_defensively_exits_on_shadow_direction_flip(monkeypatch
 
     flip_bot.run_monitor()
 
-    assert submitted == [(("SPY260707C00750000", 5, "sell"), {})]
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260707C00750000", 5, "sell"), {"limit_price": 0.98})
+    ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved[0]["status"] == "closed"
     assert saved[0]["exit_reason"].startswith("SHADOW DEFENSIVE EXIT")
@@ -897,6 +918,7 @@ def test_flip_bot_monitor_ratchets_profit_protection_for_0dte_winner(monkeypatch
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 1.50)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 1.50})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -907,10 +929,12 @@ def test_flip_bot_monitor_ratchets_profit_protection_for_0dte_winner(monkeypatch
 
     flip_bot.run_monitor()
 
-    assert submitted == [(("SPY260706C00750000", 5, "sell"), {})]
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260706C00750000", 5, "sell"), {"limit_price": 1.50})
+    ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved[0]["status"] == "closed"
-    assert saved[0]["exit_reason"] == "PROFIT PROTECT +50.0% (best +66.0%, lock +56.0%)"
+    assert saved[0]["exit_reason"] == "PROFIT PROTECT +50.0% [bid] (mid +50.0%, best +66.0%, lock +56.0%)"
     assert saved[0]["pnl"] == 250.0
 
 
@@ -1005,6 +1029,7 @@ def test_flip_bot_monitor_uses_eastern_time_for_intraday_cutoff(monkeypatch, tmp
         lambda: datetime(2026, 7, 14, 13, 45, tzinfo=ZoneInfo("America/New_York")),
     )
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 1.0)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 1.0})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -1017,12 +1042,17 @@ def test_flip_bot_monitor_uses_eastern_time_for_intraday_cutoff(monkeypatch, tmp
 
     flip_bot.run_monitor()
 
-    assert submitted == [(("SPY260714C00750000", 1, "sell"), {})]
+    assert _without_client_order_ids(submitted) == [
+        (("SPY260714C00750000", 1, "sell"), {"limit_price": 1.00})
+    ]
     saved = json.loads(state_file.read_text(encoding="utf-8"))
     assert saved[0]["status"] == "closed"
     assert saved[0]["exit_reason"] == "TIME EXIT 13:45"
 
 def _stub_shadow_candidate_pipeline(monkeypatch, flip_bot, option_symbol_for) -> None:
+    # Most lifecycle tests isolate one source contract. Paired collection has a
+    # dedicated integration test below.
+    monkeypatch.setattr(flip_bot, "SHADOW_PAIRED_DIRECTION_ENABLED", False)
     monkeypatch.setattr(
         flip_bot,
         "_find_0dte_for_symbol",
@@ -1056,6 +1086,11 @@ def test_flip_bot_logs_shadow_0dte_candidates_without_execution(monkeypatch, tmp
 
     log_path = tmp_path / "flip_shadow_candidates_log.jsonl"
     monkeypatch.setattr(flip_bot, "SHADOW_CANDIDATE_LOG_PATH", log_path)
+    monkeypatch.setattr(
+        flip_bot,
+        "PAIRED_DIRECTION_COLLECTION_LOG_PATH",
+        tmp_path / "paired_direction_collection_log.jsonl",
+    )
     monkeypatch.setattr(flip_bot, "SHADOW_CANDIDATES", ["QQQ", "IWM", "NVDA"])
     monkeypatch.setattr(flip_bot, "_spot", lambda symbol: 105.0)
     monkeypatch.setattr(flip_bot, "_prev_close", lambda symbol: 100.0)
@@ -1086,13 +1121,88 @@ def test_flip_bot_logs_shadow_0dte_candidates_without_execution(monkeypatch, tmp
     assert [row["symbol"] for row in rows] == ["QQQ", "IWM", "NVDA"]
     assert rows[0]["option_symbol"] == "QQQ260702C00105000"
     assert rows[1]["option_symbol"] == "IWM260702C00105000"
-    assert all(row["schema_version"] == 3 for row in rows)
+    assert all(row["schema_version"] == flip_bot.SHADOW_CANDIDATE_SCHEMA_VERSION for row in rows)
     assert all(row["lifecycle_id"] for row in rows)
     assert all(row["episode_horizon_minutes"] == 60 for row in rows)
     assert all(row["learner_tracks"] == [
         "flip_entry_exit", "options_directional_contract_selection",
     ] for row in rows)
     assert all(row["action"] == "enter_shadow" for row in rows)
+
+
+def test_flip_shadow_logger_adds_matched_opposite_direction(monkeypatch, tmp_path) -> None:
+    import json
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import flip_bot
+
+    log_path = tmp_path / "flip_shadow_candidates_log.jsonl"
+    monkeypatch.setattr(flip_bot, "SHADOW_CANDIDATE_LOG_PATH", log_path)
+    collection_path = tmp_path / "paired_direction_collection_log.jsonl"
+    monkeypatch.setattr(flip_bot, "PAIRED_DIRECTION_COLLECTION_LOG_PATH", collection_path)
+    now = [datetime(2026, 7, 2, 11, 0, tzinfo=ZoneInfo("America/New_York"))]
+    monkeypatch.setattr(flip_bot, "_now_et", lambda: now[0])
+    _stub_shadow_candidate_pipeline(monkeypatch, flip_bot, lambda sym: f"{sym}260702C00105000")
+    monkeypatch.setattr(flip_bot, "SHADOW_PAIRED_DIRECTION_ENABLED", True)
+    monkeypatch.setattr(
+        flip_bot,
+        "_matched_opposite_option",
+        lambda sym, right, source: (f"{sym}260702P00095000", 95.0, "2026-07-02", 0.001),
+    )
+    quote_calls = []
+
+    def synchronized_quotes(source, opposite, diagnostics=None):
+        quote_calls.append((source, opposite))
+        if diagnostics is not None:
+            diagnostics.update(status="quote_quality_passed", reason="synchronized_two_sided_quotes")
+        call_mid, put_mid = (1.0, 1.0) if len(quote_calls) == 1 else (1.10, 0.90)
+        return {
+            source: {
+                "selection_bid": call_mid - 0.01, "selection_ask": call_mid + 0.01,
+                "entry_price_est": call_mid,
+                "quote_timestamp": "2026-07-02T15:00:00Z", "quote_age_seconds": 1.0,
+            },
+            opposite: {
+                "selection_bid": put_mid - 0.01, "selection_ask": put_mid + 0.01,
+                "entry_price_est": put_mid,
+                "quote_timestamp": "2026-07-02T15:00:00Z", "quote_age_seconds": 1.0,
+            },
+        }
+
+    monkeypatch.setattr(flip_bot, "_synchronized_direction_quotes", synchronized_quotes)
+
+    rows = flip_bot.log_shadow_0dte_candidates(10_000, symbols=["SPY"])
+    entries = [row for row in rows if row.get("event_type") == "shadow_entry"]
+
+    assert [(row["strategy"], row["right"]) for row in entries] == [
+        ("0dte", "CALL"),
+        ("paired_direction_shadow", "PUT"),
+    ]
+    paired = entries[1]
+    assert paired["decision_lattice_role"] == "opposite_direction"
+    assert entries[0]["decision_pair_id"] == paired["decision_pair_id"]
+    assert entries[0]["pair_sync_status"] == "synchronized_forward"
+    assert entries[0]["decision_context_sha256"] == paired["decision_context_sha256"]
+    assert len(entries[0]["decision_context_sha256"]) == 64
+    assert entries[0]["paired_direction_policy_version"].endswith("_v1")
+    assert entries[0]["paired_direction_policy_spec_sha256"] == paired["paired_direction_policy_spec_sha256"]
+    assert len(entries[0]["feature_snapshot_sha256"]) == 64
+    assert paired["live_execution_allowed"] is False
+    assert paired["execution_enabled"] is False
+    assert paired["can_submit_orders"] is False
+
+    now[0] = datetime(2026, 7, 2, 11, 5, tzinfo=ZoneInfo("America/New_York"))
+    marks = flip_bot.log_shadow_0dte_candidates(10_000, symbols=["SPY"])
+    paired_marks = [row for row in marks if row.get("decision_pair_id") == paired["decision_pair_id"]]
+
+    assert len(quote_calls) == 2
+    assert len(paired_marks) == 2
+    assert {row["pair_mark_sync_status"] for row in paired_marks} == {"synchronized_batch"}
+    assert {row["mark_price"] for row in paired_marks} == {0.9, 1.1}
+    attempts = [json.loads(line) for line in collection_path.read_text(encoding="utf-8").splitlines()]
+    assert attempts[0]["status"] == "accepted"
+    assert attempts[0]["reason"] == "synchronized_pair_created"
+    assert attempts[0]["can_submit_orders"] is False
 
 
 def test_spy_accelerated_shadow_logs_without_live_consensus_gate(monkeypatch, tmp_path) -> None:
@@ -1168,6 +1278,7 @@ def test_shadow_reversal_challenger_is_not_starved_by_generic_episodes(monkeypat
     log_path.write_text("\n".join(json.dumps(row) for row in active) + "\n", encoding="utf-8")
 
     monkeypatch.setattr(flip_bot, "SHADOW_CANDIDATE_LOG_PATH", log_path)
+    monkeypatch.setattr(flip_bot, "SHADOW_PAIRED_DIRECTION_ENABLED", False)
     monkeypatch.setattr(
         flip_bot,
         "_now_et",
@@ -1307,6 +1418,78 @@ def test_flip_shadow_keeps_observing_after_target_for_runner_research(monkeypatc
     assert reason == ""
     assert current == 80.0
     assert best == 80.0
+
+
+def test_flip_shadow_first_mark_exits_when_momentum_is_not_confirmed() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import flip_bot
+
+    now = datetime(2026, 8, 12, 10, 5, tzinfo=ZoneInfo("America/New_York"))
+    rows = [{
+        "event_type": "shadow_entry",
+        "scanned_at": "2026-08-12T14:00:00Z",
+        "execution_mode": "shadow_only",
+        "live_execution_allowed": False,
+        "entry_price_est": 1.0,
+        "episode_expires_at": "2026-08-12T16:00:00Z",
+        "hard_close_time": "13:45",
+    }]
+
+    reason, current, best = flip_bot._shadow_exit_reason(rows, 1.0, now)
+
+    assert reason == "first_mark_momentum_not_confirmed"
+    assert current == 0.0
+    assert best == 0.0
+
+
+def test_flip_first_mark_gate_cannot_affect_non_shadow_lifecycle() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import flip_bot
+
+    now = datetime(2026, 8, 12, 10, 5, tzinfo=ZoneInfo("America/New_York"))
+    rows = [{
+        "event_type": "entry",
+        "scanned_at": "2026-08-12T14:00:00Z",
+        "execution_mode": "paper",
+        "live_execution_allowed": False,
+        "entry_price_est": 1.0,
+        "episode_expires_at": "2026-08-12T16:00:00Z",
+        "hard_close_time": "13:45",
+    }]
+
+    reason, current, best = flip_bot._shadow_exit_reason(rows, 0.9, now)
+
+    assert reason == ""
+    assert round(current, 2) == -10.0
+    assert best == 0.0
+
+
+def test_flip_shadow_first_mark_gate_does_not_reclassify_later_marks() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import flip_bot
+
+    now = datetime(2026, 8, 12, 10, 10, tzinfo=ZoneInfo("America/New_York"))
+    rows = [
+        {
+            "event_type": "shadow_entry",
+            "scanned_at": "2026-08-12T14:00:00Z",
+            "execution_mode": "shadow_only",
+            "live_execution_allowed": False,
+            "entry_price_est": 1.0,
+            "episode_expires_at": "2026-08-12T16:00:00Z",
+            "hard_close_time": "13:45",
+        },
+        {"event_type": "shadow_mark", "entry_price_est": 1.1, "return_pct_at_mark": 10.0},
+    ]
+
+    reason, current, best = flip_bot._shadow_exit_reason(rows, 0.9, now)
+
+    assert reason == ""
+    assert round(current, 2) == -10.0
+    assert round(best, 2) == 10.0
 
 
 def test_flip_shadow_runner_closes_on_post_target_ratchet(monkeypatch) -> None:
@@ -1753,6 +1936,7 @@ def test_monitor_keeps_pending_exit_open_until_broker_fill(monkeypatch, tmp_path
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.69)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.69})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -1760,6 +1944,12 @@ def test_monitor_keeps_pending_exit_open_until_broker_fill(monkeypatch, tmp_path
         or {"id": "exit-1", "status": "accepted", "filled_avg_price": None},
     )
     monkeypatch.setattr(flip_bot, "_get", lambda path: next(order_states))
+    monkeypatch.setattr(
+        flip_bot,
+        "_patch",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("replacement unavailable")),
+    )
+    monkeypatch.setattr(flip_bot.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(flip_bot, "_alert", lambda msg: None)
     monkeypatch.setattr(flip_bot, "_capture_point_in_time", lambda *args, **kwargs: [])
     monkeypatch.setattr(flip_bot, "shadow_exit_advice", lambda *args, **kwargs: {"enabled": False})
@@ -1773,11 +1963,8 @@ def test_monitor_keeps_pending_exit_open_until_broker_fill(monkeypatch, tmp_path
 
     flip_bot.run_monitor()
     still_pending = json.loads(state_file.read_text(encoding="utf-8"))[0]
-    assert still_pending["status"] == "open"
-    assert len(submissions) == 1
-
-    flip_bot.run_monitor()
-    closed = json.loads(state_file.read_text(encoding="utf-8"))[0]
+    assert still_pending["status"] == "closed"
+    closed = still_pending
     assert closed["status"] == "closed"
     assert closed["exit_price"] == 0.68
     assert closed["exit_price_source"] == "broker_filled_avg_price"
@@ -1812,6 +1999,7 @@ def test_monitor_uses_broker_fill_not_trigger_mid_for_immediate_exit(monkeypatch
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.69)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.69})
     monkeypatch.setattr(
         flip_bot,
         "_submit",
@@ -1891,6 +2079,7 @@ def test_monitor_cancel_confirms_resting_target_before_software_sell(monkeypatch
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.69)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.69})
     monkeypatch.setattr(
         flip_bot,
         "_get",
@@ -1948,6 +2137,7 @@ def test_monitor_resting_fill_wins_cancel_race_without_second_sell(monkeypatch, 
     monkeypatch.setattr(flip_bot, "STATE_FILE", state_file)
     monkeypatch.setattr(flip_bot, "_market_open", lambda: True)
     monkeypatch.setattr(flip_bot, "_option_mid", lambda symbol: 0.69)
+    monkeypatch.setattr(flip_bot, "_selection_quote_fields", lambda symbol: {"selection_bid": 0.69})
     monkeypatch.setattr(flip_bot, "_get", lambda path: events.append("get") or next(order_states))
     monkeypatch.setattr(flip_bot, "_delete", lambda path: events.append("cancel"))
     monkeypatch.setattr(

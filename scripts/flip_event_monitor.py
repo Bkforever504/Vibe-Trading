@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(ROOT / "agent" / ".env")
 
 from strategies import flip_bot
+from strategies.flip_option_quote_subscription import requested_option_symbols
 
 
 STATE_PATH = Path.home() / ".vibe-trading" / "flip-trades.json"
@@ -41,6 +42,7 @@ _quotes: dict[str, dict[str, Any]] = {}
 _quote_lock = threading.Lock()
 _trigger_lock = threading.Lock()
 _last_trigger = 0.0
+_option_stream_permanently_unavailable = threading.Event()
 
 
 def _utc_now() -> str:
@@ -180,6 +182,27 @@ def _run_trade_stream(stop_event: threading.Event) -> None:
         _event("trade_stream_failed", error=str(exc))
 
 
+def _record_option_stream_failure(symbols: set[str], exc: Exception) -> None:
+    error = str(exc)
+    permanent = "insufficient subscription" in error.lower()
+    if permanent:
+        _option_stream_permanently_unavailable.set()
+    _event(
+        "option_stream_failed",
+        symbols=sorted(symbols),
+        feed=FEED_NAME,
+        error=error,
+        permanent=permanent,
+    )
+    _health(
+        "degraded",
+        active_symbols=sorted(symbols),
+        option_stream_available=False,
+        option_stream_error=error,
+        option_stream_retry_suppressed=permanent,
+    )
+
+
 def _run_option_stream(symbols: set[str]) -> None:
     try:
         from alpaca.data.enums import OptionsFeed
@@ -191,7 +214,7 @@ def _run_option_stream(symbols: set[str]) -> None:
         _event("option_stream_started", symbols=sorted(symbols), feed=FEED_NAME)
         stream.run()
     except Exception as exc:
-        _event("option_stream_failed", symbols=sorted(symbols), feed=FEED_NAME, error=str(exc))
+        _record_option_stream_failure(symbols, exc)
 
 
 def _within_session() -> bool:
@@ -223,8 +246,12 @@ def main() -> int:
     _health("running", active_symbols=[])
 
     while _within_session() and not stop_event.is_set():
-        symbols = _open_option_symbols()
-        if symbols and (option_thread is None or not option_thread.is_alive() or symbols != active_symbols):
+        symbols = _open_option_symbols() | requested_option_symbols()
+        if (
+            symbols
+            and not _option_stream_permanently_unavailable.is_set()
+            and (option_thread is None or not option_thread.is_alive() or symbols != active_symbols)
+        ):
             # A symbol change starts a fresh subscription. Old daemon threads are
             # harmless because closed symbols cannot pass the durable state gate.
             active_symbols = symbols

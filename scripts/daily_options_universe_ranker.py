@@ -18,6 +18,7 @@ LIQUIDITY_PATH = REPORT_DIR / "options-liquidity-feasibility.json"
 SHADOW_PATH = REPORT_DIR / "flip-shadow-pnl-evaluator.json"
 CATALYST_PATH = REPORT_DIR / "market-catalyst-calendar.json"
 SURFACE_PATH = REPORT_DIR / "options-surface-intelligence.json"
+STOCK_SCREENER_PATH = REPORT_DIR / "daily-stock-screener.json"
 REPORT_PATH = REPORT_DIR / "daily-options-universe-ranker.json"
 LOG_PATH = ROOT / "data" / "daily_options_universe_ranker_log.jsonl"
 
@@ -66,6 +67,8 @@ def _rank_symbol(
     liquidity: dict[str, Any],
     shadow: dict[str, Any],
     surface: dict[str, Any],
+    stock_screen: dict[str, Any],
+    stock_screen_required: bool,
 ) -> dict[str, Any]:
     completed = _integer(shadow.get("completed_count"))
     trading_days = _integer(shadow.get("trading_day_count"))
@@ -79,6 +82,10 @@ def _rank_symbol(
     surface_ok = str(surface.get("status") or "") == "ok"
     surface_usable = bool(surface.get("surface_usable_for_shadow_research"))
     retail_lottery_risk = bool(surface.get("retail_lottery_risk"))
+    stock_screen_checked = bool(stock_screen)
+    stock_screen_status = str(stock_screen.get("status") or "unavailable")
+    stock_screen_score = _number(stock_screen.get("score"))
+    stock_screen_veto = stock_screen_status == "blocked" or (stock_screen_required and not stock_screen_checked)
 
     blockers: list[str] = []
     if not liquidity:
@@ -96,6 +103,10 @@ def _rank_symbol(
         blockers.append("positive_out_of_sample_edge_not_proven")
     if retail_lottery_risk:
         blockers.append("cheap_option_retail_lottery_risk")
+    if not stock_screen_checked:
+        blockers.append("stock_screen_not_checked")
+    elif stock_screen_veto:
+        blockers.append("stock_screen_blocked")
 
     score = min(25.0, liquidity_score / 5.0 * 25.0)
     if liquidity_ok:
@@ -108,6 +119,11 @@ def _rank_symbol(
         score += 5.0
     if retail_lottery_risk:
         score -= 15.0
+    # The causal 1d/5d/20d lab produced no final-period survivor. Preserve the
+    # screen as a data/liquidity veto, but do not let its directional score
+    # improve rank or promotion priority.
+    if stock_screen_veto:
+        score -= 20.0
     if oos_positive and expectancy > 0:
         score += min(6.0, 2.0 + expectancy / 10.0)
     if oos_count >= 10 and win_rate >= 0.55:
@@ -126,9 +142,9 @@ def _rank_symbol(
 
     if symbol == "SPY":
         tier = "execution_benchmark"
-    elif retail_lottery_risk:
+    elif retail_lottery_risk or stock_screen_veto:
         tier = "blocked"
-    elif promotion_eligible and liquidity_ok:
+    elif promotion_eligible and liquidity_ok and completed >= 10 and trading_days >= 30 and oos_positive:
         tier = "promotion_review"
     elif liquidity_ok:
         tier = "shadow_challenger"
@@ -157,6 +173,15 @@ def _rank_symbol(
         "institutional_flow_available": bool(surface.get("institutional_flow_available")),
         "retail_lottery_risk": retail_lottery_risk,
         "retail_lottery_risk_reasons": surface.get("retail_lottery_risk_reasons") or [],
+        "stock_screen_checked": stock_screen_checked,
+        "stock_screen_status": stock_screen_status,
+        "stock_screen_score": round(stock_screen_score, 2),
+        "stock_screen_direction": stock_screen.get("direction"),
+        "stock_screen_long_eligible": bool(stock_screen.get("long_eligible")),
+        "stock_screen_short_eligible": bool(stock_screen.get("short_eligible")),
+        "stock_screen_veto": stock_screen_veto,
+        "stock_screen_formula_version": stock_screen.get("formula_version"),
+        "stock_screen_directional_authority": "blocked_failed_1d_5d_20d_walk_forward",
         "hot_score": _number(hot.get("hot_score")),
         "deep_universe_score": _number(hot.get("deep_universe_score")),
         "shadow_completed_count": completed,
@@ -177,6 +202,7 @@ def build_report(
     shadow_path: Path = SHADOW_PATH,
     catalyst_path: Path = CATALYST_PATH,
     surface_path: Path | None = SURFACE_PATH,
+    stock_screener_path: Path | None = STOCK_SCREENER_PATH,
     today: str | None = None,
 ) -> dict[str, Any]:
     weekly = _read_json(weekly_path)
@@ -184,13 +210,25 @@ def build_report(
     shadow_report = _read_json(shadow_path)
     catalyst = _read_json(catalyst_path)
     surface_report = _read_json(surface_path) if surface_path is not None else {}
+    stock_screener_report = _read_json(stock_screener_path) if stock_screener_path is not None else {}
     hot = _by_symbol(weekly.get("hot_instruments") or [])
     liquidity = _by_symbol(liquidity_report.get("results") or [])
     shadow = _shadow_by_symbol(shadow_report)
     surface = _by_symbol(surface_report.get("results") or [])
-    symbols = sorted(set(hot) | set(liquidity) | set(shadow) | set(surface) | {"SPY"})
+    stock_screen = _by_symbol(stock_screener_report.get("rankings") or [])
+    for row in stock_screen.values():
+        row["formula_version"] = stock_screener_report.get("formula_version")
+    symbols = sorted(set(hot) | set(liquidity) | set(shadow) | set(surface) | set(stock_screen) | {"SPY"})
     rankings = [
-        _rank_symbol(symbol, hot.get(symbol, {}), liquidity.get(symbol, {}), shadow.get(symbol, {}), surface.get(symbol, {}))
+        _rank_symbol(
+            symbol,
+            hot.get(symbol, {}),
+            liquidity.get(symbol, {}),
+            shadow.get(symbol, {}),
+            surface.get(symbol, {}),
+            stock_screen.get(symbol, {}),
+            stock_screener_path is not None,
+        )
         for symbol in symbols
     ]
     rankings.sort(key=lambda row: (row["tier"] != "execution_benchmark", -row["rank_score"], row["symbol"]))
@@ -214,6 +252,10 @@ def build_report(
         "blocked_count": len(blocked),
         "surface_checked_count": sum(1 for row in rankings if row["options_surface_checked"]),
         "retail_lottery_risk_count": sum(1 for row in rankings if row["retail_lottery_risk"]),
+        "stock_screen_status": stock_screener_report.get("status") or "unavailable",
+        "stock_screen_formula_version": stock_screener_report.get("formula_version"),
+        "market_posture": stock_screener_report.get("market_posture") or {},
+        "market_sentiment": stock_screener_report.get("market_sentiment") or {},
         "promotion_review": promotion_review,
         "shadow_challengers": challengers,
         "blocked": blocked,
@@ -231,6 +273,7 @@ def build_report(
             "Unsigned public-chain volume is context only; it is never labeled institutional buying or selling.",
             "Cheap high-IV wide-spread option wings can block a non-SPY shadow challenger as retail-lottery risk.",
             "Rank scores are evidence-capped so tiny samples cannot appear elite.",
+            "The stock screen can veto an illiquid name but cannot promote it or create an order.",
         ],
     }
 

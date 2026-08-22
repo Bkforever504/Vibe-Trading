@@ -37,9 +37,63 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 def fetch_recent_bars(symbol: str, period: str = "5d", interval: str = "15m") -> pd.DataFrame:
     try:
         df = yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=True)
-        return df.tail(80).reset_index(drop=True)
+        return df.tail(80)
     except Exception:
         return pd.DataFrame()
+
+
+def reference_levels_from_bars(bars: pd.DataFrame) -> dict[str, Any]:
+    """Derive current-session VWAP and prior-session extremes without look-ahead."""
+    if bars is None or bars.empty:
+        return {"status": "no_data", "vwap": None, "prior_high": None, "prior_low": None}
+    if isinstance(bars.index, pd.DatetimeIndex):
+        timestamps = pd.Series(bars.index, index=bars.index)
+    else:
+        timestamp_column = next(
+            (name for name in ("Datetime", "Date", "timestamp") if name in bars.columns),
+            None,
+        )
+        if timestamp_column is None:
+            return {
+                "status": "timestamps_unavailable",
+                "vwap": None,
+                "prior_high": None,
+                "prior_low": None,
+            }
+        timestamps = pd.to_datetime(bars[timestamp_column], errors="coerce")
+    valid = bars.loc[timestamps.notna()].copy()
+    if valid.empty:
+        return {"status": "timestamps_invalid", "vwap": None, "prior_high": None, "prior_low": None}
+    valid["_session_date"] = list(timestamps.loc[timestamps.notna()].dt.date)
+    session_dates = sorted(valid["_session_date"].unique())
+    if len(session_dates) < 2:
+        return {
+            "status": "prior_session_unavailable",
+            "vwap": None,
+            "prior_high": None,
+            "prior_low": None,
+        }
+    current = valid[valid["_session_date"] == session_dates[-1]]
+    prior = valid[valid["_session_date"] == session_dates[-2]]
+    required = {"High", "Low", "Close", "Volume"}
+    if current.empty or prior.empty or not required.issubset(valid.columns):
+        return {"status": "ohlcv_incomplete", "vwap": None, "prior_high": None, "prior_low": None}
+    volume = pd.to_numeric(current["Volume"], errors="coerce").fillna(0.0)
+    typical = (
+        pd.to_numeric(current["High"], errors="coerce")
+        + pd.to_numeric(current["Low"], errors="coerce")
+        + pd.to_numeric(current["Close"], errors="coerce")
+    ) / 3.0
+    total_volume = float(volume.sum())
+    vwap = float((typical * volume).sum() / total_volume) if total_volume > 0 else None
+    return {
+        "status": "point_in_time_session_levels",
+        "vwap": round(vwap, 6) if vwap is not None and pd.notna(vwap) else None,
+        "prior_high": round(float(pd.to_numeric(prior["High"], errors="coerce").max()), 6),
+        "prior_low": round(float(pd.to_numeric(prior["Low"], errors="coerce").min()), 6),
+        "current_session": str(session_dates[-1]),
+        "prior_session": str(session_dates[-2]),
+    }
 
 
 def _candle_parts(row: pd.Series) -> dict[str, float]:
@@ -153,7 +207,13 @@ def analyze_symbol(symbol: str, bars: pd.DataFrame, reference_levels: dict[str, 
 
 def build_report(symbols: list[str] | None = None) -> dict[str, Any]:
     symbols = symbols or DEFAULT_SYMBOLS
-    items = [analyze_symbol(symbol, fetch_recent_bars(symbol)) for symbol in symbols]
+    items = []
+    for symbol in symbols:
+        bars = fetch_recent_bars(symbol)
+        levels = reference_levels_from_bars(bars)
+        item = analyze_symbol(symbol, bars, reference_levels=levels)
+        item["reference_level_status"] = levels.get("status")
+        items.append(item)
     summary = dict(Counter(row.get("bias", "neutral") for row in items))
     for key in ["bullish", "bearish", "neutral"]:
         summary.setdefault(key, 0)

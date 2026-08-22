@@ -17,9 +17,15 @@ import signal
 import time
 import csv
 import uuid
-from datetime import datetime
+from collections import OrderedDict
+from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, List, Optional
+from urllib.error import HTTPError as UrlHTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Security, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
@@ -42,8 +48,15 @@ RUNS_DIR = Path(__file__).resolve().parent / "runs"
 SESSIONS_DIR = Path(__file__).resolve().parent / "sessions"
 UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
 AGENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = AGENT_DIR.parent
 ENV_PATH = AGENT_DIR / ".env"
 ENV_EXAMPLE_PATH = AGENT_DIR / ".env.example"
+_LIVE_OPPORTUNITY_REPORT = Path.home() / ".vibe-trading" / "reports" / "live-opportunity-engine.json"
+
+# Installed console entry points place ``agent`` on sys.path but omit the repo
+# root, where the operational report builders live.
+if str(PROJECT_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(PROJECT_ROOT))
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 _UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
@@ -1449,6 +1462,235 @@ async def update_data_source_settings(payload: UpdateDataSourceSettingsRequest):
     return _build_data_source_settings_response(_read_env_values(ENV_PATH))
 
 
+class _TtlLruCache:
+    """Small thread-safe TTL/LRU cache with stale fallback support."""
+
+    def __init__(self, *, ttl_seconds: float, maxsize: int = 64) -> None:
+        self.ttl_seconds = ttl_seconds
+        self.maxsize = maxsize
+        self._items: OrderedDict[object, tuple[float, object]] = OrderedDict()
+        self._lock = Lock()
+
+    def get(self, key: object) -> object | None:
+        with self._lock:
+            item = self._items.get(key)
+            if item is None:
+                return None
+            stored_at, value = item
+            self._items.move_to_end(key)
+            if time.monotonic() - stored_at > self.ttl_seconds:
+                return None
+            return deepcopy(value)
+
+    def peek(self, key: object) -> object | None:
+        with self._lock:
+            item = self._items.get(key)
+            if item is None:
+                return None
+            self._items.move_to_end(key)
+            return deepcopy(item[1])
+
+    def set(self, key: object, value: object) -> None:
+        with self._lock:
+            self._items[key] = (time.monotonic(), deepcopy(value))
+            self._items.move_to_end(key)
+            while len(self._items) > self.maxsize:
+                self._items.popitem(last=False)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._items.clear()
+
+
+_TRADING_QUOTES_CACHE = _TtlLruCache(ttl_seconds=5.0, maxsize=64)
+_TRADING_BARS_CACHE = _TtlLruCache(ttl_seconds=15.0, maxsize=128)
+_TRADING_SYMBOL_RE = re.compile(r"^[A-Z][A-Z0-9.-]{0,14}$")
+_TRADING_TIMEFRAMES = {
+    "1m": "1Min",
+    "5m": "5Min",
+    "15m": "15Min",
+    "30m": "30Min",
+    "1h": "1Hour",
+    "1d": "1Day",
+}
+
+
+def _alpaca_dashboard_credentials() -> tuple[str, str]:
+    values = _read_env_values(ENV_PATH)
+    api_key = (
+        os.getenv("ALPACA_API_KEY")
+        or os.getenv("APCA_API_KEY_ID")
+        or values.get("ALPACA_API_KEY")
+        or values.get("APCA_API_KEY_ID")
+        or ""
+    ).strip()
+    secret = (
+        os.getenv("ALPACA_SECRET_KEY")
+        or os.getenv("APCA_API_SECRET_KEY")
+        or values.get("ALPACA_SECRET_KEY")
+        or values.get("APCA_API_SECRET_KEY")
+        or ""
+    ).strip()
+    if not api_key or not secret:
+        raise RuntimeError("Alpaca market data credentials are unavailable")
+    return api_key, secret
+
+
+def _alpaca_market_data_json(path: str, params: dict[str, object]) -> dict[str, Any]:
+    api_key, secret = _alpaca_dashboard_credentials()
+    request = UrlRequest(
+        f"https://data.alpaca.markets{path}?{urlencode(params)}",
+        headers={"APCA-API-KEY-ID": api_key, "APCA-API-SECRET-KEY": secret},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except UrlHTTPError as exc:
+        raise RuntimeError(f"Alpaca market data returned HTTP {exc.code}") from exc
+    except (URLError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Alpaca market data request failed") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("Alpaca market data returned an invalid payload")
+    return payload
+
+
+def _fetch_alpaca_latest_quotes(symbols: tuple[str, ...]) -> dict[str, Any]:
+    payload = _alpaca_market_data_json(
+        "/v2/stocks/quotes/latest",
+        {"symbols": ",".join(symbols), "feed": "iex"},
+    )
+    quotes = payload.get("quotes")
+    return quotes if isinstance(quotes, dict) else {}
+
+
+def _fetch_alpaca_bars(symbol: str, timeframe: str, limit: int) -> list[dict[str, Any]]:
+    payload = _alpaca_market_data_json(
+        "/v2/stocks/bars",
+        {
+            "symbols": symbol,
+            "timeframe": _TRADING_TIMEFRAMES[timeframe],
+            "limit": limit,
+            "feed": "iex",
+            "adjustment": "raw",
+            "sort": "asc",
+        },
+    )
+    bars_by_symbol = payload.get("bars")
+    if not isinstance(bars_by_symbol, dict):
+        return []
+    bars = bars_by_symbol.get(symbol)
+    return [row for row in bars if isinstance(row, dict)] if isinstance(bars, list) else []
+
+
+def _finite_number(value: object) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number and abs(number) != float("inf") else None
+
+
+def _market_timestamp(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _market_freshness(timestamp: datetime | None, *, now: datetime) -> str:
+    if timestamp is None:
+        return "missing"
+    age_seconds = max(0.0, (now - timestamp).total_seconds())
+    if age_seconds <= 60:
+        return "live"
+    if age_seconds <= 15 * 60:
+        return "recent"
+    return "stale"
+
+
+def _normalize_trading_symbols(value: str) -> tuple[str, ...]:
+    symbols = tuple(sorted({item.strip().upper() for item in value.split(",") if item.strip()}))
+    if not symbols:
+        raise HTTPException(status_code=400, detail="At least one symbol is required")
+    if len(symbols) > 25:
+        raise HTTPException(status_code=400, detail="Maximum 25 symbols")
+    if any(not _TRADING_SYMBOL_RE.fullmatch(symbol) for symbol in symbols):
+        raise HTTPException(status_code=400, detail="Invalid symbol")
+    return symbols
+
+
+def _quote_payload(symbols: tuple[str, ...], rows: dict[str, Any]) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    quotes: dict[str, Any] = {}
+    for symbol in symbols:
+        row = rows.get(symbol) if isinstance(rows.get(symbol), dict) else {}
+        bid = _finite_number(row.get("bp"))
+        ask = _finite_number(row.get("ap"))
+        quoted_at = _market_timestamp(row.get("t"))
+        freshness = _market_freshness(quoted_at, now=now)
+        price = (bid + ask) / 2 if bid is not None and ask is not None else bid if bid is not None else ask
+        quotes[symbol] = {
+            "price": round(price, 6) if price is not None else None,
+            "bid": bid,
+            "ask": ask,
+            "ts": quoted_at.isoformat() if quoted_at else None,
+            "freshness": freshness,
+            "stale": freshness in {"stale", "missing"},
+            "source": "alpaca_iex_latest_quote",
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+    return {
+        "generated_at": now.isoformat(),
+        "source": {"provider": "alpaca", "feed": "iex", "label": "alpaca_iex_latest_quote"},
+        "quotes": quotes,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _bars_payload(symbol: str, timeframe: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    candles: list[dict[str, Any]] = []
+    latest_at: datetime | None = None
+    for row in rows:
+        timestamp = _market_timestamp(row.get("t"))
+        open_price = _finite_number(row.get("o"))
+        high = _finite_number(row.get("h"))
+        low = _finite_number(row.get("l"))
+        close = _finite_number(row.get("c"))
+        if timestamp is None or None in {open_price, high, low, close}:
+            continue
+        latest_at = timestamp
+        candles.append(
+            {
+                "time": int(timestamp.timestamp()),
+                "open": open_price,
+                "high": high,
+                "low": low,
+                "close": close,
+                "volume": _finite_number(row.get("v")),
+            }
+        )
+    now = datetime.now(timezone.utc)
+    return {
+        "generated_at": now.isoformat(),
+        "symbol": symbol,
+        "tf": timeframe,
+        "source": {"provider": "alpaca", "feed": "iex", "label": "alpaca_iex_bars"},
+        "source_timestamp": latest_at.isoformat() if latest_at else None,
+        "freshness": _market_freshness(latest_at, now=now),
+        "bars": candles,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Liveness probe."""
@@ -1457,6 +1699,160 @@ async def health_check():
         service="Vibe-Trading API",
         timestamp=datetime.now().isoformat()
     )
+
+
+@app.get("/trading/dashboard", dependencies=[Depends(require_auth)])
+async def trading_dashboard():
+    """Return the normalized read-only trading cockpit feed."""
+    from scripts.live_trading_cockpit import build_cockpit
+
+    return build_cockpit()
+
+
+@app.get("/trading/dashboard/sources/{source_name}", dependencies=[Depends(require_auth)])
+async def trading_dashboard_source(source_name: str):
+    """Return one whitelisted raw report for cockpit source inspection."""
+    from scripts.live_trading_cockpit import load_source
+
+    try:
+        report = load_source(source_name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="unknown dashboard source") from exc
+    if not report:
+        raise HTTPException(status_code=404, detail="dashboard source is unavailable")
+    return report
+
+
+@app.get("/trading/quotes", dependencies=[Depends(require_auth)])
+async def trading_quotes(
+    symbols: str = Query(..., min_length=1, max_length=300),
+):
+    """Return cached Alpaca IEX latest quotes without order authority."""
+    normalized = _normalize_trading_symbols(symbols)
+    cached = _TRADING_QUOTES_CACHE.get(normalized)
+    if isinstance(cached, dict):
+        cached["cache"] = "hit"
+        return cached
+    try:
+        rows = await asyncio.to_thread(_fetch_alpaca_latest_quotes, normalized)
+    except Exception as exc:  # noqa: BLE001 - endpoint fails closed without leaking credentials
+        stale = _TRADING_QUOTES_CACHE.peek(normalized)
+        if isinstance(stale, dict):
+            stale["cache"] = "stale_fallback"
+            stale["freshness"] = "stale"
+            for quote in stale.get("quotes", {}).values():
+                if isinstance(quote, dict):
+                    quote["freshness"] = "stale"
+                    quote["stale"] = True
+            return stale
+        raise HTTPException(status_code=503, detail="Alpaca quote data unavailable") from exc
+    payload = _quote_payload(normalized, rows)
+    _TRADING_QUOTES_CACHE.set(normalized, payload)
+    payload["cache"] = "miss"
+    return payload
+
+
+@app.get("/trading/bars", dependencies=[Depends(require_auth)])
+async def trading_bars(
+    symbol: str = Query(..., min_length=1, max_length=15),
+    tf: str = Query("5m"),
+    limit: int = Query(200, ge=1, le=1000),
+):
+    """Return cached Alpaca IEX candles shaped for lightweight-charts."""
+    normalized = _normalize_trading_symbols(symbol)
+    if len(normalized) != 1:
+        raise HTTPException(status_code=400, detail="Exactly one symbol is required")
+    if tf not in _TRADING_TIMEFRAMES:
+        raise HTTPException(status_code=400, detail="Unsupported timeframe")
+    clean_symbol = normalized[0]
+    key = (clean_symbol, tf, limit)
+    cached = _TRADING_BARS_CACHE.get(key)
+    if isinstance(cached, dict):
+        cached["cache"] = "hit"
+        return cached
+    try:
+        rows = await asyncio.to_thread(_fetch_alpaca_bars, clean_symbol, tf, limit)
+    except Exception as exc:  # noqa: BLE001 - endpoint fails closed without leaking credentials
+        stale = _TRADING_BARS_CACHE.peek(key)
+        if isinstance(stale, dict):
+            stale["cache"] = "stale_fallback"
+            stale["freshness"] = "stale"
+            return stale
+        raise HTTPException(status_code=503, detail="Alpaca bar data unavailable") from exc
+    payload = _bars_payload(clean_symbol, tf, rows)
+    _TRADING_BARS_CACHE.set(key, payload)
+    payload["cache"] = "miss"
+    return payload
+
+
+def _read_live_opportunity_report() -> dict[str, Any]:
+    """Read and safety-normalize the current opportunity snapshot."""
+    try:
+        payload = json.loads(_LIVE_OPPORTUNITY_REPORT.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail="Live opportunity feed unavailable") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=503, detail="Live opportunity feed is invalid")
+    payload = deepcopy(payload)
+    payload["execution_enabled"] = False
+    payload["can_submit_orders"] = False
+    for row in payload.get("candidates") or []:
+        if isinstance(row, dict):
+            row["execution_enabled"] = False
+            row["can_submit_orders"] = False
+    return payload
+
+
+@app.get("/trading/opportunities", dependencies=[Depends(require_auth)])
+async def trading_opportunities():
+    """Return the latest ranked read-only streaming opportunity snapshot."""
+    return _read_live_opportunity_report()
+
+
+@app.get("/trading/feed-status", dependencies=[Depends(require_auth)])
+async def trading_feed_status():
+    """Return configured market-data provenance without credentials."""
+    from scripts.live_opportunity_engine import build_feed_provenance
+
+    provenance = build_feed_provenance()
+    try:
+        report = _read_live_opportunity_report()
+    except HTTPException:
+        report = {}
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "configured": provenance,
+        "last_report_at": report.get("generated_at"),
+        "last_event_at": (report.get("feed") or {}).get("last_event_at"),
+        "stream_status": report.get("stream_status", "snapshot_only" if report else "unavailable"),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+@app.get("/trading/opportunities/stream", dependencies=[Depends(require_event_stream_auth)])
+async def trading_opportunities_stream(request: Request):
+    """Stream file-backed opportunity state changes through authenticated SSE."""
+    async def event_stream():
+        last_mtime_ns: int | None = None
+        while not await request.is_disconnected():
+            try:
+                stat = _LIVE_OPPORTUNITY_REPORT.stat()
+                if stat.st_mtime_ns != last_mtime_ns:
+                    payload = _read_live_opportunity_report()
+                    yield f"event: opportunity\ndata: {json.dumps(payload, separators=(',', ':'))}\n\n"
+                    last_mtime_ns = stat.st_mtime_ns
+            except (OSError, HTTPException):
+                unavailable = {
+                    "decision_state": "STAND_ASIDE",
+                    "status": "unavailable",
+                    "execution_enabled": False,
+                    "can_submit_orders": False,
+                }
+                yield f"event: opportunity\ndata: {json.dumps(unavailable, separators=(',', ':'))}\n\n"
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/correlation")

@@ -21,6 +21,11 @@ if str(ROOT) not in sys.path:
 from research.liquid_universe_orb_replication import Variant, fetch_bars, replay as replay_first_bar
 from research.liquid_universe_retest_lab import RetestConfig, replay as replay_retest
 from scripts.point_in_time_quotes import capture_lifecycle_sample
+from scripts.tradier_options_data import (
+    fetch_quotes as fetch_tradier_quotes,
+    quote_is_fresh as tradier_quote_is_fresh,
+    tradier_selected,
+)
 from strategies.flip_contract_ranker import rank_contracts
 
 NY = ZoneInfo("America/New_York")
@@ -99,8 +104,34 @@ def fetch_contract_candidates(symbol: str, direction: str, *, min_dte: int = 7, 
                 "bid": bid,
                 "ask": ask,
                 "quote_timestamp": str(getattr(quote, "timestamp", "") or "") or None,
+                "quote_provider": "alpaca_options_snapshot_v1beta1",
+                "quote_scope": "indicative_modified_not_opra_nbbo",
             }
         )
+    if tradier_selected() and rows:
+        quotes = fetch_tradier_quotes(row["option_symbol"] for row in rows)
+        overlaid: list[dict[str, Any]] = []
+        for row in rows:
+            parsed = quotes.get(row["option_symbol"])
+            if not parsed or not tradier_quote_is_fresh(parsed):
+                continue
+            quote = parsed["quote"]
+            bid = float(quote["bid"])
+            ask = float(quote["ask"])
+            mid = (bid + ask) / 2.0
+            overlaid.append(
+                {
+                    **row,
+                    "bid": bid,
+                    "ask": ask,
+                    "spread_pct": round((ask - bid) / mid * 100.0, 3) if mid > 0 else None,
+                    "quote_age_seconds": quote.get("quote_age_seconds"),
+                    "quote_timestamp": quote.get("quote_timestamp"),
+                    "quote_provider": parsed["provenance"].get("provider"),
+                    "quote_scope": parsed["provenance"].get("quote_scope"),
+                }
+            )
+        rows = overlaid
     return rows
 
 

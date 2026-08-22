@@ -23,10 +23,29 @@ def test_loop_deduplicates_events_and_nominates_repeated_patterns(tmp_path) -> N
     ledger = tmp_path / "ledger.jsonl"
     report_path = tmp_path / "report.json"
     log_path = tmp_path / "log.jsonl"
+    shadow_path = tmp_path / "shadow.jsonl"
+    flip_state_path = _write(tmp_path / "flip-state.json", [])
+    options_twin_path = tmp_path / "options-twin.jsonl"
 
-    report, new_rows = build_report(learning, watchdog, audit, ledger)
+    report, new_rows = build_report(
+        learning,
+        watchdog,
+        audit,
+        ledger,
+        shadow_path=shadow_path,
+        flip_state_path=flip_state_path,
+        options_shadow_twin_path=options_twin_path,
+    )
     write_outputs(report, new_rows, ledger, report_path, log_path)
-    rerun, rerun_rows = build_report(learning, watchdog, audit, ledger)
+    rerun, rerun_rows = build_report(
+        learning,
+        watchdog,
+        audit,
+        ledger,
+        shadow_path=shadow_path,
+        flip_state_path=flip_state_path,
+        options_shadow_twin_path=options_twin_path,
+    )
 
     assert len(new_rows) == 2
     assert rerun_rows == []
@@ -48,7 +67,15 @@ def test_decaying_watchdog_mistake_remains_memory_without_blocking(tmp_path) -> 
     })
     audit = _write(tmp_path / "audit.json", {"subjects": []})
 
-    report, _ = build_report(learning, watchdog, audit, tmp_path / "ledger.jsonl")
+    report, _ = build_report(
+        learning,
+        watchdog,
+        audit,
+        tmp_path / "ledger.jsonl",
+        shadow_path=tmp_path / "shadow.jsonl",
+        flip_state_path=_write(tmp_path / "flip-state.json", []),
+        options_shadow_twin_path=tmp_path / "options-twin.jsonl",
+    )
 
     assert report["repeated_patterns"][0]["severity"] == "decaying"
     assert report["shadow_challenger_nominations"] == []
@@ -82,7 +109,15 @@ def test_shadow_losses_are_clustered_by_actionable_entry_context(tmp_path) -> No
     watchdog = _write(tmp_path / "watchdog.json", {"alerts": [], "setup_mismatch_examples": []})
     audit = _write(tmp_path / "audit.json", {"subjects": []})
 
-    report, _ = build_report(learning, watchdog, audit, tmp_path / "ledger.jsonl")
+    report, _ = build_report(
+        learning,
+        watchdog,
+        audit,
+        tmp_path / "ledger.jsonl",
+        shadow_path=tmp_path / "shadow.jsonl",
+        flip_state_path=_write(tmp_path / "flip-state.json", []),
+        options_shadow_twin_path=tmp_path / "options-twin.jsonl",
+    )
 
     nomination = report["shadow_challenger_nominations"][0]
     assert nomination["supporting_occurrences"] == 2

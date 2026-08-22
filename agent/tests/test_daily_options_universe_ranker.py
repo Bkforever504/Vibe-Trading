@@ -25,7 +25,7 @@ def test_ranker_keeps_spy_benchmark_and_challengers_shadow_only(tmp_path: Path) 
     }})
     catalyst = _write(tmp_path / "catalyst.json", {"today": {"max_impact": "high", "allowed_playbooks": ["stand_aside"], "vetoes": ["event"]}})
 
-    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None, today="2026-07-13")
+    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None, stock_screener_path=None, today="2026-07-13")
     nvda = next(row for row in result["rankings"] if row["symbol"] == "NVDA")
 
     assert result["execution_enabled"] is False
@@ -43,7 +43,7 @@ def test_ranker_liquidity_veto_blocks_socially_hot_symbol(tmp_path: Path) -> Non
     shadow = _write(tmp_path / "shadow.json", {"by_symbol": {}})
     catalyst = _write(tmp_path / "catalyst.json", {})
 
-    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None)
+    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None, stock_screener_path=None)
     tsla = next(row for row in result["rankings"] if row["symbol"] == "TSLA")
 
     assert tsla["tier"] == "blocked"
@@ -60,7 +60,7 @@ def test_ranker_requires_full_forward_evidence_for_top_cap(tmp_path: Path) -> No
     }}})
     catalyst = _write(tmp_path / "catalyst.json", {})
 
-    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None)
+    result = ranker.build_report(weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow, catalyst_path=catalyst, surface_path=None, stock_screener_path=None)
     qqq = next(row for row in result["rankings"] if row["symbol"] == "QQQ")
 
     assert qqq["tier"] == "promotion_review"
@@ -81,7 +81,7 @@ def test_surface_lottery_risk_blocks_only_shadow_ranking(tmp_path: Path) -> None
 
     result = ranker.build_report(
         weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow,
-        catalyst_path=catalyst, surface_path=surface,
+        catalyst_path=catalyst, surface_path=surface, stock_screener_path=None,
     )
     rivn = next(row for row in result["rankings"] if row["symbol"] == "RIVN")
 
@@ -89,3 +89,44 @@ def test_surface_lottery_risk_blocks_only_shadow_ranking(tmp_path: Path) -> None
     assert "cheap_option_retail_lottery_risk" in rivn["blockers"]
     assert rivn["institutional_flow_available"] is False
     assert result["non_spy_execution_allowed"] is False
+
+
+def test_stock_screen_can_veto_but_cannot_promote(tmp_path: Path) -> None:
+    weekly = _write(tmp_path / "weekly.json", {"hot_instruments": [{"symbol": "NVDA", "hot_score": 99}]})
+    liquidity = _write(tmp_path / "liquidity.json", {"results": [{"symbol": "NVDA", "status": "ok", "score": 5, "flip_shadow_eligible": True}]})
+    shadow = _write(tmp_path / "shadow.json", {"by_symbol": {"NVDA": {
+        "completed_count": 50, "trading_day_count": 60, "out_of_sample_positive": True,
+        "promotion_eligible": True,
+    }}})
+    catalyst = _write(tmp_path / "catalyst.json", {})
+    screen = _write(tmp_path / "screen.json", {
+        "status": "ok",
+        "formula_version": "screen-v1",
+        "rankings": [{"symbol": "NVDA", "status": "blocked", "score": 99}],
+    })
+
+    result = ranker.build_report(
+        weekly_path=weekly, liquidity_path=liquidity, shadow_path=shadow,
+        catalyst_path=catalyst, surface_path=None, stock_screener_path=screen,
+    )
+    nvda = next(row for row in result["rankings"] if row["symbol"] == "NVDA")
+
+    assert nvda["tier"] == "blocked"
+    assert nvda["stock_screen_veto"] is True
+    assert "stock_screen_blocked" in nvda["blockers"]
+    assert result["non_spy_execution_allowed"] is False
+
+
+def test_qualified_stock_screen_score_cannot_increase_rank() -> None:
+    common = {
+        "symbol": "NVDA",
+        "hot": {},
+        "liquidity": {"status": "ok", "score": 5, "flip_shadow_eligible": True},
+        "shadow": {},
+        "surface": {},
+        "stock_screen_required": True,
+    }
+    low = ranker._rank_symbol(stock_screen={"status": "watch", "score": 0}, **common)
+    high = ranker._rank_symbol(stock_screen={"status": "qualified_long", "score": 100}, **common)
+    assert high["rank_score"] == low["rank_score"]
+    assert high["stock_screen_directional_authority"] == "blocked_failed_1d_5d_20d_walk_forward"

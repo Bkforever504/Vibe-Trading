@@ -43,13 +43,13 @@ def test_bear_trend_candidate_uses_vwap_and_50ema(monkeypatch) -> None:
     )
     monkeypatch.setattr(flip_bot, "_atm_option", lambda sym, right: ("SPY260624P00730000", 730.0, 0.20, "2026-06-24"))
 
-    setup = flip_bot.find_bear_trend_day(5000.0)
+    setup = flip_bot.find_bear_trend_day(100_000.0)
 
     assert setup is not None
     assert setup["strategy"] == "bear_trend"
     assert setup["symbol"] == "SPY"
     assert setup["right"] == "PUT"
-    assert setup["contracts"] == 5
+    assert setup["contracts"] == 1
     assert setup["confidence"] >= 8
     assert "VWAP" in setup["catalyst"]
     assert "50EMA" in setup["catalyst"]

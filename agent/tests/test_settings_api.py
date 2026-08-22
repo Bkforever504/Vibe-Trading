@@ -182,6 +182,7 @@ def test_settings_reads_reject_remote_dev_mode_clients(
     monkeypatch.setattr(api_server, "ENV_PATH", env_path)
     monkeypatch.setattr(api_server, "ENV_EXAMPLE_PATH", env_example)
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
+    monkeypatch.setattr(api_server, "_API_KEY", None)
     remote_client = TestClient(api_server.app, client=("203.0.113.10", 50000))
 
     llm_response = remote_client.get("/settings/llm")
@@ -256,6 +257,7 @@ def test_settings_writes_reject_remote_dev_mode_clients(
     monkeypatch.setattr(api_server, "ENV_PATH", env_path)
     monkeypatch.setattr(api_server, "ENV_EXAMPLE_PATH", env_example)
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
+    monkeypatch.setattr(api_server, "_API_KEY", None)
     remote_client = TestClient(api_server.app, client=("203.0.113.10", 50000))
 
     response = remote_client.put(

@@ -10,6 +10,7 @@ import argparse
 import csv
 import json
 import subprocess
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from io import StringIO
@@ -32,6 +33,19 @@ OPTIONS_ENTRY_WINDOWS_ET = (("09:45", "10:30"), ("15:00", "15:45"))
 # at their own start minute, while still flagging genuinely stuck tasks.
 RUNNING_GRACE_MINUTES = 30
 
+
+def _minute_series(start: str, end: str, step_minutes: int) -> set[str]:
+    """Build an inclusive HH:MM schedule without duplicating long trigger lists."""
+    start_hour, start_minute = (int(part) for part in start.split(":"))
+    end_hour, end_minute = (int(part) for part in end.split(":"))
+    current = start_hour * 60 + start_minute
+    final = end_hour * 60 + end_minute
+    return {
+        f"{minute // 60:02d}:{minute % 60:02d}"
+        for minute in range(current, final + 1, step_minutes)
+    }
+
+
 EXPECTED_TASKS = {
     # Timing governance before the rest of the day starts.
     r"\VibeTrade\MarketScheduleAlignment": {"08:10", "19:58"},
@@ -47,19 +61,36 @@ EXPECTED_TASKS = {
     r"\VibeTrade\RVIVRegimeScanner": {"08:37"},
     r"\VibeTrade\HurstRegimeScanner": {"08:38"},
     r"\VibeTrade\OpeningRangeBreadthScanner": {"08:40"},
+    r"\Flip-Bot-Exploration": {"08:40"},
+    r"\VibeTrade\TrendParticipationShadowEntry": {"08:47", "14:02"},
+    r"\VibeTrade\TrendParticipationShadowMonitor": {"08:50"},
     # Regular-hours execution/watch.
-    r"\Flip-Bot-Monitor": {"08:45"},
-    r"\VibeTradingOptionsShadowTwin": {
-        "08:45", "09:15", "09:45", "10:15", "10:45", "11:15", "11:45",
-        "12:15", "12:45", "13:15", "13:45", "14:15", "14:45",
-    },
+    # Three staggered 15-minute task families provide one monitor run every
+    # five minutes without overlapping scheduler instances.
+    r"\Flip-Bot-Monitor": _minute_series("08:45", "15:45", 15),
+    r"\Flip-Bot-Monitor-5m-A": _minute_series("08:50", "15:35", 15),
+    r"\Flip-Bot-Monitor-5m-B": _minute_series("08:55", "15:40", 15),
+    r"\VibeTradingOptionsShadowTwin": {"08:45"},
     r"\VibeTradingShadowScanner": {"09:30", "10:30", "11:30", "12:30", "13:30", "14:30"},
     r"\Flip-Bot-Trend-Entry": {
         "09:45", "10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30",
         "11:45", "12:00", "12:15", "12:30", "12:45", "13:00", "13:15", "13:30", "13:45",
     },
     r"\IWM-Bot-Entry": {"08:45", "14:00"},
-    r"\IWM-Bot-Monitor": {"10:00", "11:00", "12:00", "13:00", "14:00", "15:00"},
+    r"\IWM-Bot-Monitor": {"08:35"},
+    r"\SPY-Theta-Harvester-Entry": {"08:45"},
+    r"\SPY-Theta-Harvester-Monitor": {"09:00", "10:00", "11:00", "12:00", "13:00", "14:00"},
+    r"\SPY-Iron-Condor-Entry": {"08:45"},
+    r"\SPY-Iron-Condor-Observation": {"08:50"},
+    r"\SPY-Iron-Condor-Monitor": {"09:00", "12:00", "14:00"},
+    r"\Liquidity-Sweep-Scanner": {"08:43", "09:35", "10:40"},
+    r"\SPY-0DTE-PM-Entry": {"11:05", "12:05"},
+    r"\SPY-0DTE-PM-Monitor": _minute_series("11:15", "14:45", 15),
+    r"\SPY-Wheel-Check": {"08:45"},
+    r"\VIX-Call-Hedge-Check": {"09:00"},
+    r"\Portfolio-Theta-Dashboard": {"09:30"},
+    r"\SPY-Weekend-Vol-Entry": {"13:35"},
+    r"\SPY-Weekend-Vol-Monitor": {"08:50", "13:05", "14:05"},
     r"\VibeTrade\PortfolioConcentrationMonitor": {"11:05"},
     # Close context after regular close.
     r"\RSI2ShadowLogger": {"15:20"},
@@ -102,11 +133,20 @@ EXPECTED_TASKS = {
     r"\VibeTrade\DailyEODSummary": {"20:00"},
     r"\VibeTrade\EliteBotReadinessScorecard": {"20:03"},
     r"\VibeTrade\NightlyResearchLoop": {"20:05"},
+    r"\VibeTradingNightlyOptionsNBBOEvidence": {"20:15"},
+}
+
+EXPECTED_TASK_REPETITIONS = {
+    r"\VibeTradingOptionsShadowTwin": {"interval": "PT1M", "duration": "PT6H10M"},
+    r"\IWM-Bot-Monitor": {"interval": "PT1M", "duration": "PT6H25M"},
+    r"\VibeTrade\TrendParticipationShadowMonitor": {"interval": "PT5M", "duration": "PT6H5M"},
 }
 
 ORDER_CHECKS = [
     ("preopen_before_open", r"\VibeTrade\PreOpenSentimentLogger", r"\Flip-Bot-Entry"),
+    ("production_entry_before_exploration", r"\Flip-Bot-Entry", r"\Flip-Bot-Exploration"),
     ("open_scanners_before_trend", r"\VibeTrade\OpeningRangeBreadthScanner", r"\Flip-Bot-Trend-Entry"),
+    ("opening_range_before_trend_shadow", r"\VibeTrade\OpeningRangeBreadthScanner", r"\VibeTrade\TrendParticipationShadowEntry"),
     ("close_context_before_market_force", r"\VibeTrade\SectorRotationRanker", r"\VibeTrade\MarketForceScore"),
     ("activity_before_outcome", r"\VibeTrade\DailyBotActivityExport", r"\VibeTrade\DailyOutcomeReviewer"),
     ("liquidity_before_universe_rank", r"\VibeTrade\OptionsLiquidityFeasibility", r"\VibeTrade\DailyOptionsUniverseRanker"),
@@ -164,6 +204,32 @@ def query_scheduled_tasks() -> list[dict[str, str]]:
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or proc.stdout).strip())
     return list(csv.DictReader(StringIO(proc.stdout)))
+
+
+def query_task_repetitions() -> dict[str, dict[str, str]]:
+    repetitions: dict[str, dict[str, str]] = {}
+    namespace = {"task": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+    for task in EXPECTED_TASK_REPETITIONS:
+        proc = subprocess.run(
+            ["schtasks", "/Query", "/TN", task, "/XML"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if proc.returncode != 0:
+            continue
+        try:
+            root = ET.fromstring(proc.stdout)
+        except ET.ParseError:
+            continue
+        repetition = root.find(".//task:CalendarTrigger/task:Repetition", namespace)
+        if repetition is None:
+            continue
+        interval = repetition.findtext("task:Interval", default="", namespaces=namespace)
+        duration = repetition.findtext("task:Duration", default="", namespaces=namespace)
+        repetitions[task] = {"interval": interval, "duration": duration}
+    return repetitions
 
 
 def _task_times(rows: list[dict[str, str]]) -> dict[str, set[str]]:
@@ -238,8 +304,19 @@ def _entry_window_coverage_issues(actual_times: dict[str, set[str]]) -> list[dic
     return issues
 
 
-def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None = None) -> dict[str, Any]:
+def build_report(
+    rows: list[dict[str, str]] | None = None,
+    now: datetime | None = None,
+    task_repetitions: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    live_query = rows is None
     rows = rows if rows is not None else query_scheduled_tasks()
+    task_repetitions = (
+        task_repetitions
+        if task_repetitions is not None
+        else query_task_repetitions() if live_query
+        else EXPECTED_TASK_REPETITIONS
+    )
     now = now or datetime.now()
     actual_times = _task_times(rows)
     statuses = _task_statuses(rows)
@@ -250,6 +327,9 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
 
     for task, expected in EXPECTED_TASKS.items():
         actual = actual_times.get(task, set())
+        expected_repetition = EXPECTED_TASK_REPETITIONS.get(task)
+        actual_repetition = task_repetitions.get(task)
+        repetition_ok = expected_repetition is None or actual_repetition == expected_repetition
         missing = sorted(expected - actual)
         extra = sorted(actual - expected)
         status_values = sorted(statuses.get(task, set()))
@@ -259,6 +339,19 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
             issues.append({"task": task, "issue": "missing_expected_times", "missing": missing, "actual": sorted(actual)})
         if extra:
             warnings.append({"task": task, "issue": "extra_start_times", "extra": extra, "expected": sorted(expected)})
+        if expected_repetition is not None and actual_repetition is None:
+            issues.append({
+                "task": task,
+                "issue": "missing_expected_repetition",
+                "expected": expected_repetition,
+            })
+        elif expected_repetition is not None and not repetition_ok:
+            issues.append({
+                "task": task,
+                "issue": "repetition_mismatch",
+                "expected": expected_repetition,
+                "actual": actual_repetition,
+            })
         status_ok = True
         bad_statuses = [status for status in status_values if status not in {"Ready", "Running"}]
         if bad_statuses:
@@ -286,8 +379,10 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
             "task": task,
             "expected": sorted(expected),
             "actual": sorted(actual),
+            "expected_repetition": expected_repetition,
+            "actual_repetition": actual_repetition,
             "statuses": status_values,
-            "aligned": not missing and bool(actual) and status_ok,
+            "aligned": not missing and bool(actual) and status_ok and repetition_ok,
         })
 
     issues.extend(_entry_window_coverage_issues(actual_times))
@@ -328,6 +423,7 @@ def build_report(rows: list[dict[str, str]] | None = None, now: datetime | None 
         "notes": [
             "Times are Central Time on Kenny's Windows machine.",
             "IWM entry triggers must cover both configured Eastern fill-quality windows.",
+            "Options shadow and paper position monitors must retain their governed one-minute repetition intervals.",
             "This checks regular trading-day timing. Holiday/half-day handling remains a manual watch item unless an exchange calendar is added.",
             "Portfolio monitor uses a repeating 15-minute task and self-skips outside its monitor window, so it is tracked separately by health/logs.",
         ],

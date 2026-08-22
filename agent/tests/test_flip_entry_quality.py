@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -92,6 +92,9 @@ def test_primary_consensus_caution_blocks_only_primary_lane() -> None:
     setup["execution_lane"] = "paper_challenger"
     assert bot._primary_consensus_caution_blocker(setup, consensus) is None
 
+    setup["execution_lane"] = "exploration"
+    assert bot._primary_consensus_caution_blocker(setup, consensus) is None
+
 
 def test_entry_slippage_limit_uses_lower_reference_price() -> None:
     setup = {"entry_price_est": 1.30, "selection_ask": 1.25}
@@ -139,6 +142,118 @@ def test_entry_slippage_blocker_requires_fresh_submit_quote(monkeypatch) -> None
 
     assert blocker is not None
     assert blocker["reason"] == "entry_quote_stale_or_unverifiable"
+
+
+def test_entry_execution_quality_blocks_tick_size_dominated_contract() -> None:
+    from strategies.flip_execution_policy import evaluate_long_option_quote
+
+    result = evaluate_long_option_quote(
+        bid=0.04,
+        ask=0.05,
+        quote_age_seconds=0.5,
+        min_ask=0.10,
+        max_spread_pct_of_mid=0.10,
+    )
+
+    assert result["eligible"] is False
+    assert "entry_premium_below_minimum" in result["blockers"]
+    assert "entry_relative_spread_too_wide" in result["blockers"]
+    assert result["immediate_cross_loss_pct_of_ask"] == 0.20
+
+
+def test_entry_slippage_blocker_records_eligible_fresh_quote(monkeypatch) -> None:
+    setup = {
+        "option_symbol": "SPY260717C00747000",
+        "entry_price_est": 1.25,
+        "selection_ask": 1.25,
+    }
+    monkeypatch.setattr(bot, "_option_mid", lambda _occ: 1.25)
+    monkeypatch.setattr(
+        bot,
+        "_selection_quote_fields",
+        lambda _occ: {
+            "selection_bid": 1.24,
+            "selection_ask": 1.25,
+            "quote_age_seconds": 0.5,
+        },
+    )
+
+    blocker = bot._entry_slippage_blocker(setup)
+
+    assert blocker is None
+    assert setup["entry_execution_quality"]["eligible"] is True
+    assert setup["entry_execution_quality"]["spread_pct_of_mid"] < 0.01
+
+
+def test_entry_slippage_blocker_requests_and_waits_for_opra_quote(monkeypatch) -> None:
+    setup = {
+        "option_symbol": "SPY260817C00780000",
+        "entry_price_est": 1.25,
+        "selection_ask": 1.25,
+    }
+    requested = []
+    streamed_quotes = iter(
+        [
+            {},
+            {
+                "selection_bid": 1.24,
+                "selection_ask": 1.25,
+                "quote_age_seconds": 0.1,
+                "quote_feed": "opra",
+                "quote_authority": "opra",
+                "quote_transport": "websocket",
+            },
+        ]
+    )
+    monkeypatch.setattr(bot, "REQUIRE_OPRA_EXECUTION_QUOTES", True)
+    monkeypatch.setattr(bot, "OPRA_ENTRY_QUOTE_WAIT_SECONDS", 1.0)
+    monkeypatch.setattr(bot, "request_option_quote", lambda symbol, **_kwargs: requested.append(symbol))
+    monkeypatch.setattr(bot, "_stream_option_quote", lambda _symbol: next(streamed_quotes))
+    monkeypatch.setattr(bot.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(bot, "_option_mid", lambda _symbol: 1.245)
+
+    blocker = bot._entry_slippage_blocker(setup)
+
+    assert blocker is None
+    assert requested == ["SPY260817C00780000"]
+    assert setup["entry_quote_authority_at_submit"] == "opra"
+
+
+def test_bounded_paper_exploration_can_use_fresh_rest_snapshot(monkeypatch) -> None:
+    setup = {
+        "option_symbol": "SPY260817P00765000",
+        "entry_price_est": 0.50,
+        "selection_ask": 0.50,
+        "execution_lane": "exploration",
+    }
+    monkeypatch.setattr(bot, "PAPER", True)
+    monkeypatch.setattr(bot, "LIVE_EXECUTION_ENABLED", False)
+    monkeypatch.setattr(bot, "REQUIRE_OPRA_EXECUTION_QUOTES", True)
+    monkeypatch.setattr(bot, "_option_mid", lambda _symbol: 0.495)
+    monkeypatch.setattr(
+        bot,
+        "_execution_quote_fields",
+        lambda _symbol: {
+            "selection_bid": 0.49,
+            "selection_ask": 0.50,
+            "quote_age_seconds": 0.5,
+            "quote_timestamp": "2026-08-18T14:50:00Z",
+            "quote_feed": "unverified_snapshot",
+            "quote_authority": "unverified_rest_snapshot",
+            "quote_transport": "rest",
+        },
+    )
+    monkeypatch.setattr(
+        bot,
+        "request_option_quote",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("OPRA must not be requested")),
+    )
+
+    blocker = bot._entry_slippage_blocker(setup)
+
+    assert blocker is None
+    assert setup["entry_quote_policy"] == "bounded_paper_snapshot_allowed"
+    assert setup["entry_quote_authority_at_submit"] == "unverified_rest_snapshot"
 
 
 def test_entry_evidence_gate_blocks_raw_and_stale_orb_but_allows_fresh_retest() -> None:
@@ -370,7 +485,7 @@ def test_confirmed_orb_retest_reaches_execution_candidate(monkeypatch) -> None:
     monkeypatch.setattr(bot, "_now_et", lambda: datetime(2026, 7, 15, 9, 45))
     _stub_0dte_advisory_context(monkeypatch)
 
-    setup = bot._find_0dte_for_symbol(10_000, "SPY")
+    setup = bot._find_0dte_for_symbol(100_000, "SPY")
 
     assert setup is not None
     assert setup["right"] == "PUT"
@@ -511,7 +626,42 @@ def test_path_telemetry_baseline_starts_at_entry_break_even() -> None:
     assert baseline["best_pnl_pct"] == 0.0
     assert baseline["worst_pnl_pct"] == 0.0
     assert baseline["path_telemetry_schema_version"] == 1
-    assert baseline["path_telemetry_source"] == "live_entry_baseline"
+    assert baseline["path_telemetry_source"] == "forward_observed_lifecycle"
+    assert baseline["path_telemetry_observed"] is True
+    assert baseline["telemetry_quality"] == "forward_observed"
+
+
+def test_trade_shape_uses_executable_price_and_pins_first_mark() -> None:
+    trade = {
+        "entry_price": 1.0,
+        "entry_at": "2026-08-10T14:30:00Z",
+        "best_pnl_pct": 0.0,
+        "worst_pnl_pct": -12.0,
+    }
+    observed_at = datetime(2026, 8, 10, 14, 35, tzinfo=timezone.utc)
+
+    first = bot._trade_shape_snapshot(
+        trade,
+        mid=0.98,
+        executable_price=0.90,
+        observed_at=observed_at,
+    )
+    second = bot._trade_shape_snapshot(
+        trade,
+        mid=1.25,
+        executable_price=1.20,
+        observed_at=datetime(2026, 8, 10, 14, 40, tzinfo=timezone.utc),
+    )
+
+    assert first["state"] == "loser_never_confirmed"
+    assert first["executable_pnl_pct"] == -10.0
+    assert first["mid_to_executable_friction_pct_of_entry"] == 8.0
+    assert trade["first_executable_mark_confirmation"] == "not_green"
+    assert trade["first_executable_mark_pnl_pct"] == -10.0
+    assert second["state"] == "recovered_from_adverse_excursion"
+    assert trade["monitor_observation_count"] == 2
+    assert second["authority"] == "telemetry_only"
+    assert second["can_submit_orders"] is False
 
 
 def test_update_pnl_extremes_uses_break_even_baseline_after_restart() -> None:
@@ -543,6 +693,8 @@ def test_stamp_exit_writes_complete_exit_record() -> None:
     # exit_at parses as an aware-ish ISO timestamp.
     datetime.fromisoformat(trade["exit_at"].replace("Z", "+00:00"))
     assert trade["exit_date"]
+    assert trade["best_pnl_pct"] == 0.0
+    assert trade["worst_pnl_pct"] == -18.51
 
 
 def test_stamp_exit_records_broker_order_id() -> None:

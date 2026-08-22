@@ -9,13 +9,19 @@ import argparse
 import json
 import math
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.probability_calibration import chronological_holdout, probability_metrics
+
+
 VIBE_HOME = Path.home() / ".vibe-trading"
 DEFAULT_TRADES = VIBE_HOME / "flip-trades.json"
 DEFAULT_MISSED_REVIEW = VIBE_HOME / "reports" / "flip-decision-missed-banger-review.json"
@@ -51,6 +57,20 @@ def extract_confidence(trade: dict[str, Any]) -> tuple[float | None, str]:
     match = CONFIDENCE_PATTERN.search(catalyst)
     if match:
         return min(10.0, max(0.0, float(match.group(1)))), "inferred_from_catalyst"
+    return None, "missing"
+
+
+def extract_probability(trade: dict[str, Any]) -> tuple[float | None, str]:
+    """Read only an explicitly frozen probability; never reinterpret a score."""
+    entry_quality = trade.get("entry_quality") if isinstance(trade.get("entry_quality"), dict) else {}
+    snapshot = entry_quality.get("feature_snapshot") if isinstance(entry_quality.get("feature_snapshot"), dict) else {}
+    for key in ("calibrated_probability", "raw_probability", "win_probability"):
+        value = _finite(snapshot.get(key))
+        if value is not None and 0.0 <= value <= 1.0:
+            return value, f"structured_entry_snapshot.{key}"
+    value = _finite(trade.get("raw_probability"))
+    if value is not None and 0.0 <= value <= 1.0:
+        return value, "trade.raw_probability"
     return None, "missing"
 
 
@@ -194,21 +214,38 @@ def build_report(trades_payload: Any, missed_review: dict[str, Any]) -> dict[str
     post = [row for row in closed if row["entry_date"] >= POST_HARDENING_START]
     predictions: list[float] = []
     outcomes: list[int] = []
+    probability_samples: list[dict[str, Any]] = []
     provenance = defaultdict(int)
+    probability_provenance = defaultdict(int)
     for trade in post:
         confidence, source = extract_confidence(trade)
         provenance[source] += 1
         if confidence is not None:
             predictions.append(confidence / 10.0)
             outcomes.append(int(float(trade["pnl"]) > 0))
+        probability, probability_source = extract_probability(trade)
+        probability_provenance[probability_source] += 1
+        if probability is not None:
+            probability_samples.append({
+                "id": trade.get("id"),
+                "timestamp": trade.get("entry_at") or trade.get("entry_date"),
+                "probability": probability,
+                "outcome": int(float(trade["pnl"]) > 0),
+            })
 
     early, recent, split = split_at_profit_peak(post)
     structured = [row for row in post if extract_confidence(row)[1] == "structured_entry_snapshot"]
     missed_evaluations = missed_review.get("evaluations") if isinstance(missed_review.get("evaluations"), list) else []
+    probability_calibration = probability_metrics(probability_samples)
+    probability_holdout = chronological_holdout(probability_samples)
+    calibration_evidence = (
+        probability_holdout.get("status") == "ok"
+        and (_finite(probability_holdout.get("brier_skill_vs_expanding_base_rate")) or 0.0) > 0
+    )
     dimensions = {
         "risk_controls": 10.0,
         "realized_sample_depth": round(min(10.0, len(post) / 100.0 * 10.0), 1),
-        "confidence_calibration": 0.0 if len(set(predictions)) < 2 else 3.0,
+        "confidence_calibration": 3.0 if calibration_evidence else 0.0,
         "point_in_time_entry_telemetry": round(min(10.0, len(structured) / 30.0 * 10.0), 1),
         "independent_oos_or_forward_trials": 0.0,
     }
@@ -233,10 +270,30 @@ def build_report(trades_payload: Any, missed_review: dict[str, Any]) -> dict[str
             "provenance_counts": dict(sorted(provenance.items())),
             "structured_snapshot_subset": _trade_stats(structured),
             "execution_ready": False,
-            "interpretation": "A score used as confidence must vary and predict outcomes; a repeated 9/10 setup grade does neither yet.",
+            "authority": "legacy_setup_score_diagnostic_only",
+            "interpretation": "The legacy 0-10 field is a setup score, not a probability. Its score/10 diagnostic cannot earn calibration authority.",
+        },
+        "probability_calibration": {
+            **probability_calibration,
+            "provenance_counts": dict(sorted(probability_provenance.items())),
+            "chronological_holdout": probability_holdout,
+            "execution_ready": False,
+            "probability_source_policy": "explicit_frozen_probability_only",
+            "outcome_definition": "realized_trade_pnl_positive_after_recorded_exit",
         },
         "consensus_veto_counterfactual": consensus_counterfactual(post),
         "blocked_trade_proxy": blocker_proxy_summary(missed_evaluations),
+        "decision_denominator": {
+            "taken_closed_count": len(post),
+            "blocked_or_skipped_evaluation_count": len(missed_evaluations),
+            "blocked_or_skipped_observed_count": sum(
+                row.get("outcome_status") == "observed" for row in missed_evaluations
+            ),
+            "blocked_or_skipped_unscored_count": sum(
+                row.get("outcome_status") != "observed" for row in missed_evaluations
+            ),
+            "warning": "Blocked candidates use underlying proxies until option-level counterfactual fills are available.",
+        },
         "profitability_evidence_grade": {
             "score_out_of_10": overall,
             "dimensions": dimensions,
@@ -246,6 +303,7 @@ def build_report(trades_payload: Any, missed_review: dict[str, Any]) -> dict[str
         "actions": [
             "Rename the current 0-10 value to setup_score until calibration is earned.",
             "Log a preregistered probability from a frozen model separately from setup_score.",
+            "Fit calibration only on prior resolved dates and report the expanding-window holdout separately.",
             "Keep the multi-warning primary consensus caution veto in paper mode and evaluate 30 blocked-versus-taken outcomes.",
             "Do not loosen gates to recreate the early winning streak; test regime and exit hypotheses independently.",
         ],

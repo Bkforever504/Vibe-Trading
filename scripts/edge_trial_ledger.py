@@ -20,7 +20,7 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 LEDGER_PATH = ROOT / "data" / "edge_trial_ledger.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "edge-trial-ledger.json"
 REPORT_LOG_PATH = ROOT / "data" / "edge_trial_ledger_report_log.jsonl"
-ATTEMPT_INVENTORY_PATH = ROOT / "research" / "attempted_trial_inventory_2026-07-20.json"
+ATTEMPT_INVENTORY_PATH = ROOT / "research" / "attempted_trial_inventory_2026-08-04.json"
 
 ALPHA = 0.05
 MIN_OOS_TRADES = 30

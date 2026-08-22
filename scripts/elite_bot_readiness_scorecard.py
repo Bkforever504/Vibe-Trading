@@ -33,6 +33,9 @@ SOURCE_PATHS = {
     "trial_ledger": REPORT_DIR / "edge-trial-ledger.json",
     "equity_curve": REPORT_DIR / "flip-equity-curve.json",
     "options_twin": REPORT_DIR / "options-shadow-twin.json",
+    "options_nbbo_curriculum": ROOT / "data" / "options_nbbo_curriculum_results.json",
+    "time_buckets": REPORT_DIR / "flip-shadow-time-buckets.json",
+    "scenario_curriculum": ROOT / "data" / "market_scenario_curriculum_results.json",
 }
 AUTOMATION_TASKS = {
     r"\VibeTradingOptionsShadowTwin",
@@ -171,7 +174,65 @@ def _entry(s: dict[str, dict[str, Any]], today: date) -> dict[str, Any]:
         blockers.append(f"Accumulate at least 60 calendar days of forward evidence; current={days}.")
     if capture_samples < 30:
         blockers.append(f"Build complete entry/exit path telemetry on at least 30 trades; current={capture_samples}.")
-    return _category("Entry quality", raw, cap, [f"closed={count}", f"days={days}", f"expectancy={expectancy}", f"profit_factor={profit_factor}"], blockers)
+    # Time-bucket Sortino: if all rankable buckets show negative Sortino, risk-adjusted entry edge is unproven.
+    tb = s.get("time_buckets") or {}
+    bucket_rankings = tb.get("shadow_selector_rankings") if isinstance(tb.get("shadow_selector_rankings"), list) else []
+    min_ranking_completed = _integer(tb.get("min_bucket_ranking_completed") or 10)
+    rankable = [
+        row for row in bucket_rankings
+        if isinstance(row, dict) and _integer(row.get("completed_count")) >= min_ranking_completed
+    ]
+    if rankable:
+        sortinos = [row.get("sortino_ratio") for row in rankable if row.get("sortino_ratio") is not None]
+        positive_sortino_count = sum(1 for v in sortinos if isinstance(v, (int, float)) and v > 0)
+        if sortinos and positive_sortino_count == 0:
+            cap = max(0.0, cap - 1)
+            blockers.append(
+                f"All {len(sortinos)} rankable time buckets have negative Sortino ratio; "
+                "risk-adjusted entry edge unproven. Resolve before entry quality can reach cap."
+            )
+        elif positive_sortino_count > 0:
+            raw += 0.5
+    structure = tb.get("market_structure_walk_forward")
+    structure_cohort_count = 0
+    structure_ready_count = 0
+    if isinstance(structure, dict):
+        structure_cohort_count = _integer(structure.get("cohort_count"))
+        structure_ready_count = _integer(structure.get("statistical_gate_ready_count"))
+        if structure_cohort_count > 0 and structure_ready_count == 0:
+            cap = min(cap, 6.0)
+            blockers.append(
+                f"No market-structure setup cohort passes chronological holdout, doubled-cost, "
+                f"outlier-removal, quote-coverage, and profit-concentration review; "
+                f"cohorts_reviewed={structure_cohort_count}."
+            )
+        elif structure_ready_count > 0:
+            raw += 0.5
+    curriculum = s.get("scenario_curriculum") or {}
+    curriculum_gate = curriculum.get("review_gate") if isinstance(curriculum.get("review_gate"), dict) else {}
+    curriculum_present = bool(curriculum)
+    curriculum_passed = curriculum_gate.get("passed") is True
+    curriculum_oos = curriculum.get("walk_forward_summary") if isinstance(curriculum.get("walk_forward_summary"), dict) else {}
+    curriculum_oos_base = curriculum_oos.get("base") if isinstance(curriculum_oos.get("base"), dict) else {}
+    curriculum_holdout = curriculum.get("locked_holdout") if isinstance(curriculum.get("locked_holdout"), dict) else {}
+    curriculum_holdout_result = curriculum_holdout.get("result") if isinstance(curriculum_holdout.get("result"), dict) else {}
+    curriculum_holdout_base = curriculum_holdout_result.get("base") if isinstance(curriculum_holdout_result.get("base"), dict) else {}
+    if curriculum_present and not curriculum_passed:
+        cap = min(cap, 6.0)
+        blockers.append(
+            "Historical market-scenario curriculum failed its chronological and locked-holdout review gate; "
+            f"oos_expectancy_bps={curriculum_oos_base.get('expectancy_bps')}, "
+            f"holdout_expectancy_bps={curriculum_holdout_base.get('expectancy_bps')}."
+        )
+    evidence = [
+        f"closed={count}", f"days={days}", f"expectancy={expectancy}", f"profit_factor={profit_factor}",
+        f"rankable_buckets={len(rankable)}", f"positive_sortino_buckets={positive_sortino_count if rankable else 'n/a'}",
+        f"market_structure_cohorts={structure_cohort_count}",
+        f"market_structure_gate_ready={structure_ready_count}",
+        f"scenario_curriculum_present={curriculum_present}",
+        f"scenario_curriculum_passed={curriculum_passed}",
+    ]
+    return _category("Entry quality", raw, cap, evidence, blockers)
 
 
 def _universe(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -268,6 +329,92 @@ def _counterfactual_gate_quality(s: dict[str, dict[str, Any]]) -> dict[str, Any]
     if not twin:
         blockers.insert(0, "Restore the forward-only options shadow-twin report.")
         cap = 0
+    # Close cost quality: high exit friction caps execution evidence.
+    close_q = twin.get("close_cost_quality") if isinstance(twin.get("close_cost_quality"), dict) else {}
+    close_status = str(close_q.get("status") or "")
+    if close_status == "high_close_friction":
+        cap = min(cap, 4.0)
+        blockers.append(
+            f"Close friction exceeds 15% of mid debit (avg={close_q.get('avg_close_friction_pct_of_mid')}); "
+            "round-trip TCA unacceptable — score capped at 4 until resolved."
+        )
+    elif close_status == "watch_close_friction":
+        cap = min(cap, 7.0)
+        blockers.append(
+            f"Close friction 5–15% of mid debit (avg={close_q.get('avg_close_friction_pct_of_mid')}); "
+            "monitor round-trip TCA — score capped at 7."
+        )
+    # Deflated Sharpe: DSR < 0.5 means negative edge probability.
+    dsr_report = twin.get("deflated_sharpe") if isinstance(twin.get("deflated_sharpe"), dict) else {}
+    dsr_status = str(dsr_report.get("status") or "")
+    dsr = _number(dsr_report.get("dsr"), -1.0) if dsr_status not in ("insufficient_n", "zero_variance", "") else -1.0
+    if dsr != -1.0:
+        if dsr < 0.5:
+            cap = min(cap, 3.0)
+            blockers.append(
+                f"Deflated Sharpe probability of positive edge is {dsr:.0%} (<50%); "
+                "statistical evidence does not support edge — score capped at 3."
+            )
+        elif dsr < 0.65:
+            cap = min(cap, 6.0)
+            blockers.append(
+                f"Deflated Sharpe probability of positive edge is {dsr:.0%} (50–65%); "
+                "edge weak under non-normality adjustment — score capped at 6."
+            )
+    calibration = twin.get("calibration") if isinstance(twin.get("calibration"), dict) else {}
+    holdout = calibration.get("chronological_holdout") if isinstance(calibration.get("chronological_holdout"), dict) else {}
+    holdout_status = str(holdout.get("status") or "")
+    holdout_skill = _number(holdout.get("brier_skill_vs_expanding_base_rate"), -1.0)
+    if resolved >= 30 and holdout_status != "ok":
+        cap = min(cap, 6.0)
+        blockers.append(
+            f"Chronological probability holdout is not reviewable (status={holdout_status or 'missing'}); "
+            "counterfactual evidence is capped at 6."
+        )
+    elif holdout_status == "ok" and holdout_skill <= 0:
+        cap = min(cap, 4.0)
+        blockers.append(
+            f"Chronological calibrated probabilities do not beat the expanding base rate "
+            f"(Brier skill={holdout_skill:.3f}); counterfactual evidence is capped at 4."
+        )
+    # Drawdown resilience: long loss streaks relative to sample size indicate fragility.
+    dd = twin.get("drawdown") if isinstance(twin.get("drawdown"), dict) else {}
+    max_consec = _integer(dd.get("max_consecutive_losses"))
+    if resolved > 0 and max_consec >= 5 and max_consec / resolved >= 0.30:
+        cap = min(cap, 5.0)
+        blockers.append(
+            f"Max consecutive losses ({max_consec}) is ≥30% of resolved sample ({resolved}); "
+            "drawdown resilience unproven — score capped at 5."
+        )
+    nbbo = s.get("options_nbbo_curriculum") or {}
+    nbbo_gate = nbbo.get("review_gate") if isinstance(nbbo.get("review_gate"), dict) else {}
+    nbbo_present = bool(nbbo)
+    nbbo_passed = nbbo_gate.get("passed") is True
+    nbbo_resolved = _integer(nbbo.get("resolved_count"))
+    nbbo_coverage = _number(nbbo.get("lifecycle_coverage"))
+    nbbo_accepted_quotes = _integer(nbbo.get("accepted_nbbo_quote_count"))
+    if nbbo_accepted_quotes > 0:
+        blockers = [
+            (
+                "Forward shadow marks remain indicative; licensed OPRA evidence exists only in the "
+                "historical curriculum and has not passed its sample/holdout gate."
+                if blocker.startswith("OPRA NBBO history or equivalent executable quote evidence")
+                else blocker
+            )
+            for blocker in blockers
+        ]
+    if not nbbo_present:
+        cap = min(cap, 4.0)
+        blockers.append(
+            "Historical multi-leg NBBO curriculum is missing; option execution edge remains capped at 4."
+        )
+    elif not nbbo_passed:
+        cap = min(cap, 4.0)
+        blockers.append(
+            "Historical multi-leg NBBO curriculum has not passed executable-quote, chronological, "
+            f"and locked-holdout review; status={nbbo.get('status')}, resolved={nbbo_resolved}, "
+            f"coverage={nbbo_coverage:.1%}."
+        )
     return _category(
         "Counterfactual gate quality",
         score,
@@ -278,6 +425,15 @@ def _counterfactual_gate_quality(s: dict[str, dict[str, Any]]) -> dict[str, Any]
             f"distinct_dates={dates}",
             f"entry_quote_coverage={entry_coverage:.1%}",
             f"mark_quote_coverage={mark_coverage:.1%}",
+            f"close_friction_status={close_status or 'n/a'}",
+            f"dsr={dsr:.3f}" if dsr != -1.0 else "dsr=n/a",
+            f"calibration_holdout_status={holdout_status or 'n/a'}",
+            f"calibration_holdout_skill={holdout_skill:.3f}" if holdout_skill != -1.0 else "calibration_holdout_skill=n/a",
+            f"max_consecutive_losses={max_consec}",
+            f"options_nbbo_curriculum_present={nbbo_present}",
+            f"options_nbbo_curriculum_passed={nbbo_passed}",
+            f"options_nbbo_resolved={nbbo_resolved}",
+            f"options_nbbo_accepted_quotes={nbbo_accepted_quotes}",
         ],
         blockers,
     )

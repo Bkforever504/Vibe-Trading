@@ -127,6 +127,25 @@ def _parse_time(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=ET)
 
 
+def _first_touch(
+    future: list[dict[str, Any]], direction: str, target: float, stop: float,
+) -> tuple[str, bool, bool]:
+    target_touched = False
+    stop_touched = False
+    for bar in future:
+        target_on_bar = float(bar["high"]) >= target if direction == "call" else float(bar["low"]) <= target
+        stop_on_bar = float(bar["low"]) <= stop if direction == "call" else float(bar["high"]) >= stop
+        target_touched = target_touched or target_on_bar
+        stop_touched = stop_touched or stop_on_bar
+        if target_on_bar and stop_on_bar:
+            return "ambiguous_same_bar", target_touched, stop_touched
+        if target_on_bar:
+            return "target", target_touched, stop_touched
+        if stop_on_bar:
+            return "stop", target_touched, stop_touched
+    return "horizon", target_touched, stop_touched
+
+
 def _resolve_outcomes(history: list[dict[str, Any]], bars_by_symbol: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
     resolved = {row.get("episode_id") for row in history if row.get("record_type") == "outcome"}
     outcomes = []
@@ -149,16 +168,17 @@ def _resolve_outcomes(history: list[dict[str, Any]], bars_by_symbol: dict[str, l
         target = float(row["counterfactual"]["target"])
         favorable = max(float(bar["high"]) - entry for bar in future) if direction == "call" else max(entry - float(bar["low"]) for bar in future)
         adverse = max(entry - float(bar["low"]) for bar in future) if direction == "call" else max(float(bar["high"]) - entry for bar in future)
-        target_hit = any(float(bar["high"]) >= target for bar in future) if direction == "call" else any(float(bar["low"]) <= target for bar in future)
-        stop_hit = any(float(bar["low"]) <= stop for bar in future) if direction == "call" else any(float(bar["high"]) >= stop for bar in future)
+        resolution, target_hit, stop_hit = _first_touch(future, direction, target, stop)
         outcomes.append({
             "record_type": "outcome", "episode_id": row["episode_id"],
+            "outcome_schema_version": 2,
             "symbol": row["symbol"], "opened_at": row["as_of"],
             "evaluated_at": datetime.now(ET).isoformat(), "horizon_minutes": 60,
             "max_favorable_points": round(favorable, 4),
             "max_adverse_points": round(adverse, 4),
             "target_touched": target_hit, "stop_touched": stop_hit,
-            "ambiguous_same_horizon": target_hit and stop_hit,
+            "first_touch_resolution": resolution,
+            "ambiguous_same_horizon": resolution == "ambiguous_same_bar",
             "authority": "shadow_research_only",
             "execution_enabled": False, "can_submit_orders": False,
         })
@@ -201,8 +221,18 @@ def run(log_path: Path = LOG_PATH, report_path: Path = REPORT_PATH) -> dict[str,
     _append(log_path, [scan_record] + new_signals + outcomes)
     all_history = history + [scan_record] + new_signals + outcomes
     resolved_rows = [row for row in all_history if row.get("record_type") == "outcome"]
-    unambiguous = [row for row in resolved_rows if not row.get("ambiguous_same_horizon")]
-    wins = sum(bool(row.get("target_touched")) and not bool(row.get("stop_touched")) for row in unambiguous)
+    ordered = [row for row in resolved_rows if row.get("first_touch_resolution")]
+    ordered_wins = sum(row.get("first_touch_resolution") == "target" for row in ordered)
+    legacy = [row for row in resolved_rows if not row.get("first_touch_resolution")]
+    legacy_unambiguous = [row for row in legacy if not row.get("ambiguous_same_horizon")]
+    legacy_wins = sum(
+        bool(row.get("target_touched")) and not bool(row.get("stop_touched"))
+        for row in legacy_unambiguous
+    )
+    legacy_ambiguous = len(legacy) - len(legacy_unambiguous)
+    lower_wins = ordered_wins + legacy_wins
+    upper_wins = lower_wins + legacy_ambiguous
+    resolved_count = len(resolved_rows)
     report = {
         "generated_at": datetime.now(ET).isoformat(),
         "status": "ok" if snapshots else "error",
@@ -210,8 +240,15 @@ def run(log_path: Path = LOG_PATH, report_path: Path = REPORT_PATH) -> dict[str,
         "new_shadow_signals": len(new_signals), "new_outcomes": len(outcomes),
         "evidence": {
             "signals": sum(row.get("record_type") == "signal" for row in all_history),
-            "resolved": len(resolved_rows), "unambiguous": len(unambiguous),
-            "target_before_stop_win_rate": wins / len(unambiguous) if unambiguous else None,
+            "resolved": resolved_count,
+            "ordered_first_touch_outcomes": len(ordered),
+            "legacy_unambiguous_outcomes": len(legacy_unambiguous),
+            "legacy_ambiguous_outcomes": legacy_ambiguous,
+            "target_before_stop_win_rate": ordered_wins / len(ordered) if ordered else None,
+            "legacy_unambiguous_win_rate": legacy_wins / len(legacy_unambiguous) if legacy_unambiguous else None,
+            "win_rate_lower_bound": lower_wins / resolved_count if resolved_count else None,
+            "win_rate_upper_bound": upper_wins / resolved_count if resolved_count else None,
+            "interpretation": "Legacy outcomes that touched both levels lack first-touch order and remain bounded, not imputed.",
         },
         "authority": "shadow_research_only",
         "execution_enabled": False, "can_submit_orders": False,

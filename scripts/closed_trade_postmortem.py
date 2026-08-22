@@ -269,15 +269,18 @@ def explain_flip_pnl(trade: dict[str, Any], force: dict[str, Any] | None) -> dic
     else:
         primary_driver = "trade did not produce enough favorable movement before exit"
         next_action = "review entry timing and market context before repeating"
+    exit_price_source = str(trade.get("exit_price_source") or "").lower()
+    entry_price_source = str(trade.get("entry_price_source") or "").lower()
+    broker_fill_sources = {"broker_fill", "broker_filled_avg_price"}
+    if exit_price_source in broker_fill_sources and entry_price_source in broker_fill_sources:
+        pnl_source = "broker_fill"
+    elif exit_price_source == "quote_mid_at_order_submission":
+        pnl_source = "quote_mid_at_order_submission"
+    else:
+        pnl_source = "legacy_record_unverified_fill"
     return {
         "outcome": outcome,
-        "pnl_source": (
-            "broker_fill"
-            if trade.get("exit_price_source") == "broker_fill"
-            else "quote_mid_at_order_submission"
-            if trade.get("exit_price_source") == "quote_mid_at_order_submission"
-            else "legacy_record_unverified_fill"
-        ),
+        "pnl_source": pnl_source,
         "primary_driver": primary_driver,
         "market_context": force_class,
         "garch_volatility_risk": garch,

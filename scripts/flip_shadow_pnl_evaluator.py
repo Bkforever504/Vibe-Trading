@@ -8,12 +8,18 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from collections import defaultdict
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from strategies.flip_execution_policy import evaluate_long_option_quote
+
 VIBE_HOME = Path.home() / ".vibe-trading"
 LOG_PATH = ROOT / "data" / "flip_shadow_candidates_log.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "flip-shadow-pnl-evaluator.json"
@@ -140,6 +146,13 @@ def evaluate_group(rows: list[dict[str, Any]]) -> dict[str, Any]:
     )
     entry = _safe_float(first.get("entry_price_est")) or 0.0
     entry_ask = _safe_float(first.get("selection_ask"))
+    entry_execution_quality = first.get("entry_execution_quality")
+    if not isinstance(entry_execution_quality, dict):
+        entry_execution_quality = evaluate_long_option_quote(
+            bid=first.get("selection_bid"),
+            ask=first.get("selection_ask"),
+            quote_age_seconds=first.get("quote_age_seconds"),
+        )
     contracts = _safe_int(first.get("contracts"), 1)
     priced_rows = [row for row in rows if _safe_float(row.get("entry_price_est")) is not None]
     prices = [_safe_float(row.get("entry_price_est")) or 0.0 for row in priced_rows]
@@ -273,6 +286,11 @@ def evaluate_group(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "simulated_exit_pnl": round(float(simulated_exit_price - entry) * contracts * 100, 2),
         "simulated_exit_reason": simulated_exit_reason,
         "executable_quote_coverage": executable_quote_coverage,
+        "entry_execution_quality": entry_execution_quality,
+        "execution_quality_eligible": entry_execution_quality.get("eligible") is True,
+        "execution_quality_rejection_reason": (
+            None if entry_execution_quality.get("eligible") is True else entry_execution_quality.get("reason")
+        ),
         "executable_entry_ask": round(executable_entry, 4),
         "executable_exit_bid": round(float(executable["exit_price"] or 0.0), 4),
         "cost_adjusted_exit_return_pct": round(float(executable["exit_return_pct"] or 0.0), 2),
@@ -532,6 +550,67 @@ def _research_strategy_summary(trades: list[dict[str, Any]]) -> list[dict[str, A
     return summaries
 
 
+def _execution_quality_summary(trades: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compare all executable outcomes with the production-shaped quote subset."""
+    completed = [
+        trade for trade in trades
+        if trade.get("status") in {"winner", "loser"}
+        and trade.get("executable_quote_coverage") is True
+    ]
+    completed.sort(key=lambda trade: (str(trade.get("date") or ""), str(trade.get("entry_seen_at") or "")))
+    eligible = [trade for trade in completed if trade.get("execution_quality_eligible") is True]
+    rejected = [trade for trade in completed if trade.get("execution_quality_eligible") is not True]
+
+    def metrics(items: list[dict[str, Any]]) -> dict[str, Any]:
+        pnls = [float(item.get("cost_adjusted_exit_pnl") or 0.0) for item in items]
+        returns = [float(item.get("evidence_exit_return_pct") or 0.0) for item in items]
+        equity = 0.0
+        peak = 0.0
+        max_drawdown = 0.0
+        for pnl in pnls:
+            equity += pnl
+            peak = max(peak, equity)
+            max_drawdown = max(max_drawdown, peak - equity)
+        wins = sum(1 for pnl in pnls if pnl > 0)
+        losses = sum(1 for pnl in pnls if pnl < 0)
+        return {
+            "completed_count": len(items),
+            "distinct_dates": len({str(item.get("date") or "") for item in items if item.get("date")}),
+            "winner_count": wins,
+            "loser_count": losses,
+            "win_rate": round(wins / len(items), 4) if items else None,
+            "net_pnl": round(sum(pnls), 2),
+            "expectancy_pnl": round(sum(pnls) / len(items), 2) if items else None,
+            "expectancy_return_pct": round(sum(returns) / len(items), 2) if items else None,
+            "max_drawdown_pnl": round(max_drawdown, 2) if items else None,
+        }
+
+    all_metrics = metrics(completed)
+    eligible_metrics = metrics(eligible)
+    rejection_reasons: dict[str, int] = defaultdict(int)
+    for trade in rejected:
+        rejection_reasons[str(trade.get("execution_quality_rejection_reason") or "unknown")] += 1
+    baseline_drawdown = float(all_metrics.get("max_drawdown_pnl") or 0.0)
+    eligible_drawdown = float(eligible_metrics.get("max_drawdown_pnl") or 0.0)
+    return {
+        "policy_version": "long_option_execution_v1",
+        "authority": "shadow_attribution_only_no_auto_promotion",
+        "all_executable": all_metrics,
+        "execution_quality_eligible": eligible_metrics,
+        "rejected_count": len(rejected),
+        "rejection_reasons": dict(sorted(rejection_reasons.items())),
+        "drawdown_reduction_pct": (
+            round((baseline_drawdown - eligible_drawdown) / baseline_drawdown * 100.0, 2)
+            if baseline_drawdown > 0 else None
+        ),
+        "review_ready": len(eligible) >= 100 and eligible_metrics["distinct_dates"] >= 20,
+        "warnings": [
+            "Eligibility reduces transaction-cost exposure; it does not prove positive expectancy.",
+            "Review requires at least 100 eligible outcomes across 20 dates and a positive chronological holdout.",
+        ],
+    }
+
+
 def build_report(log_path: Path = LOG_PATH, day: str | None = None) -> dict[str, Any]:
     all_rows = _read_jsonl(log_path)
     rows = [
@@ -577,6 +656,7 @@ def build_report(log_path: Path = LOG_PATH, day: str | None = None) -> dict[str,
     ]
     by_symbol = _symbol_summary(trades)
     research_strategy_challengers = _research_strategy_summary(research_trades)
+    execution_quality = _execution_quality_summary(trades)
     challenger_leaderboard = sorted(
         [dict(symbol=symbol, **summary) for symbol, summary in by_symbol.items()],
         key=lambda row: (bool(row["promotion_eligible"]), float(row["selection_score"]), int(row["completed_count"])),
@@ -659,6 +739,7 @@ def build_report(log_path: Path = LOG_PATH, day: str | None = None) -> dict[str,
         "by_symbol": by_symbol,
         "challenger_leaderboard": challenger_leaderboard,
         "research_strategy_challengers": research_strategy_challengers,
+        "execution_quality": execution_quality,
         "today_shadow_entries": today_entries,
         "execution_focus": {
             "symbol": "SPY",

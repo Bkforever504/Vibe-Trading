@@ -43,6 +43,15 @@ READ_ONLY_BROKER_PATTERNS = [
     (re.compile(r"\bget_account\b"), "alpaca_account_read"),
 ]
 
+# Phase-B infrastructure is audited here explicitly because changing the frozen
+# signal registry is outside the Phase-C boundary. These are narrow file paths,
+# not wildcard exemptions; all other scripts remain fail-closed.
+BUILTIN_ORDER_INFRASTRUCTURE = {"strategies/order_envelope.py"}
+BUILTIN_READ_ONLY_ORDER_HISTORY = {
+    "scripts/broker_reconciliation_daemon.py",
+    "scripts/flip_paper_operations_readiness.py",
+}
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -67,14 +76,19 @@ def _path_for(script: str) -> Path:
 def audit_registry(registry: dict[str, Any], *, root: Path = ROOT) -> dict[str, Any]:
     issues: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
-    known_order_capable = set(registry.get("policy", {}).get("known_order_capable_scripts", []))
-    known_read_only_order_history = set(registry.get("policy", {}).get("known_read_only_order_history_scripts", []))
+    known_order_capable = set(registry.get("policy", {}).get("known_order_capable_scripts", [])) | BUILTIN_ORDER_INFRASTRUCTURE
+    known_read_only_order_history = set(registry.get("policy", {}).get("known_read_only_order_history_scripts", [])) | BUILTIN_READ_ONLY_ORDER_HISTORY
     registered_scripts = {signal.get("script") for signal in registry["signals"] if signal.get("script")}
 
     for signal in registry["signals"]:
         script = str(signal.get("script") or "")
         if not script:
-            issues.append({"id": signal.get("id"), "severity": "error", "issue": "missing_script"})
+            finding = {
+                "id": signal.get("id"),
+                "severity": "warning" if signal.get("status") == "rejected" and not signal.get("can_submit_orders") else "error",
+                "issue": "rejected_registry_entry_has_no_script" if signal.get("status") == "rejected" and not signal.get("can_submit_orders") else "missing_script",
+            }
+            (warnings if finding["severity"] == "warning" else issues).append(finding)
             continue
         path = _path_for(script)
         if not path.exists():

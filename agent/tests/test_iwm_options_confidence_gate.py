@@ -860,6 +860,391 @@ def test_options_group_stop_triggers_at_200_percent_of_credit(monkeypatch, tmp_p
     assert "stop loss hit: -211.1%" in state["trades"][0]["closing_reason"]
 
 
+def test_options_group_closes_at_50_percent_profit_target(monkeypatch, tmp_path) -> None:
+    from types import SimpleNamespace
+    from strategies import iwm_options_bot as bot
+
+    state_file = tmp_path / "options-trades.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "trades": [
+                    {
+                        "label": "Put Spread [IWM]",
+                        "status": "open",
+                        "legs": ["IWM1", "IWM2"],
+                        "leg_details": [
+                            {"symbol": "IWM1", "side": "sell", "ratio_qty": 1},
+                            {"symbol": "IWM2", "side": "buy", "ratio_qty": 1},
+                        ],
+                        "net_credit": 0.60,
+                        "qty": 2,
+                        "profit_close_pct": 0.5,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(bot, "TRADE_STATE_FILE", state_file)
+    monkeypatch.setattr(bot, "AUTO_CLOSE_GROUPS", True)
+    monkeypatch.setattr(bot, "_can_submit_option_close_orders", lambda: True)
+    monkeypatch.setattr(
+        bot.options_state,
+        "reconcile",
+        lambda *_args: {"entries_allowed": True, "findings": [], "group_states": {}},
+    )
+
+    closed = []
+
+    class FakeClient:
+        def get_all_positions(self):
+            return [
+                SimpleNamespace(symbol="IWM1", asset_class="us_option", qty=-2, unrealized_pl=36.0),
+                SimpleNamespace(symbol="IWM2", asset_class="us_option", qty=2, unrealized_pl=24.0),
+            ]
+
+        def close_position(self, symbol):
+            closed.append(symbol)
+
+    bot.monitor_and_close(FakeClient())
+
+    state = bot._load_trade_state()
+    assert closed == ["IWM1", "IWM2"]
+    assert state["trades"][0]["status"] == "closing"
+    assert state["trades"][0]["closing_reason"].startswith("profit target hit: +50.0%")
+
+
+def _confirmed_paper_spread_trade() -> dict:
+    return {
+        "id": "trade-abc123",
+        "label": "Put Spread [IWM]",
+        "strategy": "put_spread",
+        "status": "open",
+        "legs": ["IWM1", "IWM2"],
+        "leg_details": [
+            {"symbol": "IWM1", "side": "sell", "ratio_qty": 1},
+            {"symbol": "IWM2", "side": "buy", "ratio_qty": 1},
+        ],
+        "net_credit": 0.60,
+        "qty": 2,
+        "entry_filled_qty": 2,
+        "entry_fill_source": "alpaca_filled_avg_price",
+        "profit_close_pct": 0.50,
+    }
+
+
+def _filled_target_order(status: str = "filled", filled_qty: str = "2") -> dict:
+    return {
+        "id": "target-1",
+        "status": status,
+        "order_class": "mleg",
+        "filled_qty": filled_qty,
+        "filled_avg_price": "0.30",
+        "filled_at": "2026-08-04T15:02:00Z",
+        "legs": [{"symbol": "IWM1"}, {"symbol": "IWM2"}],
+    }
+
+
+def test_paper_resting_profit_order_reverses_exact_filled_mleg(monkeypatch) -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import iwm_options_bot as bot
+
+    trade = _confirmed_paper_spread_trade()
+    posted = []
+    monkeypatch.setattr(bot, "PAPER", True)
+    monkeypatch.setattr(bot, "ENABLE_PAPER_RESTING_PROFIT_ORDERS", True)
+    monkeypatch.setattr(bot, "_order_snapshot_by_client_id", lambda _client_id: None)
+    monkeypatch.setattr(
+        bot,
+        "_now_et",
+        lambda: datetime(2026, 8, 4, 10, 0, tzinfo=ZoneInfo("America/New_York")),
+    )
+    monkeypatch.setattr(
+        bot,
+        "_post_order_with_retry",
+        lambda body, label, **kwargs: posted.append((body, label, kwargs))
+        or {"id": "target-1", "status": "new"},
+    )
+
+    changed, ok = bot._ensure_paper_resting_profit_order(trade)
+
+    assert changed is True and ok is True
+    body, _, kwargs = posted[0]
+    assert body["limit_price"] == "0.30"
+    assert body["time_in_force"] == "day"
+    assert body["order_class"] == "mleg"
+    assert body["qty"] == "2"
+    assert kwargs["risk_reducing_close"] is True
+    assert body["legs"] == [
+        {"symbol": "IWM1", "side": "buy", "ratio_qty": "1", "position_intent": "buy_to_close"},
+        {"symbol": "IWM2", "side": "sell", "ratio_qty": "1", "position_intent": "sell_to_close"},
+    ]
+    assert trade["profit_order_id"] == "target-1"
+
+
+def test_resting_profit_order_recovers_lost_submit_response_by_client_id(monkeypatch) -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from strategies import iwm_options_bot as bot
+
+    trade = _confirmed_paper_spread_trade()
+    recovered = {"id": "recovered-target", "status": "new", "submitted_at": "2026-08-04T14:00:00Z"}
+    monkeypatch.setattr(bot, "PAPER", True)
+    monkeypatch.setattr(bot, "ENABLE_PAPER_RESTING_PROFIT_ORDERS", True)
+    monkeypatch.setattr(
+        bot,
+        "_now_et",
+        lambda: datetime(2026, 8, 4, 10, 0, tzinfo=ZoneInfo("America/New_York")),
+    )
+    monkeypatch.setattr(bot, "_order_snapshot_by_client_id", lambda _client_id: recovered)
+    monkeypatch.setattr(
+        bot,
+        "_post_order_with_retry",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must recover, not submit")),
+    )
+
+    changed, ok = bot._ensure_paper_resting_profit_order(trade)
+
+    assert changed is True and ok is True
+    assert trade["profit_order_id"] == "recovered-target"
+    assert trade["profit_order_recovered_by_client_id"] is True
+
+
+def test_resting_profit_order_is_hard_blocked_outside_paper(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = _confirmed_paper_spread_trade()
+    monkeypatch.setattr(bot, "PAPER", False)
+    monkeypatch.setattr(bot, "ENABLE_PAPER_RESTING_PROFIT_ORDERS", True)
+    monkeypatch.setattr(
+        bot,
+        "_post_order_with_retry",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not submit")),
+    )
+
+    changed, ok = bot._ensure_paper_resting_profit_order(trade)
+
+    assert changed is False and ok is False
+    assert "profit_order_id" not in trade
+
+
+def test_resting_profit_order_restart_is_idempotent(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = {**_confirmed_paper_spread_trade(), "profit_order_id": "existing-target"}
+    monkeypatch.setattr(bot, "PAPER", True)
+    monkeypatch.setattr(bot, "ENABLE_PAPER_RESTING_PROFIT_ORDERS", True)
+    monkeypatch.setattr(
+        bot,
+        "_post_order_with_retry",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("duplicate submission")),
+    )
+
+    assert bot._ensure_paper_resting_profit_order(trade) == (False, True)
+
+
+def test_resting_profit_order_full_fill_closes_verified_group(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = {**_confirmed_paper_spread_trade(), "profit_order_id": "target-1"}
+    monkeypatch.setattr(bot, "_order_snapshot", lambda _order_id: _filled_target_order())
+
+    changed, ok = bot._refresh_resting_profit_orders({"trades": [trade]})
+
+    assert changed is True and ok is True
+    assert trade["status"] == "closed"
+    assert trade["realized_pnl_dollars"] == 60.0
+    assert trade["close_verified_by"] == "alpaca_filled_mleg_order"
+
+
+def test_order_snapshot_requests_nested_mleg_legs(monkeypatch) -> None:
+    import requests
+    from strategies import iwm_options_bot as bot
+
+    captured = {}
+
+    class Response:
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"id": "target-1", "order_class": "mleg", "legs": []}
+
+    def fake_get(*args, **kwargs):
+        captured.update(kwargs)
+        return Response()
+
+    monkeypatch.setenv("ALPACA_API_KEY", "paper-key")
+    monkeypatch.setenv("ALPACA_SECRET_KEY", "paper-secret")
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    assert bot._order_snapshot("target-1")["id"] == "target-1"
+    assert captured["params"] == {"nested": "true"}
+
+
+def test_resting_profit_order_partial_fill_fails_closed(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = {**_confirmed_paper_spread_trade(), "profit_order_id": "target-1"}
+    monkeypatch.setattr(
+        bot,
+        "_order_snapshot",
+        lambda _order_id: _filled_target_order(status="partially_filled", filled_qty="1"),
+    )
+
+    changed, ok = bot._refresh_resting_profit_orders({"trades": [trade]})
+
+    assert changed is True and ok is False
+    assert trade["status"] == "open"
+    assert trade["profit_order_manual_review"] == "partial_mleg_fill_requires_reconciliation"
+
+
+def test_resting_profit_cancel_race_accepts_verified_full_fill(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = {**_confirmed_paper_spread_trade(), "profit_order_id": "target-1"}
+    snapshots = iter([
+        {**_filled_target_order(status="new", filled_qty="0"), "filled_avg_price": None},
+        _filled_target_order(),
+    ])
+    monkeypatch.setattr(bot, "_order_snapshot", lambda _order_id: next(snapshots))
+    monkeypatch.setattr(bot, "_cancel_order_by_id", lambda _order_id: True)
+
+    result = bot._cancel_resting_profit_order(trade, "stop loss hit")
+
+    assert result == "filled"
+    assert trade["status"] == "closed"
+    assert trade["closing_reason"] == "resting profit target filled during cancel race"
+
+
+def test_resting_profit_cancel_must_reach_terminal_status(monkeypatch) -> None:
+    from strategies import iwm_options_bot as bot
+
+    trade = {**_confirmed_paper_spread_trade(), "profit_order_id": "target-1"}
+    snapshots = iter([
+        {**_filled_target_order(status="new", filled_qty="0"), "filled_avg_price": None},
+        {**_filled_target_order(status="pending_cancel", filled_qty="0"), "filled_avg_price": None},
+    ])
+    monkeypatch.setattr(bot, "_order_snapshot", lambda _order_id: next(snapshots))
+    monkeypatch.setattr(bot, "_cancel_order_by_id", lambda _order_id: True)
+
+    result = bot._cancel_resting_profit_order(trade, "stop loss hit")
+
+    assert result == "blocked"
+    assert trade["status"] == "open"
+    assert trade["profit_order_cancel_blocked"] == "cancel_not_terminal:pending_cancel"
+
+
+def test_monitor_refuses_second_exit_while_target_cancel_is_pending(monkeypatch, tmp_path) -> None:
+    from types import SimpleNamespace
+    from strategies import iwm_options_bot as bot
+
+    trade = {
+        **_confirmed_paper_spread_trade(),
+        "profit_order_id": "target-1",
+        "profit_order_status": "new",
+        "entry_order_status": "filled",
+    }
+    state_file = tmp_path / "options-trades.json"
+    state_file.write_text(json.dumps({"trades": [trade]}), encoding="utf-8")
+    snapshots = iter([
+        {**_filled_target_order(status="new", filled_qty="0"), "filled_avg_price": None},
+        {**_filled_target_order(status="new", filled_qty="0"), "filled_avg_price": None},
+        {**_filled_target_order(status="pending_cancel", filled_qty="0"), "filled_avg_price": None},
+    ])
+    closed = []
+    monkeypatch.setattr(bot, "TRADE_STATE_FILE", state_file)
+    monkeypatch.setattr(bot, "AUTO_CLOSE_GROUPS", True)
+    monkeypatch.setattr(bot, "_order_snapshot", lambda _order_id: next(snapshots))
+    monkeypatch.setattr(bot, "_cancel_order_by_id", lambda _order_id: True)
+    monkeypatch.setattr(bot, "_can_submit_option_close_orders", lambda: True)
+    monkeypatch.setattr(bot, "_close_trade_group", lambda *_args: closed.append(True) or True)
+    monkeypatch.setattr(bot, "shadow_exit_advice", lambda *_args: {"enabled": False})
+    monkeypatch.setattr(
+        bot.options_state,
+        "reconcile",
+        lambda *_args: {"entries_allowed": True, "findings": [], "group_states": {}},
+    )
+
+    class FakeClient:
+        def get_all_positions(self):
+            return [
+                SimpleNamespace(symbol="IWM1", asset_class="us_option", qty=-2, unrealized_pl=-80.0),
+                SimpleNamespace(symbol="IWM2", asset_class="us_option", qty=2, unrealized_pl=-50.0),
+            ]
+
+    result = bot.monitor_and_close(FakeClient())
+
+    saved = bot._load_trade_state()["trades"][0]
+    assert result is False
+    assert closed == []
+    assert saved["status"] == "open"
+    assert "resting target cancellation unconfirmed" in saved["exit_pending_reason"]
+
+
+def test_order_retry_reuses_client_id_after_timeout(monkeypatch) -> None:
+    import requests
+    from strategies import iwm_options_bot as bot
+
+    sent_bodies = []
+
+    class FakeResponse:
+        status_code = 200
+        ok = True
+        text = ""
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"id": "paper-order-1"}
+
+    def fake_post(*_args, **kwargs):
+        sent_bodies.append(dict(kwargs["json"]))
+        if len(sent_bodies) == 1:
+            raise requests.Timeout("read timed out")
+        return FakeResponse()
+
+    monkeypatch.setattr(bot, "manual_reset_required", lambda: False)
+    monkeypatch.setattr(bot, "ORDER_RETRY_BASE_SECONDS", 0.0)
+    monkeypatch.setattr(requests, "post", fake_post)
+
+    result = bot._post_order_with_retry(
+        {"symbol": "IWM", "qty": "1", "side": "buy", "type": "market"},
+        "timeout retry test",
+    )
+
+    assert result == {"id": "paper-order-1"}
+    assert len(sent_bodies) == 2
+    assert sent_bodies[0]["client_order_id"] == sent_bodies[1]["client_order_id"]
+    assert sent_bodies[0]["client_order_id"].startswith("vibe-timeout-retry-")
+
+
+def test_hv_proxy_logs_flat_range_fallback(monkeypatch, caplog) -> None:
+    import pandas as pd
+    from strategies import iwm_options_bot as bot
+
+    class FakeTicker:
+        @staticmethod
+        def history(period):
+            assert period == "1y"
+            return pd.DataFrame({"Close": [100.0] * 60})
+
+    monkeypatch.setattr(bot.yf, "Ticker", lambda _symbol: FakeTicker())
+
+    with caplog.at_level("WARNING"):
+        rank = bot._hv_proxy_iv_rank("IWM")
+
+    assert rank == 50.0
+    assert "52-week HV range is flat" in caplog.text
+
+
 def test_options_group_exit_waits_when_option_market_closed(monkeypatch, tmp_path) -> None:
     from types import SimpleNamespace
     from strategies import iwm_options_bot as bot

@@ -88,6 +88,7 @@ class _FakeStdQuotes:
 @pytest.fixture
 def fake_client(monkeypatch: pytest.MonkeyPatch) -> _FakeStdQuotes:
     """Install a fake StdQuotes so DataLoader doesn't hit the TDX network."""
+    monkeypatch.delenv("VIBE_TRADING_DATA_CACHE", raising=False)
     fake = _FakeStdQuotes()
     fake_module = SimpleNamespace(Quotes=SimpleNamespace(factory=lambda market: fake))
     import sys

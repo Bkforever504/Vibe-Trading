@@ -170,9 +170,14 @@ def _write(path: Path, report: dict[str, Any], *, append: bool = False) -> None:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(report, sort_keys=True, separators=(",", ":")) + "\n")
         return
-    temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temp, path)
+    temp = path.with_suffix(
+        path.suffix + f".tmp-{os.getpid()}-{datetime.now(timezone.utc).timestamp()}"
+    )
+    try:
+        temp.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def main() -> int:

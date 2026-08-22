@@ -57,3 +57,27 @@ def test_registry_file_is_valid_json() -> None:
 
     assert payload["signals"]
     assert "known_order_capable_scripts" in payload["policy"]
+
+
+def test_rejected_research_entry_without_script_is_a_warning(tmp_path: Path) -> None:
+    registry = {
+        "policy": {},
+        "signals": [{
+            "id": "rejected_idea",
+            "script": "",
+            "status": "rejected",
+            "can_submit_orders": False,
+            "execution_enabled": False,
+        }],
+    }
+
+    report = audit.audit_registry(registry, root=tmp_path)
+
+    assert report["passed"] is True
+    assert report["warnings"][0]["issue"] == "rejected_registry_entry_has_no_script"
+
+
+def test_repository_execution_gate_audit_passes() -> None:
+    report = audit.audit_registry(audit.load_registry(ROOT / "research" / "signal_registry.json"))
+
+    assert report["passed"] is True, report["issues"]

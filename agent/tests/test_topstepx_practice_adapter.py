@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,33 @@ def test_execution_is_disabled_before_any_order_api_call(tmp_path: Path) -> None
             side="buy", size=1, stop_ticks=40, target_ticks=60,
             account_state=AccountState(150000, 150000, 0, 2000),
             rule_profile=practice_profile(),
+        )
+    assert transport.calls == []
+
+
+def test_required_intelligence_clearance_fails_before_api_calls(tmp_path: Path) -> None:
+    transport = FakeTransport([])
+    adapter = TopstepXPracticeAdapter(
+        username="user",
+        api_key="key",
+        config=replace(enabled_config(tmp_path), require_intelligence_clearance=True),
+        transport=transport,
+        now_fn=lambda: datetime(2026, 7, 20, 14, 0, tzinfo=timezone.utc),
+    )
+    kwargs = {
+        "side": "buy",
+        "size": 1,
+        "stop_ticks": 40,
+        "target_ticks": 60,
+        "account_state": AccountState(150000, 150000, 0, 2000),
+        "rule_profile": practice_profile(),
+    }
+    with pytest.raises(PracticeSafetyError, match="intelligence clearance"):
+        adapter.place_practice_bracket_order(**kwargs)
+    with pytest.raises(PracticeSafetyError, match="did not approve"):
+        adapter.place_practice_bracket_order(
+            **kwargs,
+            intelligence_assessment={"status": "abstain", "forward_validated_edge": False},
         )
     assert transport.calls == []
 

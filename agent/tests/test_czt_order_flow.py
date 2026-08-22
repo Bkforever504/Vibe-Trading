@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from strategies.czt_order_flow import evaluate_czt, volume_profile, normalize_bars
+from scripts.czt_order_flow_shadow import _first_touch
 
 
 def _bars(direction: str = "up", count: int = 60, with_prints: bool = False):
@@ -62,3 +63,26 @@ def test_print_data_can_confirm_but_not_authorize():
 def test_requires_minimum_history():
     with pytest.raises(ValueError, match="at least 30"):
         evaluate_czt(_bars(count=12), symbol="SPY")
+
+
+def test_first_touch_uses_chronological_bar_order():
+    future = [
+        {"high": 102.1, "low": 99.5},
+        {"high": 101.0, "low": 98.8},
+    ]
+
+    resolution, target_touched, stop_touched = _first_touch(future, "call", target=102.0, stop=99.0)
+
+    assert resolution == "target"
+    assert target_touched is True
+    assert stop_touched is False
+
+
+def test_first_touch_fails_closed_on_same_bar_ambiguity():
+    resolution, target_touched, stop_touched = _first_touch(
+        [{"high": 102.1, "low": 98.9}], "call", target=102.0, stop=99.0,
+    )
+
+    assert resolution == "ambiguous_same_bar"
+    assert target_touched is True
+    assert stop_touched is True

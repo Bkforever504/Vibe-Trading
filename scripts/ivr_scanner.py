@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -34,8 +34,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 LOG_PATH = ROOT / "data" / "iv_history_log.jsonl"
-SYMBOLS = ["SPY", "QQQ", "IWM"]
+SYMBOLS = ["SPY", "QQQ", "IWM", "AAPL", "NVDA", "TSLA", "PLTR"]
 LOOKBACK_DAYS = 252
+MIN_IVR_HISTORY = 30
+ATM_IV_DTE_MIN = 7
+ATM_IV_DTE_MAX = 45
+ATM_IV_METHOD = "nearest_expiry_7_45d_mean_atm_call_put_v2"
 
 _ALPACA_KEY: str | None = None
 _ALPACA_SECRET: str | None = None
@@ -60,8 +64,42 @@ def _load_env() -> None:
                 _ALPACA_SECRET = v.strip()
 
 
+def _select_atm_iv(snapshot: dict, symbol: str, spot: float) -> float | None:
+    """Select deterministic nearest-expiry ATM IV from valid call/put snapshots."""
+    rows: list[tuple[date, str, float, float]] = []
+    for occ_symbol, snap in snapshot.items():
+        iv = getattr(snap, "implied_volatility", None)
+        try:
+            iv_value = float(iv)
+        except (TypeError, ValueError):
+            continue
+        if not (0.0 < iv_value < 10.0):
+            continue
+        try:
+            rest = occ_symbol[len(symbol):]
+            expiry = datetime.strptime(rest[:6], "%y%m%d").date()
+            right = rest[6]
+            strike = float(rest[7:]) / 1000.0
+        except (IndexError, TypeError, ValueError):
+            continue
+        if right not in {"C", "P"}:
+            continue
+        rows.append((expiry, right, abs(strike - spot), iv_value))
+
+    if not rows:
+        return None
+    nearest_expiry = min(row[0] for row in rows)
+    nearest_rows = [row for row in rows if row[0] == nearest_expiry]
+    selected: list[float] = []
+    for right in ("C", "P"):
+        side = [row for row in nearest_rows if row[1] == right]
+        if side:
+            selected.append(min(side, key=lambda row: row[2])[3])
+    return sum(selected) / len(selected) if selected else None
+
+
 def _fetch_atm_iv(symbol: str, spot: float) -> float | None:
-    """Fetch ATM implied volatility from Alpaca 0DTE or nearest-expiry option chain."""
+    """Fetch maturity-stable ATM IV from Alpaca's nearest 7-45 DTE expiry."""
     try:
         from alpaca.data.historical.option import OptionHistoricalDataClient
         from alpaca.data.requests import OptionChainRequest
@@ -71,49 +109,13 @@ def _fetch_atm_iv(symbol: str, spot: float) -> float | None:
     _load_env()
     client = OptionHistoricalDataClient(api_key=_ALPACA_KEY, secret_key=_ALPACA_SECRET)
 
-    today = date.today().strftime("%Y-%m-%d")
-    expiry_end = (date.today() + timedelta(days=14)).strftime("%Y-%m-%d")
-
     request = OptionChainRequest(
         underlying_symbol=symbol,
-        expiration_date_gte=today,
-        expiration_date_lte=expiry_end,
+        expiration_date_gte=(date.today() + timedelta(days=ATM_IV_DTE_MIN)).strftime("%Y-%m-%d"),
+        expiration_date_lte=(date.today() + timedelta(days=ATM_IV_DTE_MAX)).strftime("%Y-%m-%d"),
     )
     snapshot = client.get_option_chain(request)
-
-    # Find ATM call closest to spot price in nearest expiry
-    best: tuple[float, float] | None = None  # (distance_from_atm, iv)
-    nearest_expiry: str | None = None
-
-    for occ_symbol, snap in snapshot.items():
-        greeks = getattr(snap, "greeks", None)
-        if greeks is None:
-            continue
-        iv = getattr(snap, "implied_volatility", None)
-        if iv is None or float(iv) <= 0:
-            continue
-
-        try:
-            rest = occ_symbol[len(symbol):]
-            expiry = datetime.strptime(rest[:6], "%y%m%d").date().isoformat()
-            right = "call" if rest[6] == "C" else "put"
-            strike = float(rest[7:]) / 1000.0
-        except Exception:
-            continue
-
-        if right != "call":
-            continue
-
-        if nearest_expiry is None:
-            nearest_expiry = expiry
-        if expiry != nearest_expiry:
-            continue
-
-        dist = abs(strike - spot)
-        if best is None or dist < best[0]:
-            best = (dist, float(iv))
-
-    return best[1] if best is not None else None
+    return _select_atm_iv(snapshot, symbol, spot)
 
 
 def _fetch_spot(symbol: str) -> float | None:
@@ -141,7 +143,11 @@ def _fetch_spot(symbol: str) -> float | None:
         return None
 
 
-def _load_iv_history(symbol: str, log_path: Path = LOG_PATH) -> list[float]:
+def _load_iv_history(
+    symbol: str,
+    log_path: Path = LOG_PATH,
+    method: str = ATM_IV_METHOD,
+) -> list[float]:
     """Load historical ATM IV readings for a symbol from the log."""
     if not log_path.exists():
         return []
@@ -158,19 +164,26 @@ def _load_iv_history(symbol: str, log_path: Path = LOG_PATH) -> list[float]:
         if row.get("date", "") < cutoff:
             continue
         for scan in row.get("scans", []):
-            if scan.get("symbol") == symbol and scan.get("atm_iv") is not None:
+            if (
+                scan.get("symbol") == symbol
+                and scan.get("atm_iv") is not None
+                and scan.get("atm_iv_method") == method
+            ):
                 ivs.append(float(scan["atm_iv"]))
     return ivs
 
 
 def compute_ivr(current_iv: float, history: list[float]) -> dict:
-    if len(history) < 5:
+    if len(history) < MIN_IVR_HISTORY:
         return {
             "ivr": None,
             "ivp": None,
             "history_days": len(history),
             "status": "accumulating",
-            "note": f"Need more data ({len(history)}/30 min readings). IVR available after ~30 days.",
+            "note": (
+                f"Need more data ({len(history)}/{MIN_IVR_HISTORY} readings). "
+                "IVR remains unavailable until the minimum is met."
+            ),
         }
 
     iv_high = max(history)
@@ -211,18 +224,22 @@ def scan_symbol(symbol: str) -> dict:
 
         atm_iv = _fetch_atm_iv(symbol, spot)
         if atm_iv is None:
-            return {"symbol": symbol, "status": "error", "error": "ATM IV unavailable — market may be closed"}
+            return {"symbol": symbol, "status": "error", "error": "ATM IV unavailable - market may be closed"}
 
         history = _load_iv_history(symbol)
         # Include current reading in history for IVR calc
         history_with_current = history + [atm_iv]
         ivr_data = compute_ivr(atm_iv, history_with_current)
+        ivr_status = str(ivr_data.pop("status", "unknown"))
 
         return {
             "symbol": symbol,
             "status": "ok",
+            "ivr_status": ivr_status,
             "spot": round(spot, 2),
             "atm_iv": round(atm_iv, 4),
+            "atm_iv_method": ATM_IV_METHOD,
+            "current_iv_pct": round(atm_iv * 100, 2),
             **ivr_data,
         }
     except Exception as exc:
@@ -249,7 +266,7 @@ def log_scan(results: list[dict], log_path: Path = LOG_PATH) -> None:
 
     entry = {
         "date": today,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "scans": results,
     }
     rows.append(entry)
@@ -263,7 +280,7 @@ def print_report(results: list[dict]) -> None:
     for r in results:
         sym = r["symbol"]
         if r.get("status") == "error":
-            print(f"\n{sym}: ERROR — {r.get('error')}")
+            print(f"\n{sym}: ERROR - {r.get('error')}")
             continue
         ivr = r.get("ivr")
         ivp = r.get("ivp")
@@ -282,8 +299,8 @@ def print_report(results: list[dict]) -> None:
             print(f"  Range: {r['iv_52w_low']:.1f}% - {r['iv_52w_high']:.1f}% ({days} days)")
     print("""
 IVR Guide:
-  < 25: Premium CHEAP  → favor buying options (calls/puts)
-  > 75: Premium RICH   → favor selling spreads (IWM bot)
+  < 25: Premium CHEAP  -> favor buying options (calls/puts)
+  > 75: Premium RICH   -> favor selling spreads (IWM bot)
 """)
 
 

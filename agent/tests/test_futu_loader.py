@@ -39,8 +39,9 @@ from backtest.loaders.base import NoAvailableSourceError  # noqa: E402
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
-def reset_futu_mock():
+def reset_futu_mock(monkeypatch):
     """Ensure the futu stub is clean before and after every test."""
+    monkeypatch.delenv("VIBE_TRADING_DATA_CACHE", raising=False)
     _futu_stub.OpenQuoteContext.reset_mock()
     _futu_stub.OpenQuoteContext.side_effect = None
     yield

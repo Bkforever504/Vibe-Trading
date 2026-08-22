@@ -61,6 +61,11 @@ def test_parser_extracts_full_snapshot_with_ok_provenance() -> None:
     assert parsed["provenance"]["missing_fields"] == []
 
 
+def test_quote_scope_distinguishes_opra_from_modified_indicative() -> None:
+    assert pit.option_quote_scope("opra") == "alpaca_opra_nbbo"
+    assert pit.option_quote_scope("indicative") == "indicative_modified_not_opra_nbbo"
+
+
 def test_parser_nulls_missing_fields_and_reports_partial() -> None:
     payload = {
         "snapshots": {

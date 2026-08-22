@@ -72,3 +72,28 @@ def test_build_report_is_read_only_and_summarizes_symbols(monkeypatch) -> None:
     assert report["can_submit_orders"] is False
     assert report["summary"]["bullish"] == 2
     assert {row["symbol"] for row in report["items"]} == {"SPY", "QQQ"}
+
+
+def test_reference_levels_use_current_and_prior_sessions_only() -> None:
+    index = pd.to_datetime([
+        "2026-08-02T14:30:00Z",
+        "2026-08-02T14:45:00Z",
+        "2026-08-03T14:30:00Z",
+        "2026-08-03T14:45:00Z",
+    ])
+    bars = pd.DataFrame(
+        [
+            {"Open": 99.0, "High": 101.0, "Low": 98.0, "Close": 100.0, "Volume": 10},
+            {"Open": 100.0, "High": 102.0, "Low": 99.0, "Close": 101.0, "Volume": 20},
+            {"Open": 101.0, "High": 103.0, "Low": 100.0, "Close": 102.0, "Volume": 10},
+            {"Open": 102.0, "High": 104.0, "Low": 101.0, "Close": 103.0, "Volume": 30},
+        ],
+        index=index,
+    )
+
+    levels = scanner.reference_levels_from_bars(bars)
+
+    assert levels["status"] == "point_in_time_session_levels"
+    assert levels["prior_high"] == 102.0
+    assert levels["prior_low"] == 98.0
+    assert levels["vwap"] == 102.416667

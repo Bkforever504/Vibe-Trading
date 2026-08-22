@@ -34,9 +34,26 @@ _CLEAN = BacktestConfig(slippage_ticks=0, commission_per_rt=0.0)
 # Candle helpers
 # ---------------------------------------------------------------------------
 
-def _c(minute: int, open_: float, high: float, low: float, close: float, volume: int = 100, base: datetime | None = None) -> Candle:
+def _c(
+    minute: int,
+    open_: float,
+    high: float,
+    low: float,
+    close: float,
+    volume: int = 100,
+    base: datetime | None = None,
+    instrument_id: str | None = None,
+) -> Candle:
     b = base or datetime(2026, 6, 22, 9, 30)
-    return Candle(timestamp=b + timedelta(minutes=minute), open=open_, high=high, low=low, close=close, volume=volume)
+    return Candle(
+        timestamp=b + timedelta(minutes=minute),
+        open=open_,
+        high=high,
+        low=low,
+        close=close,
+        volume=volume,
+        instrument_id=instrument_id,
+    )
 
 
 def _long_day(*, date: datetime | None = None, exit_high: float = 115.0, exit_low: float = 108.0) -> list[Candle]:
@@ -526,6 +543,17 @@ def test_build_opening_gap_sides_uses_prior_close_to_current_open() -> None:
     assert sides["2026-06-24"] == "sell"
 
 
+def test_build_opening_gap_sides_blocks_contract_roll_boundary() -> None:
+    prior_date = datetime(2026, 6, 22, 9, 30)
+    current_date = datetime(2026, 6, 23, 9, 30)
+    prior = [_c(0, 100, 101, 99, 100, base=prior_date, instrument_id="MESM6")]
+    current = [_c(0, 110, 111, 109, 110, base=current_date, instrument_id="MESU6")]
+
+    sides = build_opening_gap_sides(prior + current, min_gap_pct=0.01)
+
+    assert sides["2026-06-23"] is None
+
+
 def test_opening_gap_bias_blocks_long_on_gap_down_day() -> None:
     prior = _flat_day(date=datetime(2026, 6, 22, 9, 30), close=105)
     long_signal = _long_day(date=datetime(2026, 6, 23, 9, 30))
@@ -716,6 +744,35 @@ def test_replay_day_pullback_no_signal_returns_empty() -> None:
                          signal_type="pullback", pullback_tolerance_ticks=4, pullback_stop_ticks=8)
     trades = replay_day(_pullback_no_pullback_day(), orb_config=_ORB, bt_config=cfg, symbol="MNQ")
     assert trades == []
+
+
+def test_replay_day_late_retest_captures_delayed_breakout() -> None:
+    base = datetime(2026, 6, 22, 9, 30)
+    candles = [
+        _c(0, 100, 101, 99, 100, 100, base),
+        _c(1, 100, 102, 99, 101, 100, base),
+        _c(2, 101, 101.5, 100, 101, 100, base),
+        _c(3, 101, 101.75, 100.5, 101.25, 100, base),
+        _c(4, 101.25, 104, 101, 103.5, 200, base),
+        _c(5, 103.5, 104, 101.75, 102.5, 120, base),
+        _c(6, 102.5, 108, 102, 107, 150, base),
+    ]
+    cfg = BacktestConfig(
+        slippage_ticks=0,
+        commission_per_rt=0.0,
+        signal_type="late_retest",
+        pullback_tolerance_ticks=4,
+        pullback_stop_ticks=8,
+    )
+    trades = replay_day(
+        candles,
+        orb_config=OpeningRangeConfig(range_minutes=2, min_breakout_points=0.5, reward_risk=2.0),
+        bt_config=cfg,
+        symbol="MNQ",
+    )
+    assert len(trades) == 1
+    assert trades[0].entry_time == candles[5].timestamp
+    assert trades[0].exit_reason == "target"
 
 
 # ---------------------------------------------------------------------------

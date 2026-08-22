@@ -39,12 +39,36 @@ def _return_pct(series: pd.Series, lookback: int) -> float | None:
     return round(((float(clean.iloc[-1]) / float(clean.iloc[-lookback - 1])) - 1.0) * 100.0, 3)
 
 
+def _return_pct_at(series: pd.Series, lookback: int, end_offset: int) -> float | None:
+    clean = series.dropna()
+    end_index = len(clean) - 1 - end_offset
+    start_index = end_index - lookback
+    if start_index < 0 or end_index < 0:
+        return None
+    return ((float(clean.iloc[end_index]) / float(clean.iloc[start_index])) - 1.0) * 100.0
+
+
+def _rotation_quadrant(symbol: str, relative_strength: float, relative_momentum: float) -> str:
+    """Classify an explicit RRG-style proxy without claiming true RRG parity."""
+    if symbol == "SPY":
+        return "benchmark"
+    if relative_strength >= 0 and relative_momentum >= 0:
+        return "leading_proxy"
+    if relative_strength >= 0:
+        return "weakening_proxy"
+    if relative_momentum >= 0:
+        return "improving_proxy"
+    return "lagging_proxy"
+
+
 def compute_rankings(close: pd.DataFrame) -> dict[str, Any]:
     if close.empty or len(close) < 51:
         return {"status": "insufficient_data", "rows": len(close), "required_rows": 51}
     latest = close.iloc[-1]
     sma50 = close.rolling(50).mean().iloc[-1]
     spy_ret_20 = _return_pct(close["SPY"], 20) if "SPY" in close.columns else None
+    spy_ret_5 = _return_pct(close["SPY"], 5) if "SPY" in close.columns else None
+    spy_prior_ret_20 = _return_pct_at(close["SPY"], 20, 5) if "SPY" in close.columns else None
     rows = []
     for symbol in close.columns:
         series = close[symbol]
@@ -57,13 +81,27 @@ def compute_rankings(close: pd.DataFrame) -> dict[str, Any]:
             continue
         above50 = bool(pd.notna(latest.get(symbol)) and pd.notna(sma50.get(symbol)) and latest[symbol] > sma50[symbol])
         rel20 = round(ret20 - spy_ret_20, 3) if spy_ret_20 is not None and symbol != "SPY" else 0.0
+        rel5 = round(ret5 - spy_ret_5, 3) if spy_ret_5 is not None and symbol != "SPY" else 0.0
+        prior_ret20 = _return_pct_at(series, 20, 5)
+        if symbol == "SPY":
+            relative_momentum = 0.0
+        elif prior_ret20 is not None and spy_prior_ret_20 is not None:
+            prior_rel20 = prior_ret20 - spy_prior_ret_20
+            relative_momentum = round(rel20 - prior_rel20, 3)
+        else:
+            relative_momentum = rel5
+        quadrant = _rotation_quadrant(symbol, rel20, relative_momentum)
         score = ret20 + (0.5 * ret5) + (0.25 * ret1) + (2.0 if above50 else -2.0) + rel20
         rows.append({
             "symbol": symbol,
             "return_1d_pct": ret1,
             "return_5d_pct": ret5,
             "return_20d_pct": ret20,
+            "relative_to_spy_5d_pct": rel5,
             "relative_to_spy_20d_pct": rel20,
+            "relative_strength_20d_pct": rel20,
+            "relative_momentum_5d_change_pct": relative_momentum,
+            "rotation_quadrant_proxy": quadrant,
             "above_50dma": above50,
             "rotation_score": round(score, 3),
             "bucket": "risk_on" if symbol in RISK_ON else "defensive" if symbol in DEFENSIVE else "benchmark",
@@ -99,6 +137,9 @@ def compute_rankings(close: pd.DataFrame) -> dict[str, Any]:
         "top5": top5,
         "bottom5": bottom5,
         "rankings": ranked,
+        "rotation_quadrant_method": "sign_of_20d_relative_return_and_5d_change_in_20d_relative_return_vs_spy",
+        "true_rrg_calculation": False,
+        "execution_authority": "context_only",
     }
 
 
@@ -118,6 +159,7 @@ def build_report(symbols: list[str] | None = None) -> dict[str, Any]:
         "warnings": [
             "Context only. No broker orders are wired.",
             "Use leadership as posture evidence, not a direct entry signal.",
+            "Rotation quadrants are an explicit relative-strength/momentum proxy, not proprietary RRG values.",
         ],
     }
 

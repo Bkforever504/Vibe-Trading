@@ -42,6 +42,33 @@ def test_build_report_flags_missing_expected_time() -> None:
     assert any(issue["issue"] == "missing_expected_times" and issue["task"] == bad_task for issue in report["issues"])
 
 
+def test_build_report_flags_monitor_repetition_mismatch() -> None:
+    task = r"\VibeTradingOptionsShadowTwin"
+    repetitions = {
+        **alignment.EXPECTED_TASK_REPETITIONS,
+        task: {"interval": "PT30M", "duration": "PT6H"},
+    }
+
+    report = alignment.build_report(_rows_from_expected(), task_repetitions=repetitions)
+
+    assert report["passed"] is False
+    assert any(
+        issue.get("task") == task and issue.get("issue") == "repetition_mismatch"
+        for issue in report["issues"]
+    )
+
+
+def test_build_report_flags_missing_monitor_repetition() -> None:
+    report = alignment.build_report(_rows_from_expected(), task_repetitions={})
+
+    assert report["passed"] is False
+    missing = {
+        issue.get("task") for issue in report["issues"]
+        if issue.get("issue") == "missing_expected_repetition"
+    }
+    assert missing == set(alignment.EXPECTED_TASK_REPETITIONS)
+
+
 def test_build_report_flags_uncovered_options_entry_window() -> None:
     task = r"\IWM-Bot-Entry"
     report = alignment.build_report(_rows_from_expected({task: {"09:45"}}))

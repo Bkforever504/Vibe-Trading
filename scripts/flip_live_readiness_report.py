@@ -21,7 +21,7 @@ from strategies.flip_live_readiness import affordable_contracts, evaluate_live_r
 ENV_PATH = ROOT / "agent" / ".env"
 REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "flip-live-readiness.json"
 MAX_NOTIONAL_PCT = 0.02
-MAX_CONTRACTS = 5
+MAX_CONTRACTS = max(1, int(os.getenv("FLIP_MAX_CONTRACTS", "1")))
 
 
 def _load_env() -> None:

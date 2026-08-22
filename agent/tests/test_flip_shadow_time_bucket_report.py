@@ -17,6 +17,8 @@ def _row(
     *,
     event: str = "shadow_mark",
     strategy: str = "0dte",
+    day: str = "2026-07-14",
+    spread_cents: int = 2,
 ) -> dict:
     return {
         "schema_version": 3,
@@ -24,7 +26,7 @@ def _row(
         "execution_mode": "shadow_only",
         "lifecycle_id": lifecycle,
         "event_type": event,
-        "date": "2026-07-14",
+        "date": day,
         "episode_bucket_et": bucket,
         "symbol": "SPY",
         "right": "CALL",
@@ -33,6 +35,7 @@ def _row(
         "entry_price_est": price,
         "selection_ask": price,
         "selection_bid": price,
+        "spread_cents": spread_cents,
         "contracts": 1,
         "scanned_at": f"2026-07-14T{bucket}:00Z",
     }
@@ -87,3 +90,30 @@ def test_time_bucket_report_isolates_research_challengers(tmp_path: Path) -> Non
     assert built["buckets"][0]["expectancy_return_pct"] == -30.0
     assert built["research_strategy_results"][0]["strategy"] == "orb_15m_retest"
     assert built["research_strategy_results"][0]["expectancy_return_pct"] == 100.0
+
+
+def test_market_structure_scorecard_uses_chronological_holdout_and_stress(tmp_path: Path) -> None:
+    source = tmp_path / "shadow.jsonl"
+    rows = []
+    for index in range(20):
+        day = f"2026-07-{index + 1:02d}"
+        for trade_index in range(5):
+            lifecycle = f"day-{index}-trade-{trade_index}"
+            rows.extend([
+                _row(lifecycle, "09:30", 1.0, day=day),
+                _row(lifecycle, "09:30", 1.2, event="shadow_exit", day=day),
+            ])
+    _write_jsonl(source, rows)
+
+    built = report.build_report(source)
+    scorecard = built["market_structure_walk_forward"]
+    cohort = next(row for row in scorecard["cohorts"] if row["cohort_type"] == "setup_symbol")
+
+    assert cohort["full"]["count"] == 100
+    assert cohort["distinct_dates"] == 20
+    assert cohort["chronological_holdout"]["count"] == 30
+    assert cohort["full"]["expectancy_return_pct"] == 20.0
+    assert cohort["full"]["doubled_cost_expectancy_return_pct"] == 18.0
+    assert cohort["statistical_gate_ready"] is True
+    assert cohort["promotion_eligible"] is False
+    assert cohort["promotion_blockers"] == ["human_review_required"]

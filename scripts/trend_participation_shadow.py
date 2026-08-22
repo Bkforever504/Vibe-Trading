@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -83,6 +84,29 @@ def _append(row: dict[str, Any], path: Path = LOG_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+
+
+def _append_scan_heartbeat(report: dict[str, Any], path: Path = LOG_PATH) -> None:
+    rejection_reasons = Counter(
+        str(reason)
+        for rejection in report.get("rejections", [])
+        if isinstance(rejection, dict)
+        for reason in rejection.get("reasons", [])
+    )
+    _append({
+        "type": "scan_heartbeat",
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "session": report.get("date"),
+        "mode": report.get("mode"),
+        "status": report.get("status"),
+        "candidate_count": len(report.get("candidates", [])),
+        "mark_count": len(report.get("marks", [])),
+        "outcome_count": len(report.get("outcomes", [])),
+        "blocker_count": len(report.get("blockers", [])),
+        "rejection_counts": dict(sorted(rejection_reasons.items())),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }, path)
 
 
 def _by_symbol(report: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
@@ -294,6 +318,7 @@ def build_entry_report(
             f"SHADOW ONLY — no order submitted. Evidence building."
         )
     base["status"] = "candidates_recorded" if base["candidates"] else "no_qualified_candidates"
+    _append_scan_heartbeat(base, log_path)
     return base
 
 
@@ -359,6 +384,7 @@ def build_monitor_report(
                 f"SHADOW ONLY — no order submitted."
             )
     report["status"] = "ok"
+    _append_scan_heartbeat(report, log_path)
     return report
 
 

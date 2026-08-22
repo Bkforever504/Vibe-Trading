@@ -115,16 +115,17 @@ def test_flip_submit_rejects_automatic_market_order(monkeypatch):
     monkeypatch.setattr(flip_bot, "_post", lambda _path, body: posted.append(body) or {"id": "exit"})
     assert flip_bot._submit("SPY260810C00600000", 1, "buy") is None
     assert flip_bot._submit("SPY260810C00600000", 1, "sell") == {"id": "exit"}
-    assert posted == [
-        {
-            "symbol": "SPY260810C00600000",
-            "qty": "1",
-            "side": "sell",
-            "time_in_force": "day",
-            "type": "limit",
-            "limit_price": "0.88",
-        }
-    ]
+    assert len(posted) == 1
+    _body = posted[0]
+    assert _body.get("client_order_id", "").startswith("vt-")
+    assert {k: v for k, v in _body.items() if k != "client_order_id"} == {
+        "symbol": "SPY260810C00600000",
+        "qty": "1",
+        "side": "sell",
+        "time_in_force": "day",
+        "type": "limit",
+        "limit_price": "0.88",
+    }
 
 
 def test_ambiguous_order_timeout_is_not_retried(monkeypatch):
@@ -189,3 +190,22 @@ def test_indicative_stream_quote_never_triggers_monitor(monkeypatch, tmp_path):
     assert triggered == []
     cached = json.loads((tmp_path / "quotes.json").read_text(encoding="utf-8"))
     assert cached["quote_authority"] == "indicative_telemetry_only"
+
+
+def test_option_stream_subscription_failure_suppresses_reconnect(monkeypatch):
+    events = []
+    health = []
+    flip_event_monitor._option_stream_permanently_unavailable.clear()
+    monkeypatch.setattr(flip_event_monitor, "_event", lambda kind, **details: events.append((kind, details)))
+    monkeypatch.setattr(flip_event_monitor, "_health", lambda status, **details: health.append((status, details)))
+
+    flip_event_monitor._record_option_stream_failure(
+        {"SPY260818P00767000"},
+        RuntimeError("insufficient subscription"),
+    )
+
+    assert flip_event_monitor._option_stream_permanently_unavailable.is_set()
+    assert events[0][1]["permanent"] is True
+    assert health[0][0] == "degraded"
+    assert health[0][1]["option_stream_retry_suppressed"] is True
+    flip_event_monitor._option_stream_permanently_unavailable.clear()

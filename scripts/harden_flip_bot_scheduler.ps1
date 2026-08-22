@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 
 $taskNames = @(
     "Flip-Bot-Entry",
+    "Flip-Bot-Exploration",
     "Flip-Bot-Monitor",
     "Flip-Bot-Monitor-5m-A",
     "Flip-Bot-Monitor-5m-B",
@@ -19,7 +20,10 @@ foreach ($taskName in $taskNames) {
     $settings = New-ScheduledTaskSettingsSet `
         -MultipleInstances IgnoreNew `
         -ExecutionTimeLimit $limit `
+        -RestartCount 3 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
         -StartWhenAvailable `
+        -RunOnlyIfNetworkAvailable `
         -WakeToRun `
         -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries
