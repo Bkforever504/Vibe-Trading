@@ -65,10 +65,10 @@ function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
       </div>
       {families.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-xs">
-            <caption className="sr-only">Precision, recall, and coverage delta by pattern family</caption>
+          <table className="w-full min-w-[900px] text-left text-xs">
+            <caption className="sr-only">Independent annotation metrics and resolved outcome quality by pattern family</caption>
             <thead className="bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-3 py-2">Family</th><th className="px-3 py-2">Labeled</th><th className="px-3 py-2">Detected</th><th className="px-3 py-2">Delta</th><th className="px-3 py-2">Precision</th><th className="px-3 py-2">Recall</th></tr>
+              <tr><th className="px-3 py-2">Family</th><th className="px-3 py-2">Labeled</th><th className="px-3 py-2">Detected</th><th className="px-3 py-2">Delta</th><th className="px-3 py-2">Precision</th><th className="px-3 py-2">Recall</th><th className="px-3 py-2">Resolved</th><th className="px-3 py-2">Win rate</th><th className="px-3 py-2">Avg R</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {families.map((row) => (
@@ -79,6 +79,9 @@ function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
                   <td className="px-3 py-2"><span className={`inline-flex min-w-12 justify-center rounded px-2 py-1 font-bold tabular-nums ${deltaTone(row.coverage_delta)}`}>{deltaLabel(row.coverage_delta)}</span></td>
                   <td className="px-3 py-2 tabular-nums">{pct(row.precision)}</td>
                   <td className="px-3 py-2 tabular-nums">{pct(row.recall)}</td>
+                  <td className="px-3 py-2 tabular-nums">{row.outcome_quality?.resolved_outcomes ?? 0}</td>
+                  <td className="px-3 py-2 tabular-nums">{pct(row.outcome_quality?.observed_win_rate)}</td>
+                  <td className="px-3 py-2 tabular-nums">{row.outcome_quality?.average_r == null ? "Not measured" : `${row.outcome_quality.average_r.toFixed(2)}R`}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,6 +97,7 @@ export function DetectionTab({ scorecard, promotion }: DetectionTabProps) {
   const coverage = scorecard?.pattern_coverage;
   const misses = scorecard?.top_missed_moves ?? [];
   const totals = coverage?.totals;
+  const opportunity = coverage?.opportunity_coverage;
   const cisd = coverage?.cisd_hypothesis;
   return (
     <>
@@ -106,9 +110,21 @@ export function DetectionTab({ scorecard, promotion }: DetectionTabProps) {
         ].map(([name, value]) => <div key={name} className="bg-card p-4"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">{name}</div><div className="mt-1 text-2xl font-bold">{value}</div></div>)}
       </div>
 
-      {coverage && !coverage.metrics_qualified ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Placeholder denominator active — precision and recall remain unqualified until the independent frozen-spec ground-truth builder is available.</div> : null}
+      {coverage && !coverage.metrics_qualified ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Move denominator unavailable — opportunity precision and recall remain unqualified until the independent frozen-spec builder completes.</div> : coverage && coverage.pattern_metrics_qualified === false ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Opportunity coverage is measured, but per-family precision and recall remain unavailable until an independent pattern annotation contract is populated. Resolved outcome quality is shown separately.</div> : null}
 
       <CisdProgress promotion={promotion} />
+
+      {coverage ? (
+        <section className="mt-4 border border-border bg-card" aria-labelledby="opportunity-coverage-heading">
+          <div className="border-b border-border px-3 py-2"><h2 id="opportunity-coverage-heading" className="text-sm font-semibold">Opportunity coverage</h2><p className="mt-0.5 text-xs text-muted-foreground">Any-family detection matched to independently labeled price displacement at the same completed bar.</p></div>
+          <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-card p-4"><div className="text-[10px] uppercase text-muted-foreground">Labeled moves</div><div className="mt-1 text-xl font-bold tabular-nums">{opportunity?.ground_truth_moves ?? 0}</div></div>
+            <div className="bg-card p-4"><div className="text-[10px] uppercase text-muted-foreground">Moves caught</div><div className="mt-1 text-xl font-bold tabular-nums">{opportunity?.true_positives ?? 0}</div></div>
+            <div className="bg-card p-4"><div className="text-[10px] uppercase text-muted-foreground">Opportunity precision</div><div className="mt-1 text-xl font-bold tabular-nums">{pct(opportunity?.precision)}</div></div>
+            <div className="bg-card p-4"><div className="text-[10px] uppercase text-muted-foreground">Opportunity recall</div><div className="mt-1 text-xl font-bold tabular-nums">{pct(opportunity?.recall)}</div></div>
+          </div>
+        </section>
+      ) : null}
 
       {coverage ? (
         <div className="mt-4 grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">

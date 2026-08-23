@@ -151,6 +151,7 @@ def test_projection_builds_stable_causal_envelope_and_complete_denominator() -> 
     assert row["pattern_id"] == "ict_cisd_universal_model"
     assert row["trigger_timeframe"] == "5m"
     assert row["plan_hash"].startswith("plan-")
+    assert row["plan_id"] == row["plan_hash"]
     assert row["producer_aliases"] == ["2026-08-21:SPY:ict_cisd_universal_model"]
     assert row["feed_quality"]["venue_coverage"] == "iex_single_venue_not_consolidated_sip"
     assert row["pattern_grade"]["validation_status"] == "UNCALIBRATED"
@@ -167,6 +168,18 @@ def test_projection_builds_stable_causal_envelope_and_complete_denominator() -> 
         "producer_failure_count": 0,
         "denominator_reconciled": True,
     }
+
+
+def test_projection_preserves_detector_trigger_timeframe() -> None:
+    snapshot = _snapshot()
+    default_row = project_snapshot(snapshot, now=NOW)["detections"][0]
+    snapshot["candidates"][0]["trigger_timeframe"] = "15m"
+    snapshot["market_structure_watchlist"][0]["best_setup"]["timeframe"] = "15m"
+
+    row = project_snapshot(snapshot, now=NOW)["detections"][0]
+
+    assert row["trigger_timeframe"] == "15m"
+    assert row["detection_id"] != default_row["detection_id"]
 
 
 def test_append_is_snapshot_idempotent_but_preserves_lifecycle_updates(tmp_path: Path) -> None:

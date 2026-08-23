@@ -166,6 +166,13 @@ def _row_envelope(
     )
     if trigger_bar_ts is None:
         return None
+    trigger_timeframe = str(
+        row.get("trigger_timeframe")
+        or best.get("timeframe")
+        or structure.get("primary_timeframe")
+        or watch.get("primary_timeframe")
+        or "5m"
+    ).strip().lower()
     decision_at = _timestamp(snapshot.get("generated_at")) or now.isoformat().replace("+00:00", "Z")
     canonical_direction = "bullish" if direction in {"bullish", "long"} else "bearish"
     entry_zone = _dict(entry_plan.get("entry_zone"))
@@ -196,7 +203,7 @@ def _row_envelope(
         "direction": canonical_direction,
         "causal_level": trigger,
         "trigger_bar_ts": trigger_bar_ts,
-        "trigger_timeframe": "5m",
+        "trigger_timeframe": trigger_timeframe,
         "detector_version": DETECTOR_VERSION,
         "plan_version": PLAN_VERSION,
     }
@@ -233,7 +240,7 @@ def _row_envelope(
         "pattern_family": str(best.get("family") or "unknown"),
         "regime": str(structure.get("structure_regime") or watch.get("structure_regime") or "unavailable"),
         "direction": canonical_direction,
-        "trigger_timeframe": "5m",
+        "trigger_timeframe": trigger_timeframe,
         "asset_timeframe_policy_id": ASSET_TIMEFRAME_POLICY_ID,
         "detector_version": DETECTOR_VERSION,
         "spec_version": "2026-08-22",
@@ -256,6 +263,7 @@ def _row_envelope(
         "invalidation": invalidation,
         "targets": targets,
         "geometry_complete": trigger is not None and invalidation is not None and trigger != invalidation,
+        "plan_id": plan_hash,
         "plan_hash": plan_hash,
         "immutable_plan": immutable_plan,
         "blockers": blockers,

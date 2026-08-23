@@ -30,10 +30,12 @@ import { SocialEvidencePanel } from "../SocialEvidencePanel";
 import { TickerStrip } from "../TickerStrip";
 import { LiveOpportunityPanel } from "../LiveOpportunityPanel";
 import { DailyReviewGate } from "../DailyReviewGate";
+import { SystemReadinessGate } from "../SystemReadinessGate";
+import { ExecutionQualityPanel } from "../ExecutionQualityPanel";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
 const source = (name: string, available = true) => ({
-  source: name, provider: available ? "report" : null, mode: available ? "shadow" : null,
+  name, filename: `${name}.json`, source: name, provider: available ? "report" : null, mode: available ? "shadow" : null,
   generated_at: "2026-08-20T20:00:00Z", age_seconds: 10, freshness: available ? "live" as const : "missing" as const,
   available, provenance_qualified: available, data: available ? { summary: `${name} evidence` } : {},
   execution_enabled: false as const, can_submit_orders: false as const,
@@ -78,8 +80,9 @@ describe("trading primitives", () => {
   });
 
   it("shows provenance status for options and context-only social evidence", () => {
-    render(<><OptionsContextPanel context={{ status: "context_available", completeness: "complete", surface: source("surface"), heatmap: source("heatmap"), vol_premium: source("vol_premium"), reason: "Qualified", execution_enabled: false, can_submit_orders: false }} /><SocialEvidencePanel social={{ verified_trader: source("verified_trader"), public_intake: source("public_intake"), trending_symbols: source("trending_symbols"), execution_enabled: false, can_submit_orders: false }} /></>);
+    render(<><OptionsContextPanel context={{ status: "context_available", completeness: "complete", surface: source("surface"), heatmap: source("heatmap"), vol_premium: source("vol_premium"), feed_qualification: source("options_feed_qualification"), manual_execution_reference_available: true, price_discovery_qualified_count: 2, reason: "Qualified", execution_enabled: false, can_submit_orders: false }} /><SocialEvidencePanel social={{ verified_trader: source("verified_trader"), public_intake: source("public_intake"), trending_symbols: source("trending_symbols"), execution_enabled: false, can_submit_orders: false }} /></>);
     expect(screen.getAllByText("Qualified").length).toBeGreaterThan(0);
+    expect(screen.getByText("Current OPRA-qualified")).toBeInTheDocument();
     expect(screen.getByText(/never an entry trigger/i)).toBeInTheDocument();
   });
 
@@ -108,6 +111,45 @@ describe("trading primitives", () => {
     expect(screen.getByText("93.8% complete")).toBeInTheDocument();
     expect(screen.getByText(/pattern grader/i)).toBeInTheDocument();
     expect(screen.getByText(/not entry authority/i)).toBeInTheDocument();
+  });
+
+  it("separates installed, runtime, and evidence readiness", () => {
+    render(<SystemReadinessGate readiness={{
+      build: { status: "installed", percent: 100, gates: [] },
+      runtime: { status: "attention_required", percent: 75, gates: [{ id: "move_ground_truth", ready: false, reason: "independent MOVE denominator qualified", generated_at: null, execution_enabled: false, can_submit_orders: false }] },
+      evidence: { status: "collecting", ranking_qualified_bucket_count: 0, eligible_outcomes: 12, independent_dates: 4, message: "Setup grades are not probabilities." },
+      ready_for_manual_review: false,
+      probability_claims_qualified: false,
+      execution_enabled: false,
+      can_submit_orders: false,
+    }} />);
+
+    expect(screen.getByText("System readiness")).toBeInTheDocument();
+    expect(screen.getByText("100.0% installed")).toBeInTheDocument();
+    expect(screen.getByText("75.0% live")).toBeInTheDocument();
+    expect(screen.getByText(/move ground truth/i)).toBeInTheDocument();
+    expect(screen.getByText(/collecting evidence/i)).toBeInTheDocument();
+  });
+
+  it("shows manual and broker execution-quality followups", () => {
+    render(<ExecutionQualityPanel quality={{
+      status: "followup_required",
+      manual: source("manual_execution_quality"),
+      broker: source("broker_fill_observer"),
+      manual_observations: 3,
+      manual_followups: 1,
+      broker_fills: 2,
+      broker_matched: 1,
+      broker_linkage_issues: 1,
+      message: "Resolve execution evidence.",
+      execution_enabled: false,
+      can_submit_orders: false,
+    }} />);
+
+    expect(screen.getByText("Execution quality")).toBeInTheDocument();
+    expect(screen.getByText("1 manual follow-up")).toBeInTheDocument();
+    expect(screen.getByText("1 linkage issue")).toBeInTheDocument();
+    expect(screen.getByText(/observation only/i)).toBeInTheDocument();
   });
 
   it("changes the sizing preference from its input", () => {

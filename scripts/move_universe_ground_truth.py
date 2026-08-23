@@ -32,7 +32,10 @@ def ground_truth_spec_status(path: Path = MOVE_GROUND_TRUTH_SPEC) -> dict[str, A
         text = path.read_text(encoding="utf-8-sig")
     except OSError:
         text = ""
-    normalized = {line.strip().lower() for line in text.splitlines()}
+    normalized = {
+        line.replace("**", "").replace("__", "").strip().lower()
+        for line in text.splitlines()
+    }
     approved = "status: frozen" in normalized and "kenny approval: approved" in normalized
     return {
         "path": path.as_posix(),

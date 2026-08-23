@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from scripts.dashboard_readiness import build_readiness
+
 
 VIBE_HOME = Path.home() / ".vibe-trading"
 REPORT_DIR = VIBE_HOME / "reports"
@@ -66,6 +68,10 @@ REPORT_FILES: dict[str, str] = {
     "options_liquidity": "options-liquidity-feasibility.json",
     "options_surface": "options-surface-intelligence.json",
     "options_heatmap": "options-liquidation-heatmap.json",
+    "options_feed_qualification": "options-feed-qualification.json",
+    "move_ground_truth": "move-ground-truth-summary.json",
+    "manual_execution_quality": "manual-execution-quality.json",
+    "broker_fill_observer": "broker-fill-observer.json",
     "options_playbook": "adaptive-options-shadow-playbook.json",
     "premium_levels": "option-premium-levels.json",
     "vol_premium": "options-vol-premium.json",
@@ -614,20 +620,35 @@ def _options_context(
         "vol_premium": _source_surface(
             "vol_premium", reports, sources_by_name, require_provenance=True
         ),
+        "feed_qualification": _source_surface(
+            "options_feed_qualification", reports, sources_by_name, require_provenance=True
+        ),
     }
-    qualified = [row for row in surfaces.values() if row["provenance_qualified"]]
-    if len(qualified) == len(surfaces):
+    research_surfaces = [surfaces[key] for key in ("surface", "heatmap", "vol_premium")]
+    qualified = [row for row in research_surfaces if row["provenance_qualified"]]
+    if len(qualified) == len(research_surfaces):
         completeness = "complete"
     elif qualified:
         completeness = "partial"
     else:
         completeness = "unavailable"
+    feed_report = reports.get("options_feed_qualification", {})
+    feed_summary = _dict(feed_report.get("summary"))
+    feed_source = sources_by_name.get("options_feed_qualification", {})
+    feed_current = feed_source.get("freshness") in {"live", "prior_session"}
+    manual_execution_reference_available = (
+        feed_current and int(_number(feed_summary.get("manual_execution_qualified")) or 0) > 0
+    )
     return {
         "status": "context_available" if qualified else "unavailable",
         "completeness": completeness,
         **surfaces,
+        "manual_execution_reference_available": manual_execution_reference_available,
+        "price_discovery_qualified_count": int(_number(feed_summary.get("price_discovery_qualified")) or 0),
         "reason": (
-            "Options context is read-only and source-provenance qualified."
+            "Research context is available and a current OPRA-qualified manual execution reference is present."
+            if qualified and manual_execution_reference_available
+            else "Research context is available, but no current OPRA-qualified manual execution reference is present."
             if qualified
             else "No provenance-qualified options context is available."
         ),
@@ -1478,6 +1499,44 @@ def _daily_review_gate(report: dict[str, Any], source: dict[str, Any]) -> dict[s
     }
 
 
+def _execution_quality(
+    reports: dict[str, dict[str, Any]], sources_by_name: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    manual = reports.get("manual_execution_quality", {})
+    broker = reports.get("broker_fill_observer", {})
+    manual_summary = _dict(manual.get("summary"))
+    broker_summary = _dict(broker.get("summary"))
+    followups = int(_number(manual_summary.get("missing_followup_count")) or 0)
+    linkage_issues = int(_number(broker_summary.get("ambiguous_count")) or 0) + int(
+        _number(broker_summary.get("unmatched_count")) or 0
+    )
+    if followups or linkage_issues:
+        status = "followup_required"
+    elif manual or broker:
+        status = "available"
+    else:
+        status = "missing"
+    return {
+        "status": status,
+        "manual": _source_surface("manual_execution_quality", reports, sources_by_name),
+        "broker": _source_surface("broker_fill_observer", reports, sources_by_name),
+        "manual_observations": int(_number(manual_summary.get("observation_count")) or 0),
+        "manual_followups": followups,
+        "broker_fills": int(_number(broker_summary.get("fill_count")) or 0),
+        "broker_matched": int(_number(broker_summary.get("matched_count")) or 0),
+        "broker_linkage_issues": linkage_issues,
+        "message": (
+            "Resolve manual outcome follow-ups and ambiguous broker-fill linkage."
+            if status == "followup_required"
+            else "Execution-quality evidence is available for review."
+            if status == "available"
+            else "Execution-quality producers have not emitted evidence yet."
+        ),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def build_cockpit(
     *, report_dir: Path = REPORT_DIR, now: datetime | None = None
 ) -> dict[str, Any]:
@@ -1599,6 +1658,7 @@ def build_cockpit(
     daily_review_gate = _daily_review_gate(
         reports["aplus_review"], sources_by_name.get("aplus_review", {})
     )
+    system_readiness = build_readiness(root=ROOT, report_dir=report_dir, now=now)
 
     stale_sources = [row["name"] for row in sources if row["freshness"] in {"stale", "missing"}]
     risk_blockers = []
@@ -1618,7 +1678,7 @@ def build_cockpit(
         }
 
     return {
-        "schema_version": 10,
+        "schema_version": 11,
         "generated_at": now.isoformat(),
         "refresh_seconds": 15,
         "mode": "read_only_decision_support",
@@ -1653,6 +1713,8 @@ def build_cockpit(
         },
         "command_card": command_card,
         "daily_review_gate": daily_review_gate,
+        "system_readiness": system_readiness,
+        "execution_quality": _execution_quality(reports, sources_by_name),
         "dealer_regime": _dealer_gamma_regime(market_force),
         "options_context": _options_context(reports, sources_by_name),
         "decision_desk": {

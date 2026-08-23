@@ -382,6 +382,37 @@ def test_cockpit_surfaces_pattern_evidence_and_fail_closed_daily_review_gate(tmp
     assert cockpit["daily_review_gate"]["can_submit_orders"] is False
 
 
+def test_cockpit_surfaces_operational_readiness_and_execution_quality(tmp_path: Path) -> None:
+    write_report(tmp_path, "manual-execution-quality.json", {
+        "generated_at": "2026-08-19T14:59:58Z",
+        "status": "followup_required",
+        "summary": {"observation_count": 3, "missing_followup_count": 1},
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+    write_report(tmp_path, "broker-fill-observer.json", {
+        "generated_at": "2026-08-19T14:59:58Z",
+        "status": "ok",
+        "summary": {"fill_count": 2, "matched_count": 1, "ambiguous_count": 1, "unmatched_count": 0},
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    assert cockpit["schema_version"] == 11
+    assert cockpit["system_readiness"]["build"]["percent"] == 100.0
+    assert cockpit["system_readiness"]["runtime"]["status"] == "attention_required"
+    quality = cockpit["execution_quality"]
+    assert quality["status"] == "followup_required"
+    assert quality["manual_observations"] == 3
+    assert quality["manual_followups"] == 1
+    assert quality["broker_fills"] == 2
+    assert quality["broker_linkage_issues"] == 1
+    assert quality["execution_enabled"] is False
+    assert quality["can_submit_orders"] is False
+
+
 def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_options(
     tmp_path: Path,
 ) -> None:
@@ -481,13 +512,23 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
             "mode": "forward_only_shadow_research",
             "rows": [],
         },
+        "options-feed-qualification.json": {
+            "generated_at": "2026-08-19T14:59:59Z",
+            "provider": "options_feed_qualification",
+            "mode": "read_only_evidence_qualification",
+            "status": "manual_execution_reference_available",
+            "summary": {"price_discovery_qualified": 1, "manual_execution_qualified": 1},
+            "records": [],
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
     }
     for filename, payload in reports.items():
         write_report(tmp_path, filename, payload)
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 10
+    assert cockpit["schema_version"] == 11
     for group_name in ("retro", "journal", "social"):
         group = cockpit["evidence"][group_name]
         assert group["execution_enabled"] is False
@@ -516,6 +557,9 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
     assert options["surface"]["source"] == "options_surface"
     assert options["heatmap"]["source"] == "options_heatmap"
     assert options["vol_premium"]["source"] == "vol_premium"
+    assert options["feed_qualification"]["source"] == "options_feed_qualification"
+    assert options["manual_execution_reference_available"] is True
+    assert options["price_discovery_qualified_count"] == 1
     assert options["execution_enabled"] is False
     assert options["can_submit_orders"] is False
 
@@ -570,7 +614,7 @@ def test_trade_board_scores_factors_without_inventing_probability_or_contract(tm
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
     plan = cockpit["trade_board"]["stocks"][0]
 
-    assert cockpit["schema_version"] == 10
+    assert cockpit["schema_version"] == 11
     assert plan["grade"] in {"A+", "A", "A-", "B+", "B", "B-", "C", "D"}
     assert plan["probability"]["value"] is None
     assert plan["trade_plan"]["contract"] is None
@@ -939,7 +983,7 @@ def test_reconciliation_diff_forces_stand_aside_and_exposes_weekly_failures(tmp_
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 10
+    assert cockpit["schema_version"] == 11
     assert cockpit["command_card"]["state"] == "STAND_ASIDE"
     assert cockpit["command_card"]["color"] == "RED"
     assert cockpit["operations"]["failure_taxonomy_week"] == {"BAD_ENTRY": 2, "STALE_DATA": 1}

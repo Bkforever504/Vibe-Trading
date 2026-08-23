@@ -1055,6 +1055,9 @@ export interface TradingOptionsContext {
   surface: TradingEvidenceSource;
   heatmap: TradingEvidenceSource;
   vol_premium: TradingEvidenceSource;
+  feed_qualification?: TradingEvidenceSource;
+  manual_execution_reference_available?: boolean;
+  price_discovery_qualified_count?: number;
   reason: string;
   execution_enabled: false;
   can_submit_orders: false;
@@ -1492,17 +1495,35 @@ export interface DetectionPatternStat {
   precision: number | null;
   recall: number | null;
   coverage_delta: number | null;
+  outcome_quality?: {
+    resolved_outcomes: number;
+    wins: number;
+    observed_win_rate: number | null;
+    average_r: number | null;
+  };
 }
 
 export interface DetectionPatternCoverage {
   status: string;
   metrics_qualified: boolean;
+  pattern_metrics_qualified?: boolean;
   source_labels: string[];
   totals: {
     ground_truth_labeled: number;
     grader_detected: number;
     true_positives: number;
-    coverage_delta: number;
+    coverage_delta: number | null;
+  };
+  opportunity_coverage?: {
+    metrics_qualified: boolean;
+    ground_truth_moves: number;
+    detected_events: number;
+    true_positives: number;
+    false_positives: number;
+    false_negatives: number;
+    precision: number | null;
+    recall: number | null;
+    coverage_delta: number | null;
   };
   per_pattern: DetectionPatternStat[];
   per_family: DetectionPatternStat[];
@@ -1555,8 +1576,47 @@ export interface TradingDailyReviewGate {
   can_submit_orders: false;
 }
 
+export interface TradingReadinessGate {
+  id: string;
+  ready: boolean;
+  reason: string;
+  generated_at: string | null;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingSystemReadiness {
+  build: { status: string; percent: number; gates: TradingReadinessGate[] };
+  runtime: { status: string; percent: number; gates: TradingReadinessGate[] };
+  evidence: {
+    status: "qualified" | "collecting" | string;
+    ranking_qualified_bucket_count: number;
+    eligible_outcomes: number;
+    independent_dates: number;
+    message: string;
+  };
+  ready_for_manual_review: boolean;
+  probability_claims_qualified: boolean;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingExecutionQuality {
+  status: "available" | "followup_required" | "missing" | string;
+  manual: TradingSource;
+  broker: TradingSource;
+  manual_observations: number;
+  manual_followups: number;
+  broker_fills: number;
+  broker_matched: number;
+  broker_linkage_issues: number;
+  message: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingDashboard {
-  schema_version: 10;
+  schema_version: 11;
   generated_at: string;
   refresh_seconds: number;
   mode: string;
@@ -1610,6 +1670,8 @@ export interface TradingDashboard {
     can_submit_orders: false;
   };
   daily_review_gate?: TradingDailyReviewGate;
+  system_readiness?: TradingSystemReadiness;
+  execution_quality?: TradingExecutionQuality;
   dealer_regime?: {
     status: "context_available" | "unavailable";
     source_status: string;

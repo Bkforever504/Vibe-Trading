@@ -126,6 +126,45 @@ def test_declared_pattern_producer_failure_prevents_complete_review(tmp_path: Pa
     assert report["source_inventory"][0]["status"] == "producer_failed"
 
 
+def test_independent_denominator_and_broker_observer_fail_closed(tmp_path: Path) -> None:
+    move = tmp_path / "move.json"
+    move.write_text(json.dumps({"metrics_qualified": False, "producer_healthy": False, "moves": []}), encoding="utf-8")
+    broker = tmp_path / "broker.json"
+    broker.write_text(json.dumps({"status": "unavailable", "fills": []}), encoding="utf-8")
+
+    report = build_report(
+        day="2026-08-21",
+        sources={"move_ground_truth": move, "broker_fill_observer": broker},
+        outcome_paths=[],
+        now=NOW,
+    )
+
+    assert report["review_status"] == "attention_required"
+    assert {row["source"] for row in report["source_inventory"] if row["status"] == "producer_failed"} == {
+        "move_ground_truth", "broker_fill_observer"
+    }
+
+
+def test_immature_move_evidence_is_reviewed_when_producer_is_healthy(tmp_path: Path) -> None:
+    move = tmp_path / "move.json"
+    move.write_text(json.dumps({
+        "metrics_qualified": False,
+        "producer_healthy": True,
+        "ground_truth_status": "awaiting_horizon_maturity",
+        "moves": [],
+    }), encoding="utf-8")
+
+    report = build_report(
+        day="2026-08-21",
+        sources={"move_ground_truth": move},
+        outcome_paths=[],
+        now=NOW,
+    )
+
+    assert report["review_status"] == "complete"
+    assert report["source_inventory"][0]["status"] == "reviewed"
+
+
 def test_matching_outcome_closes_review_followup(tmp_path: Path) -> None:
     source = tmp_path / "source.jsonl"
     _write_jsonl(source, [{

@@ -81,6 +81,7 @@ def test_pattern_scorecard_measures_family_precision_recall_and_coverage_delta()
     ground = {
         "date": "2026-08-21",
         "metrics_qualified": True,
+        "pattern_annotation_qualified": True,
         "moves": [
             {"symbol": "AAA", "pattern_ids": ["ict_cisd_universal_model"]},
             {"symbol": "BBB", "pattern_ids": ["ict_cisd_universal_model"]},
@@ -106,6 +107,7 @@ def test_pattern_scorecard_measures_family_precision_recall_and_coverage_delta()
     assert coverage["cisd_hypothesis"]["n_outcomes"] == 2
     assert coverage["cisd_hypothesis"]["n_dates"] == 1
     assert coverage["cisd_hypothesis"]["brier"] == 0.2
+    assert coverage["pattern_metrics_qualified"] is True
     assert coverage["execution_enabled"] is False
     assert coverage["can_submit_orders"] is False
 
@@ -116,7 +118,7 @@ def test_placeholder_coverage_is_labeled_unqualified() -> None:
         [{"date": "2026-08-21", "symbol": "AAA", "pattern_id": "double_bottom"}],
     )
 
-    assert coverage["status"] == "placeholder_pending_kenny_signoff"
+    assert coverage["status"] == "unqualified_move_denominator"
     assert coverage["metrics_qualified"] is False
     assert coverage["totals"]["coverage_delta"] is None
 
@@ -126,6 +128,7 @@ def test_pattern_grader_native_schema_counts_resolved_cisd_without_inventing_pro
         {
             "date": "2026-08-21",
             "metrics_qualified": True,
+            "pattern_annotation_qualified": True,
             "moves": [{"symbol": "MES", "pattern_ids": ["ict_cisd_universal_model"]}],
         },
         [{
@@ -149,6 +152,7 @@ def test_pattern_coverage_keeps_same_day_trigger_events_distinct_and_joins_compa
     ground = {
         "date": "2026-08-21",
         "metrics_qualified": True,
+        "pattern_annotation_qualified": True,
         "moves": [
             {"symbol": "SPY", "pattern_ids": ["ict_cisd_universal_model"], "timeframe": "5m", "trigger_bar_ts": "2026-08-21T14:00:00Z", "direction": "bullish"},
             {"symbol": "SPY", "pattern_ids": ["ict_cisd_universal_model"], "timeframe": "5m", "trigger_bar_ts": "2026-08-21T16:00:00Z", "direction": "bearish"},
@@ -170,3 +174,84 @@ def test_pattern_coverage_keeps_same_day_trigger_events_distinct_and_joins_compa
     assert coverage["totals"]["true_positives"] == 2
     assert coverage["totals"]["coverage_delta"] == 0.0
     assert coverage["cisd_hypothesis"]["n_outcomes"] == 2
+
+
+def test_frozen_price_move_denominator_qualifies_opportunity_recall_not_pattern_family_recall() -> None:
+    ground = {
+        "date": "2026-08-21",
+        "metrics_qualified": True,
+        "pattern_annotation_qualified": False,
+        "moves": [
+            {
+                "instrument": "SPY",
+                "timeframe": "5m",
+                "trigger_bar_ts": "2026-08-21T14:00:00Z",
+                "direction": "bullish",
+                "label": 1,
+            },
+            {
+                "instrument": "QQQ",
+                "timeframe": "5m",
+                "trigger_bar_ts": "2026-08-21T15:00:00Z",
+                "direction": "bearish",
+                "label": -1,
+            },
+        ],
+    }
+    grader = [
+        {
+            "date": "2026-08-21",
+            "symbol": "SPY",
+            "pattern_id": "double_bottom",
+            "trigger_timeframe": "5m",
+            "trigger_bar_ts": "2026-08-21T14:00:00Z",
+            "direction": "bullish",
+        }
+    ]
+
+    coverage = build_pattern_coverage(ground, grader)
+
+    assert coverage["status"] == "opportunity_measured_pattern_annotation_missing"
+    assert coverage["metrics_qualified"] is True
+    assert coverage["pattern_metrics_qualified"] is False
+    assert coverage["opportunity_coverage"] == {
+        "metrics_qualified": True,
+        "ground_truth_moves": 2,
+        "detected_events": 1,
+        "true_positives": 1,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.5,
+        "coverage_delta": -0.5,
+    }
+    family = coverage["per_family"][0]
+    assert family["precision"] is None
+    assert family["recall"] is None
+
+
+def test_family_outcome_quality_is_separate_from_independent_pattern_recall() -> None:
+    coverage = build_pattern_coverage(
+        {
+            "date": "2026-08-21",
+            "metrics_qualified": True,
+            "pattern_annotation_qualified": False,
+            "moves": [],
+        },
+        [
+            {"detection_id": "a", "date": "2026-08-21", "symbol": "SPY", "pattern_id": "double_bottom"},
+            {"detection_id": "b", "date": "2026-08-21", "symbol": "QQQ", "pattern_id": "double_bottom"},
+        ],
+        outcome_rows=[
+            {"detection_id": "a", "outcome_r": 2.0, "won": True},
+            {"detection_id": "b", "outcome_r": -1.0, "won": False},
+        ],
+    )
+
+    quality = coverage["per_family"][0]["outcome_quality"]
+    assert quality == {
+        "resolved_outcomes": 2,
+        "wins": 1,
+        "observed_win_rate": 0.5,
+        "average_r": 0.5,
+    }

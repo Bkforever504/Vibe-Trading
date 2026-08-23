@@ -51,6 +51,13 @@ BUILTIN_READ_ONLY_ORDER_HISTORY = {
     "scripts/broker_reconciliation_daemon.py",
     "scripts/flip_paper_operations_readiness.py",
 }
+BUILTIN_NON_EXECUTION_EVIDENCE = {
+    # These modules contain order vocabulary only to observe broker history or
+    # reject forbidden manual-observation fields. Their dedicated tests assert
+    # GET-only/no-network boundaries and false order authority.
+    "scripts/broker_fill_observer.py",
+    "scripts/manual_execution_quality.py",
+}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -153,6 +160,7 @@ def audit_registry(registry: dict[str, Any], *, root: Path = ROOT) -> dict[str, 
                 order_hits
                 and rel not in known_order_capable
                 and rel not in known_read_only_order_history
+                and rel not in BUILTIN_NON_EXECUTION_EVIDENCE
                 and rel not in {"strategies/execution_guard.py", "scripts/execution_gate_audit.py"}
             ):
                 issues.append({

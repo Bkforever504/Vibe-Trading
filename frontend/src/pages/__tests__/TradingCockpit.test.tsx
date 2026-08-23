@@ -15,7 +15,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const dashboard = {
-  schema_version: 10,
+  schema_version: 11,
   generated_at: '2026-08-19T14:00:00Z',
   refresh_seconds: 15,
   mode: 'read_only_decision_support',

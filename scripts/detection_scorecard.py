@@ -138,6 +138,22 @@ def _outcome(row: dict[str, Any]) -> float | None:
     return None if number is None else float(number > 0)
 
 
+def _outcome_r(row: dict[str, Any]) -> float | None:
+    value: Any = row.get("outcome_r")
+    if value is None:
+        value = row.get("realized_r")
+    if value is None:
+        for key in ("outcome_eod", "outcome_60m", "outcome_15m", "outcome_5m", "outcome"):
+            nested = row.get(key)
+            if isinstance(nested, dict):
+                value = nested.get("outcome_r")
+                if value is None:
+                    value = nested.get("realized_r")
+                if value is not None:
+                    break
+    return _number(value)
+
+
 def _probability(row: dict[str, Any]) -> float | None:
     value: Any = row.get("probability")
     if isinstance(value, dict):
@@ -158,9 +174,10 @@ def build_pattern_coverage(
     families: dict[str, str] | None = None,
     outcome_rows: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
-    """Compare causal grader detections with separately labeled truth patterns."""
+    """Measure price-move coverage and pattern annotations without conflating them."""
     family_map = families or _taxonomy_families()
     date_key = str(ground_truth.get("date") or "")[:10]
+
     def event_key(row: dict[str, Any], pattern_id: str, row_date: str) -> tuple[str, str, str, str, str, str]:
         stamp = _dt(row.get("trigger_bar_ts") or row.get("bar_close_ts"))
         trigger = stamp.isoformat().replace("+00:00", "Z") if stamp else ""
@@ -207,12 +224,45 @@ def build_pattern_coverage(
         detection_family[key] = _pattern_family(row, family_map)
         usable_rows.append(row)
 
+    latest_outcomes: dict[str, dict[str, Any]] = {}
+    for outcome in outcome_rows:
+        if not isinstance(outcome, dict):
+            continue
+        detection_id = str(outcome.get("detection_id") or outcome.get("event_id") or outcome.get("candidate_id") or "")
+        if detection_id:
+            latest_outcomes[detection_id] = {**latest_outcomes.get(detection_id, {}), **outcome}
+
+    resolved_rows: list[dict[str, Any]] = []
+    for row in usable_rows:
+        detection_id = str(row.get("detection_id") or row.get("event_id") or row.get("candidate_id") or "")
+        merged = {**row, **latest_outcomes.get(detection_id, {})}
+        if _outcome(merged) is not None:
+            resolved_rows.append(merged)
+
+    move_metrics_qualified = bool(ground_truth.get("metrics_qualified"))
+    pattern_metrics_qualified = move_metrics_qualified and bool(
+        ground_truth.get("pattern_annotation_qualified")
+    )
+
+    def outcome_quality(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
+        resolved = [row for row in rows if _outcome(row) is not None]
+        outcomes = [_outcome(row) for row in resolved]
+        realized = [_outcome_r(row) for row in resolved]
+        realized = [value for value in realized if value is not None]
+        return {
+            "resolved_outcomes": len(resolved),
+            "wins": sum(value == 1.0 for value in outcomes),
+            "observed_win_rate": round(sum(value == 1.0 for value in outcomes) / len(outcomes), 4) if outcomes else None,
+            "average_r": round(sum(realized) / len(realized), 4) if realized else None,
+        }
+
     pattern_ids = sorted({key[2] for key in truth | detections})
     per_pattern: list[dict[str, Any]] = []
     for pattern_id in pattern_ids:
         pattern_truth = {key for key in truth if key[2] == pattern_id}
         pattern_detected = {key for key in detections if key[2] == pattern_id}
         hits = pattern_truth & pattern_detected
+        pattern_outcomes = [row for row in resolved_rows if _pattern_id(row) == pattern_id]
         per_pattern.append({
             "pattern_id": pattern_id,
             "family": family_map.get(pattern_id) or next((detection_family[key] for key in pattern_detected), "unclassified"),
@@ -221,9 +271,10 @@ def build_pattern_coverage(
             "true_positives": len(hits),
             "false_positives": len(pattern_detected - pattern_truth),
             "false_negatives": len(pattern_truth - pattern_detected),
-            "precision": round(len(hits) / len(pattern_detected), 4) if pattern_detected else None,
-            "recall": round(len(hits) / len(pattern_truth), 4) if pattern_truth else None,
-            "coverage_delta": round((len(pattern_detected) - len(pattern_truth)) / len(pattern_truth), 4) if pattern_truth else None,
+            "precision": round(len(hits) / len(pattern_detected), 4) if pattern_metrics_qualified and pattern_detected else None,
+            "recall": round(len(hits) / len(pattern_truth), 4) if pattern_metrics_qualified and pattern_truth else None,
+            "coverage_delta": round((len(pattern_detected) - len(pattern_truth)) / len(pattern_truth), 4) if pattern_metrics_qualified and pattern_truth else None,
+            "outcome_quality": outcome_quality(pattern_outcomes),
         })
 
     per_family: list[dict[str, Any]] = []
@@ -232,6 +283,7 @@ def build_pattern_coverage(
         labeled = sum(row["ground_truth_labeled"] for row in rows)
         detected = sum(row["grader_detected"] for row in rows)
         hits = sum(row["true_positives"] for row in rows)
+        family_outcomes = [row for row in resolved_rows if _pattern_family(row, family_map) == family]
         per_family.append({
             "family": family,
             "ground_truth_labeled": labeled,
@@ -239,18 +291,12 @@ def build_pattern_coverage(
             "true_positives": hits,
             "false_positives": sum(row["false_positives"] for row in rows),
             "false_negatives": sum(row["false_negatives"] for row in rows),
-            "precision": round(hits / detected, 4) if detected else None,
-            "recall": round(hits / labeled, 4) if labeled else None,
-            "coverage_delta": round((detected - labeled) / labeled, 4) if labeled else None,
+            "precision": round(hits / detected, 4) if pattern_metrics_qualified and detected else None,
+            "recall": round(hits / labeled, 4) if pattern_metrics_qualified and labeled else None,
+            "coverage_delta": round((detected - labeled) / labeled, 4) if pattern_metrics_qualified and labeled else None,
+            "outcome_quality": outcome_quality(family_outcomes),
         })
 
-    latest_outcomes: dict[str, dict[str, Any]] = {}
-    for outcome in outcome_rows:
-        if not isinstance(outcome, dict):
-            continue
-        detection_id = str(outcome.get("detection_id") or outcome.get("event_id") or outcome.get("candidate_id") or "")
-        if detection_id:
-            latest_outcomes[detection_id] = {**latest_outcomes.get(detection_id, {}), **outcome}
     cisd_rows = []
     for row in usable_rows:
         if _pattern_id(row) != "ict_cisd_universal_model":
@@ -260,17 +306,55 @@ def build_pattern_coverage(
     resolved = [row for row in cisd_rows if _outcome(row) is not None]
     scored = [(_probability(row), _outcome(row)) for row in resolved]
     scored = [(probability, outcome) for probability, outcome in scored if probability is not None and outcome is not None]
-    qualified = bool(ground_truth.get("metrics_qualified"))
+
+    def opportunity_key(row: dict[str, Any], row_date: str) -> tuple[str, str, str, str, str]:
+        _, symbol, _, timeframe, trigger, direction = event_key(row, "", row_date)
+        label = row.get("label")
+        if not direction and label in {1, "+1"}:
+            direction = "bullish"
+        elif not direction and label in {-1, "-1"}:
+            direction = "bearish"
+        return row_date, symbol, timeframe, trigger, direction
+
+    move_truth = {
+        opportunity_key(row, date_key)
+        for row in ground_truth.get("moves") or []
+        if isinstance(row, dict)
+        and row.get("excluded") is not True
+        and row.get("label") in {1, -1, "+1", "-1"}
+    }
+    detected_events = {opportunity_key(row, _row_date(row)) for row in usable_rows}
+    opportunity_hits = move_truth & detected_events
+    opportunity_coverage = {
+        "metrics_qualified": move_metrics_qualified,
+        "ground_truth_moves": len(move_truth),
+        "detected_events": len(detected_events),
+        "true_positives": len(opportunity_hits),
+        "false_positives": len(detected_events - move_truth),
+        "false_negatives": len(move_truth - detected_events),
+        "precision": round(len(opportunity_hits) / len(detected_events), 4) if move_metrics_qualified and detected_events else None,
+        "recall": round(len(opportunity_hits) / len(move_truth), 4) if move_metrics_qualified and move_truth else None,
+        "coverage_delta": round((len(detected_events) - len(move_truth)) / len(move_truth), 4) if move_metrics_qualified and move_truth else None,
+    }
+    status = (
+        "unqualified_move_denominator"
+        if not move_metrics_qualified
+        else "measured"
+        if pattern_metrics_qualified
+        else "opportunity_measured_pattern_annotation_missing"
+    )
     return {
-        "status": "measured" if qualified else "placeholder_pending_kenny_signoff",
-        "metrics_qualified": qualified,
+        "status": status,
+        "metrics_qualified": move_metrics_qualified,
+        "pattern_metrics_qualified": pattern_metrics_qualified,
         "source_labels": ["data/pattern_grader_log.jsonl", "move_universe_ground_truth"],
         "totals": {
             "ground_truth_labeled": len(truth),
             "grader_detected": len(detections),
             "true_positives": len(truth & detections),
-            "coverage_delta": round((len(detections) - len(truth)) / len(truth), 4) if truth else None,
+            "coverage_delta": round((len(detections) - len(truth)) / len(truth), 4) if pattern_metrics_qualified and truth else None,
         },
+        "opportunity_coverage": opportunity_coverage,
         "per_pattern": per_pattern,
         "per_family": per_family,
         "cisd_hypothesis": {

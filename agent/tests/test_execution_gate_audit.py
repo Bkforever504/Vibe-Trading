@@ -81,3 +81,10 @@ def test_repository_execution_gate_audit_passes() -> None:
     report = audit.audit_registry(audit.load_registry(ROOT / "research" / "signal_registry.json"))
 
     assert report["passed"] is True, report["issues"]
+
+
+def test_new_execution_evidence_modules_have_narrow_non_execution_allowlist() -> None:
+    assert audit.BUILTIN_NON_EXECUTION_EVIDENCE == {
+        "scripts/broker_fill_observer.py",
+        "scripts/manual_execution_quality.py",
+    }

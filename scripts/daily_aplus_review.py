@@ -42,6 +42,12 @@ DEFAULT_SOURCES: dict[str, Path] = {
     "intraday_opportunity_brief": REPORT_DIR / "intraday-opportunity-brief.json",
     "eod_opportunity_brief": REPORT_DIR / "eod-opportunity-brief.json",
     "deep_liquid_universe": REPORT_DIR / "deep-liquid-universe-scan.json",
+    "move_ground_truth": REPORT_DIR / "move-ground-truth-summary.json",
+    "detection_scorecard": REPORT_DIR / "detection-scorecard-rolling.json",
+    "grade_calibration": REPORT_DIR / "grade-probability-calibration.json",
+    "options_feed_qualification": REPORT_DIR / "options-feed-qualification.json",
+    "manual_execution_quality": REPORT_DIR / "manual-execution-quality.json",
+    "broker_fill_observer": REPORT_DIR / "broker-fill-observer.json",
 }
 DEFAULT_OUTCOMES = (DATA_DIR / "pattern_grader_outcomes.jsonl", DATA_DIR / "shadow_outcomes.jsonl")
 TOP_SCORE = 93.0
@@ -275,11 +281,15 @@ def build_report(
             modified_at = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         age_minutes = max(0.0, (now - modified_at).total_seconds() / 60.0) if modified_at else None
         producer_failed = any(
-            isinstance(row.get("scan_reconciliation"), dict)
-            and (
-                int(_number(row["scan_reconciliation"].get("producer_failure_count")) or 0) > 0
-                or row["scan_reconciliation"].get("denominator_reconciled") is False
+            (
+                isinstance(row.get("scan_reconciliation"), dict)
+                and (
+                    int(_number(row["scan_reconciliation"].get("producer_failure_count")) or 0) > 0
+                    or row["scan_reconciliation"].get("denominator_reconciled") is False
+                )
             )
+            or (source == "move_ground_truth" and row.get("producer_healthy") is False)
+            or (source == "broker_fill_observer" and row.get("status") == "unavailable")
             for row in rows
         )
         inventory.append({

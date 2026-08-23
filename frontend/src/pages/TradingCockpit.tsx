@@ -32,6 +32,8 @@ import { SocialEvidencePanel } from "@/components/trading/SocialEvidencePanel";
 import { TickerStrip } from "@/components/trading/TickerStrip";
 import { LiveOpportunityPanel } from "@/components/trading/LiveOpportunityPanel";
 import { DailyReviewGate } from "@/components/trading/DailyReviewGate";
+import { SystemReadinessGate } from "@/components/trading/SystemReadinessGate";
+import { ExecutionQualityPanel } from "@/components/trading/ExecutionQualityPanel";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
@@ -624,6 +626,8 @@ export function TradingCockpit() {
               </div>
             </section>
             <DailyReviewGate gate={data.daily_review_gate} />
+            <SystemReadinessGate readiness={data.system_readiness} />
+            <ExecutionQualityPanel quality={data.execution_quality} />
             <CommandCard command={data.command_card} dealer={data.dealer_regime} blockers={data.operations.risk_blockers} />
             <DecisionDesk data={data.decision_desk} />
             <LiveOpportunityPanel report={liveReport} connection={streamConnection} onOpenChart={setChartSymbol} />
