@@ -961,7 +961,8 @@ export interface TradingSource {
   available: boolean;
   generated_at: string | null;
   age_seconds: number | null;
-  freshness: "live" | "recent" | "prior_session" | "stale" | "missing";
+  freshness: "live" | "recent" | "prior_session" | "stale" | "missing" | "clock_skew";
+  clock_skew_seconds?: number;
   provider?: string | null;
   mode?: string | null;
   execution_enabled: boolean;
@@ -1490,7 +1491,7 @@ export interface DetectionPatternStat {
   false_negatives: number;
   precision: number | null;
   recall: number | null;
-  coverage_delta: number;
+  coverage_delta: number | null;
 }
 
 export interface DetectionPatternCoverage {
@@ -1535,6 +1536,21 @@ export interface CisdPromotionStatus {
   eligible_for_validated_promotion: boolean;
   last_updated_utc: string;
   source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingDailyReviewGate {
+  status: "complete" | "attention_required" | "missing" | string;
+  date: string | null;
+  generated_at: string | null;
+  source?: TradingSource | Record<string, unknown>;
+  reviewed_setup_count: number;
+  outcome_followup_count: number;
+  source_coverage_pct: number | null;
+  overall_review_coverage_pct: number | null;
+  failed_sources: string[];
+  message: string;
   execution_enabled: false;
   can_submit_orders: false;
 }
@@ -1593,6 +1609,7 @@ export interface TradingDashboard {
     execution_enabled: false;
     can_submit_orders: false;
   };
+  daily_review_gate?: TradingDailyReviewGate;
   dealer_regime?: {
     status: "context_available" | "unavailable";
     source_status: string;
@@ -1707,6 +1724,17 @@ export interface TradingDashboard {
       can_submit_orders: false;
     };
     cisd_promotion_status?: CisdPromotionStatus;
+    pattern_grader?: {
+      schema_version?: number;
+      provider?: string;
+      generated_at?: string;
+      summary?: Record<string, unknown>;
+      scan_reconciliation?: Record<string, unknown>;
+      latest_detections?: Array<Record<string, unknown>>;
+      source?: TradingSource | Record<string, unknown>;
+      execution_enabled: false;
+      can_submit_orders: false;
+    };
     execution_enabled?: false;
     can_submit_orders?: false;
   };

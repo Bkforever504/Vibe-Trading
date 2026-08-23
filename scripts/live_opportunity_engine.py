@@ -375,6 +375,23 @@ class LiveOpportunityEngine:
             rows.sort(key=lambda row: str(row.get("t") or ""))
             del rows[:-120]
 
+    def update_higher_timeframes(
+        self,
+        symbol: str,
+        higher_timeframes: Mapping[str, list[dict[str, Any]]],
+        *,
+        refreshed_at: str | None = None,
+    ) -> None:
+        """Replace completed HTF context without disturbing live 5m state."""
+        with self._lock:
+            state = self._symbols.setdefault(symbol.upper(), {"quote": {}, "bars": []})
+            current = state.setdefault("higher_timeframes", {})
+            for name, frame_rows in higher_timeframes.items():
+                normalized = _bars_normalized(list(frame_rows))[-120:]
+                if normalized:
+                    current[str(name)] = normalized
+            state["higher_timeframes_refreshed_at"] = refreshed_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
     def _candidates_for(self, symbol: str, state: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
         rows = _bars_normalized(state.get("bars") or [])
         if len(rows) < 3:
@@ -895,6 +912,7 @@ def run_rest_poll(
     """Fallback when the account's single Alpaca WebSocket is already in use."""
     engine.transport = "rest_polling"
     next_bar_refresh = 0.0
+    next_context_refresh = time.monotonic() + 15 * 60.0
     while not stop_event.is_set():
         try:
             quotes = _fetch_latest_quotes(symbols, feed=engine.feed)
@@ -906,6 +924,16 @@ def run_rest_poll(
                     for bar in rows[-120:]:
                         engine.update_completed_bar(symbol, bar)
                 next_bar_refresh = time.monotonic() + 60.0
+            if time.monotonic() >= next_context_refresh:
+                refreshed = _fetch_completed_context_bars(symbols, feed=engine.feed)
+                refreshed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                for symbol in symbols:
+                    engine.update_higher_timeframes(
+                        symbol,
+                        refreshed.get(symbol) or {},
+                        refreshed_at=refreshed_at,
+                    )
+                next_context_refresh = time.monotonic() + 15 * 60.0
             snapshot = engine.snapshot()
             snapshot["stream_status"] = "rest_polling_fallback"
             snapshot["stream_fallback_reason"] = "alpaca_websocket_connection_limit"
@@ -947,6 +975,7 @@ def run_stream(
             _receive_control(ws, expected_type="subscription")
             delay = 1.0
             last_write = 0.0
+            next_context_refresh = time.monotonic() + 15 * 60.0
             while not stop.is_set():
                 messages = json.loads(ws.recv())
                 for message in messages if isinstance(messages, list) else [messages]:
@@ -961,6 +990,16 @@ def run_stream(
                         completed = aggregator.add(symbol, message)
                         if completed:
                             engine.update_completed_bar(symbol, completed)
+                if time.monotonic() >= next_context_refresh:
+                    refreshed = _fetch_completed_context_bars(symbols, feed=engine.feed)
+                    refreshed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                    for symbol in symbols:
+                        engine.update_higher_timeframes(
+                            symbol,
+                            refreshed.get(symbol) or {},
+                            refreshed_at=refreshed_at,
+                        )
+                    next_context_refresh = time.monotonic() + 15 * 60.0
                 if time.monotonic() - last_write >= 2.0:
                     snapshot = engine.snapshot()
                     snapshot["stream_status"] = "connected"

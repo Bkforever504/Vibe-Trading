@@ -98,7 +98,7 @@ def test_pattern_scorecard_measures_family_precision_recall_and_coverage_delta()
         "ground_truth_labeled": 2,
         "grader_detected": 2,
         "true_positives": 1,
-        "coverage_delta": 0,
+        "coverage_delta": 0.0,
     }
     assert family["family"] == "liquidity_delivery"
     assert family["precision"] == 0.5
@@ -118,7 +118,7 @@ def test_placeholder_coverage_is_labeled_unqualified() -> None:
 
     assert coverage["status"] == "placeholder_pending_kenny_signoff"
     assert coverage["metrics_qualified"] is False
-    assert coverage["totals"]["coverage_delta"] == 1
+    assert coverage["totals"]["coverage_delta"] is None
 
 
 def test_pattern_grader_native_schema_counts_resolved_cisd_without_inventing_probability() -> None:
@@ -143,3 +143,30 @@ def test_pattern_grader_native_schema_counts_resolved_cisd_without_inventing_pro
     assert coverage["cisd_hypothesis"]["n_outcomes"] == 1
     assert coverage["cisd_hypothesis"]["brier"] is None
     assert coverage["cisd_hypothesis"]["scored_outcomes"] == 0
+
+
+def test_pattern_coverage_keeps_same_day_trigger_events_distinct_and_joins_companion_outcomes() -> None:
+    ground = {
+        "date": "2026-08-21",
+        "metrics_qualified": True,
+        "moves": [
+            {"symbol": "SPY", "pattern_ids": ["ict_cisd_universal_model"], "timeframe": "5m", "trigger_bar_ts": "2026-08-21T14:00:00Z", "direction": "bullish"},
+            {"symbol": "SPY", "pattern_ids": ["ict_cisd_universal_model"], "timeframe": "5m", "trigger_bar_ts": "2026-08-21T16:00:00Z", "direction": "bearish"},
+        ],
+    }
+    grader = [
+        {"detection_id": "one", "date": "2026-08-21", "symbol": "SPY", "pattern_id": "ict_cisd_universal_model", "trigger_timeframe": "5m", "trigger_bar_ts": "2026-08-21T14:00:00Z", "direction": "bullish"},
+        {"detection_id": "two", "date": "2026-08-21", "symbol": "SPY", "pattern_id": "ict_cisd_universal_model", "trigger_timeframe": "5m", "trigger_bar_ts": "2026-08-21T16:00:00Z", "direction": "bearish"},
+    ]
+    outcomes = [
+        {"detection_id": "one", "pattern_id": "ict_cisd_universal_model", "outcome_60m": {"realized_r": 2.0, "won": True}},
+        {"detection_id": "two", "pattern_id": "ict_cisd_universal_model", "outcome_60m": {"realized_r": -1.0, "won": False}},
+    ]
+
+    coverage = build_pattern_coverage(ground, grader, outcome_rows=outcomes)
+
+    assert coverage["totals"]["ground_truth_labeled"] == 2
+    assert coverage["totals"]["grader_detected"] == 2
+    assert coverage["totals"]["true_positives"] == 2
+    assert coverage["totals"]["coverage_delta"] == 0.0
+    assert coverage["cisd_hypothesis"]["n_outcomes"] == 2

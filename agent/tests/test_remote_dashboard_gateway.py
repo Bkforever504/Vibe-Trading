@@ -14,6 +14,16 @@ def test_dashboard_supervisor_rejects_stale_published_tunnel_hostname() -> None:
     assert "(Test-RemoteTunnel) -and (Test-PublishedUrl)" in script
 
 
+def test_dashboard_backend_is_bound_to_loopback_behind_authenticated_gateway() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_live_trading_dashboard_backend.ps1").read_text(encoding="utf-8")
+
+    assert "'127.0.0.1'" in runner
+    assert "'0.0.0.0'" not in runner
+
+
 def test_remote_dashboard_gateway_allows_only_read_only_cockpit_get_paths() -> None:
     assert _is_allowed_api_path("/trading/dashboard")
     assert _is_allowed_api_path("/trading/dashboard/sources/catalysts")

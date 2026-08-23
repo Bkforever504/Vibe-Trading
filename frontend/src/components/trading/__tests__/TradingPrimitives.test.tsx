@@ -29,6 +29,7 @@ import { PositionSizer } from "../PositionSizer";
 import { SocialEvidencePanel } from "../SocialEvidencePanel";
 import { TickerStrip } from "../TickerStrip";
 import { LiveOpportunityPanel } from "../LiveOpportunityPanel";
+import { DailyReviewGate } from "../DailyReviewGate";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
 const source = (name: string, available = true) => ({
@@ -86,6 +87,27 @@ describe("trading primitives", () => {
     render(<EvidenceReport title="Outcome" source={source("daily_outcome")} />);
     expect(screen.getByText("Outcome")).toBeInTheDocument();
     expect(screen.getByText(/no execution authority/i)).toBeInTheDocument();
+  });
+
+  it("fails the daily review gate visibly when a producer is missing", () => {
+    render(<DailyReviewGate gate={{
+      status: "attention_required",
+      date: "2026-08-21",
+      generated_at: "2026-08-21T23:00:00Z",
+      reviewed_setup_count: 3,
+      outcome_followup_count: 2,
+      source_coverage_pct: 93.8,
+      overall_review_coverage_pct: 93.8,
+      failed_sources: ["pattern_grader"],
+      message: "Daily review is incomplete.",
+      execution_enabled: false,
+      can_submit_orders: false,
+    }} />);
+
+    expect(screen.getByText("Daily A+ review gate")).toBeInTheDocument();
+    expect(screen.getByText("93.8% complete")).toBeInTheDocument();
+    expect(screen.getByText(/pattern grader/i)).toBeInTheDocument();
+    expect(screen.getByText(/not entry authority/i)).toBeInTheDocument();
   });
 
   it("changes the sizing preference from its input", () => {

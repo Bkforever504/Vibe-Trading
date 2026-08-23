@@ -11,11 +11,13 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 from zoneinfo import ZoneInfo
 
+import requests
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.intraday_opportunity_radar import fetch_intraday_bars
+from scripts.premarket_opportunity_radar import _credentials
 
 MARKET_TZ = ZoneInfo("America/New_York")
 SOURCE_LEDGER = ROOT / "data" / "pattern_grader_log.jsonl"
@@ -98,15 +100,49 @@ def _simulate(bars: Iterable[dict[str, Any]], *, direction: str, entry: float, s
     )
     if not eligible:
         return None
+    entry_index = next((
+        index
+        for index, (_stamp, row) in enumerate(eligible)
+        if (
+            (low := _number(row.get("l") if row.get("l") is not None else row.get("low"))) is not None
+            and (high := _number(row.get("h") if row.get("h") is not None else row.get("high"))) is not None
+            and low <= entry <= high
+        )
+    ), None)
+    if entry_index is None:
+        return {
+            "status": "unfilled",
+            "realized_r": None,
+            "won": False,
+            "hit_t1": False,
+            "hit_t2": False,
+            "stopped": False,
+            "expired": True,
+            "entry_touched": False,
+            "entry_fill_assumption": "trigger_not_touched_by_completed_ohlc",
+            "mfe_r": None,
+            "mae_r": None,
+            "bars_observed": len(eligible),
+            "horizon_end_utc": deadline.isoformat().replace("+00:00", "Z"),
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+    eligible = eligible[entry_index:]
     hit_t1 = False
     hit_t2 = False
     stopped = False
     realized_r: float | None = None
+    mfe_r = 0.0
+    mae_r = 0.0
     for _stamp, row in eligible:
         high = _number(row.get("h") if row.get("h") is not None else row.get("high"))
         low = _number(row.get("l") if row.get("l") is not None else row.get("low"))
         if high is None or low is None:
             continue
+        favorable = (high - entry) / risk if direction == "bullish" else (entry - low) / risk
+        adverse = (low - entry) / risk if direction == "bullish" else (entry - high) / risk
+        mfe_r = max(mfe_r, favorable)
+        mae_r = min(mae_r, adverse)
         # Stop priority on an ambiguous same bar is deliberately conservative.
         stop_hit = low <= stop if direction == "bullish" else high >= stop
         if stop_hit:
@@ -130,6 +166,10 @@ def _simulate(bars: Iterable[dict[str, Any]], *, direction: str, entry: float, s
         "hit_t2": hit_t2,
         "stopped": stopped,
         "expired": not stopped and not hit_t2,
+        "entry_touched": True,
+        "entry_fill_assumption": "trigger_touch_from_completed_ohlc_not_executable_quote",
+        "mfe_r": round(mfe_r, 6),
+        "mae_r": round(mae_r, 6),
         "bars_observed": len(eligible),
         "horizon_end_utc": deadline.isoformat().replace("+00:00", "Z"),
         "execution_enabled": False,
@@ -138,9 +178,38 @@ def _simulate(bars: Iterable[dict[str, Any]], *, direction: str, entry: float, s
 
 
 def _alpaca_loader(symbol: str, start: datetime, end: datetime) -> list[dict[str, Any]]:
-    del start
-    rows, errors = fetch_intraday_bars([symbol], end.astimezone(MARKET_TZ))
-    return [] if errors else rows.get(symbol.upper(), [])
+    params: dict[str, Any] = {
+        "symbols": symbol.upper(),
+        "timeframe": "5Min",
+        "start": start.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "end": end.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "adjustment": "raw",
+        "feed": "iex",
+        "limit": 10_000,
+        "sort": "asc",
+    }
+    rows: list[dict[str, Any]] = []
+    token: str | None = None
+    for _ in range(4):
+        if token:
+            params["page_token"] = token
+        response = requests.get(
+            "https://data.alpaca.markets/v2/stocks/bars",
+            headers=_credentials(),
+            params=params,
+            timeout=25,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        rows.extend(
+            row
+            for row in (payload.get("bars") or {}).get(symbol.upper(), [])
+            if isinstance(row, dict)
+        )
+        token = str(payload.get("next_page_token") or "") or None
+        if not token:
+            break
+    return rows
 
 
 def resolve_rows(
@@ -176,6 +245,14 @@ def resolve_rows(
             "schema_version": 1,
             "detection_id": detection_id,
             "pattern_id": detection.get("pattern_id"),
+            "setup_family": detection.get("setup_family") or detection.get("pattern_id"),
+            "grade": detection.get("grade"),
+            "regime": detection.get("regime"),
+            "asset_class": detection.get("asset_class"),
+            "trigger_timeframe": detection.get("trigger_timeframe"),
+            "detector_version": detection.get("detector_version"),
+            "spec_hash": detection.get("spec_hash"),
+            "plan_hash": detection.get("plan_hash"),
             "symbol": symbol,
             "direction": geometry[0],
             "trigger_bar_ts": trigger.isoformat().replace("+00:00", "Z"),
@@ -192,6 +269,15 @@ def resolve_rows(
                 snapshot[name] = result
                 changed = True
         if changed:
+            for primary_name in ("outcome_eod", "outcome_60m", "outcome_15m", "outcome_5m"):
+                primary = snapshot.get(primary_name)
+                if isinstance(primary, dict) and primary.get("status") == "resolved":
+                    snapshot["calibration_horizon"] = primary_name
+                    snapshot["outcome_r"] = primary.get("realized_r")
+                    snapshot["won"] = primary.get("won")
+                    snapshot["mfe_r"] = primary.get("mfe_r")
+                    snapshot["mae_r"] = primary.get("mae_r")
+                    break
             additions.append(snapshot)
             latest[detection_id] = snapshot
         else:

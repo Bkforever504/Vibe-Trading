@@ -71,6 +71,19 @@ APLUS_TIMEFRAME_MATRIX: tuple[dict[str, Any], ...] = (
     {"timeframe": "1w", "role": "major_structure", "minimum_bars": 8, "required_for_aplus": False},
 )
 
+# Maximum completed-bar lag versus the primary 5m data cut. These are
+# freshness/causality gates, not performance parameters. Daily/weekly limits
+# include ordinary weekends and market holidays.
+TIMEFRAME_MAX_LAG_MINUTES: dict[str, int] = {
+    "1m": 15,
+    "5m": 15,
+    "15m": 35,
+    "30m": 65,
+    "60m": 125,
+    "1d": 4 * 24 * 60,
+    "1w": 14 * 24 * 60,
+}
+
 
 def _finite(value: Any) -> float | None:
     try:
@@ -255,13 +268,35 @@ def _timeframe_coverage(
     frames, provenance = _timeframe_rows(rows, higher_timeframes)
     report_rows: list[dict[str, Any]] = []
     missing_required: list[str] = []
+    primary_rows = frames.get("5m") or []
+    primary_cut = _timestamp(primary_rows[-1].get("t")) if primary_rows else None
     for spec in APLUS_TIMEFRAME_MATRIX:
         timeframe = str(spec["timeframe"])
-        completed = len(frames.get(timeframe) or [])
+        timeframe_rows = frames.get(timeframe) or []
+        completed = len(timeframe_rows)
         minimum = int(spec["minimum_bars"])
         required = bool(spec["required_for_aplus"])
-        if completed >= minimum:
+        last_completed = _timestamp(timeframe_rows[-1].get("t")) if timeframe_rows else None
+        lag_minutes = (
+            max(0.0, (primary_cut - last_completed).total_seconds() / 60.0)
+            if primary_cut is not None and last_completed is not None
+            else None
+        )
+        max_lag = TIMEFRAME_MAX_LAG_MINUTES.get(timeframe)
+        stale = bool(
+            completed >= minimum
+            and lag_minutes is not None
+            and max_lag is not None
+            and lag_minutes > max_lag
+            and "derived" not in provenance.get(timeframe, "")
+        )
+        if completed >= minimum and not stale:
             status = "available"
+        elif stale and required:
+            status = "required_stale"
+            missing_required.append(timeframe)
+        elif stale:
+            status = "optional_stale"
         elif required:
             status = "required_missing" if completed == 0 else "required_insufficient_history"
             missing_required.append(timeframe)
@@ -272,6 +307,9 @@ def _timeframe_coverage(
             "completed_bars": completed,
             "status": status,
             "provenance": provenance.get(timeframe, "unavailable"),
+            "last_completed_bar_at": last_completed.isoformat().replace("+00:00", "Z") if last_completed else None,
+            "lag_minutes_vs_primary": round(lag_minutes, 1) if lag_minutes is not None else None,
+            "max_lag_minutes": max_lag,
         })
     return {
         "status": "complete_for_aplus_review" if not missing_required else "incomplete_for_aplus_review",

@@ -16,6 +16,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 VIBE_HOME = Path.home() / ".vibe-trading"
 OUTCOMES = ROOT / "data" / "shadow_outcomes.jsonl"
+PATTERN_OUTCOMES = ROOT / "data" / "pattern_grader_outcomes.jsonl"
 OUTPUT = ROOT / "data" / "grade_probability_calibration.json"
 GRADE_SCORE = {"D": 0.0, "C": 1.0, "B": 2.0, "A": 3.0}
 
@@ -126,7 +127,18 @@ def build_calibration(
     cutoff = current - timedelta(hours=24)
     normalized: list[dict[str, Any]] = []
     skipped = 0
-    for row in outcomes:
+    unkeyed: list[dict[str, Any]] = []
+    latest_detection: dict[str, dict[str, Any]] = {}
+    for source in outcomes:
+        row = dict(source)
+        detection_id = str(row.get("detection_id") or "")
+        if not detection_id:
+            unkeyed.append(row)
+            continue
+        prior = latest_detection.get(detection_id)
+        if prior is None or str(row.get("resolved_at") or "") >= str(prior.get("resolved_at") or ""):
+            latest_detection[detection_id] = row
+    for row in [*unkeyed, *latest_detection.values()]:
         stamp = _dt(row.get("resolved_at"))
         grade = str(row.get("grade") or "").upper()[:1]
         family = str(row.get("setup_family") or "").strip()
@@ -215,9 +227,10 @@ def _atomic(path: Path, payload: dict[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--outcomes", type=Path, default=OUTCOMES)
+    parser.add_argument("--pattern-outcomes", type=Path, default=PATTERN_OUTCOMES)
     parser.add_argument("--output", type=Path, default=OUTPUT)
     args = parser.parse_args()
-    report = build_calibration(_read_jsonl(args.outcomes))
+    report = build_calibration([*_read_jsonl(args.outcomes), *_read_jsonl(args.pattern_outcomes)])
     _atomic(args.output, report)
     _atomic(VIBE_HOME / "reports" / "grade-probability-calibration.json", report)
     print(f"grade_calibration eligible={report['eligible_outcomes']} buckets={len(report['buckets'])}")

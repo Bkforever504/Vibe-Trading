@@ -360,6 +360,30 @@ def test_missing_daily_regime_context_blocks_aplus_review_without_hiding_setup()
     assert result["decision"] != "READY_TO_REVIEW"
 
 
+def test_stale_daily_regime_is_reported_and_blocks_aplus_review() -> None:
+    rows = _bars([100.0 + index * 0.04 for index in range(120)])
+    daily = _bars([90.0 + index * 0.4 for index in range(30)])
+    for index, row in enumerate(daily):
+        row["t"] = (
+            datetime(2026, 7, 1, 20, 0, tzinfo=timezone.utc) + timedelta(days=index)
+        ).isoformat().replace("+00:00", "Z")
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 104.74, "ask": 104.76, "freshness": "live", "spread_bps": 1.91},
+        rvol=2.0,
+        average_dollar_volume=900_000_000,
+        direction_hint="bullish",
+        higher_timeframes={"1d": daily},
+    )
+
+    coverage = {row["timeframe"]: row for row in result["timeframe_coverage"]["frames"]}
+    assert coverage["1d"]["status"] == "required_stale"
+    assert coverage["1d"]["lag_minutes_vs_primary"] > coverage["1d"]["max_lag_minutes"]
+    assert "1d" in result["timeframe_coverage"]["missing_required"]
+    assert "incomplete_aplus_timeframe_coverage" in result["hard_blockers"]
+
+
 def test_weekly_advisory_context_is_visible_but_does_not_create_intraday_conflict() -> None:
     result = analyze_market_structure(
         _bars([100.0 + index * 0.05 for index in range(120)]),

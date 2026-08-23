@@ -160,6 +160,7 @@ def build_report(day: str | None = None, paths: dict[str, Path] | None = None) -
         "provider": "daily_outcome_reviewer",
         "mode": "read_only",
         "execution_enabled": False,
+        "can_submit_orders": False,
         "posture": posture,
         "posture_score": posture_score,
         "market_force_classification": (market_force or {}).get("classification"),

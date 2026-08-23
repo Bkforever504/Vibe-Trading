@@ -31,6 +31,7 @@ import { PositionSizer } from "@/components/trading/PositionSizer";
 import { SocialEvidencePanel } from "@/components/trading/SocialEvidencePanel";
 import { TickerStrip } from "@/components/trading/TickerStrip";
 import { LiveOpportunityPanel } from "@/components/trading/LiveOpportunityPanel";
+import { DailyReviewGate } from "@/components/trading/DailyReviewGate";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
@@ -622,6 +623,7 @@ export function TradingCockpit() {
                 <div className="flex items-center gap-2 text-xs"><StatusPill>{data.ranking_policy?.mode ?? data.headline.state}</StatusPill><span className="text-muted-foreground">{data.ranking_policy ? `${data.ranking_policy.qualified_candidate_count} probability-qualified now` : "Every plan is revalidated before entry"}</span></div>
               </div>
             </section>
+            <DailyReviewGate gate={data.daily_review_gate} />
             <CommandCard command={data.command_card} dealer={data.dealer_regime} blockers={data.operations.risk_blockers} />
             <DecisionDesk data={data.decision_desk} />
             <LiveOpportunityPanel report={liveReport} connection={streamConnection} onOpenChart={setChartSymbol} />

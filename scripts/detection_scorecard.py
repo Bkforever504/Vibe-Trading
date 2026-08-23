@@ -15,6 +15,7 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 RADAR_LOG = ROOT / "data" / "intraday_opportunity_radar_log.jsonl"
 MISSED_LEDGER = ROOT / "data" / "missed_move_postmortem.jsonl"
 PATTERN_GRADER_LOG = ROOT / "data" / "pattern_grader_log.jsonl"
+PATTERN_GRADER_OUTCOMES = ROOT / "data" / "pattern_grader_outcomes.jsonl"
 PATTERN_TAXONOMY = ROOT / "research" / "pattern_taxonomy.json"
 
 
@@ -155,23 +156,41 @@ def build_pattern_coverage(
     pattern_grader_rows: Iterable[dict[str, Any]],
     *,
     families: dict[str, str] | None = None,
+    outcome_rows: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Compare causal grader detections with separately labeled truth patterns."""
     family_map = families or _taxonomy_families()
     date_key = str(ground_truth.get("date") or "")[:10]
-    truth: set[tuple[str, str, str]] = set()
-    truth_family: dict[tuple[str, str, str], str] = {}
+    def event_key(row: dict[str, Any], pattern_id: str, row_date: str) -> tuple[str, str, str, str, str, str]:
+        stamp = _dt(row.get("trigger_bar_ts") or row.get("bar_close_ts"))
+        trigger = stamp.isoformat().replace("+00:00", "Z") if stamp else ""
+        direction = str(row.get("direction") or "").lower()
+        if direction in {"long", "bull"}:
+            direction = "bullish"
+        elif direction in {"short", "bear"}:
+            direction = "bearish"
+        timeframe = str(row.get("timeframe") or row.get("trigger_timeframe") or "").lower()
+        return (
+            row_date,
+            str(row.get("symbol") or row.get("instrument") or "").upper(),
+            pattern_id,
+            timeframe,
+            trigger,
+            direction,
+        )
+
+    truth: set[tuple[str, str, str, str, str, str]] = set()
+    truth_family: dict[tuple[str, str, str, str, str, str], str] = {}
     for move in ground_truth.get("moves") or []:
         if not isinstance(move, dict):
             continue
-        symbol = str(move.get("symbol") or "").upper()
         for pattern_id, family in _pattern_labels(move, family_map):
-            key = (date_key, symbol, pattern_id)
+            key = event_key(move, pattern_id, date_key)
             truth.add(key)
             truth_family[key] = family
 
-    detections: set[tuple[str, str, str]] = set()
-    detection_family: dict[tuple[str, str, str], str] = {}
+    detections: set[tuple[str, str, str, str, str, str]] = set()
+    detection_family: dict[tuple[str, str, str, str, str, str], str] = {}
     usable_rows: list[dict[str, Any]] = []
     for row in pattern_grader_rows:
         if not isinstance(row, dict) or row.get("detected") is False:
@@ -183,7 +202,7 @@ def build_pattern_coverage(
         symbol = str(row.get("symbol") or row.get("instrument") or "").upper()
         if not pattern_id or not symbol:
             continue
-        key = (row_date, symbol, pattern_id)
+        key = event_key(row, pattern_id, row_date)
         detections.add(key)
         detection_family[key] = _pattern_family(row, family_map)
         usable_rows.append(row)
@@ -204,7 +223,7 @@ def build_pattern_coverage(
             "false_negatives": len(pattern_truth - pattern_detected),
             "precision": round(len(hits) / len(pattern_detected), 4) if pattern_detected else None,
             "recall": round(len(hits) / len(pattern_truth), 4) if pattern_truth else None,
-            "coverage_delta": len(pattern_detected) - len(pattern_truth),
+            "coverage_delta": round((len(pattern_detected) - len(pattern_truth)) / len(pattern_truth), 4) if pattern_truth else None,
         })
 
     per_family: list[dict[str, Any]] = []
@@ -222,10 +241,22 @@ def build_pattern_coverage(
             "false_negatives": sum(row["false_negatives"] for row in rows),
             "precision": round(hits / detected, 4) if detected else None,
             "recall": round(hits / labeled, 4) if labeled else None,
-            "coverage_delta": detected - labeled,
+            "coverage_delta": round((detected - labeled) / labeled, 4) if labeled else None,
         })
 
-    cisd_rows = [row for row in usable_rows if _pattern_id(row) == "ict_cisd_universal_model"]
+    latest_outcomes: dict[str, dict[str, Any]] = {}
+    for outcome in outcome_rows:
+        if not isinstance(outcome, dict):
+            continue
+        detection_id = str(outcome.get("detection_id") or outcome.get("event_id") or outcome.get("candidate_id") or "")
+        if detection_id:
+            latest_outcomes[detection_id] = {**latest_outcomes.get(detection_id, {}), **outcome}
+    cisd_rows = []
+    for row in usable_rows:
+        if _pattern_id(row) != "ict_cisd_universal_model":
+            continue
+        detection_id = str(row.get("detection_id") or row.get("event_id") or row.get("candidate_id") or "")
+        cisd_rows.append({**row, **latest_outcomes.get(detection_id, {})})
     resolved = [row for row in cisd_rows if _outcome(row) is not None]
     scored = [(_probability(row), _outcome(row)) for row in resolved]
     scored = [(probability, outcome) for probability, outcome in scored if probability is not None and outcome is not None]
@@ -238,7 +269,7 @@ def build_pattern_coverage(
             "ground_truth_labeled": len(truth),
             "grader_detected": len(detections),
             "true_positives": len(truth & detections),
-            "coverage_delta": len(detections) - len(truth),
+            "coverage_delta": round((len(detections) - len(truth)) / len(truth), 4) if truth else None,
         },
         "per_pattern": per_pattern,
         "per_family": per_family,
@@ -262,6 +293,7 @@ def build_scorecard(
     k: int = 10,
     regime: str = "unavailable",
     pattern_grader_rows: Iterable[dict[str, Any]] = (),
+    pattern_outcome_rows: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     date_key = str(ground_truth.get("date") or "")[:10]
     snapshots = sorted(
@@ -333,7 +365,11 @@ def build_scorecard(
         "partition_counts": counts,
         "snapshots_reviewed": len(snapshots),
     }
-    pattern_coverage = build_pattern_coverage(ground_truth, pattern_grader_rows)
+    pattern_coverage = build_pattern_coverage(
+        ground_truth,
+        pattern_grader_rows,
+        outcome_rows=pattern_outcome_rows,
+    )
     return {
         "schema_version": 1,
         "provider": "detection_scorecard",
@@ -422,6 +458,7 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data")
     parser.add_argument("--radar-log", type=Path, default=RADAR_LOG)
     parser.add_argument("--pattern-grader-log", type=Path, default=PATTERN_GRADER_LOG)
+    parser.add_argument("--pattern-grader-outcomes", type=Path, default=PATTERN_GRADER_OUTCOMES)
     parser.add_argument("--k", type=int, default=10)
     args = parser.parse_args()
     compact = args.date.replace("-", "")
@@ -431,6 +468,7 @@ def main() -> int:
         _read_jsonl(args.radar_log),
         k=args.k,
         pattern_grader_rows=_read_jsonl(args.pattern_grader_log),
+        pattern_outcome_rows=_read_jsonl(args.pattern_grader_outcomes),
     )
     daily_path = args.data_dir / f"detection_scorecard_{compact}.json"
     _atomic(daily_path, report)

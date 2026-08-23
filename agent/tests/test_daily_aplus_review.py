@@ -65,11 +65,65 @@ def test_missing_declared_source_fails_review_coverage_closed(tmp_path: Path) ->
 
     assert report["review_status"] == "attention_required"
     assert report["summary"]["source_coverage_pct"] == 0.0
+    assert report["summary"]["system_review_coverage_pct"] == 0.0
+    assert report["summary"]["overall_review_coverage_pct"] == 0.0
     assert report["source_inventory"][0]["status"] == "missing"
     assert report["source_inventory"][0]["freshness"] == "missing"
     assert report["source_inventory"][0]["last_modified_at"] is None
     assert report["execution_enabled"] is False
     assert report["can_submit_orders"] is False
+
+
+def test_nested_market_structure_a_grade_is_reviewed_with_parent_symbol(tmp_path: Path) -> None:
+    live = tmp_path / "live.json"
+    live.write_text(json.dumps({
+        "generated_at": "2026-08-21T15:35:00Z",
+        "market_structure_watchlist": [{
+            "symbol": "SPY",
+            "grade": "A",
+            "score": 89,
+            "pattern_grade": {"rubric_version": "pattern_grade_v1", "final_score": 89},
+            "best_setup": {
+                "pattern_id": "ict_cisd_universal_model",
+                "direction": "bullish",
+                "trigger": 650.25,
+                "invalidation": 648.75,
+            },
+            "timeframe_coverage": {"status": "complete_for_aplus_review", "missing_required": []},
+        }],
+    }), encoding="utf-8")
+
+    report = build_report(
+        day="2026-08-21",
+        sources={"live_opportunity": live},
+        outcome_paths=[],
+        now=NOW,
+    )
+
+    assert report["summary"]["top_tier_observation_count"] == 1
+    assert report["items"][0]["symbol"] == "SPY"
+    assert report["items"][0]["setup"] == "ict_cisd_universal_model"
+    assert report["items"][0]["geometry_complete"] is True
+
+
+def test_declared_pattern_producer_failure_prevents_complete_review(tmp_path: Path) -> None:
+    status = tmp_path / "pattern-grader-grades.json"
+    status.write_text(json.dumps({
+        "generated_at": "2026-08-21T15:35:00Z",
+        "scan_reconciliation": {"producer_failure_count": 1, "denominator_reconciled": False},
+        "latest_detections": [],
+    }), encoding="utf-8")
+
+    report = build_report(
+        day="2026-08-21",
+        sources={"pattern_grader_status": status},
+        outcome_paths=[],
+        now=NOW,
+    )
+
+    assert report["review_status"] == "attention_required"
+    assert report["summary"]["source_coverage_pct"] == 0.0
+    assert report["source_inventory"][0]["status"] == "producer_failed"
 
 
 def test_matching_outcome_closes_review_followup(tmp_path: Path) -> None:

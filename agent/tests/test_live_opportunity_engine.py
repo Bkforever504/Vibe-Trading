@@ -243,6 +243,19 @@ def test_rest_fallback_is_explicit_in_mode_and_provenance() -> None:
     assert report["can_submit_orders"] is False
 
 
+def test_live_engine_can_refresh_higher_timeframe_context_without_reseeding_symbol() -> None:
+    engine = LiveOpportunityEngine(feed="iex")
+    engine.seed_symbol("SPY", bars=_bars(), quote={}, higher_timeframes={"1d": _bars()})
+    refreshed = _bars()
+    refreshed[-1]["c"] = 111.0
+
+    engine.update_higher_timeframes("SPY", {"1d": refreshed}, refreshed_at="2026-08-21T15:00:00Z")
+
+    state = engine._symbols["SPY"]  # white-box assertion for the refresh contract
+    assert state["higher_timeframes"]["1d"][-1]["c"] == 111.0
+    assert state["higher_timeframes_refreshed_at"] == "2026-08-21T15:00:00Z"
+
+
 def test_scheduled_fallback_never_reuses_plus_minus_grades_as_canonical() -> None:
     report = project_radar_report({
         "date": "2026-08-21",

@@ -15,6 +15,13 @@ def _detection() -> dict:
         "trigger": 100.0,
         "invalidation": 99.0,
         "probability": 0.62,
+        "grade": "A",
+        "setup_family": "ict_cisd_universal_model",
+        "regime": "trend",
+        "asset_class": "equity",
+        "trigger_timeframe": "5m",
+        "detector_version": "market_structure_intelligence_v5",
+        "spec_hash": "abc123",
         "outcome_5m": None,
         "outcome_15m": None,
         "outcome_60m": None,
@@ -43,6 +50,11 @@ def test_resolver_fills_only_elapsed_horizons_without_trigger_bar_lookahead() ->
     assert resolved["outcome_15m"]["hit_t2"] is True
     assert resolved["outcome_60m"] is None
     assert resolved["outcome_eod"] is None
+    assert resolved["grade"] == "A"
+    assert resolved["setup_family"] == "ict_cisd_universal_model"
+    assert resolved["regime"] == "trend"
+    assert resolved["outcome_r"] == 2.0
+    assert resolved["calibration_horizon"] == "outcome_15m"
     assert resolved["execution_enabled"] is False
     assert resolved["can_submit_orders"] is False
 
@@ -59,3 +71,32 @@ def test_resolver_is_idempotent_and_fails_closed_when_bars_are_missing() -> None
     second, _ = resolve_rows([detection], first, now=now, bar_loader=lambda *_args: bars)
     assert len(first) == 1
     assert second == []
+
+
+def test_historical_loader_honors_requested_start_and_end(monkeypatch) -> None:
+    from scripts import pattern_grader_outcome_resolver as resolver
+
+    captured: dict = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"bars": {"SPY": [{"t": "2026-08-21T14:05:00Z", "o": 1, "h": 2, "l": 1, "c": 2}]}}
+
+    def fake_get(_url, *, headers, params, timeout):
+        captured.update({"headers": headers, "params": params, "timeout": timeout})
+        return Response()
+
+    monkeypatch.setattr(resolver.requests, "get", fake_get)
+    monkeypatch.setattr(resolver, "_credentials", lambda: {"APCA-API-KEY-ID": "hidden", "APCA-API-SECRET-KEY": "hidden"})
+    start = datetime(2026, 8, 21, 14, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 8, 21, 15, 0, tzinfo=timezone.utc)
+
+    rows = resolver._alpaca_loader("SPY", start, end)
+
+    assert rows[0]["c"] == 2
+    assert captured["params"]["start"] == "2026-08-21T14:00:00Z"
+    assert captured["params"]["end"] == "2026-08-21T15:00:00Z"
+    assert captured["params"]["feed"] == "iex"

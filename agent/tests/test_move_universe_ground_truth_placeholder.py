@@ -18,7 +18,7 @@ def test_placeholder_is_empty_and_fail_closed_before_kenny_approval(tmp_path) ->
     assert report["can_submit_orders"] is False
 
 
-def test_loader_swaps_to_real_denominator_only_with_both_approval_markers(tmp_path) -> None:
+def test_approved_spec_keeps_legacy_radar_proxy_unqualified_until_spec_builder_exists(tmp_path) -> None:
     spec = tmp_path / "MOVE_GROUND_TRUTH_SPEC_2026-08-20.md"
     spec.write_text("# MOVE denominator\nStatus: frozen\nKenny Approval: approved\n", encoding="utf-8")
     report = load_ground_truth(
@@ -27,7 +27,7 @@ def test_loader_swaps_to_real_denominator_only_with_both_approval_markers(tmp_pa
         spec_path=spec,
     )
 
-    assert report["ground_truth_status"] == "approved_frozen"
-    assert report["metrics_qualified"] is True
+    assert report["ground_truth_status"] == "approved_frozen_legacy_proxy_unqualified"
+    assert report["metrics_qualified"] is False
     assert [row["symbol"] for row in report["moves"]] == ["WIN"]
     assert report["spec"]["approved"] is True

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from scripts.grade_probability_service import build_calibration
+from scripts.pattern_grader_outcome_resolver import resolve_rows
 
 
 def _rows(count: int, *, start: datetime, family: str = "range_break_retest") -> list[dict]:
@@ -43,3 +44,40 @@ def test_calibration_refuses_small_or_recent_buckets() -> None:
 
     assert report["skipped_outcomes"] == 1
     assert all(row["calibration_status"] == "not_calibrated" for row in report["buckets"])
+
+
+def test_real_pattern_resolver_output_is_accepted_by_calibration() -> None:
+    trigger = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
+    detection = {
+        "detection_id": "pd-one",
+        "pattern_id": "range_break_retest",
+        "setup_family": "range_break_retest",
+        "symbol": "SPY",
+        "direction": "bullish",
+        "trigger_bar_ts": trigger.isoformat().replace("+00:00", "Z"),
+        "trigger": 100.0,
+        "invalidation": 99.0,
+        "grade": "A",
+        "regime": "trend",
+    }
+    bars = [
+        {"t": "2026-07-01T14:05:00Z", "o": 100, "h": 101.2, "l": 100, "c": 101},
+        {"t": "2026-07-01T14:10:00Z", "o": 101, "h": 102.2, "l": 100.8, "c": 102},
+    ]
+    outcomes, warnings = resolve_rows(
+        [detection],
+        [],
+        now=trigger + timedelta(hours=2),
+        bar_loader=lambda *_args: bars,
+    )
+
+    report = build_calibration(
+        outcomes,
+        now=datetime(2026, 8, 22, tzinfo=timezone.utc),
+        minimum_bucket_n=1,
+    )
+
+    assert warnings == []
+    assert report["eligible_outcomes"] == 1
+    assert report["skipped_outcomes"] == 0
+    assert report["buckets"][0]["setup_family"] == "range_break_retest"

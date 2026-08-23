@@ -26,6 +26,7 @@ LOG_PATH = DATA_DIR / "daily_aplus_review_log.jsonl"
 
 DEFAULT_SOURCES: dict[str, Path] = {
     "pattern_grader": DATA_DIR / "pattern_grader_log.jsonl",
+    "pattern_grader_status": REPORT_DIR / "pattern-grader-grades.json",
     "premarket_radar_log": DATA_DIR / "premarket_opportunity_radar_log.jsonl",
     "intraday_radar": DATA_DIR / "intraday_opportunity_radar_log.jsonl",
     "daily_edge_log": DATA_DIR / "daily_edge_orchestrator_log.jsonl",
@@ -148,12 +149,39 @@ def _walk(
     if not isinstance(value, dict):
         return
     context = dict(inherited)
-    for key in ("date", "generated_at", "timestamp", "as_of_et"):
+    for key in ("date", "generated_at", "timestamp", "as_of_et", "symbol", "instrument"):
         if value.get(key) is not None:
             context[key] = value[key]
     basis = _top_tier_basis(value, source)
     if basis and _row_day(value, context) == day:
         yield _observation(value, source=source, day=day, context=context, basis=basis)
+        # A canonical candidate already represents the economic setup. Walking
+        # into its nested market-structure explanation would double count it.
+        return
+
+    # The live watchlist stores the canonical pattern below ``best_setup`` and
+    # keeps symbol/grade/coverage on its parent. Normalize that contract before
+    # applying the same top-tier rule so zero rows cannot masquerade as review.
+    nested_best = value.get("best_setup") if isinstance(value.get("best_setup"), dict) else None
+    if nested_best and (value.get("symbol") or context.get("symbol")):
+        entry_plan = value.get("entry_plan") if isinstance(value.get("entry_plan"), dict) else {}
+        nested = {
+            **nested_best,
+            "symbol": value.get("symbol") or context.get("symbol"),
+            "instrument": value.get("instrument") or context.get("instrument"),
+            "grade": value.get("grade"),
+            "score": value.get("score"),
+            "pattern_grade": value.get("pattern_grade"),
+            "generated_at": value.get("generated_at") or context.get("generated_at") or context.get("timestamp") or context.get("as_of_et"),
+            "entry": nested_best.get("trigger") if nested_best.get("trigger") is not None else entry_plan.get("trigger"),
+            "invalidation": nested_best.get("invalidation") if nested_best.get("invalidation") is not None else entry_plan.get("invalidation"),
+            "timeframe_coverage": value.get("timeframe_coverage"),
+            "blockers": value.get("hard_blockers") or value.get("blockers") or [],
+        }
+        nested_basis = _top_tier_basis(nested, source)
+        if nested_basis and _row_day(nested, context) == day:
+            yield _observation(nested, source=source, day=day, context=context, basis=nested_basis)
+        return
     for child in value.values():
         if isinstance(child, (dict, list)):
             yield from _walk(child, source=source, day=day, inherited=context)
@@ -169,11 +197,13 @@ def _observation(
         (str(row[key]) for key in ("detection_id", "candidate_id", "signal_id", "plan_id", "trade_key") if row.get(key)),
         None,
     )
-    identity = explicit_id or hashlib.sha256(f"{day}|{source}|{symbol}|{setup}|{direction}".encode()).hexdigest()[:20]
     detected_at = _timestamp(
         row.get("generated_at") or row.get("timestamp") or row.get("trigger_bar_ts")
         or row.get("triggered_at") or context.get("generated_at") or context.get("timestamp") or context.get("as_of_et")
     )
+    identity = explicit_id or hashlib.sha256(
+        f"{source}|{symbol}|{setup}|{direction}|{detected_at or day}".encode()
+    ).hexdigest()[:20]
     entry = next((_number(row.get(key)) for key in ("entry", "trigger", "entry_trigger") if _number(row.get(key)) is not None), None)
     invalidation = next((_number(row.get(key)) for key in ("invalidation", "stop") if _number(row.get(key)) is not None), None)
     blockers = [str(item) for item in row.get("blockers", [])] if isinstance(row.get("blockers"), list) else []
@@ -244,10 +274,18 @@ def build_report(
         if path.exists():
             modified_at = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         age_minutes = max(0.0, (now - modified_at).total_seconds() / 60.0) if modified_at else None
+        producer_failed = any(
+            isinstance(row.get("scan_reconciliation"), dict)
+            and (
+                int(_number(row["scan_reconciliation"].get("producer_failure_count")) or 0) > 0
+                or row["scan_reconciliation"].get("denominator_reconciled") is False
+            )
+            for row in rows
+        )
         inventory.append({
             "source": source,
             "path": str(path),
-            "status": "missing" if not path.exists() else "parse_error" if parse_errors else "reviewed",
+            "status": "missing" if not path.exists() else "parse_error" if parse_errors else "producer_failed" if producer_failed else "reviewed",
             "freshness": "missing" if modified_at is None else "fresh" if age_minutes <= 36 * 60 else "stale",
             "last_modified_at": modified_at.isoformat().replace("+00:00", "Z") if modified_at else None,
             "age_minutes": round(age_minutes, 1) if age_minutes is not None else None,
@@ -336,16 +374,21 @@ def build_report(
     available_sources = sum(row["status"] == "reviewed" for row in inventory)
     missing_or_bad = len(inventory) - available_sources
     resolved_count = sum(row["outcome_review_status"] == "resolved" for row in items)
+    source_coverage = round(100.0 * available_sources / len(inventory), 1) if inventory else 100.0
+    enumerated_review_coverage = 100.0
+    overall_review_coverage = min(source_coverage, enumerated_review_coverage)
     summary = {
         "declared_source_count": len(inventory),
         "reviewed_source_count": available_sources,
-        "source_coverage_pct": round(100.0 * available_sources / len(inventory), 1) if inventory else 100.0,
+        "source_coverage_pct": source_coverage,
         "top_tier_observation_count": len(observations),
         "distinct_setup_count": len(items),
         "current_distinct_setup_count": len(items) - carried_count,
         "carried_followup_count": carried_count,
         "system_reviewed_setup_count": len(items),
-        "system_review_coverage_pct": 100.0,
+        "enumerated_setup_review_coverage_pct": enumerated_review_coverage,
+        "system_review_coverage_pct": overall_review_coverage,
+        "overall_review_coverage_pct": overall_review_coverage,
         "outcome_resolved_count": resolved_count,
         "outcome_followup_count": len(items) - resolved_count,
         "blocked_or_incomplete_count": sum(bool(row["blockers"]) or not row["geometry_complete"] for row in items),

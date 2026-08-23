@@ -6,10 +6,28 @@ from pathlib import Path
 
 import pytest
 
-from scripts.live_trading_cockpit import _apply_grade_calibration, build_cockpit, load_source
+from scripts.live_trading_cockpit import _apply_grade_calibration, _plan_id, build_cockpit, load_source
 
 
 NOW = datetime(2026, 8, 19, 15, 0, tzinfo=timezone.utc)
+
+
+def test_plan_id_is_stable_across_display_time_and_distinguishes_trigger_events() -> None:
+    base = {
+        "symbol": "SPY",
+        "asset_class": "equity",
+        "source": "live_opportunities",
+        "setup": "range_break_retest",
+        "direction": "bullish",
+        "entry": 650,
+        "stop": 648,
+        "target": 654,
+        "generated_at": "2026-08-19T15:00:00Z",
+        "evidence": {"candidate_id": "spy-one"},
+    }
+
+    assert _plan_id(base) == _plan_id(dict(base))
+    assert _plan_id(base) != _plan_id({**base, "generated_at": "2026-08-19T16:00:00Z"})
 
 
 def test_grade_calibration_attaches_only_forward_qualified_probability() -> None:
@@ -186,6 +204,50 @@ def test_source_older_than_24_hours_is_quarantined_even_during_prior_session_ban
     assert quarantined["bot_status"]["reason"] == "source_older_than_24h"
 
 
+def test_future_timestamp_is_clock_skewed_and_quarantined(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        "bot-status-snapshot.json",
+        {"timestamp": "2026-08-19T16:00:00Z", "provider": "bot_status_snapshot"},
+    )
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    source = next(row for row in cockpit["sources"] if row["name"] == "bot_status")
+    quarantined = {row["name"]: row for row in cockpit["operations"]["quarantined_sources"]}
+
+    assert source["freshness"] == "clock_skew"
+    assert source["clock_skew_seconds"] == 3600.0
+    assert quarantined["bot_status"]["reason"] == "source_timestamp_in_future"
+
+
+def test_live_candidate_uses_live_source_sla_not_generic_24_hours(tmp_path: Path) -> None:
+    write_report(tmp_path, "live-opportunity-engine.json", {
+        "generated_at": "2026-08-19T14:30:00Z",
+        "candidates": [{
+            "candidate_id": "stale-live",
+            "symbol": "SPY",
+            "asset_class": "equity",
+            "setup_family": "range_break_retest",
+            "direction": "bullish",
+            "decision_score": 89,
+            "grade": "A",
+            "state": "READY_TO_REVIEW",
+            "entry": 650,
+            "invalidation": 648,
+            "targets": [{"price": 654}],
+            "reward_risk_after_friction": 1.9,
+            "blockers": [],
+        }],
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    candidate = next(row for row in cockpit["candidates"] if row["symbol"] == "SPY")
+
+    assert candidate["actionability"] == "research_only"
+    assert "source_exceeds_live_sla" in candidate["blockers"]
+    assert candidate["probability"]["ranking_eligible"] is False
+
+
 def test_cockpit_surfaces_streaming_opportunities_with_feed_provenance(tmp_path: Path) -> None:
     write_report(
         tmp_path,
@@ -275,6 +337,49 @@ def test_cockpit_surfaces_cisd_promotion_status_as_read_only_discovery_evidence(
     assert status["n_outcomes"] == 47
     assert status["eligible_for_validated_promotion"] is False
     assert source["freshness"] == "live"
+
+
+def test_cockpit_surfaces_pattern_evidence_and_fail_closed_daily_review_gate(tmp_path: Path) -> None:
+    write_report(tmp_path, "pattern-grader-grades.json", {
+        "generated_at": "2026-08-19T14:59:58Z",
+        "provider": "pattern_grader_report",
+        "summary": {"distinct_lifecycle_count": 7, "a_grade_count": 2, "qualified_probability_count": 0},
+        "scan_reconciliation": {
+            "eligible_symbol_count": 10,
+            "evaluated_symbol_count": 10,
+            "data_blocked_symbol_count": 1,
+            "emitted_detection_count": 7,
+            "abstained_symbol_count": 3,
+            "producer_failure_count": 0,
+            "denominator_reconciled": True,
+        },
+        "latest_detections": [],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+    write_report(tmp_path, "daily-aplus-review.json", {
+        "timestamp": "2026-08-19T14:59:30Z",
+        "provider": "daily_aplus_review",
+        "review_status": "attention_required",
+        "summary": {
+            "system_reviewed_setup_count": 2,
+            "source_coverage_pct": 93.8,
+            "overall_review_coverage_pct": 93.8,
+            "outcome_followup_count": 2,
+        },
+        "source_inventory": [{"source": "pattern_grader", "status": "missing"}],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    assert cockpit["discovery"]["pattern_grader"]["summary"]["a_grade_count"] == 2
+    assert cockpit["daily_review_gate"]["status"] == "attention_required"
+    assert cockpit["daily_review_gate"]["overall_review_coverage_pct"] == 93.8
+    assert cockpit["daily_review_gate"]["failed_sources"] == ["pattern_grader"]
+    assert cockpit["daily_review_gate"]["execution_enabled"] is False
+    assert cockpit["daily_review_gate"]["can_submit_orders"] is False
 
 
 def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_options(
@@ -504,7 +609,7 @@ def test_probability_first_ranking_uses_only_qualified_forward_calibration(tmp_p
         tmp_path,
         "live-opportunity-engine.json",
         {
-            "generated_at": "2026-08-21T15:00:00Z",
+                "generated_at": "2026-08-19T15:00:00Z",
             "candidates": [
                 live_row("QUALITY", 96, {
                     "value": 82,

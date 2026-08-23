@@ -63,6 +63,8 @@ def test_build_report_uses_sources_and_event_collector(tmp_path: Path, monkeypat
     monkeypatch.setattr(reviewer, "collect_events", lambda day: [{"event_type": "trade", "source": "flip_bot", "pnl": "100"}])
 
     report = reviewer.build_report(day="2026-06-30", paths=paths)
+    assert report["execution_enabled"] is False
+    assert report["can_submit_orders"] is False
 
     assert report["execution_enabled"] is False
     assert report["posture"] == "normal"

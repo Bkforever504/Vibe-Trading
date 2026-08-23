@@ -29,6 +29,7 @@ REPORT_FILES: dict[str, str] = {
     "intraday_radar": "intraday-opportunity-radar.json",
     "detection_scorecard": "detection-scorecard-rolling.json",
     "cisd_promotion": "cisd-promotion-status.json",
+    "pattern_grades": "pattern-grader-grades.json",
     "grade_calibration": "grade-probability-calibration.json",
     "live_opportunities": "live-opportunity-engine.json",
     "sec_catalysts": "sec-catalyst-feed.json",
@@ -336,20 +337,35 @@ def _occ_contract(value: Any, now: datetime) -> dict[str, Any] | None:
     }
 
 
-def _plan_id(row: dict[str, Any], now: datetime) -> str:
-    raw = "|".join(
-        [
-            now.date().isoformat(),
-            _text(row.get("symbol")),
-            _text(row.get("asset_class")),
-            _text(row.get("setup")),
-            _text(row.get("direction")),
-            _text(row.get("entry")),
-            _text(row.get("stop")),
-            _text(row.get("target")),
-        ]
-    )
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+def _plan_id(row: dict[str, Any]) -> str:
+    """Return a source-event-stable plan identity, independent of display day."""
+    evidence = _dict(row.get("evidence"))
+    confirmation = _dict(evidence.get("price_action_confirmation"))
+    identity = {
+        "symbol": _text(row.get("symbol")),
+        "asset_class": _text(row.get("asset_class")),
+        "source": _text(row.get("source")),
+        "setup": _text(row.get("setup")),
+        "direction": _text(row.get("direction")),
+        "producer_id": _text(
+            evidence.get("detection_id")
+            or evidence.get("candidate_id")
+            or evidence.get("signal_id")
+            or row.get("candidate_id")
+        ),
+        "trigger_bar_ts": _text(
+            row.get("generated_at")
+            or evidence.get("bar_completed_at")
+            or confirmation.get("bar_completed_at")
+            or evidence.get("trigger_bar_ts")
+            or evidence.get("generated_at")
+        ),
+        "entry": _number(row.get("entry")),
+        "stop": _number(row.get("stop")),
+        "target": _number(row.get("target")),
+    }
+    raw = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+    return "plan-" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
 
 
 def _parse_time(value: Any) -> datetime | None:
@@ -398,7 +414,21 @@ def _source_inventory(
         path = report_dir / filename
         report = reports.get(name, {})
         generated = _source_time(report, path) if report else None
-        age = max(0.0, (now - generated).total_seconds()) if generated else None
+        explicit_generated = next(
+            (
+                parsed
+                for key in ("generated_at", "timestamp", "as_of_et", "data_cutoff", "date")
+                if (parsed := _parse_time(report.get(key))) is not None
+            ),
+            None,
+        )
+        raw_age = (now - generated).total_seconds() if generated else None
+        clock_skew = (
+            max(0.0, -(now - explicit_generated).total_seconds())
+            if explicit_generated is not None and (now - explicit_generated).total_seconds() < -300
+            else 0.0
+        )
+        age = max(0.0, raw_age) if raw_age is not None else None
         report_hash = (
             "sha256:" + hashlib.sha256(json.dumps(report, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()
             if report
@@ -415,7 +445,8 @@ def _source_inventory(
                 "available": bool(report),
                 "generated_at": generated.isoformat() if generated else None,
                 "age_seconds": round(age, 1) if age is not None else None,
-                "freshness": _freshness(age),
+                "freshness": "clock_skew" if clock_skew else _freshness(age),
+                "clock_skew_seconds": round(clock_skew, 1),
                 "provider": report.get("provider"),
                 "mode": report.get("mode"),
                 "execution_enabled": False,
@@ -431,7 +462,13 @@ def _quarantined_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         {
             "name": str(row.get("name") or "unknown"),
             "freshness": str(row.get("freshness") or "missing"),
-            "reason": "source_missing" if not row.get("available") else "source_older_than_24h",
+            "reason": (
+                "source_missing"
+                if not row.get("available")
+                else "source_timestamp_in_future"
+                if row.get("freshness") == "clock_skew"
+                else "source_older_than_24h"
+            ),
             "source_label": str(row.get("filename") or row.get("path") or row.get("name") or "unknown"),
             "execution_enabled": False,
             "can_submit_orders": False,
@@ -440,6 +477,7 @@ def _quarantined_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not row.get("available")
         or not isinstance(row.get("age_seconds"), (int, float))
         or float(row["age_seconds"]) > 24 * 60 * 60
+        or row.get("freshness") == "clock_skew"
     ]
 
 
@@ -972,20 +1010,44 @@ def _quarantine_stale_candidate(
         return row
     source = sources_by_name.get(source_name, {})
     age = _number(source.get("age_seconds"))
-    if source.get("available") and age is not None and age <= 24 * 60 * 60:
+    max_age_by_source = {
+        "live_opportunities": 20 * 60,
+        "trade_signals": 20 * 60,
+        "intraday_radar": 30 * 60,
+        "premarket_radar": 8 * 60 * 60,
+        "stock_screener": 8 * 60 * 60,
+        "daily_edge": 36 * 60 * 60,
+        "bottom_reversals": 36 * 60 * 60,
+    }
+    max_age = max_age_by_source.get(source_name, 24 * 60 * 60)
+    source_qualified = (
+        source.get("available")
+        and source.get("freshness") != "clock_skew"
+        and age is not None
+        and age <= max_age
+    )
+    if source_qualified:
         return row
+    failure = (
+        "source_timestamp_in_future"
+        if source.get("freshness") == "clock_skew"
+        else "source_exceeds_live_sla"
+        if max_age <= 60 * 60
+        else "source_exceeds_report_sla_or_missing"
+    )
+    failures = {failure, "source_older_than_24h_or_missing"}
     probability = {**_dict(row.get("probability")), "ranking_eligible": False}
     probability.setdefault("qualification_failures", [])
     probability["qualification_failures"] = sorted(
-        {*_list(probability["qualification_failures"]), "source_older_than_24h_or_missing"}
+        {*_list(probability["qualification_failures"]), *failures}
     )
     return {
         **row,
         "paper_consumable": False,
-        "blockers": sorted({*_list(row.get("blockers")), "source_older_than_24h_or_missing"}),
+        "blockers": sorted({*_list(row.get("blockers")), *failures}),
         "lifecycle": "research_only",
         "actionability": "research_only",
-        "next_action": "STAND_ASIDE until the source refreshes within 24 hours.",
+        "next_action": f"STAND_ASIDE until the source refreshes within its {int(max_age / 60)} minute SLA.",
         "decision_score": min(float(row.get("decision_score") or 0), 20.0),
         "probability": probability,
     }
@@ -1196,7 +1258,7 @@ def _enrich_candidate(
     probability["ranking_eligible"] = bool(probability.get("calibration_qualified")) and decision["actionability"] == "shadow_ready" and not row["blockers"]
     row.update(
         {
-            "plan_id": _plan_id(row, now),
+            "plan_id": _plan_id(row),
             "setup_score": score,
             "setup_grade": _grade(score),
             "timing_score": decision["timing_score"],
@@ -1381,6 +1443,41 @@ def _dealer_gamma_regime(market_force: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _daily_review_gate(report: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:
+    """Summarize whether the daily top-tier evidence denominator is complete."""
+    summary = _dict(report.get("summary"))
+    failed_sources = sorted({
+        _text(_dict(row).get("source"), "unknown")
+        for row in _list(report.get("source_inventory"))
+        if _text(_dict(row).get("status"), "missing") != "reviewed"
+    })
+    overall = _number(
+        summary.get("overall_review_coverage_pct")
+        if summary.get("overall_review_coverage_pct") is not None
+        else summary.get("system_review_coverage_pct")
+    )
+    reported_status = _text(report.get("review_status"), "missing")
+    complete = bool(report) and reported_status == "complete" and overall == 100.0 and not failed_sources
+    return {
+        "status": "complete" if complete else "attention_required" if report else "missing",
+        "date": report.get("date"),
+        "generated_at": report.get("timestamp") or report.get("generated_at"),
+        "source": source,
+        "reviewed_setup_count": int(_number(summary.get("system_reviewed_setup_count")) or 0),
+        "outcome_followup_count": int(_number(summary.get("outcome_followup_count")) or 0),
+        "source_coverage_pct": _number(summary.get("source_coverage_pct")),
+        "overall_review_coverage_pct": overall,
+        "failed_sources": failed_sources,
+        "message": (
+            "All declared evidence producers and enumerated top-tier setups were reviewed."
+            if complete
+            else "Daily review is incomplete; missing producers or open evidence coverage must be resolved."
+        ),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def build_cockpit(
     *, report_dir: Path = REPORT_DIR, now: datetime | None = None
 ) -> dict[str, Any]:
@@ -1499,6 +1596,9 @@ def build_cockpit(
     reconciliation = reports["position_reconciliation"]
     health = reports["signal_health"]
     audit = reports["execution_audit"]
+    daily_review_gate = _daily_review_gate(
+        reports["aplus_review"], sources_by_name.get("aplus_review", {})
+    )
 
     stale_sources = [row["name"] for row in sources if row["freshness"] in {"stale", "missing"}]
     risk_blockers = []
@@ -1552,6 +1652,7 @@ def build_cockpit(
             "can_submit_orders": False,
         },
         "command_card": command_card,
+        "daily_review_gate": daily_review_gate,
         "dealer_regime": _dealer_gamma_regime(market_force),
         "options_context": _options_context(reports, sources_by_name),
         "decision_desk": {
@@ -1653,6 +1754,12 @@ def build_cockpit(
             "move_coverage": _dict(reports["move_coverage"].get("summary")),
             "scorecard_rolling": reports["detection_scorecard"],
             "cisd_promotion_status": reports["cisd_promotion"],
+            "pattern_grader": {
+                **reports["pattern_grades"],
+                "source": sources_by_name.get("pattern_grades", {}),
+                "execution_enabled": False,
+                "can_submit_orders": False,
+            },
             "execution_enabled": False,
             "can_submit_orders": False,
         },

@@ -53,7 +53,7 @@ describe("DetectionTab", () => {
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
     expect(screen.getByText("33.3%")).toBeInTheDocument();
     expect(screen.getAllByText("50.0%")).toHaveLength(2);
-    expect(screen.getAllByText("+1")).toHaveLength(2);
+    expect(screen.getAllByText("+100.0%")).toHaveLength(2);
     expect(screen.getByText(/n=9 · dates=4/)).toBeInTheDocument();
     expect(screen.getByText("Brier 0.180")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/placeholder denominator active/i);
