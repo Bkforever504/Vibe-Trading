@@ -40,3 +40,13 @@ def test_remote_dashboard_gateway_allows_only_read_only_cockpit_get_paths() -> N
 
 def test_remote_dashboard_gateway_accept_queue_handles_parallel_module_bursts() -> None:
     assert DashboardHTTPServer.request_queue_size >= 64
+
+
+def test_remote_dashboard_build_inlines_dynamic_imports_for_mobile_reliability() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    config = (root / "frontend" / "vite.config.ts").read_text(encoding="utf-8")
+
+    assert "inlineDynamicImports: true" in config
+    assert "manualChunks" not in config

@@ -50,10 +50,10 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            "vendor-react": ["react", "react-dom", "react-router-dom"],
-            "vendor-charts": ["echarts"],
-          },
+          // The private mobile dashboard is served through a localhost reverse
+          // proxy. Inline route imports so iOS never has to fan out across
+          // dozens of ESM requests during the initial render.
+          inlineDynamicImports: true,
         },
       },
     },
