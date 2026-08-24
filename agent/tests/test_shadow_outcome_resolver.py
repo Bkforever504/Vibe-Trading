@@ -48,3 +48,44 @@ def test_run_once_is_append_only_and_idempotent(tmp_path: Path) -> None:
     assert first["resolved_count"] == 1
     assert second["resolved_count"] == 0
     assert output.read_bytes() == original
+
+
+def test_proxy_ohlcv_terminal_uses_net_result_and_stays_non_promotable() -> None:
+    rows = [
+        {
+            "type": "entry",
+            "plan_id": "mes-orb-0932-vix-v2:2026-08-17",
+            "candidate_id": "mes-orb-0932-vix-v2",
+            "strategy_id": "mes-orb-0932-vix-v2",
+            "family_id": "mes-opening-breakout",
+            "spec_hash": "sha256:" + "a" * 64,
+            "created_at": "2026-08-17T13:35:00Z",
+            "entry_price_observed_proxy": 100.0,
+            "max_risk_per_contract": 20.0,
+            "data_source": "yfinance_proxy_MES=F",
+            "evidence_tier": "proxy_ohlcv_non_executable",
+            "promotion_eligible": False,
+            "evidence_blockers": ["databento_mbo_and_executable_quotes_required"],
+        },
+        {
+            "type": "exit",
+            "plan_id": "mes-orb-0932-vix-v2:2026-08-17",
+            "resolved_at": "2026-08-17T16:00:00Z",
+            "pnl_before_fees": 15.0,
+            "net_dollar": 10.0,
+            "outcome_r": 0.5,
+            "promotion_eligible": False,
+            "reason": "time_stop",
+        },
+    ]
+
+    outcome = build_resolutions({"proxy.jsonl": rows}, resolved_at=NOW)[0]
+
+    assert outcome["entry_fill_executable"] is None
+    assert outcome["exit_fill_executable"] is None
+    assert outcome["pnl_before_fees"] == 15.0
+    assert outcome["net_dollar"] == 10.0
+    assert outcome["outcome_r"] == 0.5
+    assert outcome["candidate_id"] == "mes-orb-0932-vix-v2"
+    assert outcome["promotion_eligible"] is False
+    assert outcome["quote_method"] == "proxy_ohlcv_non_executable"

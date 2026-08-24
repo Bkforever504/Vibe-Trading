@@ -21,6 +21,8 @@ LEDGER_NAMES = (
     "options_shadow_twin_log.jsonl",
     "adaptive_options_shadow_playbook_log.jsonl",
     "mes_reopen_vix_shadow_log.jsonl",
+    "mes_orb_0932_vix_v2_shadow_log.jsonl",
+    "mes_reopen_drift_v2_shadow_log.jsonl",
     "event_gap_continuation_shadow_log.jsonl",
     "momentum_edge_ensemble_shadow_log.jsonl",
     "gex_level_reaction_shadow_log.jsonl",
@@ -139,30 +141,46 @@ def resolve_plan(
         path_pnl = [value - entry for value in executable_marks] if entry is not None else []
 
     quantity = _number(terminal.get("quantity")) or _number(candidate.get("effective_qty")) or 1.0
-    pnl = _number(terminal.get("pnl_before_fees"))
+    pnl_before_fees = _number(terminal.get("pnl_before_fees"))
+    net_pnl = _number(terminal.get("net_dollar"))
+    pnl = net_pnl if net_pnl is not None else pnl_before_fees
     if pnl is None and entry is not None and exit_fill is not None:
         pnl = (entry - exit_fill if style == "credit" else exit_fill - entry) * 100.0 * quantity
+        pnl_before_fees = pnl
     max_risk = _number(candidate.get("max_risk_per_contract")) or _number(candidate.get("risk_per_contract"))
-    outcome_r = pnl / (max_risk * quantity) if pnl is not None and max_risk and quantity else None
+    terminal_outcome_r = _number(terminal.get("outcome_r"))
+    outcome_r = terminal_outcome_r if terminal_outcome_r is not None else pnl / (max_risk * quantity) if pnl is not None and max_risk and quantity else None
 
     entry_time = _time(candidate.get("created_at") or candidate.get("captured_at") or candidate.get("timestamp"))
     exit_time = _time(terminal.get("resolved_at") or terminal.get("closed_at") or terminal.get("timestamp"))
     duration = (exit_time - entry_time).total_seconds() / 60.0 if entry_time and exit_time and exit_time >= entry_time else None
+    promotion_eligible = candidate.get("promotion_eligible") is not False and terminal.get("promotion_eligible") is not False
+    terminal_resolved_at = _time(terminal.get("resolved_at") or terminal.get("closed_at") or terminal.get("timestamp"))
     return {
         "schema_version": 1,
         "plan_id": plan_id,
+        "candidate_id": candidate.get("candidate_id") or candidate.get("strategy_id") or plan_id,
+        "strategy_id": candidate.get("strategy_id"),
+        "family_id": candidate.get("family_id"),
+        "spec_hash": candidate.get("spec_hash"),
         "source_ledger": source_ledger,
+        "data_source": candidate.get("data_source"),
+        "evidence_tier": candidate.get("evidence_tier"),
+        "promotion_eligible": promotion_eligible,
+        "evidence_blockers": candidate.get("evidence_blockers") or [],
         "entry_fill_executable": entry,
         "exit_fill_executable": exit_fill,
         "mfe": max(path_pnl) if path_pnl else None,
         "mae": min(path_pnl) if path_pnl else None,
         "outcome_r": outcome_r,
+        "pnl_before_fees": pnl_before_fees,
+        "net_dollar": net_pnl,
         "time_in_trade_minutes": round(duration, 3) if duration is not None else None,
         "counterfactual_next_ranked": candidate.get("counterfactual_next_ranked"),
         "counterfactual_cash": {"pnl": 0.0, "outcome_r": 0.0},
-        "resolved_at": resolved_at.isoformat(),
+        "resolved_at": (terminal_resolved_at or resolved_at).isoformat(),
         "terminal_reason": terminal.get("reason"),
-        "quote_method": "entry_executable_ask_or_strategy_credit_exit_executable_bid_or_close_debit",
+        "quote_method": "entry_executable_ask_or_strategy_credit_exit_executable_bid_or_close_debit" if promotion_eligible else "proxy_ohlcv_non_executable",
         "execution_enabled": False,
         "can_submit_orders": False,
     }
@@ -239,4 +257,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
