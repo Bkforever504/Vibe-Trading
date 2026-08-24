@@ -62,7 +62,18 @@ function Test-PublishedUrl {
         if ($published.Scheme -ne "https" -or -not $published.Host.EndsWith(".trycloudflare.com")) {
             return $false
         }
-        return [System.Net.Dns]::GetHostAddresses($published.Host).Count -gt 0
+        # Windows can retain a negative DNS cache entry while a new Cloudflare
+        # quick-tunnel hostname is already public. Query public resolvers so the
+        # supervisor does not churn a healthy tunnel every 90 seconds.
+        foreach ($resolver in @("1.1.1.1", "8.8.8.8")) {
+            try {
+                $answers = Resolve-DnsName -Name $published.Host -Type A -Server $resolver -DnsOnly -ErrorAction Stop
+                if (@($answers | Where-Object { $_.IPAddress }).Count -gt 0) { return $true }
+            } catch {
+                continue
+            }
+        }
+        return $false
     } catch {
         return $false
     }
