@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.remote_dashboard_gateway import _is_allowed_api_path
+from scripts.remote_dashboard_gateway import DashboardHTTPServer, _is_allowed_api_path
 
 
 def test_dashboard_supervisor_rejects_stale_published_tunnel_hostname() -> None:
@@ -10,7 +10,8 @@ def test_dashboard_supervisor_rejects_stale_published_tunnel_hostname() -> None:
     script = (root / "scripts" / "run_remote_trading_dashboard_supervisor.ps1").read_text(encoding="utf-8")
 
     assert "function Test-PublishedUrl" in script
-    assert "[System.Net.Dns]::GetHostAddresses" in script
+    assert "Resolve-DnsName" in script
+    assert '-Server $resolver' in script
     assert "(Test-RemoteTunnel) -and (Test-PublishedUrl)" in script
 
 
@@ -35,3 +36,7 @@ def test_remote_dashboard_gateway_allows_only_read_only_cockpit_get_paths() -> N
     assert not _is_allowed_api_path("/trading/quotes/extra")
     assert not _is_allowed_api_path("/trading/opportunities/delete")
     assert not _is_allowed_api_path("/live/status")
+
+
+def test_remote_dashboard_gateway_accept_queue_handles_parallel_module_bursts() -> None:
+    assert DashboardHTTPServer.request_queue_size >= 64

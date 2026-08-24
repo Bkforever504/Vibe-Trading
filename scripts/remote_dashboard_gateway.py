@@ -34,6 +34,13 @@ ALLOWED_API_PATHS = {
 }
 
 
+class DashboardHTTPServer(ThreadingHTTPServer):
+    """Threaded gateway sized for browsers that burst-load ESM chunks."""
+
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def _is_allowed_api_path(path: str) -> bool:
     return path in ALLOWED_API_PATHS or path.startswith(ALLOWED_API_PREFIX)
 
@@ -228,7 +235,7 @@ def main() -> None:
         token=token,
     )
     handler = type("ConfiguredReadOnlyDashboardHandler", (ReadOnlyDashboardHandler,), {"config": config})
-    server = ThreadingHTTPServer((args.host, args.port), handler)
+    server = DashboardHTTPServer((args.host, args.port), handler)
     print(f"Read-only dashboard gateway listening on http://{args.host}:{args.port}", flush=True)
     server.serve_forever()
 
