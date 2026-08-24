@@ -110,5 +110,5 @@ def test_scheduler_is_central_time_scoped_and_shadow_only() -> None:
     assert '-At "09:32"' in text
     assert '-At "15:05"' in text
     runner = (ROOT / "scripts" / "run_equity_orb_scout_v1_shadow.ps1").read_text(encoding="utf-8")
-    assert "equity_orb_scout_v1_shadow.py --mode $Mode" in runner
+    assert "shadow_alert_runner.py --scanner equity-orb-scout-v1 --mode $Mode" in runner
     assert "submit_order" not in runner

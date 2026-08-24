@@ -2,6 +2,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Set-Location "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 
+if (Test-Path -LiteralPath ".\KILL_SWITCH") {
+    Write-Host "KILL_SWITCH active; Databento regrader skipped."
+    exit 0
+}
+
 # At most one plan is attempted per invocation. The aggregate daily ceiling is
 # $2.25 across all invocations; cached requests do not consume that allowance.
 # No broker/order API is imported anywhere in this pipeline.
