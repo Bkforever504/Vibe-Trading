@@ -11,7 +11,8 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_MARKER = "hypothesis-v1"
+SCHEMA_MARKER = "hypothesis-v2"
+SUPPORTED_SCHEMAS = ("hypothesis-v1", "hypothesis-v2")
 HASH_PLACEHOLDER = "sha256:<SPEC_HASH>"
 REQUIRED_METADATA = (
     "Preregistration Schema",
@@ -21,6 +22,12 @@ REQUIRED_METADATA = (
     "Status",
     "Spec Hash",
 )
+V2_REQUIRED_METADATA = (
+    "Universe ID",
+    "Universe Version",
+    "Universe Hash",
+    "Membership As Of",
+)
 REQUIRED_SECTIONS = (
     "Entry Rule",
     "Exit Rule",
@@ -28,6 +35,15 @@ REQUIRED_SECTIONS = (
     "Timestamp Basis",
     "Execution Policy",
     "Cost Stress",
+)
+V2_REQUIRED_SECTIONS = (
+    "Experiment Family & Multiple Testing",
+    "Regime Coverage",
+    "Latency Budget",
+    "Blocker EV Review",
+    "Data Repair & Backfill",
+    "Decay & Revalidation",
+    "Universe Version",
 )
 METADATA_RE = re.compile(r"^([A-Za-z][A-Za-z ]+):\s*(.*?)\s*$", re.MULTILINE)
 SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
@@ -74,16 +90,21 @@ def validate_spec(path: Path) -> dict[str, Any]:
     metadata = parsed["metadata"]
     sections = parsed["sections"]
     errors: list[str] = []
-    for field in REQUIRED_METADATA:
+    schema = metadata.get("Preregistration Schema")
+    required_metadata = REQUIRED_METADATA + (V2_REQUIRED_METADATA if schema == "hypothesis-v2" else ())
+    for field in required_metadata:
         if not metadata.get(field):
             errors.append(f"missing_metadata:{field}")
-    for section in REQUIRED_SECTIONS:
+    required_sections = REQUIRED_SECTIONS + (V2_REQUIRED_SECTIONS if schema == "hypothesis-v2" else ())
+    for section in required_sections:
         if len(sections.get(section, "").strip()) < 10:
             errors.append(f"missing_or_empty_section:{section}")
-    if metadata.get("Preregistration Schema") != SCHEMA_MARKER:
+    if schema not in SUPPORTED_SCHEMAS:
         errors.append("unsupported_preregistration_schema")
     if metadata.get("Origin") not in {"research", "social", "external"}:
         errors.append("invalid_origin")
+    if schema == "hypothesis-v2" and not re.fullmatch(r"sha256:[0-9a-f]{64}", str(metadata.get("Universe Hash") or "")):
+        errors.append("invalid_universe_hash")
     if str(metadata.get("Status", "")).lower() != "frozen":
         errors.append("status_must_be_frozen")
     declared_hash = metadata.get("Spec Hash")
@@ -101,7 +122,9 @@ def validate_spec(path: Path) -> dict[str, Any]:
         "errors": sorted(set(errors)),
         "metadata": metadata,
         "computed_spec_hash": computed_hash,
-        "required_sections": list(REQUIRED_SECTIONS),
+        "preregistration_schema": schema,
+        "required_metadata": list(required_metadata),
+        "required_sections": list(required_sections),
         "execution_enabled": False,
         "can_submit_orders": False,
     }
@@ -116,7 +139,7 @@ def discover_specs(root: Path) -> list[Path]:
             head = path.read_text(encoding="utf-8-sig")[:4096]
         except OSError:
             continue
-        if f"Preregistration Schema: {SCHEMA_MARKER}" in head:
+        if any(f"Preregistration Schema: {schema}" in head for schema in SUPPORTED_SCHEMAS):
             candidates.append(path)
     return sorted(candidates)
 

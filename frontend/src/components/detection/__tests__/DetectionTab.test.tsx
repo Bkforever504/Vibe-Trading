@@ -48,9 +48,36 @@ const promotion = {
   can_submit_orders: false as const,
 };
 
+const governance = {
+  tested_this_week: 3,
+  rejected_this_week: 1,
+  bonferroni_denominator: 5,
+  effective_alpha: 0.01,
+  status: "active_family",
+  promotion_rule_version: "2026-08-23-v2",
+  governance_status: "held_missing_evidence" as const,
+  latest_candidate_decisions: 2,
+  decision_counts: { promote: 0, hold: 1, reject: 1 },
+  failed_rule_ids: [],
+  unavailable_rule_ids: ["PROMO_LATENCY_WINDOW_V2"],
+  controls: {
+    multiple_testing_method: "benjamini_hochberg",
+    fdr_alpha: 0.05,
+    required_regimes: ["trend", "chop", "high_vol", "low_vol"],
+    minimum_dates_per_regime: 8,
+    latency_p90_maximum_fraction: 0.2,
+    revalidation_maximum_age_days: 30,
+    source_repair_requires_backfill_regrade: true,
+    universe_version_required: true,
+  },
+  provenance: [],
+  execution_enabled: false as const,
+  can_submit_orders: false as const,
+};
+
 describe("DetectionTab", () => {
   it("renders family precision, recall, delta, and CISD evidence", () => {
-    render(<DetectionTab scorecard={scorecard} promotion={promotion} />);
+    render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} />);
 
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
     expect(screen.getByText("Opportunity coverage")).toBeInTheDocument();
@@ -66,5 +93,10 @@ describe("DetectionTab", () => {
     expect(screen.getByText("47.8%")).toBeInTheDocument();
     expect(screen.getByText("0.208")).toBeInTheDocument();
     expect(screen.getByText("unvalidated_pattern_hypothesis")).toBeInTheDocument();
+    expect(screen.getByText("Promotion governance")).toBeInTheDocument();
+    expect(screen.getByText("held missing evidence")).toBeInTheDocument();
+    expect(screen.getByText("benjamini_hochberg")).toBeInTheDocument();
+    expect(screen.getByText("8 dates each")).toBeInTheDocument();
+    expect(screen.getByText(/PROMO_LATENCY_WINDOW_V2/)).toBeInTheDocument();
   });
 });

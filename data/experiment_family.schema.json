@@ -8,9 +8,13 @@
     "family_id": { "minLength": 1, "type": "string" },
     "origin": { "enum": ["research", "social", "external"] },
     "recorded_at": { "minLength": 1, "type": "string" },
-    "schema_version": { "const": 1 },
+    "schema_version": { "enum": [1, 2] },
     "spec_hash": { "pattern": "^sha256:[0-9a-f]{64}$", "type": "string" },
-    "spec_path": { "minLength": 1, "type": "string" }
+    "spec_path": { "minLength": 1, "type": "string" },
+    "universe_id": { "type": ["string", "null"] },
+    "universe_version": { "type": ["string", "null"] },
+    "universe_hash": { "pattern": "^sha256:[0-9a-f]{64}$", "type": ["string", "null"] },
+    "membership_as_of": { "type": ["string", "null"] }
   },
   "required": ["schema_version", "recorded_at", "candidate_id", "family_id", "spec_hash", "spec_path", "origin", "execution_enabled", "can_submit_orders"],
   "title": "Frozen experiment family member",

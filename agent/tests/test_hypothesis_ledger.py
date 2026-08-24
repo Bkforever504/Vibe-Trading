@@ -66,3 +66,34 @@ def test_family_ledger_counts_each_frozen_hash_once_and_never_decrements(tmp_pat
     assert experiment_family_size(path) == 1
     assert experiment_family_size(path, "family-a") == 1
     assert len(read_jsonl(path)) == 1
+
+
+def test_universe_identity_is_immutable_in_both_ledgers(tmp_path: Path) -> None:
+    hypothesis = tmp_path / "hypotheses.jsonl"
+    candidate = {
+        **_candidate("proposed"),
+        "universe_id": "us-liquid",
+        "universe_version": "v1",
+        "universe_hash": "sha256:" + "b" * 64,
+        "membership_as_of": "2026-08-01",
+    }
+    append_hypothesis_event(candidate, hypothesis)
+    with pytest.raises(ValueError, match="immutable_candidate_fields_changed"):
+        append_hypothesis_event({**candidate, "status": "development", "universe_version": "v2"}, hypothesis)
+
+    family = tmp_path / "family.jsonl"
+    kwargs = {
+        "candidate_id": "candidate-a",
+        "family_id": "family-a",
+        "spec_hash": HASH,
+        "spec_path": "research/candidate-a.md",
+        "origin": "research",
+        "universe_id": "us-liquid",
+        "universe_version": "v1",
+        "universe_hash": "sha256:" + "b" * 64,
+        "membership_as_of": "2026-08-01",
+        "path": family,
+    }
+    record_frozen_spec(**kwargs)
+    with pytest.raises(ValueError, match="spec_hash_identity_conflict"):
+        record_frozen_spec(**{**kwargs, "universe_version": "v2"})

@@ -15,16 +15,62 @@
     "cost_basis": "executable_ask_to_bid",
     "minimum_lower_95_ci": 0.0
   },
-  "minimum_distinct_sessions": 20,
-  "minimum_resolved_outcomes": 30,
+  "preregistration": {
+    "required_schema": "hypothesis-v2"
+  },
+  "multiple_testing": {
+    "alpha": 0.05,
+    "denominator": "exact unique spec_hash count in data/experiment_family.jsonl",
+    "family_scope": "experiment_wide",
+    "method": "benjamini_hochberg"
+  },
+  "regime_coverage": {
+    "minimum_independent_dates_per_regime": 8,
+    "required_regimes": [
+      "trend",
+      "chop",
+      "high_vol",
+      "low_vol"
+    ]
+  },
+  "blocker_removal": {
+    "minimum_net_ev_lower_95_ci": 0.0,
+    "required_basis": "net_after_costs",
+    "require_loss_severity": true
+  },
+  "latency": {
+    "maximum_p90_fraction_of_expected_window": 0.2,
+    "minimum_observations": 30
+  },
+  "data_integrity": {
+    "require_backfill_and_regrade_after_source_repair": true,
+    "required_contaminated_outcomes_remaining": 0
+  },
+  "minimum_distinct_sessions": 30,
+  "minimum_resolved_outcomes": 100,
   "placebo": {
     "required_status": "pass",
     "test": "shuffled_labels"
   },
   "promotion_driver": "95_percent_moving_block_bootstrap_lower_bound",
   "pbo_maximum": 0.5,
-  "rule_version": "2026-08-20-v1",
-  "schema_version": 1,
+  "revalidation": {
+    "maximum_age_days": 30,
+    "minimum_latest_brier_skill": 0.0,
+    "minimum_rolling_windows": 3,
+    "stale_action": "demote_to_shadow_review"
+  },
+  "universe": {
+    "allowed_drift_statuses": [
+      "frozen",
+      "unchanged"
+    ],
+    "require_membership_as_of": true,
+    "require_sha256_membership_hash": true,
+    "require_version": true
+  },
+  "rule_version": "2026-08-23-v2",
+  "schema_version": 2,
   "stale_promotion": {
     "action": "demote_to_paper_review",
     "consecutive_hold_cash_weeks": 4,

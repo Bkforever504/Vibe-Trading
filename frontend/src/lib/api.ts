@@ -1807,6 +1807,23 @@ export interface TradingDashboard {
     bonferroni_denominator: number;
     effective_alpha: number | null;
     status: string;
+    promotion_rule_version?: string;
+    promotion_schema_version?: number;
+    governance_status?: "configuration_missing" | "awaiting_evidence" | "held_missing_evidence" | "measured_rejections_present" | "all_latest_candidates_pass";
+    latest_candidate_decisions?: number;
+    decision_counts?: { promote: number; hold: number; reject: number };
+    failed_rule_ids?: string[];
+    unavailable_rule_ids?: string[];
+    controls?: {
+      multiple_testing_method?: string;
+      fdr_alpha?: number;
+      required_regimes?: string[];
+      minimum_dates_per_regime?: number;
+      latency_p90_maximum_fraction?: number;
+      revalidation_maximum_age_days?: number;
+      source_repair_requires_backfill_regrade?: boolean;
+      universe_version_required?: boolean;
+    };
     provenance: Array<{ path: string; line_reference: number | null }>;
     execution_enabled: false;
     can_submit_orders: false;

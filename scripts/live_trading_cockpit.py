@@ -528,8 +528,12 @@ def _research_governance(report_dir: Path, now: datetime) -> dict[str, Any]:
     data_dir = ROOT / "data" if report_dir.resolve() == REPORT_DIR.resolve() else report_dir
     family_path = data_dir / "experiment_family.jsonl"
     hypothesis_path = data_dir / "hypothesis_ledger.jsonl"
+    rules_path = data_dir / "promotion_rules.json"
+    decisions_path = data_dir / "promotion_decisions.jsonl"
     family_rows = _load_jsonl(family_path)
     hypotheses = _load_jsonl(hypothesis_path)
+    rules = _load_json(rules_path)
+    decisions = _load_jsonl(decisions_path)
     week = now.isocalendar()[:2]
 
     def same_week(value: Any) -> bool:
@@ -548,15 +552,65 @@ def _research_governance(report_dir: Path, now: datetime) -> dict[str, Any]:
         if row.get("id") and row.get("status") == "rejected" and same_week(row.get("event_at"))
     }
     family_size = len(hashes)
+    latest_decisions: dict[str, dict[str, Any]] = {}
+    for row in decisions:
+        candidate_id = str(row.get("candidate_id") or "")
+        if candidate_id:
+            latest_decisions[candidate_id] = row
+    decision_counts = {
+        label: sum(1 for row in latest_decisions.values() if row.get("decision") == label)
+        for label in ("promote", "hold", "reject")
+    }
+    unavailable_rules = sorted({
+        str(item.get("rule_id"))
+        for row in latest_decisions.values()
+        for item in row.get("unavailable_rules", [])
+        if isinstance(item, dict) and item.get("rule_id")
+    })
+    failed_rules = sorted({
+        str(item.get("rule_id"))
+        for row in latest_decisions.values()
+        for item in row.get("failed_rules", [])
+        if isinstance(item, dict) and item.get("rule_id")
+    })
+    if not rules:
+        governance_status = "configuration_missing"
+    elif not latest_decisions:
+        governance_status = "awaiting_evidence"
+    elif unavailable_rules:
+        governance_status = "held_missing_evidence"
+    elif failed_rules:
+        governance_status = "measured_rejections_present"
+    else:
+        governance_status = "all_latest_candidates_pass"
     return {
         "tested_this_week": len(tested),
         "rejected_this_week": len(rejected),
         "bonferroni_denominator": family_size,
         "effective_alpha": round(0.05 / family_size, 8) if family_size else None,
         "status": "active_family" if family_size else "no_frozen_candidates",
+        "promotion_rule_version": rules.get("rule_version"),
+        "promotion_schema_version": rules.get("schema_version"),
+        "governance_status": governance_status,
+        "latest_candidate_decisions": len(latest_decisions),
+        "decision_counts": decision_counts,
+        "failed_rule_ids": failed_rules,
+        "unavailable_rule_ids": unavailable_rules,
+        "controls": {
+            "multiple_testing_method": (rules.get("multiple_testing") or {}).get("method"),
+            "fdr_alpha": (rules.get("multiple_testing") or {}).get("alpha"),
+            "required_regimes": (rules.get("regime_coverage") or {}).get("required_regimes", []),
+            "minimum_dates_per_regime": (rules.get("regime_coverage") or {}).get("minimum_independent_dates_per_regime"),
+            "latency_p90_maximum_fraction": (rules.get("latency") or {}).get("maximum_p90_fraction_of_expected_window"),
+            "revalidation_maximum_age_days": (rules.get("revalidation") or {}).get("maximum_age_days"),
+            "source_repair_requires_backfill_regrade": (rules.get("data_integrity") or {}).get("require_backfill_and_regrade_after_source_repair") is True,
+            "universe_version_required": (rules.get("universe") or {}).get("require_version") is True,
+        },
         "provenance": [
             {"path": str(family_path), "line_reference": 1 if family_rows else None},
             {"path": str(hypothesis_path), "line_reference": 1 if hypotheses else None},
+            {"path": str(rules_path), "line_reference": 1 if rules else None},
+            {"path": str(decisions_path), "line_reference": 1 if decisions else None},
         ],
         "execution_enabled": False,
         "can_submit_orders": False,

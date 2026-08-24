@@ -82,6 +82,11 @@ def run_intake(
             "spec_path": _relative(spec_path),
             "family_id": family_id,
             "origin": origin,
+            "preregistration_schema": metadata.get("Preregistration Schema"),
+            "universe_id": metadata.get("Universe ID"),
+            "universe_version": metadata.get("Universe Version"),
+            "universe_hash": metadata.get("Universe Hash"),
+            "membership_as_of": metadata.get("Membership As Of"),
             "n_resolved": 0,
             "distinct_sessions": 0,
             "first_resolved_at": None,
@@ -93,7 +98,7 @@ def run_intake(
         }
         existing = current.get(candidate_id)
         if existing:
-            conflict = any(existing.get(field) != base.get(field) for field in ("spec_hash", "spec_path", "family_id", "origin"))
+            conflict = any(existing.get(field) != base.get(field) for field in ("spec_hash", "spec_path", "family_id", "origin", "universe_id", "universe_version", "universe_hash", "membership_as_of"))
             if conflict:
                 item["errors"] = ["immutable_candidate_identity_conflict"]
                 results.append(item)
@@ -104,6 +109,10 @@ def run_intake(
                 spec_hash=spec_hash,
                 spec_path=base["spec_path"],
                 origin=origin,
+                universe_id=base["universe_id"],
+                universe_version=base["universe_version"],
+                universe_hash=base["universe_hash"],
+                membership_as_of=base["membership_as_of"],
                 path=family_path,
             )
             family_added += int(family["recorded"])
@@ -132,6 +141,10 @@ def run_intake(
             spec_hash=spec_hash,
             spec_path=base["spec_path"],
             origin=origin,
+            universe_id=base["universe_id"],
+            universe_version=base["universe_version"],
+            universe_hash=base["universe_hash"],
+            membership_as_of=base["membership_as_of"],
             path=family_path,
         )
         family_added += int(family["recorded"])

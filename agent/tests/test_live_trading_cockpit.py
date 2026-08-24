@@ -339,6 +339,37 @@ def test_cockpit_surfaces_cisd_promotion_status_as_read_only_discovery_evidence(
     assert source["freshness"] == "live"
 
 
+def test_cockpit_surfaces_v2_research_governance_fail_closed(tmp_path: Path) -> None:
+    write_report(tmp_path, "promotion_rules.json", {
+        "schema_version": 2,
+        "rule_version": "2026-08-23-v2",
+        "multiple_testing": {"method": "benjamini_hochberg", "alpha": 0.05},
+        "regime_coverage": {"required_regimes": ["trend", "chop", "high_vol", "low_vol"], "minimum_independent_dates_per_regime": 8},
+        "latency": {"maximum_p90_fraction_of_expected_window": 0.2},
+        "revalidation": {"maximum_age_days": 30},
+        "data_integrity": {"require_backfill_and_regrade_after_source_repair": True},
+        "universe": {"require_version": True},
+    })
+    (tmp_path / "promotion_decisions.jsonl").write_text(json.dumps({
+        "candidate_id": "candidate-a",
+        "decision": "hold",
+        "failed_rules": [],
+        "unavailable_rules": [{"rule_id": "PROMO_LATENCY_WINDOW_V2", "reason": "missing"}],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }) + "\n", encoding="utf-8")
+
+    governance = build_cockpit(report_dir=tmp_path, now=NOW)["research_governance"]
+
+    assert governance["promotion_rule_version"] == "2026-08-23-v2"
+    assert governance["governance_status"] == "held_missing_evidence"
+    assert governance["unavailable_rule_ids"] == ["PROMO_LATENCY_WINDOW_V2"]
+    assert governance["controls"]["minimum_dates_per_regime"] == 8
+    assert governance["controls"]["universe_version_required"] is True
+    assert governance["execution_enabled"] is False
+    assert governance["can_submit_orders"] is False
+
+
 def test_cockpit_surfaces_pattern_evidence_and_fail_closed_daily_review_gate(tmp_path: Path) -> None:
     write_report(tmp_path, "pattern-grader-grades.json", {
         "generated_at": "2026-08-19T14:59:58Z",

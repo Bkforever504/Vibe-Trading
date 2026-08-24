@@ -5,6 +5,7 @@ type Scorecard = NonNullable<NonNullable<TradingDashboard["discovery"]>["scoreca
 interface DetectionTabProps {
   scorecard?: Scorecard;
   promotion?: CisdPromotionStatus;
+  governance?: TradingDashboard["research_governance"];
 }
 
 function pct(value: number | null | undefined): string {
@@ -55,6 +56,28 @@ function CisdProgress({ promotion }: { promotion?: CisdPromotionStatus }) {
   );
 }
 
+function GovernanceControls({ governance }: { governance?: TradingDashboard["research_governance"] }) {
+  const status = governance?.governance_status ?? "awaiting_evidence";
+  const blocked = status !== "all_latest_candidates_pass";
+  const blockers = [...(governance?.unavailable_rule_ids ?? []), ...(governance?.failed_rule_ids ?? [])];
+  const controls = governance?.controls;
+  return (
+    <section className="mt-4 border border-border bg-card" aria-labelledby="governance-heading">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div><h2 id="governance-heading" className="text-sm font-semibold">Promotion governance</h2><p className="mt-0.5 text-xs text-muted-foreground">Every challenger must clear evidence quality, timing, regime, repair, decay, and universe controls.</p></div>
+        <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${blocked ? "bg-amber-500/15 text-amber-500" : "bg-emerald-500/15 text-emerald-500"}`}>{status.replace(/_/g, " ")}</span>
+      </div>
+      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-card p-3"><div className="text-[10px] uppercase text-muted-foreground">Multiple testing</div><div className="mt-1 text-sm font-bold">{controls?.multiple_testing_method ?? "Not configured"}</div><div className="text-xs text-muted-foreground">FDR α {controls?.fdr_alpha ?? "--"}</div></div>
+        <div className="bg-card p-3"><div className="text-[10px] uppercase text-muted-foreground">Regime minimum</div><div className="mt-1 text-sm font-bold">{controls?.minimum_dates_per_regime ?? "--"} dates each</div><div className="text-xs text-muted-foreground">{controls?.required_regimes?.join(" · ") || "Not configured"}</div></div>
+        <div className="bg-card p-3"><div className="text-[10px] uppercase text-muted-foreground">Latency budget</div><div className="mt-1 text-sm font-bold">p90 ≤ {controls?.latency_p90_maximum_fraction == null ? "--" : pct(controls.latency_p90_maximum_fraction)}</div><div className="text-xs text-muted-foreground">of expected move window</div></div>
+        <div className="bg-card p-3"><div className="text-[10px] uppercase text-muted-foreground">Revalidate</div><div className="mt-1 text-sm font-bold">≤ {controls?.revalidation_maximum_age_days ?? "--"} days</div><div className="text-xs text-muted-foreground">universe version + repair re-grade required</div></div>
+      </div>
+      <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">{blockers.length ? `Current holds/rejections: ${blockers.join(", ")}` : `Rule ${governance?.promotion_rule_version ?? "not loaded"} · no current governance blockers`} · execution_enabled=false · can_submit_orders=false</p>
+    </section>
+  );
+}
+
 function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
   const families = coverage.per_family ?? [];
   return (
@@ -92,7 +115,7 @@ function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
   );
 }
 
-export function DetectionTab({ scorecard, promotion }: DetectionTabProps) {
+export function DetectionTab({ scorecard, promotion, governance }: DetectionTabProps) {
   const metrics = scorecard?.metrics;
   const coverage = scorecard?.pattern_coverage;
   const misses = scorecard?.top_missed_moves ?? [];
@@ -113,6 +136,7 @@ export function DetectionTab({ scorecard, promotion }: DetectionTabProps) {
       {coverage && !coverage.metrics_qualified ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Move denominator unavailable — opportunity precision and recall remain unqualified until the independent frozen-spec builder completes.</div> : coverage && coverage.pattern_metrics_qualified === false ? <div role="status" className="mt-4 border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600">Opportunity coverage is measured, but per-family precision and recall remain unavailable until an independent pattern annotation contract is populated. Resolved outcome quality is shown separately.</div> : null}
 
       <CisdProgress promotion={promotion} />
+      <GovernanceControls governance={governance} />
 
       {coverage ? (
         <section className="mt-4 border border-border bg-card" aria-labelledby="opportunity-coverage-heading">

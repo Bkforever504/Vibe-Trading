@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HYPOTHESIS_LEDGER_PATH = ROOT / "data" / "hypothesis_ledger.jsonl"
 EXPERIMENT_FAMILY_PATH = ROOT / "data" / "experiment_family.jsonl"
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 STATUSES = {
     "proposed",
     "development",
@@ -40,6 +40,7 @@ STATUS_TRANSITIONS = {
     "rejected": set(),
 }
 IMMUTABLE_FIELDS = ("id", "spec_hash", "spec_path", "family_id", "origin")
+UNIVERSE_FIELDS = ("universe_id", "universe_version", "universe_hash", "membership_as_of")
 
 
 def utc_now() -> str:
@@ -123,6 +124,12 @@ def validate_hypothesis(record: dict[str, Any]) -> list[str]:
         errors.append("execution_enabled_must_be_false")
     if record.get("can_submit_orders") is not False:
         errors.append("can_submit_orders_must_be_false")
+    universe_values = [record.get(field) for field in UNIVERSE_FIELDS]
+    if any(universe_values) and not all(str(value or "").strip() for value in universe_values):
+        errors.append("incomplete_universe_identity")
+    universe_hash = str(record.get("universe_hash") or "")
+    if universe_hash and not re.fullmatch(r"sha256:[0-9a-f]{64}", universe_hash):
+        errors.append("invalid_universe_hash")
     return sorted(set(errors))
 
 
@@ -144,6 +151,10 @@ def append_hypothesis_event(
         "spec_path": candidate.get("spec_path"),
         "family_id": candidate.get("family_id"),
         "origin": candidate.get("origin"),
+        "universe_id": candidate.get("universe_id"),
+        "universe_version": candidate.get("universe_version"),
+        "universe_hash": candidate.get("universe_hash"),
+        "membership_as_of": candidate.get("membership_as_of"),
         "status": candidate.get("status"),
         "first_resolved_at": candidate.get("first_resolved_at"),
         "last_evaluated_at": candidate.get("last_evaluated_at"),
@@ -161,7 +172,10 @@ def append_hypothesis_event(
     if errors:
         raise ValueError(";".join(errors))
     if current:
-        changed = [field for field in IMMUTABLE_FIELDS if row[field] != current.get(field)]
+        immutable_fields = IMMUTABLE_FIELDS + tuple(
+            field for field in UNIVERSE_FIELDS if row.get(field) is not None or current.get(field) is not None
+        )
+        changed = [field for field in immutable_fields if row.get(field) != current.get(field)]
         if changed:
             raise ValueError("immutable_candidate_fields_changed:" + ",".join(changed))
         old_status = str(current.get("status"))
@@ -191,12 +205,21 @@ def record_frozen_spec(
     spec_hash: str,
     spec_path: str,
     origin: str,
+    universe_id: str | None = None,
+    universe_version: str | None = None,
+    universe_hash: str | None = None,
+    membership_as_of: str | None = None,
     path: Path = EXPERIMENT_FAMILY_PATH,
 ) -> dict[str, Any]:
     if origin not in ORIGINS:
         raise ValueError("invalid_origin")
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", spec_hash):
         raise ValueError("invalid_spec_hash")
+    universe = (universe_id, universe_version, universe_hash, membership_as_of)
+    if any(universe) and not all(universe):
+        raise ValueError("incomplete_universe_identity")
+    if universe_hash and not re.fullmatch(r"sha256:[0-9a-f]{64}", universe_hash):
+        raise ValueError("invalid_universe_hash")
     row = {
         "schema_version": SCHEMA_VERSION,
         "recorded_at": utc_now(),
@@ -205,6 +228,10 @@ def record_frozen_spec(
         "spec_hash": spec_hash,
         "spec_path": spec_path,
         "origin": origin,
+        "universe_id": universe_id,
+        "universe_version": universe_version,
+        "universe_hash": universe_hash,
+        "membership_as_of": membership_as_of,
         "execution_enabled": False,
         "can_submit_orders": False,
     }
@@ -212,7 +239,7 @@ def record_frozen_spec(
         rows = read_jsonl(path)
         existing = next((item for item in rows if item.get("spec_hash") == spec_hash), None)
         if existing:
-            immutable = ("candidate_id", "family_id", "spec_path", "origin")
+            immutable = ("candidate_id", "family_id", "spec_path", "origin") + UNIVERSE_FIELDS
             if any(existing.get(field) != row.get(field) for field in immutable):
                 raise ValueError("spec_hash_identity_conflict")
             return {"recorded": False, "duplicate": True, "family_size": len(rows)}
