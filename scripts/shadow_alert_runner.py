@@ -32,6 +32,10 @@ SCANNERS = {
         "module": "scripts.equity_orb_scout_v1_shadow",
         "label": "Equity ORB Scout v1",
     },
+    "equity-orb-scout-v2": {
+        "module": "scripts.equity_orb_scout_v2_shadow",
+        "label": "Equity ORB Scout v2 (A+ filters)",
+    },
 }
 
 
@@ -158,7 +162,7 @@ def run_guarded(
     module = importlib.import_module(str(config["module"]))
     log_path = Path(module.LOG_PATH)
     if smoke:
-        if scanner == "equity-orb-scout-v1":
+        if scanner in ("equity-orb-scout-v1", "equity-orb-scout-v2"):
             module.load_universe()
         return {"status": "smoke_pass", "scanner": scanner, "mode": mode, "exit_code": 0}
 

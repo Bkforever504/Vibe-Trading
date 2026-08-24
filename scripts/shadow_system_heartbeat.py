@@ -36,12 +36,15 @@ MES_TASKS = (
 SCOUT_TASKS = (
     ("\\VibeTrade\\", "EquityOrbScoutV1Entry"),
     ("\\VibeTrade\\", "EquityOrbScoutV1Resolve"),
+    ("\\VibeTrade\\", "EquityOrbScoutV2Entry"),
+    ("\\VibeTrade\\", "EquityOrbScoutV2Resolve"),
 )
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
     ("\\VibeTrade\\", "ShadowSystemHeartbeat"),
     ("\\VibeTrade\\", "SundayShadowPreflight"),
+    ("\\VibeTrade\\", "EodShadowCheckin"),
 )
 EXPECTED_TASKS = MES_TASKS + SCOUT_TASKS + OPTIONS_TASKS + OPS_TASKS
 
@@ -141,10 +144,12 @@ def build_report(
     ops = _task_group(tasks, OPS_TASKS)
     scanner_halts = {
         name: {"halted": is_halted(name), "state": read_state(name)}
-        for name in ("mes-orb-v2", "mes-reopen-v2", "equity-orb-scout-v1")
+        for name in ("mes-orb-v2", "mes-reopen-v2", "equity-orb-scout-v1", "equity-orb-scout-v2")
     }
     mes["alive"] = mes["alive"] and not any(scanner_halts[name]["halted"] for name in ("mes-orb-v2", "mes-reopen-v2"))
-    scout["alive"] = scout["alive"] and not scanner_halts["equity-orb-scout-v1"]["halted"]
+    scout["alive"] = scout["alive"] and not any(
+        scanner_halts[name]["halted"] for name in ("equity-orb-scout-v1", "equity-orb-scout-v2")
+    )
     hmm = report_freshness(hmm_path, now=now, max_age_hours=72.0)
     catalyst = report_freshness(catalyst_path, now=now, max_age_hours=36.0)
     kill = kill_switch_active()

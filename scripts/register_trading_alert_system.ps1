@@ -17,7 +17,9 @@ Set-Location $repo
 
 & "$repo\scripts\register_mes_v2_shadow_tasks.ps1"
 & "$repo\scripts\register_equity_orb_scout_v1_task.ps1"
+& "$repo\scripts\register_equity_orb_scout_v2_task.ps1"
 & "$repo\scripts\register_shadow_ops_tasks.ps1"
+& "$repo\scripts\register_monday_checkin_task.ps1"
 
 if (-not $SkipProducerRefresh) {
     foreach ($producer in @("HMMRegimeScanner", "MarketCatalystCalendar", "BotStatusSnapshot")) {
@@ -44,9 +46,12 @@ $expected = @(
     "MesV2DatabentoRegrade",
     "EquityOrbScoutV1Entry",
     "EquityOrbScoutV1Resolve",
+    "EquityOrbScoutV2Entry",
+    "EquityOrbScoutV2Resolve",
     "HMMRegimeScanner",
     "ShadowSystemHeartbeat",
-    "SundayShadowPreflight"
+    "SundayShadowPreflight",
+    "EodShadowCheckin"
 )
 $bad = @()
 foreach ($name in $expected) {
@@ -59,7 +64,7 @@ if ($bad.Count -gt 0) {
     throw "Missing or unhealthy scheduled tasks: $($bad -join ', ')"
 }
 
-foreach ($scanner in @("mes-orb-v2", "mes-reopen-v2", "equity-orb-scout-v1")) {
+foreach ($scanner in @("mes-orb-v2", "mes-reopen-v2", "equity-orb-scout-v1", "equity-orb-scout-v2")) {
     python scripts\shadow_alert_runner.py --scanner $scanner --mode entry --smoke
     if ($LASTEXITCODE -ne 0) { throw "Smoke failed: $scanner" }
 }
@@ -69,7 +74,7 @@ $heartbeatCode = $LASTEXITCODE
 python scripts\sunday_shadow_preflight.py --no-network --no-notify
 $preflightCode = $LASTEXITCODE
 
-$summary = "Trading alert system registered: 10 shadow/monitoring tasks Ready; scanner smoke PASS; heartbeat exit=$heartbeatCode; preflight exit=$preflightCode; no order authority."
+$summary = "Trading alert system registered: 13 shadow/monitoring tasks Ready; scanner smoke PASS; heartbeat exit=$heartbeatCode; preflight exit=$preflightCode; no order authority."
 Write-Host $summary
 if (-not $SkipDiscordConfirmation) {
     python -m agent.notifier --message $summary

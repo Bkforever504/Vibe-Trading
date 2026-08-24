@@ -138,5 +138,15 @@ def test_registration_scripts_define_required_cadences_and_master_scope() -> Non
     master = (root / "scripts" / "register_trading_alert_system.ps1").read_text(encoding="utf-8")
     assert "register_mes_v2_shadow_tasks.ps1" in master
     assert "register_equity_orb_scout_v1_task.ps1" in master
+    assert "register_equity_orb_scout_v2_task.ps1" in master
+    assert "register_monday_checkin_task.ps1" in master
     assert "register_shadow_ops_tasks.ps1" in master
     assert "iwm_options_bot.py" not in master
+
+
+def test_eod_runner_is_deterministic_and_does_not_launch_an_agent() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner_text = (root / "scripts" / "run_monday_checkin.ps1").read_text(encoding="utf-8")
+    assert "eod_shadow_checkin.py" in runner_text
+    assert "claude" not in runner_text.lower()
+    assert "dangerously-skip-permissions" not in runner_text

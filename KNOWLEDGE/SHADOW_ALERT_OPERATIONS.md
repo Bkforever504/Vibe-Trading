@@ -12,16 +12,18 @@ Set-Location C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\register_trading_alert_system.ps1
 ```
 
-The master setup registers and verifies ten Task Scheduler entries under
+The master setup registers and verifies 13 relevant Task Scheduler entries under
 `\VibeTrade\`:
 
 - MES ORB v2 entry and resolve
 - MES reopen v2 entry and resolve
 - MES v2 delayed Databento regrade
 - Equity ORB Scout v1 entry and resolve
+- Equity ORB Scout v2 entry and resolve
 - HMM regime producer at 08:40 CT on weekdays
 - System heartbeat at 09:00, 12:00, and 15:30 CT
 - Sunday preflight at 20:00 CT
+- Deterministic shadow EOD check-in at 17:07 CT on weekdays
 
 It also refreshes the HMM, catalyst, and bot-status producers, runs import-only
 scanner smoke checks, and sends a registration confirmation when Discord is
@@ -55,6 +57,7 @@ After correcting the cause, clear one halt deliberately:
 python -c "from scripts.shadow_ops import clear_halt; print(clear_halt('mes-orb-v2'))"
 python -c "from scripts.shadow_ops import clear_halt; print(clear_halt('mes-reopen-v2'))"
 python -c "from scripts.shadow_ops import clear_halt; print(clear_halt('equity-orb-scout-v1'))"
+python -c "from scripts.shadow_ops import clear_halt; print(clear_halt('equity-orb-scout-v2'))"
 ```
 
 The MES ORB scanner continues to reject stale/missing HMM context. The wrapper
@@ -63,8 +66,8 @@ more than 72 hours and catalyst data stale at more than 36 hours.
 
 ## File-drop kill switch
 
-Create this exact file to stop the MES v2, equity scout, Databento regrader,
-heartbeat, and preflight paths on their next fire:
+Create this exact file to stop the MES v2, equity scout, and Databento regrader
+work on their next fire:
 
 ```powershell
 New-Item -ItemType File -Path C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading\KILL_SWITCH
@@ -80,14 +83,15 @@ This repository-root switch does not change the IWM options bot body. The IWM
 bot separately uses `OPTIONS_LIVE_EXECUTION_ENABLED`, its execution guard, and
 the existing portfolio kill-switch controls. No Discord slash command is
 installed; the local file drop avoids adding an authenticated public command
-surface.
+surface. Heartbeat, preflight, and EOD monitoring remain active so Discord can
+report that the kill switch is engaged.
 
 ## Manual checks
 
 ```powershell
 python scripts\shadow_system_heartbeat.py
 uv run --no-project --with yfinance --with pandas --with numpy python scripts\sunday_shadow_preflight.py
-Get-ScheduledTask -TaskPath "\VibeTrade\" | Where-Object TaskName -Match "Mes|EquityOrb|ShadowSystem|SundayShadow"
+Get-ScheduledTask -TaskPath "\VibeTrade\" | Where-Object TaskName -Match "Mes|EquityOrb|ShadowSystem|SundayShadow|EodShadow"
 ```
 
 All components in this document are monitoring or shadow evidence systems:
