@@ -30,6 +30,15 @@ LEDGER_NAMES = (
     "simple_price_action_shadow_log.jsonl",
 )
 
+PROMOTION_EVIDENCE_TIERS = frozenset(
+    {
+        "databento_mbo_executable",
+        "databento_bbo_executable",
+        "executable_market_data",
+    }
+)
+PROMOTION_SOURCE_PREFIXES = ("databento_",)
+
 
 def _number(value: Any) -> float | None:
     try:
@@ -88,6 +97,57 @@ def _entry_price(candidate: Mapping[str, Any]) -> tuple[float | None, str]:
         if value is not None:
             return value, "credit" if "credit" in key else "debit"
     return None, "debit"
+
+
+def _promotion_contract(
+    candidate: Mapping[str, Any],
+    terminal: Mapping[str, Any],
+    *,
+    entry_fill: float | None,
+    exit_fill: float | None,
+) -> tuple[bool, list[str]]:
+    """Validate an explicit, executable, source-matched evidence contract."""
+    blockers: list[str] = []
+    if candidate.get("promotion_eligible") is not True:
+        blockers.append("entry_promotion_eligible_not_explicit_true")
+    if terminal.get("promotion_eligible") is not True:
+        blockers.append("terminal_promotion_eligible_not_explicit_true")
+
+    entry_source = str(candidate.get("data_source") or "").strip()
+    terminal_source = str(terminal.get("data_source") or "").strip()
+    if not entry_source or not terminal_source:
+        blockers.append("promotion_data_source_missing")
+    elif entry_source != terminal_source:
+        blockers.append("promotion_data_source_mismatch")
+    elif not entry_source.lower().startswith(PROMOTION_SOURCE_PREFIXES):
+        blockers.append("promotion_data_source_not_whitelisted")
+
+    entry_tier = str(candidate.get("evidence_tier") or "").strip()
+    terminal_tier = str(terminal.get("evidence_tier") or "").strip()
+    if not entry_tier or not terminal_tier:
+        blockers.append("promotion_evidence_tier_missing")
+    elif entry_tier != terminal_tier:
+        blockers.append("promotion_evidence_tier_mismatch")
+    elif entry_tier not in PROMOTION_EVIDENCE_TIERS:
+        blockers.append("promotion_evidence_tier_not_whitelisted")
+
+    explicit_entry_fill = any(
+        _number(candidate.get(key)) is not None
+        for key in ("entry_fill_executable", "entry_ask", "executable_entry_debit", "executable_entry_credit")
+    )
+    explicit_exit_fill = any(
+        _number(terminal.get(key)) is not None
+        for key in ("exit_fill_executable", "exit_bid", "executable_bid", "closing_debit", "executable_close_debit")
+    )
+    if entry_fill is None or not explicit_entry_fill:
+        blockers.append("executable_entry_fill_missing")
+    if exit_fill is None or not explicit_exit_fill:
+        blockers.append("executable_exit_fill_missing")
+    if candidate.get("evidence_blockers"):
+        blockers.append("entry_evidence_blockers_present")
+    if terminal.get("evidence_blockers"):
+        blockers.append("terminal_evidence_blockers_present")
+    return not blockers, sorted(set(blockers))
 
 
 def _mark_price(mark: Mapping[str, Any], style: str) -> float | None:
@@ -154,20 +214,45 @@ def resolve_plan(
     entry_time = _time(candidate.get("created_at") or candidate.get("captured_at") or candidate.get("timestamp"))
     exit_time = _time(terminal.get("resolved_at") or terminal.get("closed_at") or terminal.get("timestamp"))
     duration = (exit_time - entry_time).total_seconds() / 60.0 if entry_time and exit_time and exit_time >= entry_time else None
-    promotion_eligible = candidate.get("promotion_eligible") is not False and terminal.get("promotion_eligible") is not False
+    promotion_eligible, promotion_blockers = _promotion_contract(
+        candidate,
+        terminal,
+        entry_fill=entry,
+        exit_fill=exit_fill,
+    )
     terminal_resolved_at = _time(terminal.get("resolved_at") or terminal.get("closed_at") or terminal.get("timestamp"))
+    stable_candidate_id = candidate.get("strategy_id") or candidate.get("candidate_id") or plan_id
+    session = (
+        candidate.get("session_date")
+        or candidate.get("session")
+        or terminal.get("session_date")
+        or terminal.get("session")
+    )
+    outcome_version = terminal.get("regrade_version") or terminal.get("outcome_version") or terminal.get("evidence_version") or 1
     return {
         "schema_version": 1,
         "plan_id": plan_id,
-        "candidate_id": candidate.get("candidate_id") or candidate.get("strategy_id") or plan_id,
-        "strategy_id": candidate.get("strategy_id"),
+        "candidate_id": stable_candidate_id,
+        "strategy_id": candidate.get("strategy_id") or stable_candidate_id,
         "family_id": candidate.get("family_id"),
         "spec_hash": candidate.get("spec_hash"),
         "source_ledger": source_ledger,
         "data_source": candidate.get("data_source"),
+        "terminal_data_source": terminal.get("data_source"),
+        "source_agreement": bool(candidate.get("data_source")) and candidate.get("data_source") == terminal.get("data_source"),
         "evidence_tier": candidate.get("evidence_tier"),
+        "terminal_evidence_tier": terminal.get("evidence_tier"),
         "promotion_eligible": promotion_eligible,
-        "evidence_blockers": candidate.get("evidence_blockers") or [],
+        "evidence_blockers": sorted(set([
+            *(str(item) for item in (candidate.get("evidence_blockers") or [])),
+            *(str(item) for item in (terminal.get("evidence_blockers") or [])),
+            *promotion_blockers,
+        ])),
+        "promotion_exclusion_reasons": promotion_blockers,
+        "session": str(session)[:10] if session else None,
+        "session_date": str(session)[:10] if session else None,
+        "outcome_version": outcome_version,
+        "regraded_at": terminal.get("regraded_at"),
         "entry_fill_executable": entry,
         "exit_fill_executable": exit_fill,
         "mfe": max(path_pnl) if path_pnl else None,
@@ -180,7 +265,13 @@ def resolve_plan(
         "counterfactual_cash": {"pnl": 0.0, "outcome_r": 0.0},
         "resolved_at": (terminal_resolved_at or resolved_at).isoformat(),
         "terminal_reason": terminal.get("reason"),
-        "quote_method": "entry_executable_ask_or_strategy_credit_exit_executable_bid_or_close_debit" if promotion_eligible else "proxy_ohlcv_non_executable",
+        "quote_method": (
+            "entry_executable_ask_or_strategy_credit_exit_executable_bid_or_close_debit"
+            if promotion_eligible
+            else "proxy_ohlcv_non_executable"
+            if str(candidate.get("evidence_tier") or "").startswith("proxy_")
+            else "non_qualified_evidence"
+        ),
         "execution_enabled": False,
         "can_submit_orders": False,
     }

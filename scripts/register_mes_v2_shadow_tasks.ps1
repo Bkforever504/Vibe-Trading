@@ -1,9 +1,10 @@
-# Register the four MES v2 shadow scheduled tasks (entry + resolve for both).
+# Register four MES v2 shadow tasks plus the delayed Databento evidence task.
 # Run this script as Administrator once, then Task Scheduler will fire on cadence:
 #   MesOrb0932V2Entry       Mon/Wed/Fri at 08:47 CT (09:47 ET)
 #   MesOrb0932V2Resolve     Mon/Wed/Fri at 11:05 CT (12:05 ET)
 #   MesReopenDriftV2Entry   Mon-Thu at 17:35 CT (18:35 ET)
 #   MesReopenDriftV2Resolve Tue-Fri at 07:35 CT (08:35 ET)
+#   MesV2DatabentoRegrade   Daily at 12:30 CT (historical-delay regrade)
 
 $ErrorActionPreference = "Stop"
 
@@ -14,6 +15,7 @@ if ((Get-TimeZone).Id -ne "Central Standard Time") {
 $repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 $orb  = "$repo\scripts\run_mes_orb_0932_vix_v2_shadow.ps1"
 $rop  = "$repo\scripts\run_mes_reopen_drift_v2_shadow.ps1"
+$regrader = "$repo\scripts\run_mes_v2_databento_regrader.ps1"
 
 $service = New-Object -ComObject "Schedule.Service"
 $service.Connect()
@@ -29,22 +31,30 @@ $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -RunOnlyIfNetworkAvailable
 
+$regraderSettings = New-ScheduledTaskSettingsSet `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 45) `
+    -MultipleInstances IgnoreNew `
+    -StartWhenAvailable `
+    -RunOnlyIfNetworkAvailable
+
 function Register-Task {
     param(
         [string]$Name,
         [string]$Script,
         [string]$Argument,
-        [Microsoft.Management.Infrastructure.CimInstance]$Trigger
+        [Microsoft.Management.Infrastructure.CimInstance]$Trigger,
+        [Microsoft.Management.Infrastructure.CimInstance]$TaskSettings = $settings
     )
+    $modeArgument = if ($Argument) { " -Mode $Argument" } else { "" }
     $action = New-ScheduledTaskAction `
         -Execute "powershell.exe" `
-        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$Script`" -Mode $Argument"
+        -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$Script`"$modeArgument"
     Register-ScheduledTask `
         -TaskName $Name `
         -TaskPath "\VibeTrade\" `
         -Action $action `
         -Trigger $Trigger `
-        -Settings $settings `
+        -Settings $TaskSettings `
         -RunLevel Limited `
         -Force
     Write-Host "Registered: $Name"
@@ -62,4 +72,7 @@ Register-Task -Name "MesReopenDriftV2Entry" -Script $rop -Argument "entry" -Trig
 $morningResolve = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Tuesday,Wednesday,Thursday,Friday -At "07:35"
 Register-Task -Name "MesReopenDriftV2Resolve" -Script $rop -Argument "resolve" -Trigger $morningResolve
 
-Write-Host "All four MES v2 shadow tasks registered under \VibeTrade\"
+$dailyRegrade = New-ScheduledTaskTrigger -Daily -At "12:30"
+Register-Task -Name "MesV2DatabentoRegrade" -Script $regrader -Argument "" -Trigger $dailyRegrade -TaskSettings $regraderSettings
+
+Write-Host "All five MES v2 shadow/evidence tasks registered under \VibeTrade\"

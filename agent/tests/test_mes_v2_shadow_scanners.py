@@ -147,4 +147,6 @@ def test_scheduler_uses_central_time_and_valid_reopen_days() -> None:
     assert '-At "11:05"' in text
     assert '-DaysOfWeek Monday,Tuesday,Wednesday,Thursday -At "17:35"' in text
     assert '-DaysOfWeek Tuesday,Wednesday,Thursday,Friday -At "07:35"' in text
+    assert 'New-ScheduledTaskTrigger -Daily -At "12:30"' in text
+    assert 'MesV2DatabentoRegrade' in text
     assert '-TaskPath "\\VibeTrade\\"' in text

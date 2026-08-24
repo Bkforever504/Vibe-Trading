@@ -89,3 +89,72 @@ def test_proxy_ohlcv_terminal_uses_net_result_and_stays_non_promotable() -> None
     assert outcome["candidate_id"] == "mes-orb-0932-vix-v2"
     assert outcome["promotion_eligible"] is False
     assert outcome["quote_method"] == "proxy_ohlcv_non_executable"
+
+
+def test_resolver_aggregates_under_stable_strategy_and_requires_explicit_qualified_contract() -> None:
+    source = "databento_glbx_mdp3_mbo"
+    tier = "databento_mbo_executable"
+    rows = [
+        {
+            "type": "entry",
+            "plan_id": "mes-orb-0932-vix-v2:2026-08-24",
+            "candidate_id": "mes-orb-0932-vix-v2:2026-08-24",
+            "strategy_id": "mes-orb-0932-vix-v2",
+            "session_date": "2026-08-24",
+            "created_at": "2026-08-24T13:35:00Z",
+            "entry_fill_executable": 6500.25,
+            "max_risk_per_contract": 50.0,
+            "data_source": source,
+            "evidence_tier": tier,
+            "promotion_eligible": True,
+            "evidence_blockers": [],
+        },
+        {
+            "type": "exit",
+            "plan_id": "mes-orb-0932-vix-v2:2026-08-24",
+            "resolved_at": "2026-08-24T16:00:00Z",
+            "exit_fill_executable": 6502.25,
+            "outcome_r": 0.8,
+            "data_source": source,
+            "evidence_tier": tier,
+            "promotion_eligible": True,
+            "evidence_blockers": [],
+            "regrade_version": 2,
+        },
+    ]
+
+    outcome = build_resolutions({"qualified.jsonl": rows}, resolved_at=NOW)[0]
+
+    assert outcome["plan_id"] == "mes-orb-0932-vix-v2:2026-08-24"
+    assert outcome["candidate_id"] == "mes-orb-0932-vix-v2"
+    assert outcome["strategy_id"] == "mes-orb-0932-vix-v2"
+    assert outcome["session"] == "2026-08-24"
+    assert outcome["session_date"] == "2026-08-24"
+    assert outcome["outcome_version"] == 2
+    assert outcome["promotion_eligible"] is True
+    assert outcome["promotion_exclusion_reasons"] == []
+
+
+def test_resolver_fails_closed_when_terminal_provenance_is_missing_or_mismatched() -> None:
+    base = ledger_rows()
+    base[0].update(
+        {
+            "promotion_eligible": True,
+            "data_source": "databento_glbx_mdp3_mbo",
+            "evidence_tier": "databento_mbo_executable",
+            "evidence_blockers": [],
+        }
+    )
+    base[-1].update(
+        {
+            "promotion_eligible": True,
+            "data_source": "databento_other_feed",
+            "evidence_tier": "databento_mbo_executable",
+            "evidence_blockers": [],
+        }
+    )
+
+    outcome = build_resolutions({"mismatch.jsonl": base}, resolved_at=NOW)[0]
+
+    assert outcome["promotion_eligible"] is False
+    assert "promotion_data_source_mismatch" in outcome["promotion_exclusion_reasons"]

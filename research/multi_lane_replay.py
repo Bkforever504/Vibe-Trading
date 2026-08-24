@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Uniform, shadow-only statistical evaluation for frozen research lanes.
 
-Input rows are already-resolved executable outcomes. Required fields are
-``candidate_id``, ``session`` and ``outcome_r``. Placebo testing additionally
-requires the frozen ``signal`` (-1/1) and the corresponding unsigned
-``forward_return_r``; missing evidence remains unavailable rather than passing.
+Input rows are already-resolved executable outcomes. Promotion statistics require
+an explicit qualified-evidence contract, unique ``plan_id``, stable
+``strategy_id``/``candidate_id``, ``session_date``, and ``outcome_r``. Placebo
+testing additionally requires the frozen ``signal`` (-1/1) and corresponding
+unsigned ``forward_return_r``; missing evidence never passes silently.
 """
 from __future__ import annotations
 
@@ -24,6 +25,14 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "data" / "shadow_outcomes.jsonl"
 DEFAULT_FAMILY = ROOT / "data" / "experiment_family.jsonl"
+PROMOTION_EVIDENCE_TIERS = frozenset(
+    {
+        "databento_mbo_executable",
+        "databento_bbo_executable",
+        "executable_market_data",
+    }
+)
+PROMOTION_SOURCE_PREFIXES = ("databento_",)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -75,6 +84,82 @@ def _quantile(values: list[float], probability: float) -> float | None:
 
 def _normal_cdf(value: float) -> float:
     return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def _number(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if math.isfinite(result) else None
+
+
+def _promotion_exclusion_reasons(row: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    if row.get("promotion_eligible") is not True:
+        reasons.append("promotion_eligible_false" if row.get("promotion_eligible") is False else "promotion_eligible_missing")
+    source = str(row.get("data_source") or "").strip()
+    terminal_source = str(row.get("terminal_data_source") or "").strip()
+    if not source:
+        reasons.append("data_source_missing")
+    elif not source.lower().startswith(PROMOTION_SOURCE_PREFIXES):
+        reasons.append("data_source_not_whitelisted")
+    if row.get("source_agreement") is not True or not terminal_source or source != terminal_source:
+        reasons.append("source_agreement_not_explicit_true")
+    tier = str(row.get("evidence_tier") or "").strip()
+    terminal_tier = str(row.get("terminal_evidence_tier") or "").strip()
+    if not tier:
+        reasons.append("evidence_tier_missing")
+    elif tier not in PROMOTION_EVIDENCE_TIERS:
+        reasons.append("evidence_tier_not_whitelisted")
+    if not terminal_tier or tier != terminal_tier:
+        reasons.append("evidence_tier_agreement_missing")
+    if _number(row.get("entry_fill_executable")) is None:
+        reasons.append("executable_entry_fill_missing")
+    if _number(row.get("exit_fill_executable")) is None:
+        reasons.append("executable_exit_fill_missing")
+    if row.get("evidence_blockers"):
+        reasons.append("evidence_blockers_present")
+    if not str(row.get("plan_id") or "").strip():
+        reasons.append("plan_id_missing")
+    if not str(row.get("strategy_id") or row.get("candidate_id") or "").strip():
+        reasons.append("stable_candidate_id_missing")
+    if not str(row.get("session_date") or row.get("session") or "").strip():
+        reasons.append("session_date_missing")
+    if _number(row.get("outcome_r")) is None:
+        reasons.append("outcome_r_missing")
+    return sorted(set(reasons))
+
+
+def _version_key(row: dict[str, Any]) -> tuple[int, str]:
+    raw = row.get("regrade_version") or row.get("outcome_version") or row.get("evidence_version") or 0
+    try:
+        version = int(raw)
+    except (TypeError, ValueError):
+        version = 0
+    stamp = str(row.get("regraded_at") or row.get("resolved_at") or "")
+    return version, stamp
+
+
+def _dedupe_outcomes(rows: Iterable[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Keep one outcome per plan, preferring the latest qualified regrade."""
+    by_plan: dict[str, dict[str, Any]] = {}
+    unkeyed: list[dict[str, Any]] = []
+    total = 0
+    for source in rows:
+        total += 1
+        row = dict(source)
+        plan_id = str(row.get("plan_id") or "").strip()
+        if not plan_id:
+            unkeyed.append(row)
+            continue
+        prior = by_plan.get(plan_id)
+        rank = (not _promotion_exclusion_reasons(row), *_version_key(row))
+        prior_rank = (not _promotion_exclusion_reasons(prior), *_version_key(prior)) if prior else None
+        if prior is None or rank >= prior_rank:
+            by_plan[plan_id] = row
+    selected = [*unkeyed, *by_plan.values()]
+    return selected, total - len(selected)
 
 
 def _walk_forward(values: list[float], *, folds: int = 5, purge: int = 1) -> list[dict[str, Any]]:
@@ -142,9 +227,21 @@ def evaluate_replay(
 ) -> dict[str, Any]:
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     skipped = 0
-    for raw in rows:
-        candidate_id = str(raw.get("candidate_id") or raw.get("setup_family") or "").strip()
-        session = str(raw.get("session") or raw.get("resolved_at") or "")[:10]
+    excluded = 0
+    exclusion_reasons: dict[str, int] = defaultdict(int)
+    exclusions_by_candidate: dict[str, int] = defaultdict(int)
+    deduped_rows, duplicate_rows = _dedupe_outcomes(rows)
+    for raw in deduped_rows:
+        reasons = _promotion_exclusion_reasons(raw)
+        if reasons:
+            excluded += 1
+            excluded_candidate = str(raw.get("strategy_id") or raw.get("candidate_id") or "unknown")
+            exclusions_by_candidate[excluded_candidate] += 1
+            for reason in reasons:
+                exclusion_reasons[reason] += 1
+            continue
+        candidate_id = str(raw.get("strategy_id") or raw.get("candidate_id") or raw.get("setup_family") or "").strip()
+        session = str(raw.get("session_date") or raw.get("session") or raw.get("resolved_at") or "")[:10]
         try:
             outcome = float(raw.get("outcome_r"))
         except (TypeError, ValueError):
@@ -190,6 +287,57 @@ def evaluate_replay(
             "placebo": _placebo(candidate_rows, candidate_id=candidate_id, family_size=family_size),
             "cost_stress": {"status": "pass" if stress_available and _mean(stressed) > 0 else "fail" if stress_available else "unavailable", "doubled_cost_expectancy": round(_mean(stressed), 6) if stress_available else None},
             "purged_walk_forward": _walk_forward(values),
+            "preregistration_schema": (
+                "hypothesis-v2"
+                if all(row.get("preregistration_schema") == "hypothesis-v2" for row in candidate_rows)
+                else None
+            ),
+            "multiple_testing": {
+                "raw_p_value": _placebo(candidate_rows, candidate_id=candidate_id, family_size=family_size).get("p_value")
+            },
+            "regime_coverage": {
+                regime: {
+                    "independent_dates": len({
+                        str(row["session"])
+                        for row in candidate_rows
+                        if regime in set(row.get("regime_tags") or [])
+                    })
+                }
+                for regime in ("trend", "chop", "high_vol", "low_vol")
+            },
+            "latency": {
+                "observations": len([
+                    row for row in candidate_rows
+                    if _number(row.get("alert_latency_fraction")) is not None
+                ]),
+                "p90_fraction_of_expected_window": _quantile(
+                    sorted([
+                        float(row["alert_latency_fraction"])
+                        for row in candidate_rows
+                        if _number(row.get("alert_latency_fraction")) is not None
+                    ]),
+                    0.9,
+                ) if any(_number(row.get("alert_latency_fraction")) is not None for row in candidate_rows) else None,
+            },
+            "data_integrity": {
+                "source_repair_detected": True,
+                "backfill_status": "complete" if exclusions_by_candidate.get(candidate_id, 0) == 0 else "incomplete",
+                "regrade_status": "complete" if exclusions_by_candidate.get(candidate_id, 0) == 0 else "incomplete",
+                "contaminated_outcomes_remaining": exclusions_by_candidate.get(candidate_id, 0),
+            },
+            "revalidation": {
+                "rolling_windows": len(_walk_forward(values)),
+                "latest_brier_skill": None,
+                "last_revalidated_at": None,
+            },
+            "universe": (
+                dict(candidate_rows[0].get("universe") or {})
+                if candidate_rows and all(
+                    row.get("universe") == candidate_rows[0].get("universe")
+                    for row in candidate_rows
+                )
+                else {}
+            ),
             "execution_enabled": False,
             "can_submit_orders": False,
         }
@@ -201,6 +349,9 @@ def evaluate_replay(
         "family_size": family_size,
         "method": "purged_walk_forward_cpcv_family_pbo_moving_block_bootstrap_bonferroni",
         "skipped_rows": skipped,
+        "excluded_rows": excluded,
+        "duplicate_rows": duplicate_rows,
+        "exclusion_reasons": dict(sorted(exclusion_reasons.items())),
         "results": results,
         "execution_enabled": False,
         "can_submit_orders": False,

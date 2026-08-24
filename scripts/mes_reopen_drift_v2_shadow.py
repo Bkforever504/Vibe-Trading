@@ -102,7 +102,18 @@ def download_mes_5m(period: str = "10d") -> Any:
 
 
 def download_vix_daily(period: str = "15d") -> Any:
-    return _yfinance_download("^VIX", period=period, interval="1d", prepost=False)
+    del period
+    import pandas as pd
+
+    from scripts.market_data import fetch_vix_context
+
+    row = fetch_vix_context()
+    if row.get("available") is False or row.get("date") is None or row.get("close") is None:
+        raise ValueError("official CBOE VIX prior close unavailable")
+    return pd.DataFrame(
+        {"Close": [float(row["close"])]},
+        index=pd.DatetimeIndex([pd.to_datetime(row["date"])]),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +182,7 @@ def _base_record(event_type: str, as_of: datetime) -> dict[str, Any]:
         "candidate_id": STRATEGY_ID,
         "family_id": FAMILY_ID,
         "setup_family": FAMILY_ID,
-        "data_source": "yfinance_proxy_MES=F_30m_1h_5m_and_VIX_daily",
+        "data_source": "yfinance_proxy_MES=F_30m_1h_5m_and_cboe_official_VIX",
         "evidence_tier": "proxy_ohlcv_non_executable",
         "promotion_eligible": False,
         "evidence_blockers": ["databento_mbo_and_executable_quotes_required"],
@@ -311,6 +322,7 @@ def build_entry_plan(
     bars_5m: Any,
     vix_daily: Any,
     session_date: date,
+    macro_context: tuple[bool, list[str]] | None = None,
 ) -> dict[str, Any]:
     reasons: list[str] = []
     filters: dict[str, Any] = {}
@@ -345,6 +357,8 @@ def build_entry_plan(
         raise ValueError("VIX close unavailable")
     vix_close = float(vix_frame["Close"].dropna().iloc[-1])
     filters["vix_prior_close"] = vix_close
+    filters["vix_source"] = "cboe_vix_history"
+    filters["vix_observed_session"] = vix_frame["Close"].dropna().index[-1].date().isoformat()
     if not (VIX_MIN <= vix_close <= VIX_MAX):
         reasons.append(f"vix_out_of_band_{vix_close:.2f}")
 
@@ -354,7 +368,7 @@ def build_entry_plan(
         reasons.append(f"hurst_below_min_{hurst}")
 
     next_day = session_date + timedelta(days=1)
-    macro_blocked, macro_names = _macro_block_next_day(next_day)
+    macro_blocked, macro_names = macro_context if macro_context is not None else _macro_block_next_day(next_day)
     filters["macro_next_day_blocked"] = macro_blocked
     filters["macro_events_next_day"] = macro_names
     if macro_blocked:
@@ -556,7 +570,7 @@ def run_entry(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> in
     local_time = as_of.astimezone(ET).time().replace(tzinfo=None)
     if not (ENTRY_CAPTURE_START <= local_time <= ENTRY_CAPTURE_END):
         record = _base_record("entry", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "session_date": session_date.isoformat(),
@@ -580,9 +594,20 @@ def run_entry(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> in
             vix_daily=vix,
             session_date=session_date,
         )
+        filters = decision["filters"]
+        context_observed_at = utc_now_z(as_of)
+        filters["macro_source"] = "market_catalyst_calendar"
+        filters["macro_observed_at"] = context_observed_at
+        vix_session = date.fromisoformat(str(filters["vix_observed_session"]))
+        filters["vix_observed_at"] = (
+            datetime.combine(vix_session, time(16, 15), ET)
+            .astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
         plan = decision.get("plan")
         record = _base_record("entry", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "session_date": session_date.isoformat(),
@@ -606,7 +631,7 @@ def run_entry(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> in
             record["stop_distance_pts"] = plan["stop_distance_pts"]
     except Exception as exc:
         record = _base_record("entry", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "session_date": session_date.isoformat(),
@@ -629,7 +654,7 @@ def run_resolve(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> 
     entry = _unsettled_entry(log_path, plan_id)
     if entry is None:
         record = _base_record("resolve_noop", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "reason": "no_unsettled_entry_for_session",
         }
@@ -640,7 +665,7 @@ def run_resolve(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> 
     plan = entry.get("plan") or {}
     if not plan or not entry.get("should_enter"):
         record = _base_record("exit", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "resolved_at": utc_now_z(as_of),
@@ -658,7 +683,7 @@ def run_resolve(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> 
         max_risk = float(entry.get("max_risk_per_contract") or 0.0)
         outcome_r = (pnl / max_risk) if max_risk else None
         record = _base_record("exit", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "resolved_at": utc_now_z(as_of),
@@ -688,7 +713,7 @@ def run_resolve(*, as_of: datetime | None = None, log_path: Path = LOG_PATH) -> 
         }
     except Exception as exc:
         record = _base_record("exit", as_of) | {
-            "candidate_id": plan_id,
+            "candidate_id": STRATEGY_ID,
             "plan_id": plan_id,
             "trade_key": plan_id,
             "resolved_at": utc_now_z(as_of),

@@ -339,6 +339,31 @@ def test_cockpit_surfaces_cisd_promotion_status_as_read_only_discovery_evidence(
     assert source["freshness"] == "live"
 
 
+def test_cockpit_surfaces_mes_v2_qualified_and_excluded_evidence(tmp_path: Path) -> None:
+    write_report(tmp_path, "mes-v2-evidence-status.json", {
+        "generated_at": "2026-08-19T14:59:58Z",
+        "provider": "mes_v2_evidence_status",
+        "live_feed": {"status": "unavailable", "reason": "license_required"},
+        "candidates": [{
+            "candidate_id": "mes-orb-0932-vix-v2",
+            "qualified_outcomes": 1,
+            "excluded_outcomes": 2,
+            "blockers": ["natural_forward_sample_incomplete"],
+        }],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    status = cockpit["discovery"]["mes_v2_evidence_status"]
+    source = next(row for row in cockpit["sources"] if row["name"] == "mes_v2_evidence")
+    assert status["candidates"][0]["qualified_outcomes"] == 1
+    assert status["candidates"][0]["excluded_outcomes"] == 2
+    assert status["execution_enabled"] is False
+    assert source["freshness"] == "live"
+
+
 def test_cockpit_surfaces_v2_research_governance_fail_closed(tmp_path: Path) -> None:
     write_report(tmp_path, "promotion_rules.json", {
         "schema_version": 2,

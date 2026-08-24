@@ -75,9 +75,33 @@ const governance = {
   can_submit_orders: false as const,
 };
 
+const mesEvidence = {
+  schema_version: 1,
+  provider: "mes_v2_evidence_status" as const,
+  generated_at: "2026-08-23T20:00:00Z",
+  live_feed: { provider: "databento" as const, dataset: "GLBX.MDP3" as const, status: "unavailable", reason: "license_required" },
+  evidence_planes: { timely_discovery: "proxy_non_executable_not_promotion_eligible", promotion_measurement: "delayed_databento_mbo_regrade" },
+  candidates: [{
+    candidate_id: "mes-orb-0932-vix-v2",
+    family_id: "mes-opening-breakout",
+    qualified_outcomes: 1,
+    excluded_outcomes: 2,
+    distinct_dates: 1,
+    targets: { resolved_outcomes: 100, distinct_dates: 30, dates_per_regime: 8 },
+    regime_dates: { trend: 1, chop: 0, high_vol: 0, low_vol: 1 },
+    latency: { observations: 1, p90_fraction_of_expected_window: 0.1, maximum_allowed: 0.2 },
+    status: "collecting_or_blocked",
+    blockers: ["natural_forward_sample_incomplete"],
+    execution_enabled: false as const,
+    can_submit_orders: false as const,
+  }],
+  execution_enabled: false as const,
+  can_submit_orders: false as const,
+};
+
 describe("DetectionTab", () => {
   it("renders family precision, recall, delta, and CISD evidence", () => {
-    render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} />);
+    render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} mesEvidence={mesEvidence} />);
 
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
     expect(screen.getByText("Opportunity coverage")).toBeInTheDocument();
@@ -98,5 +122,9 @@ describe("DetectionTab", () => {
     expect(screen.getByText("benjamini_hochberg")).toBeInTheDocument();
     expect(screen.getByText("8 dates each")).toBeInTheDocument();
     expect(screen.getByText(/PROMO_LATENCY_WINDOW_V2/)).toBeInTheDocument();
+    expect(screen.getByText("MES v2 forward evidence")).toBeInTheDocument();
+    expect(screen.getByText("1 / 100")).toBeInTheDocument();
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+    expect(screen.getByText(/natural forward sample incomplete/i)).toBeInTheDocument();
   });
 });
