@@ -39,6 +39,7 @@ SCOUT_TASKS = (
     ("\\VibeTrade\\", "EquityOrbScoutV2Entry"),
     ("\\VibeTrade\\", "EquityOrbScoutV2Resolve"),
 )
+MNQ_SMT_TASKS = (("\\VibeTrade\\", "MnqSmtCisdFamilyShadow"),)
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
@@ -46,7 +47,7 @@ OPS_TASKS = (
     ("\\VibeTrade\\", "SundayShadowPreflight"),
     ("\\VibeTrade\\", "EodShadowCheckin"),
 )
-EXPECTED_TASKS = MES_TASKS + SCOUT_TASKS + OPTIONS_TASKS + OPS_TASKS
+EXPECTED_TASKS = MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + OPTIONS_TASKS + OPS_TASKS
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -140,20 +141,43 @@ def build_report(
     tasks = task_rows if task_rows is not None else probe_tasks()
     mes = _task_group(tasks, MES_TASKS)
     scout = _task_group(tasks, SCOUT_TASKS)
+    mnq_smt = _task_group(tasks, MNQ_SMT_TASKS)
     options = _task_group(tasks, OPTIONS_TASKS)
     ops = _task_group(tasks, OPS_TASKS)
     scanner_halts = {
         name: {"halted": is_halted(name), "state": read_state(name)}
-        for name in ("mes-orb-v2", "mes-reopen-v2", "equity-orb-scout-v1", "equity-orb-scout-v2")
+        for name in (
+            "mes-orb-v2",
+            "mes-reopen-v2",
+            "equity-orb-scout-v1",
+            "equity-orb-scout-v2",
+            "mnq-smt-cisd-fvg-v1",
+            "mnq-pdl-rejection-v1",
+            "mnq-smt-only-v1",
+            "mnq-cisd-only-v1",
+        )
     }
     mes["alive"] = mes["alive"] and not any(scanner_halts[name]["halted"] for name in ("mes-orb-v2", "mes-reopen-v2"))
     scout["alive"] = scout["alive"] and not any(
         scanner_halts[name]["halted"] for name in ("equity-orb-scout-v1", "equity-orb-scout-v2")
     )
+    mnq_smt["alive"] = mnq_smt["alive"] and not any(
+        scanner_halts[name]["halted"]
+        for name in ("mnq-smt-cisd-fvg-v1", "mnq-pdl-rejection-v1", "mnq-smt-only-v1", "mnq-cisd-only-v1")
+    )
     hmm = report_freshness(hmm_path, now=now, max_age_hours=72.0)
     catalyst = report_freshness(catalyst_path, now=now, max_age_hours=36.0)
     kill = kill_switch_active()
-    healthy = mes["alive"] and scout["alive"] and options["alive"] and ops["alive"] and hmm["fresh"] and catalyst["fresh"] and not kill
+    healthy = (
+        mes["alive"]
+        and scout["alive"]
+        and mnq_smt["alive"]
+        and options["alive"]
+        and ops["alive"]
+        and hmm["fresh"]
+        and catalyst["fresh"]
+        and not kill
+    )
     return {
         "schema_version": 1,
         "provider": "shadow_system_heartbeat",
@@ -161,6 +185,7 @@ def build_report(
         "status": "PASS" if healthy else "FAIL",
         "mes_v2": mes,
         "equity_scout": scout,
+        "mnq_smt_family": mnq_smt,
         "options_bot": options,
         "operations_tasks": ops,
         "hmm": hmm,
@@ -180,6 +205,7 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"{icon} **Trading system heartbeat: {report['status']}**",
             f"MES v2 alive: {check(report['mes_v2']['alive'])}",
             f"Equity scout alive: {check(report['equity_scout']['alive'])}",
+            f"MNQ SMT family alive: {check(report['mnq_smt_family']['alive'])}",
             f"Options bot alive: {check(report['options_bot']['alive'])}",
             f"HMM fresh: {check(report['hmm']['fresh'])} (age={report['hmm']['age_hours']}h)",
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",

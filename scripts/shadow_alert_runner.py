@@ -36,6 +36,26 @@ SCANNERS = {
         "module": "scripts.equity_orb_scout_v2_shadow",
         "label": "Equity ORB Scout v2 (A+ filters)",
     },
+    "mnq-smt-cisd-fvg-v1": {
+        "module": "scripts.mnq_smt_cisd_fvg_v1_shadow",
+        "label": "MNQ SMT + CISD + FVG v1",
+        "notify_empty": False,
+    },
+    "mnq-pdl-rejection-v1": {
+        "module": "scripts.mnq_pdl_rejection_v1_shadow",
+        "label": "MNQ PDL rejection v1",
+        "notify_empty": False,
+    },
+    "mnq-smt-only-v1": {
+        "module": "scripts.mnq_smt_only_v1_shadow",
+        "label": "MNQ SMT only v1",
+        "notify_empty": False,
+    },
+    "mnq-cisd-only-v1": {
+        "module": "scripts.mnq_cisd_only_v1_shadow",
+        "label": "MNQ CISD only v1",
+        "notify_empty": False,
+    },
 }
 
 
@@ -144,6 +164,12 @@ def format_resolve_alert(
     return "\n".join(lines)
 
 
+def _has_actionable_rows(mode: str, rows: list[Mapping[str, Any]]) -> bool:
+    if mode == "entry":
+        return any(row.get("event_type") == "entry" and row.get("should_enter") is True for row in rows)
+    return any(row.get("event_type") == "exit" and row.get("outcome") for row in rows)
+
+
 def run_guarded(
     scanner: str,
     mode: str,
@@ -159,15 +185,15 @@ def run_guarded(
     if is_halted(scanner):
         return {"status": "auto_halted", "scanner": scanner, "mode": mode, "exit_code": 2}
 
-    module = importlib.import_module(str(config["module"]))
-    log_path = Path(module.LOG_PATH)
-    if smoke:
-        if scanner in ("equity-orb-scout-v1", "equity-orb-scout-v2"):
-            module.load_universe()
-        return {"status": "smoke_pass", "scanner": scanner, "mode": mode, "exit_code": 0}
-
-    before = _read_jsonl(log_path)
     try:
+        module = importlib.import_module(str(config["module"]))
+        log_path = Path(module.LOG_PATH)
+        if smoke:
+            if scanner in ("equity-orb-scout-v1", "equity-orb-scout-v2"):
+                module.load_universe()
+            return {"status": "smoke_pass", "scanner": scanner, "mode": mode, "exit_code": 0}
+
+        before = _read_jsonl(log_path)
         result = module.run_entry(log_path=log_path) if mode == "entry" else module.run_resolve(log_path=log_path)
         if result != 0:
             raise RuntimeError(f"scanner_returned_{result}")
@@ -200,7 +226,8 @@ def run_guarded(
             )
             if hmm_skip is not None:
                 message = "**MES ORB v2 AUTO-HALT FOR STALE/MISSING HMM**\n" + message
-        notification = notify(message)
+        should_notify = bool(config.get("notify_empty", True)) or _has_actionable_rows(mode, rows)
+        notification = notify(message) if should_notify else {"status": "suppressed_no_action", "sent": False}
         return {
             "status": "completed",
             "scanner": scanner,

@@ -30,6 +30,10 @@ LEDGER_NAMES = (
     "gex_level_reaction_shadow_log.jsonl",
     "trend_participation_shadow_log.jsonl",
     "simple_price_action_shadow_log.jsonl",
+    "mnq_smt_cisd_fvg_v1_shadow_log.jsonl",
+    "mnq_pdl_rejection_v1_shadow_log.jsonl",
+    "mnq_smt_only_v1_shadow_log.jsonl",
+    "mnq_cisd_only_v1_shadow_log.jsonl",
 )
 
 PROMOTION_EVIDENCE_TIERS = frozenset(

@@ -1,0 +1,25 @@
+{
+  "canonical_text_policy": "sorted unique uppercase symbols joined by LF plus trailing LF",
+  "membership_as_of": "2026-08-24",
+  "notes": [
+    "MNQ is the primary tradable per Kenny approval. NQ/ES used for SMT divergence context.",
+    "Front-month continuous; roll eight calendar days before expiry.",
+    "Immutable membership. Any change requires a new universe_version and spec_hash."
+  ],
+  "roles": {
+    "ES": "context_full_size",
+    "MES": "smt_correlated_index",
+    "MNQ": "primary_execution_micro",
+    "NQ": "context_full_size"
+  },
+  "sha256_membership_hash": "sha256:84d8ceaebd9f55d346059aba4809f8389fbe26099cd7878b0498c12dcd11ddbe",
+  "symbol_count": 4,
+  "symbols": [
+    "ES",
+    "MES",
+    "MNQ",
+    "NQ"
+  ],
+  "universe_id": "cme-mnq-smt-family",
+  "universe_version": "cme-mnq-nq-mes-es-front-month-roll8-v1"
+}
