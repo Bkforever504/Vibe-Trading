@@ -1,16 +1,28 @@
 from __future__ import annotations
 
+import json
+import sys
+import threading
+import types
 from datetime import datetime, timedelta, timezone
 
 from scripts.live_opportunity_engine import (
     SETUP_FAMILIES,
     LiveOpportunityEngine,
     _aggregate_rth_hourly,
+    _aggregate_rth_four_hour,
+    _with_core_context_symbols,
     build_feed_provenance,
     _filter_completed_period_bars,
+    _data_quality_context,
+    _market_risk_context,
+    _quote_context,
     _receive_control,
+    _session_risk_context,
     project_radar_report,
+    run_stream,
 )
+from scripts.intraday_opportunity_radar import CORE_LIQUID_SYMBOLS
 from scripts.market_data_provider_registry import build_provider_registry
 
 
@@ -47,6 +59,73 @@ def test_feed_provenance_never_implies_unverified_sip() -> None:
     assert requested["can_submit_orders"] is False
 
 
+def test_all_core_liquid_symbols_are_reserved_inside_broker_limit() -> None:
+    discovered = [f"S{index:03d}" for index in range(110)]
+
+    symbols = _with_core_context_symbols(discovered)
+
+    assert symbols[: len(CORE_LIQUID_SYMBOLS)] == list(CORE_LIQUID_SYMBOLS)
+    assert "TSLA" in symbols
+    assert len(symbols) == 100
+    assert len(set(symbols)) == 100
+
+
+def test_core_liquid_symbols_are_deduplicated_before_dynamic_capacity_is_filled() -> None:
+    discovered = ["tsla", "SPY", "NVDA", *[f"D{index:03d}" for index in range(100)]]
+
+    symbols = _with_core_context_symbols(discovered)
+
+    assert symbols[: len(CORE_LIQUID_SYMBOLS)] == list(CORE_LIQUID_SYMBOLS)
+    assert symbols.count("TSLA") == 1
+    assert symbols.count("SPY") == 1
+    assert len(symbols) == 100
+
+
+def test_websocket_subscription_is_capped_at_basic_plan_limit_and_keeps_core(
+    monkeypatch, tmp_path,
+) -> None:
+    stop = threading.Event()
+    sent: list[dict[str, object]] = []
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.responses = [
+                '[{"T":"success","msg":"connected"}]',
+                '[{"T":"success","msg":"authenticated"}]',
+                '[{"T":"subscription","quotes":[],"bars":[]}]',
+            ]
+
+        def recv(self) -> str:
+            response = self.responses.pop(0)
+            if not self.responses:
+                stop.set()
+            return response
+
+        def send(self, payload: str) -> None:
+            sent.append(json.loads(payload))
+
+        def close(self) -> None:
+            return None
+
+    socket = FakeWebSocket()
+    monkeypatch.setitem(sys.modules, "websocket", types.SimpleNamespace(create_connection=lambda *_args, **_kwargs: socket))
+    monkeypatch.setattr("scripts.live_opportunity_engine._load_alpaca_credentials", lambda: ("key", "secret"))
+    symbols = _with_core_context_symbols([f"S{index:03d}" for index in range(110)])
+
+    result = run_stream(
+        LiveOpportunityEngine(feed="iex"),
+        symbols,
+        report_path=tmp_path / "live.json",
+        stop_event=stop,
+    )
+
+    subscription = next(row for row in sent if row.get("action") == "subscribe")
+    assert result == 0
+    assert subscription["quotes"] == symbols[:30]
+    assert subscription["bars"] == symbols[:30]
+    assert list(CORE_LIQUID_SYMBOLS) == symbols[: len(CORE_LIQUID_SYMBOLS)]
+
+
 def test_hourly_context_is_anchored_to_rth_and_excludes_extended_hours() -> None:
     rows = [
         {"t": "2026-08-21T13:00:00Z", "o": 99.0, "h": 100.0, "l": 98.0, "c": 99.5, "v": 10},  # 08:00 ET
@@ -61,6 +140,29 @@ def test_hourly_context_is_anchored_to_rth_and_excludes_extended_hours() -> None
     assert len(hourly) == 2
     assert hourly[0] == {"t": "2026-08-21T14:30:00Z", "o": 100.0, "h": 102.0, "l": 99.5, "c": 101.5, "v": 50.0}
     assert hourly[1] == {"t": "2026-08-21T15:30:00Z", "o": 101.5, "h": 103.0, "l": 101.0, "c": 102.5, "v": 40.0}
+
+
+def test_four_hour_context_uses_only_eight_completed_rth_thirty_minute_bars() -> None:
+    start = datetime(2026, 8, 21, 13, 30, tzinfo=timezone.utc)
+    rows = [
+        {
+            "t": (start + timedelta(minutes=30 * index)).isoformat().replace("+00:00", "Z"),
+            "o": 100.0 + index,
+            "h": 101.0 + index,
+            "l": 99.0 + index,
+            "c": 100.5 + index,
+            "v": 10,
+        }
+        for index in range(10)
+    ]
+
+    four_hour = _aggregate_rth_four_hour(rows)
+
+    assert len(four_hour) == 1
+    assert four_hour[0]["t"] == "2026-08-21T13:30:00Z"
+    assert four_hour[0]["h"] == 108.0
+    assert four_hour[0]["l"] == 99.0
+    assert four_hour[0]["v"] == 80.0
 
 
 def test_daily_and_weekly_context_excludes_current_incomplete_periods() -> None:
@@ -186,6 +288,133 @@ def test_stale_quote_forces_stand_aside_even_when_structure_is_strong() -> None:
     assert any("stale_quote" in row["blockers"] for row in report["candidates"])
 
 
+def test_fresh_market_risk_stand_aside_is_a_hard_veto_with_provenance() -> None:
+    now = datetime(2026, 8, 24, 19, 55, tzinfo=timezone.utc)
+    report = {
+        "generated_at": "2026-08-24T19:54:04Z",
+        "provider": "market_catalyst_calendar",
+        "today": {
+            "date": "2026-08-24",
+            "max_impact": "high",
+            "allowed_playbooks": ["stand_aside"],
+            "vetoes": ["dynamic_geopolitical_risk"],
+            "dynamic_risk": {"risk_level": "high", "recommended_posture": "stand_aside"},
+        },
+    }
+
+    context = _market_risk_context(report, now=now, required=True)
+
+    assert context["status"] == "stand_aside"
+    assert context["hard_veto"] is True
+    assert context["macro_event_window"] is True
+    assert context["source_label"] == "market_catalyst_calendar"
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
+
+
+def test_stale_required_market_risk_context_fails_closed() -> None:
+    now = datetime(2026, 8, 24, 19, 55, tzinfo=timezone.utc)
+    report = {"generated_at": "2026-08-24T16:00:00Z", "today": {"date": "2026-08-24"}}
+
+    context = _market_risk_context(report, now=now, required=True)
+
+    assert context["status"] == "stale"
+    assert context["hard_veto"] is True
+    assert "market_risk_context_stale" in context["blockers"]
+
+
+def test_quote_and_completed_bar_integrity_fail_closed() -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    crossed = _quote_context({"bid": 101.0, "ask": 100.0, "bid_size": 8, "ask_size": 2, "timestamp": now.isoformat()}, now)
+    rows = _bars()
+    rows[-1] = {**rows[-1], "h": 90.0}
+
+    quality = _data_quality_context(rows, crossed, now=now)
+
+    assert crossed["market_state"] == "crossed"
+    assert crossed["bid_size"] == 8
+    assert quality["status"] == "blocked"
+    assert "crossed_quote" in quality["blockers"]
+    assert "malformed_ohlc" in quality["blockers"]
+    assert quality["execution_enabled"] is False
+
+
+def test_iex_quote_scope_is_explicitly_degraded_not_mislabeled_nbbo() -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    quote = _quote_context({"bid": 104.0, "ask": 104.02, "timestamp": now.isoformat()}, now)
+
+    quality = _data_quality_context(_bars(), quote, now=now, consolidated_quote=False)
+
+    assert quality["status"] == "degraded"
+    assert "consolidated_nbbo_unavailable" in quality["warnings"]
+    assert quality["quote_scope"] == "single_venue_iex_not_nbbo"
+
+
+def test_stale_completed_bars_block_during_regular_session() -> None:
+    now = datetime(2026, 8, 21, 15, 0, tzinfo=timezone.utc)
+    quote = _quote_context({"bid": 104.0, "ask": 104.02, "timestamp": now.isoformat()}, now)
+
+    quality = _data_quality_context(_bars(), quote, now=now)
+
+    assert quality["status"] == "blocked"
+    assert "stale_primary_bars" in quality["blockers"]
+
+
+def test_session_risk_marks_open_and_close_buffers_as_stand_aside() -> None:
+    opening = _session_risk_context(datetime(2026, 8, 24, 13, 32, tzinfo=timezone.utc))
+    normal = _session_risk_context(datetime(2026, 8, 24, 14, 30, tzinfo=timezone.utc))
+    closing = _session_risk_context(datetime(2026, 8, 24, 19, 55, tzinfo=timezone.utc))
+
+    assert opening["hard_veto"] is True
+    assert opening["phase"] == "opening_auction_buffer"
+    assert normal["hard_veto"] is False
+    assert normal["phase"] == "morning_session"
+    assert closing["hard_veto"] is True
+    assert closing["phase"] == "closing_auction_buffer"
+
+
+def test_session_risk_honors_official_2026_nyse_holiday_and_early_close() -> None:
+    holiday = _session_risk_context(datetime(2026, 11, 26, 16, 0, tzinfo=timezone.utc))
+    early_close_buffer = _session_risk_context(datetime(2026, 11, 27, 17, 55, tzinfo=timezone.utc))
+
+    assert holiday["phase"] == "exchange_holiday"
+    assert holiday["hard_veto"] is True
+    assert early_close_buffer["phase"] == "closing_auction_buffer"
+    assert early_close_buffer["scheduled_close_et"] == "13:00"
+
+
+def test_engine_applies_required_market_risk_veto_to_every_candidate(tmp_path) -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    path = tmp_path / "market-risk.json"
+    path.write_text(json.dumps({
+        "generated_at": now.isoformat(),
+        "provider": "market_catalyst_calendar",
+        "today": {
+            "date": "2026-08-21",
+            "allowed_playbooks": ["stand_aside"],
+            "max_impact": "high",
+            "dynamic_risk": {"risk_level": "high", "recommended_posture": "stand_aside"},
+        },
+    }), encoding="utf-8")
+    engine = LiveOpportunityEngine(feed="iex", risk_report_path=path)
+    engine.seed_symbol(
+        "NVDA",
+        bars=_bars(),
+        quote={"bid": 104.55, "ask": 104.57, "timestamp": now.isoformat()},
+        average_dollar_volume=4_000_000_000,
+        catalyst={"headline": "NVDA raises revenue outlook", "source": "sec", "freshness": "live"},
+        benchmark_return=0.002,
+        sector_return=0.004,
+        previous_close=100.0,
+    )
+
+    report = engine.snapshot(now=now)
+
+    assert report["market_risk_context"]["hard_veto"] is True
+    assert report["ready_count"] == 0
+    assert all("market_risk_stand_aside" in row["blockers"] for row in report["candidates"])
+
+
 def test_all_preregistered_setup_families_are_declared_and_frozen() -> None:
     assert SETUP_FAMILIES == (
         "catalyst_continuation",
@@ -254,6 +483,25 @@ def test_live_engine_can_refresh_higher_timeframe_context_without_reseeding_symb
     state = engine._symbols["SPY"]  # white-box assertion for the refresh contract
     assert state["higher_timeframes"]["1d"][-1]["c"] == 111.0
     assert state["higher_timeframes_refreshed_at"] == "2026-08-21T15:00:00Z"
+
+
+def test_live_engine_supplies_spy_qqq_smt_proxy_to_watchlist() -> None:
+    engine = LiveOpportunityEngine(feed="iex")
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    qqq = _bars()
+    spy = _bars()
+    qqq[-1]["h"] = max(float(row["h"]) for row in qqq[:-1]) + 1.0
+    spy[-1]["h"] = max(float(row["h"]) for row in spy[:-1]) - 0.05
+    engine.seed_symbol("QQQ", bars=qqq, quote={"bid": 104.5, "ask": 104.52, "timestamp": now.isoformat()})
+    engine.seed_symbol("SPY", bars=spy, quote={"bid": 104.4, "ask": 104.42, "timestamp": now.isoformat()})
+
+    report = engine.snapshot(now=now)
+
+    qqq_watch = next(row for row in report["market_structure_watchlist"] if row["symbol"] == "QQQ")
+    assert qqq_watch["smt_divergence_context"]["peer_symbol"] == "SPY"
+    assert qqq_watch["smt_divergence_context"]["status"] == "divergence_observed"
+    assert qqq_watch["smt_divergence_context"]["score_effect"] == "none_until_local_validation"
+    assert qqq_watch["clc_entry_context"]["can_submit_orders"] is False
 
 
 def test_scheduled_fallback_never_reuses_plus_minus_grades_as_canonical() -> None:

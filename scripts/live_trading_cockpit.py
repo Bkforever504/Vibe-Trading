@@ -314,6 +314,88 @@ def _decision_state(
     }
 
 
+def _entry_timing_contract(
+    row: dict[str, Any],
+    decision: dict[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Explain the earliest legitimate review time without predicting a fill."""
+    entry = _number(row.get("entry"))
+    stop = _number(row.get("stop"))
+    target = _number(row.get("target"))
+    direction = _direction_family(row.get("direction"))
+    actionability = _text(decision.get("actionability"), "research_only")
+    evidence = _dict(row.get("evidence"))
+    confirmation = _dict(evidence.get("price_action_confirmation"))
+    bar_at = _parse_time(confirmation.get("bar_completed_at") or row.get("generated_at"))
+
+    timeframe = "scheduled" if row.get("asset_class") == "future" else "5m"
+    earliest: datetime | None = None
+    eta_minutes: float | None = None
+    if actionability == "shadow_ready":
+        status = "revalidate_now"
+        earliest = now
+    elif actionability == "wait" and timeframe == "5m":
+        status = "awaiting_completed_bar"
+        interval = timedelta(minutes=5)
+        earliest = (bar_at + interval) if bar_at else now.replace(second=0, microsecond=0)
+        if bar_at is None and now.second:
+            earliest += timedelta(minutes=1)
+        while earliest < now:
+            earliest += interval
+    elif actionability == "late_no_chase":
+        status = "no_chase"
+    elif actionability == "invalid":
+        status = "invalidated"
+    elif decision.get("lifecycle") == "blocked" or row.get("blockers"):
+        status = "blocked"
+    else:
+        status = "incomplete_plan"
+    if earliest is not None:
+        eta_minutes = round(max(0.0, (earliest - now).total_seconds() / 60.0), 1)
+
+    if entry is None or stop is None:
+        confirmation_required = "No entry until the source supplies a mechanical trigger and invalidation."
+    elif actionability == "shadow_ready":
+        confirmation_required = (
+            f"The completed-bar trigger at {entry:g} is confirmed; revalidate the live quote, spread, "
+            f"remaining reward, and invalidation at {stop:g} before any manual decision."
+        )
+    elif direction == "bearish":
+        confirmation_required = (
+            f"Wait for a completed {timeframe} close below {entry:g}, then a hold or rejection that does not cross {stop:g}."
+        )
+    else:
+        confirmation_required = (
+            f"Wait for a completed {timeframe} close beyond {entry:g}, then a hold or retest that does not cross {stop:g}."
+        )
+
+    reasons = [str(item) for item in _list(row.get("reasons")) if str(item).strip()]
+    why = reasons[:3] or ["Mechanical setup geometry is present; confirmation and quality gates determine entry timing."]
+    return {
+        "status": status,
+        "confirmation_timeframe": timeframe,
+        "earliest_review_at": earliest.isoformat().replace("+00:00", "Z") if earliest else None,
+        "eta_minutes": eta_minutes,
+        "eta_definition": "Earliest legitimate recheck, not a predicted fill time or guarantee.",
+        "entry_trigger": entry,
+        "entry_zone": {
+            "status": "exact_source_trigger" if entry is not None else "unavailable",
+            "low": entry,
+            "high": entry,
+            "instruction": "No tolerance band is inferred; use the source trigger and revalidate the live quote.",
+        },
+        "invalidation": stop,
+        "target": target,
+        "confirmation_required": confirmation_required,
+        "why": why,
+        "cancel_if": [str(item) for item in _list(row.get("blockers"))] + ([f"price_crosses_invalidation_{stop:g}"] if stop is not None else []),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def _factor(score: Any, reason: str, *, available: bool = True) -> dict[str, Any]:
     value = _clamp(score) if available else None
     return {
@@ -942,6 +1024,23 @@ def _intraday_candidate(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _precision_watch_with_entry_timing(row: dict[str, Any], *, now: datetime) -> dict[str, Any]:
+    """Preserve radar evidence while adding the dashboard entry-timing contract."""
+    candidate = _intraday_candidate(row)
+    decision = _decision_state(
+        candidate,
+        current_price=_number(row.get("price")),
+        contract_ready=False,
+    )
+    timing = _entry_timing_contract(candidate, decision, now=now)
+    return {
+        **row,
+        "entry_timing": timing,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def _live_opportunity_candidate(row: dict[str, Any]) -> dict[str, Any]:
     targets = [_dict(item) for item in _list(row.get("targets"))]
     target = _number(targets[0].get("price")) if targets else None
@@ -1295,6 +1394,16 @@ def _enrich_candidate(
     decision = _decision_state(row, current_price=current_price, contract_ready=contract is not None)
     if decision["actionability"] == "shadow_ready":
         blockers = [item for item in blockers if item != "strategy_confirmation_and_revalidation_required"]
+        if blockers:
+            decision.update(
+                {
+                    "lifecycle": "blocked",
+                    "actionability": "research_only",
+                    "next_action": "Stand aside. Confirmed geometry still fails one or more hard quality gates.",
+                    "timing_score": 20.0,
+                    "execution_score": min(float(decision["execution_score"]), 25.0),
+                }
+            )
     if decision["actionability"] == "late_no_chase":
         blockers.append("minimum_remaining_reward_not_met")
     if decision["actionability"] == "invalid":
@@ -1303,7 +1412,7 @@ def _enrich_candidate(
         score * 0.55 + float(decision["timing_score"]) * 0.25 + float(decision["execution_score"]) * 0.20,
         1,
     )
-    decision_caps = {"armed": 84.0, "too_late": 49.0, "invalid": 20.0, "research_only": 59.0}
+    decision_caps = {"armed": 84.0, "blocked": 39.0, "too_late": 49.0, "invalid": 20.0, "research_only": 59.0}
     decision_score = min(decision_score, decision_caps.get(str(decision["lifecycle"]), 100.0))
     if contract:
         display_instrument = contract["symbol"]
@@ -1316,6 +1425,7 @@ def _enrich_candidate(
     else:
         display_instrument = symbol
 
+    entry_timing = _entry_timing_contract({**row, "blockers": blockers}, decision, now=now)
     plan = {
         "instrument": display_instrument,
         "contract": contract,
@@ -1327,6 +1437,7 @@ def _enrich_candidate(
         "reward_risk": _number(row.get("reward_risk")),
         "time_window": "18:00 ET to 09:30 ET" if row.get("source") == "mes_reopen_holdout" else "regular session; revalidate immediately before entry",
         "risk_note": "Defined by stop/invalidation; position size is intentionally not inferred" if stop is not None else "No executable risk amount until trigger and contract are confirmed",
+        "entry_timing": entry_timing,
     }
     row = {**row}
     row["blockers"] = sorted(set(blockers))
@@ -1429,6 +1540,7 @@ def _command_card(
             "evidence_fresh": False,
             "evidence_age_seconds": None,
             "plan_id": None,
+            "entry_timing": None,
             "execution_enabled": False,
             "can_submit_orders": False,
         }
@@ -1485,6 +1597,7 @@ def _command_card(
         "evidence_fresh": evidence_fresh,
         "evidence_age_seconds": round(evidence_age_seconds, 1) if evidence_age_seconds is not None else None,
         "plan_id": row.get("plan_id"),
+        "entry_timing": _dict(plan.get("entry_timing")) or None,
         "execution_enabled": False,
         "can_submit_orders": False,
     }
@@ -1867,7 +1980,11 @@ def build_cockpit(
             "coverage": _dict(intraday.get("coverage")),
             "health": intraday.get("operational_health"),
             "session_status": intraday.get("session_status"),
-            "top_precision_watches": _list(intraday.get("precision_watch"))[:8],
+            "top_precision_watches": [
+                _precision_watch_with_entry_timing(row, now=now)
+                for row in _list(intraday.get("precision_watch"))[:8]
+                if isinstance(row, dict)
+            ],
             "move_coverage": _dict(reports["move_coverage"].get("summary")),
             "scorecard_rolling": reports["detection_scorecard"],
             "cisd_promotion_status": reports["cisd_promotion"],
@@ -1895,6 +2012,9 @@ def build_cockpit(
             "feed": _dict(live_opportunities.get("feed")),
             "providers": _dict(live_opportunities.get("providers")),
             "validation": _dict(live_opportunities.get("validation")),
+            "market_risk_context": _dict(live_opportunities.get("market_risk_context")),
+            "session_risk_context": _dict(live_opportunities.get("session_risk_context")),
+            "data_quality_summary": _dict(live_opportunities.get("data_quality_summary")),
             "top_candidates": _list(live_opportunities.get("top_candidates"))[:3],
             "market_structure_patterns": _list(live_opportunities.get("market_structure_patterns")),
             "market_structure_watchlist": _list(live_opportunities.get("market_structure_watchlist"))[:24],

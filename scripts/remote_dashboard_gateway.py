@@ -16,6 +16,7 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, unquote, urlsplit
 from urllib.request import Request, urlopen
@@ -45,12 +46,29 @@ def _is_allowed_api_path(path: str) -> bool:
     return path in ALLOWED_API_PATHS or path.startswith(ALLOWED_API_PREFIX)
 
 
+def _trusted_tailscale_identity(
+    headers: Mapping[str, str], client_address: tuple[str, int], *, enabled: bool
+) -> bool:
+    """Trust Serve identity only through this explicitly enabled loopback seam.
+
+    Tailscale Serve strips spoofed identity headers before adding its own. The
+    loopback and ts.net checks prevent this opt-in from becoming a general
+    header-based bypass if the gateway is ever rebound to another interface.
+    """
+    if not enabled or client_address[0] not in {"127.0.0.1", "::1"}:
+        return False
+    host = str(headers.get("Host") or "").split(":", 1)[0].rstrip(".").lower()
+    identity = str(headers.get("Tailscale-User-Login") or "").strip()
+    return bool(identity) and host.endswith(".ts.net")
+
+
 class GatewayConfig:
-    def __init__(self, *, frontend: Path, backend: str, api_key_file: Path, token: str) -> None:
+    def __init__(self, *, frontend: Path, backend: str, api_key_file: Path, token: str, trust_tailscale_identity: bool = False) -> None:
         self.frontend = frontend.resolve()
         self.backend = backend.rstrip("/")
         self.api_key_file = api_key_file.resolve()
         self.token = token
+        self.trust_tailscale_identity = trust_tailscale_identity
 
     def api_key(self) -> str:
         return self.api_key_file.read_text(encoding="ascii").strip()
@@ -85,7 +103,12 @@ class ReadOnlyDashboardHandler(BaseHTTPRequestHandler):
 
     def _authorized(self) -> bool:
         supplied = self._cookie_token()
-        return bool(supplied) and hmac.compare_digest(supplied, self.config.token)
+        cookie_authorized = bool(supplied) and hmac.compare_digest(supplied, self.config.token)
+        return cookie_authorized or _trusted_tailscale_identity(
+            self.headers,
+            self.client_address,
+            enabled=self.config.trust_tailscale_identity,
+        )
 
     def _pair_or_reject(self, parsed) -> bool:
         query_token = parse_qs(parsed.query).get("token", [""])[0]
@@ -215,6 +238,11 @@ def main() -> None:
     parser.add_argument("--api-key-file", type=Path, required=True)
     parser.add_argument("--token", default=os.getenv("REMOTE_DASHBOARD_TOKEN", ""))
     parser.add_argument("--token-file", type=Path)
+    parser.add_argument(
+        "--trust-tailscale-identity",
+        action="store_true",
+        help="Accept Tailscale Serve identity headers only through the loopback ts.net proxy seam.",
+    )
     args = parser.parse_args()
     token = args.token
     if args.token_file:
@@ -233,6 +261,7 @@ def main() -> None:
         backend=args.backend,
         api_key_file=args.api_key_file,
         token=token,
+        trust_tailscale_identity=args.trust_tailscale_identity,
     )
     handler = type("ConfiguredReadOnlyDashboardHandler", (ReadOnlyDashboardHandler,), {"config": config})
     server = DashboardHTTPServer((args.host, args.port), handler)

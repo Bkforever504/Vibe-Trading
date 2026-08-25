@@ -30,6 +30,9 @@ export function LiveOpportunityPanel({
   const timeframeCoverage = bestStructure?.timeframe_coverage;
   const canonicalGrade = bestStructure?.pattern_grade;
   const modelSequence = bestStructure?.best_setup?.model_sequence;
+  const marketRisk = report?.market_risk_context;
+  const sessionRisk = report?.session_risk_context;
+  const dataQuality = report?.data_quality_summary;
   const consequentEncroachment = modelSequence?.bonus_confluences.consequent_encroachment;
   const completedModelStages = modelSequence?.stages.filter((stage) => stage.status === "complete").length ?? 0;
   const gradeComponents = canonicalGrade
@@ -65,6 +68,33 @@ export function LiveOpportunityPanel({
           <span className={cn("border px-2 py-1 font-medium", report?.decision_state === "READY_TO_REVIEW" ? "border-success/30 text-success" : "border-warning/30 text-warning")}>{label(report?.decision_state ?? "STAND_ASIDE")}</span>
         </div>
       </div>
+      {(marketRisk || sessionRisk || dataQuality) ? (
+        <div className="border-b border-border bg-muted/10 px-3 py-3" aria-label="Market guardrails">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide"><ShieldCheck className="h-3.5 w-3.5" />Market guardrails</span>
+            <span className={cn("text-[10px] font-semibold uppercase tracking-wide", marketRisk?.hard_veto || sessionRisk?.hard_veto || dataQuality?.status === "blocked" ? "text-danger" : dataQuality?.status === "degraded" ? "text-warning" : "text-success")}>fail-closed entry gate</span>
+          </div>
+          <div className="mt-2 grid gap-px bg-border sm:grid-cols-3">
+            <div className="bg-card px-3 py-2.5">
+              <span className="text-[10px] uppercase text-muted-foreground">Event / macro</span>
+              <span className={cn("mt-1 block text-sm font-semibold", marketRisk?.hard_veto ? "text-danger" : "text-success")}>{label(marketRisk?.status ?? "unavailable")} · {label(marketRisk?.max_impact ?? "unknown")} impact</span>
+              <span className="mt-1 block text-xs text-muted-foreground">{marketRisk?.blockers.length ? marketRisk.blockers.map(label).join(" · ") : "No active sourced event veto."}</span>
+            </div>
+            <div className="bg-card px-3 py-2.5">
+              <span className="text-[10px] uppercase text-muted-foreground">Session phase</span>
+              <span className={cn("mt-1 block text-sm font-semibold", sessionRisk?.hard_veto ? "text-danger" : "text-success")}>{label(sessionRisk?.phase ?? "unavailable")}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">{sessionRisk?.hard_veto ? "No new entry in this phase." : "Timing gate open; setup confirmation still required."}</span>
+            </div>
+            <div className="bg-card px-3 py-2.5">
+              <span className="text-[10px] uppercase text-muted-foreground">Data integrity</span>
+              <span className={cn("mt-1 block text-sm font-semibold", dataQuality?.status === "blocked" ? "text-danger" : dataQuality?.status === "degraded" ? "text-warning" : "text-success")}>{label(dataQuality?.status ?? "unavailable")}</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {dataQuality ? `${dataQuality.blocked_symbols.length} blocked · ${dataQuality.degraded_symbols.length} degraded symbol${dataQuality.degraded_symbols.length === 1 ? "" : "s"}` : "Quote/bar checks unavailable."}
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {bestStructure ? (
         <>
         <div className="grid gap-px bg-border lg:grid-cols-3">
@@ -107,7 +137,7 @@ export function LiveOpportunityPanel({
               ))}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              1m refines execution only; 5m triggers; 15m/30m confirm; 60m and daily define structure/regime; weekly is major-context advisory.
+              1m refines execution only; 5m triggers; 15m/30m confirm; 60m/4H define structure; daily defines regime; weekly is major-context advisory.
             </p>
           </div>
         ) : null}
@@ -139,6 +169,8 @@ export function LiveOpportunityPanel({
           macro={bestStructure.macro_context}
           strat={bestStructure.strat_context}
           balanceRange={bestStructure.ny_0800_0900_range_context}
+          clc={bestStructure.clc_entry_context}
+          smt={bestStructure.smt_divergence_context}
         />
         {canonicalGrade ? (
           <div className="border-b border-border bg-card px-3 py-3">

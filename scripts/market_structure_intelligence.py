@@ -67,6 +67,7 @@ APLUS_TIMEFRAME_MATRIX: tuple[dict[str, Any], ...] = (
     {"timeframe": "15m", "role": "trigger_confirmation", "minimum_bars": 8, "required_for_aplus": True},
     {"timeframe": "30m", "role": "session_state", "minimum_bars": 4, "required_for_aplus": True},
     {"timeframe": "60m", "role": "structure_bias", "minimum_bars": 4, "required_for_aplus": True},
+    {"timeframe": "4h", "role": "higher_timeframe_bias", "minimum_bars": 8, "required_for_aplus": False},
     {"timeframe": "1d", "role": "daily_regime", "minimum_bars": 20, "required_for_aplus": True},
     {"timeframe": "1w", "role": "major_structure", "minimum_bars": 8, "required_for_aplus": False},
 )
@@ -80,6 +81,7 @@ TIMEFRAME_MAX_LAG_MINUTES: dict[str, int] = {
     "15m": 35,
     "30m": 65,
     "60m": 125,
+    "4h": 2 * 24 * 60,
     "1d": 4 * 24 * 60,
     "1w": 14 * 24 * 60,
 }
@@ -221,6 +223,8 @@ def _canonical_timeframe(value: str) -> str:
         "30min": "30m",
         "1h": "60m",
         "60min": "60m",
+        "4hour": "4h",
+        "240min": "4h",
         "1day": "1d",
         "day": "1d",
         "1week": "1w",
@@ -333,7 +337,7 @@ def _timeframe_scan(
     frames, provenance = _timeframe_rows(rows, higher_timeframes)
     roles = {str(row["timeframe"]): str(row["role"]) for row in APLUS_TIMEFRAME_MATRIX}
     output: list[dict[str, Any]] = []
-    for timeframe in ("5m", "15m", "30m", "60m", "1d", "1w", "1m"):
+    for timeframe in ("5m", "15m", "30m", "60m", "4h", "1d", "1w", "1m"):
         frame_rows = frames.get(timeframe) or []
         if not frame_rows:
             continue
@@ -505,6 +509,47 @@ def _derive_liquidity_levels(
                 _level("pwl", "PWL", min(float(row["l"]) for row in week_rows), "sell_side", "completed_prior_week_60m"),
             ])
 
+    daily_rows = _normalize(supplied.get("1d") or supplied.get("1Day") or [])
+    if daily_rows:
+        prior_close = float(daily_rows[-1]["c"])
+        levels.append(
+            _level(
+                "prior_close",
+                "Prior close",
+                prior_close,
+                "buy_side" if prior_close >= float(rows[-1]["c"]) else "sell_side",
+                "latest_completed_daily_close",
+            )
+        )
+
+    same_session = [
+        row for row in rows
+        if (stamp := _timestamp(row.get("t"))) is not None
+        and stamp.astimezone(MARKET_TZ).date() == current_local.date()
+    ]
+    session_vwap = _vwap(same_session)
+    if session_vwap is not None:
+        levels.append(
+            _level(
+                "session_vwap",
+                "VWAP",
+                session_vwap,
+                "buy_side" if session_vwap >= float(rows[-1]["c"]) else "sell_side",
+                "completed_current_session_ohlcv_vwap",
+            )
+        )
+
+    premarket_rows = [
+        row for row in same_session
+        if (stamp := _timestamp(row.get("t"))) is not None
+        and wall_time(4, 0) <= stamp.astimezone(MARKET_TZ).time() < wall_time(9, 30)
+    ]
+    if premarket_rows and current_local.time() >= wall_time(9, 30):
+        levels.extend([
+            _level("pmh", "PMH", max(float(row["h"]) for row in premarket_rows), "buy_side", "completed_0400_0930_et_premarket"),
+            _level("pml", "PML", min(float(row["l"]) for row in premarket_rows), "sell_side", "completed_0400_0930_et_premarket"),
+        ])
+
     opening_rows: list[dict[str, Any]] = []
     for row in rows:
         stamp = _timestamp(row.get("t"))
@@ -519,6 +564,40 @@ def _derive_liquidity_levels(
             _level("orl", "ORL", min(float(row["l"]) for row in opening_rows), "sell_side", "completed_0930_1000_et_opening_range"),
         ])
     return levels
+
+
+def _liquidity_target_map(
+    rows: Sequence[Mapping[str, Any]], levels: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    if not rows:
+        return {"current_price": None, "nearest_upside": None, "nearest_downside": None, "dealing_range": None}
+    current = float(rows[-1]["c"])
+    upside = [level for level in levels if float(level["price"]) > current]
+    downside = [level for level in levels if float(level["price"]) < current]
+    window = list(rows[-min(24, len(rows)) :])
+    high = max(float(row["h"]) for row in window)
+    low = min(float(row["l"]) for row in window)
+    midpoint = (high + low) / 2.0
+    tolerance = max((high - low) * 0.05, abs(current) * 0.0005)
+    location = "equilibrium" if abs(current - midpoint) <= tolerance else "premium" if current > midpoint else "discount"
+
+    def compact(level: Mapping[str, Any] | None) -> dict[str, Any] | None:
+        if level is None:
+            return None
+        return {"id": level["id"], "label": level["label"], "price": level["price"], "source_label": level["source_label"]}
+
+    return {
+        "current_price": _round(current),
+        "nearest_upside": compact(min(upside, key=lambda level: float(level["price"]), default=None)),
+        "nearest_downside": compact(max(downside, key=lambda level: float(level["price"]), default=None)),
+        "dealing_range": {
+            "low": _round(low),
+            "midpoint": _round(midpoint),
+            "high": _round(high),
+            "location": location,
+            "source_label": "last_24_completed_5m_bars",
+        },
+    }
 
 
 def _session_liquidity_patterns(
@@ -589,6 +668,153 @@ def _participation_context(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "score": _round(score, 1),
         "curvature_proxy": _round(curvature, 3),
         "reason": "Signed completed-bar dollar-volume curvature; contextual proxy only, not bid/ask-classified order flow.",
+    }
+
+
+def _smt_divergence_context(
+    rows: Sequence[Mapping[str, Any]],
+    correlated_bars: Mapping[str, Sequence[Mapping[str, Any]]] | None,
+) -> dict[str, Any]:
+    """Compare completed correlated bars for asymmetric high/low sweeps.
+
+    This is deliberately named a price-divergence proxy. It is not true order
+    flow and it has no score effect until local outcomes validate it.
+    """
+    base = {
+        "method": "paired_index_completed_bar_price_divergence_v1",
+        "true_order_flow": False,
+        "score_effect": "none_until_local_validation",
+        "probability": {"status": "unavailable_pending_local_outcomes", "value": None},
+        "source_labels": ["completed_5m_correlated_price_bars", "not_true_order_flow"],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+    primary = _normalize(rows)
+    peers = [(str(symbol).upper(), _normalize(peer_rows)) for symbol, peer_rows in (correlated_bars or {}).items()]
+    peers = [(symbol, peer_rows) for symbol, peer_rows in peers if len(peer_rows) >= 8]
+    if len(primary) < 8 or not peers:
+        return {
+            **base,
+            "status": "unavailable_without_correlated_completed_bars",
+            "direction": "neutral",
+            "peer_symbol": None,
+            "divergence": None,
+            "reason": "Need at least eight completed bars for both correlated instruments.",
+        }
+    peer_symbol, peer = peers[0]
+    primary = primary[-8:]
+    peer = peer[-8:]
+    primary_high = float(primary[-1]["h"]) > max(float(row["h"]) for row in primary[:-1])
+    peer_high = float(peer[-1]["h"]) > max(float(row["h"]) for row in peer[:-1])
+    primary_low = float(primary[-1]["l"]) < min(float(row["l"]) for row in primary[:-1])
+    peer_low = float(peer[-1]["l"]) < min(float(row["l"]) for row in peer[:-1])
+    high_divergence = primary_high != peer_high
+    low_divergence = primary_low != peer_low
+    if high_divergence and low_divergence:
+        status, direction, divergence = "conflicting_divergence", "neutral", "both_high_and_low_asymmetry"
+    elif high_divergence:
+        status, direction, divergence = "divergence_observed", "bearish", "asymmetric_buy_side_sweep"
+    elif low_divergence:
+        status, direction, divergence = "divergence_observed", "bullish", "asymmetric_sell_side_sweep"
+    else:
+        status, direction, divergence = "no_divergence", "neutral", None
+    return {
+        **base,
+        "status": status,
+        "direction": direction,
+        "peer_symbol": peer_symbol,
+        "divergence": divergence,
+        "legs": {
+            "primary_took_prior_high": primary_high,
+            "peer_took_prior_high": peer_high,
+            "primary_took_prior_low": primary_low,
+            "peer_took_prior_low": peer_low,
+        },
+        "reason": (
+            "One correlated instrument swept a completed-bar extreme while the other did not."
+            if status == "divergence_observed"
+            else "No single-sided paired-index sweep is currently confirmed."
+        ),
+    }
+
+
+def _clc_entry_context(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    direction: str,
+    best: Mapping[str, Any] | None,
+    alignment: Mapping[str, Any],
+    entry_plan: Mapping[str, Any],
+    target_map: Mapping[str, Any],
+    participation: Mapping[str, Any],
+    smt: Mapping[str, Any],
+    blockers: Sequence[str],
+) -> dict[str, Any]:
+    frames = alignment.get("frames") if isinstance(alignment.get("frames"), Mapping) else {}
+    context_frames = {
+        name: str((frames.get(name) or {}).get("bias") or "unavailable")
+        for name in ("60m", "4h", "1d")
+    }
+    context_complete = all(value == direction for value in context_frames.values())
+    current = _finite(target_map.get("current_price"))
+    zone = entry_plan.get("entry_zone") if isinstance(entry_plan.get("entry_zone"), Mapping) else {}
+    zone_low, zone_high = _finite(zone.get("low")), _finite(zone.get("high"))
+    in_zone = bool(current is not None and zone_low is not None and zone_high is not None and zone_low <= current <= zone_high)
+    reference_level = _finite((best or {}).get("reference_level"))
+    location_complete = bool(in_zone or reference_level is not None)
+    trigger_complete = bool(best and best.get("trigger_state") == "confirmed")
+    quality_complete = not any(value in blockers for value in ("stale_quote", "spread_too_wide_or_missing"))
+    confirmation_complete = trigger_complete and quality_complete
+
+    if blockers:
+        status = "blocked"
+        next_required = f"Clear blocker: {str(blockers[0]).replace('_', ' ')}."
+    elif not context_complete:
+        status = "waiting_context"
+        missing = [name for name, value in context_frames.items() if value != direction]
+        next_required = f"Wait for completed {'/'.join(missing)} bias to align {direction}."
+    elif not location_complete:
+        status = "waiting_location"
+        next_required = "Wait for price to reach the objective entry zone or a sourced reference level."
+    elif not confirmation_complete:
+        status = "waiting_confirmation"
+        next_required = "Wait for the completed 5m trigger, then recheck quote freshness and spread."
+    else:
+        status = "manual_review_ready"
+        next_required = "All CLC observations are present; Kenny still decides whether to act manually."
+
+    sequence = [
+        {"step": 1, "name": "context", "status": "complete" if context_complete else "pending", "requirement": "60m, 4H, and daily completed-bar bias agree."},
+        {"step": 2, "name": "location", "status": "complete" if location_complete else "pending", "requirement": "Price is at objective trigger geometry or a sourced market level."},
+        {"step": 3, "name": "confirmation", "status": "complete" if confirmation_complete else "pending", "requirement": "Completed 5m trigger plus fresh, tradeable quote; 1m may refine but never originate."},
+    ]
+    return {
+        "status": status,
+        "direction": direction,
+        "next_required": next_required,
+        "context": {"status": "complete" if context_complete else "pending", "frames": context_frames, "reason": "Higher-timeframe bias from completed bars only."},
+        "location": {
+            "status": "complete" if location_complete else "pending",
+            "current_price": current,
+            "entry_zone": {"low": zone_low, "high": zone_high},
+            "reference_level": reference_level,
+            "dealing_range": target_map.get("dealing_range"),
+            "nearest_upside": target_map.get("nearest_upside"),
+            "nearest_downside": target_map.get("nearest_downside"),
+        },
+        "confirmation": {
+            "status": "complete" if confirmation_complete else "pending",
+            "completed_bar_trigger": trigger_complete,
+            "quote_quality": "pass" if quality_complete else "fail",
+            "participation_proxy": participation.get("status"),
+            "smt_proxy": smt.get("status"),
+            "true_order_flow": "unavailable_without_tick_or_mbo",
+            "sequence": sequence,
+        },
+        "source_labels": ["clc_completed_bar_contract_v1", "objective_level_map_v1", "paired_index_price_divergence_v1"],
+        "score_effect": "none_separate_gate_only",
+        "execution_enabled": False,
+        "can_submit_orders": False,
     }
 
 
@@ -1204,7 +1430,7 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
         evidence={"base_rate": "unavailable_insufficient_bars"},
     )
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "decision": "STAND_ASIDE",
         "grade": pattern_grade["grade"],
         "score": pattern_grade["final_score"],
@@ -1221,15 +1447,28 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
             "primary_trigger": "5m",
             "execution_refinement": "1m_optional_not_standalone",
             "confirmation": ["15m", "30m"],
-            "structure": ["60m"],
+            "structure": ["60m", "4h"],
             "regime": ["1d", "1w"],
             "coverage_status": "incomplete_for_aplus_review",
             "closed_bar_only": True,
             "execution_enabled": False,
             "can_submit_orders": False,
         },
-        "liquidity_level_context": {"status": "unavailable", "levels": [], "active_sweeps": [], "probability_status": "unavailable_pending_local_outcomes", "execution_enabled": False, "can_submit_orders": False},
+        "liquidity_level_context": {"status": "unavailable", "levels": [], "active_sweeps": [], "nearest_upside": None, "nearest_downside": None, "dealing_range": None, "probability_status": "unavailable_pending_local_outcomes", "execution_enabled": False, "can_submit_orders": False},
         "participation_context": _participation_context([]),
+        "smt_divergence_context": _smt_divergence_context([], None),
+        "clc_entry_context": {
+            "status": "blocked",
+            "direction": "neutral",
+            "next_required": f"Need at least {MIN_BARS} completed bars; received {bars}.",
+            "context": {"status": "pending", "frames": {"60m": "unavailable", "4h": "unavailable", "1d": "unavailable"}},
+            "location": {"status": "pending", "current_price": None, "entry_zone": {"low": None, "high": None}},
+            "confirmation": {"status": "pending", "completed_bar_trigger": False, "quote_quality": "fail", "true_order_flow": "unavailable_without_tick_or_mbo", "sequence": []},
+            "source_labels": ["clc_completed_bar_contract_v1"],
+            "score_effect": "none_separate_gate_only",
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
         "macro_context": _macro_context([]),
         "strat_context": _strat_context([], None, []),
         "ny_0800_0900_range_context": _ny_0800_0900_range_context([], []),
@@ -1255,6 +1494,7 @@ def analyze_market_structure(
     average_dollar_volume: float | None = None,
     direction_hint: str | None = None,
     higher_timeframes: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
+    correlated_bars: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     macro_event_window: bool = False,
 ) -> dict[str, Any]:
     """Recognize, grade, and plan a completed-bar setup without execution rights."""
@@ -1272,6 +1512,7 @@ def analyze_market_structure(
     positive.extend(_sweep_pattern(rows, atr))
     positive.extend(_cbc_patterns(rows))
     liquidity_levels = _derive_liquidity_levels(rows, higher_timeframes)
+    target_map = _liquidity_target_map(rows, liquidity_levels)
     liquidity_patterns = _session_liquidity_patterns(rows, liquidity_levels, atr)
     positive.extend(liquidity_patterns)
     cisd_patterns = detect_cisd_universal_model(rows, higher_timeframes=higher_timeframes)
@@ -1287,6 +1528,8 @@ def analyze_market_structure(
     alignment = _timeframe_alignment(rows, direction, higher_timeframes)
     timeframe_coverage = _timeframe_coverage(rows, higher_timeframes)
     timeframe_scan = _timeframe_scan(rows, higher_timeframes)
+    participation = _participation_context(rows)
+    smt_context = _smt_divergence_context(rows, correlated_bars)
 
     matching = [row for row in positive if row["direction"] == direction] if direction != "neutral" else positive
     best = max(matching or positive, key=lambda row: (row["trigger_state"] == "confirmed", float(row["confidence_score"])), default=None)
@@ -1413,11 +1656,23 @@ def analyze_market_structure(
         entry_plan = {"status": "unavailable", "timeframe": "5m", "trigger": None, "entry_zone": {"low": None, "high": None}, "invalidation": None, "risk_per_share": None, "instruction": "Wait for a pattern with objective trigger and invalidation geometry."}
         exit_plan = {"status": "unavailable", "targets": [], "time_stop_bars": None, "time_stop": None, "management": "No valid entry geometry; stand aside."}
 
+    clc_context = _clc_entry_context(
+        rows=rows,
+        direction=direction,
+        best=best,
+        alignment=alignment,
+        entry_plan=entry_plan,
+        target_map=target_map,
+        participation=participation,
+        smt=smt_context,
+        blockers=blockers,
+    )
+
     regime = "trend" if trend["bias"] != "neutral" else "range_or_transition"
     if any(row["pattern_id"] in {"midrange_chop", "broadening_instability"} for row in negatives):
         regime = "chop_or_instability"
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "decision": decision,
         "grade": pattern_grade["grade"],
         "score": score,
@@ -1436,7 +1691,7 @@ def analyze_market_structure(
             "primary_trigger": "5m",
             "execution_refinement": "1m_optional_not_standalone",
             "confirmation": ["15m", "30m"],
-            "structure": ["60m"],
+            "structure": ["60m", "4h"],
             "regime": ["1d", "1w"],
             "coverage_status": timeframe_coverage["status"],
             "closed_bar_only": True,
@@ -1450,11 +1705,16 @@ def analyze_market_structure(
                 {"level_id": row["level_id"], "level_label": row["level_label"], "direction": row["direction"], "status": "confirmed_reclaim"}
                 for row in liquidity_patterns
             ],
+            "nearest_upside": target_map["nearest_upside"],
+            "nearest_downside": target_map["nearest_downside"],
+            "dealing_range": target_map["dealing_range"],
             "probability_status": "unavailable_pending_local_outcomes",
             "execution_enabled": False,
             "can_submit_orders": False,
         },
-        "participation_context": _participation_context(rows),
+        "participation_context": participation,
+        "smt_divergence_context": smt_context,
+        "clc_entry_context": clc_context,
         "macro_context": _macro_context(rows),
         "strat_context": _strat_context(rows, higher_timeframes, liquidity_levels),
         "ny_0800_0900_range_context": _ny_0800_0900_range_context(rows, cisd_patterns),
@@ -1476,7 +1736,7 @@ def analyze_market_structure(
         "freshness": freshness,
         "source_labels": list(dict.fromkeys([
             "completed_5m_bars",
-            *[f"completed_{name}_bars" for name in ("15m", "30m", "60m", "1d", "1w") if name in alignment["frames"]],
+            *[f"completed_{name}_bars" for name in ("15m", "30m", "60m", "4h", "1d", "1w") if name in alignment["frames"]],
             "latest_quote",
             "pattern_grade_v1",
             "aplus_timeframe_matrix_v1",
@@ -1486,6 +1746,9 @@ def analyze_market_structure(
             "ohlcv_participation_curvature_proxy_v1",
             "completed_ohlcv_strat_scenarios_v1",
             "completed_0800_0900_et_bars",
+            "clc_completed_bar_contract_v1",
+            "objective_level_map_v1",
+            "paired_index_price_divergence_v1",
         ])),
         "bar_count": len(rows),
         "closed_bar_only": True,

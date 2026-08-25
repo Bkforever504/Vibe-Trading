@@ -215,4 +215,66 @@ describe('TradingCockpit', () => {
     expect(screen.getByText(/conditional probability first/i)).toBeInTheDocument()
     expect(screen.getByText(/1 probability-qualified now/i)).toBeInTheDocument()
   })
+
+  it('shows today\'s strongest audited moves separately from actionable setups', async () => {
+    mocks.getTradingDashboard.mockResolvedValue({
+      ...dashboard,
+      headline: {
+        state: 'no_eligible_setup',
+        message: 'No setup is timely and confirmed now.',
+        best_setup: null,
+      },
+      discovery: {
+        coverage: { unique_symbols_discovered: 484, precision_watch_count: 2 },
+        health: 'ok',
+        session_status: 'regular_session',
+        top_precision_watches: [
+          {
+            symbol: 'BMNR',
+            score: 81.1,
+            grade: 'A-',
+            direction: 'bullish',
+            change_pct: 8.437,
+            volume_pace_rvol_proxy: 4.561,
+            setup: 'opening_range_breakout',
+            state: 'precision_watch',
+            catalyst_available: true,
+            price_action_confirmation: { state: 'waiting', pattern: 'no_closed_bar_confirmation' },
+            trade_levels: { confirmation_trigger: 24.9, invalidation: 24.72, target_2r: 25.26 },
+            blockers: ['strategy_confirmation_and_revalidation_required'],
+            entry_timing: {
+              status: 'awaiting_completed_bar',
+              confirmation_timeframe: '5m',
+              earliest_review_at: '2026-08-19T14:05:00Z',
+              eta_minutes: 5,
+              eta_definition: 'Earliest legitimate recheck, not a predicted fill time or guarantee.',
+              entry_trigger: 24.9,
+              entry_zone: { status: 'exact_source_trigger', low: 24.9, high: 24.9, instruction: 'Use the exact source trigger.' },
+              invalidation: 24.72,
+              target: 25.26,
+              confirmation_required: 'Wait for a completed 5m close beyond 24.9, then a hold or retest that does not cross 24.72.',
+              why: ['change=8.437%'],
+              cancel_if: ['strategy_confirmation_and_revalidation_required'],
+              execution_enabled: false,
+              can_submit_orders: false,
+            },
+          },
+        ],
+        move_coverage: { movers_audited: 100, classification_counts: { detected_early: 4, detected_late: 49, missed: 0 }, radar_snapshots_reviewed: 24 },
+        execution_enabled: false,
+        can_submit_orders: false,
+      },
+    })
+
+    render(<TradingCockpit />)
+
+    expect(await screen.findByText(/strongest market moves observed today/i)).toBeInTheDocument()
+    expect(screen.getByText(/BMNR.*bullish/i)).toBeInTheDocument()
+    expect(screen.getByText('+8.44%')).toBeInTheDocument()
+    expect(screen.getByText('4.56×')).toBeInTheDocument()
+    expect(screen.getByText(/Next 5m close/i)).toBeInTheDocument()
+    expect(screen.getByText(/completed 5m close beyond 24.9/i)).toBeInTheDocument()
+    expect(screen.getByText(/trigger 24.9.*invalid 24.72.*T2 25.26/i)).toBeInTheDocument()
+    expect(screen.getByText(/change=8.437%/i)).toBeInTheDocument()
+  })
 })

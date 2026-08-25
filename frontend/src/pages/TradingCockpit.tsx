@@ -19,7 +19,7 @@ import {
   Pin,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, type LiveOpportunityReport, type SimplePriceActionSignal, type TradingCandidate, type TradingDashboard, type TradingSource } from "@/lib/api";
+import { api, type LiveOpportunityReport, type SimplePriceActionSignal, type TradingCandidate, type TradingDashboard, type TradingEntryTiming, type TradingPrecisionWatch, type TradingSource } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Skeleton, SkeletonMetrics } from "@/components/common/Skeleton";
@@ -87,6 +87,22 @@ function age(seconds: number | null): string {
   return `${Math.round(seconds / 86400)}d ago`;
 }
 
+function entryEta(timing?: TradingEntryTiming | null): string {
+  if (!timing) return "ETA unavailable until a complete plan exists";
+  if (timing.status === "revalidate_now") return "Now — revalidate the live quote and every gate";
+  if (timing.status === "awaiting_completed_bar") {
+    const clock = timing.earliest_review_at
+      ? new Date(timing.earliest_review_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : "next bar close";
+    const minutes = timing.eta_minutes == null ? "" : timing.eta_minutes <= 0 ? "now" : `~${number(timing.eta_minutes, 0)} min`;
+    return `Next ${timing.confirmation_timeframe} close · ${clock}${minutes ? ` · ${minutes}` : ""}`;
+  }
+  if (timing.status === "no_chase") return "No entry ETA — the move is already too extended";
+  if (timing.status === "invalidated") return "No entry ETA — the setup is invalidated";
+  if (timing.status === "blocked") return "No entry ETA — a hard quality gate is blocking it";
+  return "ETA unavailable until a complete plan exists";
+}
+
 function tone(value: string): string {
   const normalized = value.toLowerCase();
   if (["ready", "live", "ok", "normal", "qualified_long", "paper_ready", "shadow_ready", "confirmed"].some((item) => normalized.includes(item))) {
@@ -149,9 +165,61 @@ function SimpleSignalBoard({ signals }: { signals: SimplePriceActionSignal[] }) 
             <div className="flex min-w-0 items-center gap-2"><SignalDot color={signal.color} /><div><div className="font-semibold">{signal.symbol} · {signal.direction}</div><div className="text-xs text-muted-foreground">{signal.grade} · {number(signal.score, 0)}/100</div></div></div>
             <div className={cn("text-xs font-bold", signal.color === "GREEN" ? "text-success" : signal.color === "RED" ? "text-danger" : "text-warning")}>{signal.state}</div>
             <div className="grid grid-cols-3 gap-3 text-xs tabular-nums"><div><div className="text-[10px] uppercase text-muted-foreground">Trigger</div><div className="mt-1 font-semibold">{signal.trigger ?? "--"}</div></div><div><div className="text-[10px] uppercase text-muted-foreground">Stop</div><div className="mt-1 font-semibold">{signal.stop ?? "--"}</div></div><div><div className="text-[10px] uppercase text-muted-foreground">Target</div><div className="mt-1 font-semibold">{signal.target ?? "--"}</div></div></div>
-            <div className="min-w-0 text-xs"><div className="font-semibold">{label(signal.decisive_reason)}</div><div className="mt-1 text-muted-foreground">{signal.action}</div></div>
+            <div className="min-w-0 text-xs">
+              <div className="font-semibold">{label(signal.decisive_reason)}</div>
+              <div className="mt-1 font-medium text-warning">Entry ETA: {signal.state === "CONFIRMED" ? "now — revalidate quote and gates" : signal.state === "WAIT" ? "next completed 5m close" : "none — signal invalid"}</div>
+              <div className="mt-1 text-muted-foreground">{signal.action}</div>
+            </div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function ObservedMovesPanel({ moves, onOpenChart }: { moves: TradingPrecisionWatch[]; onOpenChart: (symbol: string) => void }) {
+  if (!moves.length) {
+    return (
+      <section className="border-y border-border px-3 py-4 text-sm text-muted-foreground">
+        No precision-grade market move is available from the latest audited snapshot.
+      </section>
+    );
+  }
+  return (
+    <section className="border-y border-border bg-card" aria-label="Strongest market moves observed today">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-3 py-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" />Strongest market moves observed today</div>
+          <p className="mt-1 text-xs text-muted-foreground">Audited movers ranked by liquidity, volume pace, structure, catalyst, and discovery breadth. Observation is not entry permission.</p>
+        </div>
+        <StatusPill>read only</StatusPill>
+      </div>
+      <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-4">
+        {moves.slice(0, 4).map((move) => {
+          const timing = move.entry_timing;
+          return (
+            <button key={move.symbol} type="button" onClick={() => onOpenChart(move.symbol)} className="bg-card p-3 text-left hover:bg-muted/30">
+              <div className="flex items-start justify-between gap-2">
+                <div><div className="font-bold">{move.symbol} · {label(move.direction)}</div><div className="mt-0.5 text-xs text-muted-foreground">{label(move.setup)}</div></div>
+                <GradeBadge grade={move.grade} score={move.score} />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm tabular-nums">
+                <div><div className="text-[10px] uppercase text-muted-foreground">Session move</div><div className={cn("mt-1 font-bold", Number(move.change_pct ?? 0) >= 0 ? "text-success" : "text-danger")}>{move.change_pct == null ? "--" : `${move.change_pct >= 0 ? "+" : ""}${number(move.change_pct, 2)}%`}</div></div>
+                <div><div className="text-[10px] uppercase text-muted-foreground">Volume pace</div><div className="mt-1 font-bold">{move.volume_pace_rvol_proxy == null ? "--" : `${number(move.volume_pace_rvol_proxy, 2)}×`}</div></div>
+              </div>
+              <div className="mt-3 border-l-2 border-warning pl-2">
+                <div className="text-[10px] font-semibold uppercase text-muted-foreground">Entry ETA</div>
+                <div className="mt-0.5 text-xs font-semibold text-warning">{entryEta(timing)}</div>
+              </div>
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                <span className="font-semibold text-foreground">Where:</span> trigger {timing?.entry_trigger ?? move.trade_levels?.confirmation_trigger ?? "--"} · invalid {timing?.invalidation ?? move.trade_levels?.invalidation ?? "--"} · T2 {timing?.target ?? move.trade_levels?.target_2r ?? "--"}
+              </div>
+              <div className="mt-2 text-[11px] text-muted-foreground"><span className="font-semibold text-foreground">When:</span> {timing?.confirmation_required ?? "Wait for completed-bar confirmation, then revalidate the live quote."}</div>
+              <div className="mt-2 text-[11px] text-muted-foreground"><span className="font-semibold text-foreground">Why:</span> {timing?.why?.[0] ?? `${move.grade} setup quality with ${number(move.volume_pace_rvol_proxy, 2)}× volume pace.`}</div>
+              {move.catalyst_available && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-info">Fresh catalyst available</div>}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -184,7 +252,7 @@ function CommandCard({ command, dealer, blockers }: { command: TradingDashboard[
           </div>
           <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
             <div><div className="text-[10px] font-semibold uppercase text-muted-foreground">Confirmation</div><div className="mt-1">{command.confirmation_required}</div><div className="mt-1 text-xs text-muted-foreground">Evidence: {command.evidence_fresh ? "fresh" : "stale or unavailable"}</div></div>
-            <div><div className="text-[10px] font-semibold uppercase text-muted-foreground">Next action</div><div className="mt-1">{command.next_action}</div></div>
+            <div><div className="text-[10px] font-semibold uppercase text-muted-foreground">Entry ETA / next action</div><div className="mt-1 font-semibold">{entryEta(command.entry_timing)}</div><div className="mt-1 text-xs text-muted-foreground">{command.next_action}</div></div>
           </div>
           <div className="mt-3 border-t border-border pt-3 text-xs">
             <span className="font-semibold">No-trade zone: </span>
@@ -297,6 +365,14 @@ function PlanCard({ candidate, title, equity, onOpenChart }: { candidate?: Tradi
           <Metric labelText="Execution" value={number(candidate.execution_score, 0)} detail={label(candidate.instrument_status)} />
         </div>
         <PositionSizer equity={equity} entry={plan?.entry_trigger ?? candidate.entry} stop={plan?.invalidation ?? candidate.stop} multiplier={sizeMultiplier} unavailableReason={optionRiskUnavailable ? "Need executable contract max-loss" : undefined} />
+        <div className="border border-border bg-muted/20 p-3">
+          <div className="text-[10px] font-semibold uppercase text-muted-foreground">Specific entry timing</div>
+          <div className="mt-1 text-sm font-bold">{entryEta(plan?.entry_timing)}</div>
+          <div className="mt-2 text-xs"><span className="font-semibold">When:</span> <span className="text-muted-foreground">{plan?.entry_timing?.confirmation_required ?? "Wait for a source-defined completed-bar confirmation."}</span></div>
+          <div className="mt-1 text-xs"><span className="font-semibold">Where:</span> <span className="text-muted-foreground">trigger {plan?.entry_timing?.entry_trigger ?? plan?.entry_trigger ?? candidate.entry ?? "--"} · invalid {plan?.entry_timing?.invalidation ?? plan?.invalidation ?? candidate.stop ?? "--"} · target {plan?.entry_timing?.target ?? target ?? "--"}</span></div>
+          <div className="mt-1 text-xs"><span className="font-semibold">Why:</span> <span className="text-muted-foreground">{plan?.entry_timing?.why?.[0] ?? candidate.reasons[0] ?? "Mechanical plan is awaiting confirmation."}</span></div>
+          <div className="mt-2 text-[10px] text-muted-foreground">{plan?.entry_timing?.eta_definition ?? "ETA is the next legitimate review point, not a predicted fill."}</div>
+        </div>
         <div className={cn("border-l-4 px-3 py-2 text-sm", tone(candidate.actionability ?? candidate.lane))}>
           <div className="font-semibold">{label(candidate.actionability ?? candidate.lane)}</div>
           <div className="mt-1 text-xs">{candidate.next_action ?? "Revalidate all fields before a shadow decision."}</div>
@@ -347,6 +423,7 @@ function CandidateRow({ candidate, expanded, onToggle, onOpenChart, catalysts = 
               <dt className="text-muted-foreground">Entry</dt><dd className="text-right tabular-nums">{candidate.trade_plan?.entry_trigger ?? candidate.entry ?? "--"}</dd>
               <dt className="text-muted-foreground">Stop</dt><dd className="text-right tabular-nums">{candidate.trade_plan?.invalidation ?? candidate.stop ?? "--"}</dd>
               <dt className="text-muted-foreground">Target</dt><dd className="text-right tabular-nums">{candidate.trade_plan?.targets?.[0]?.price ?? candidate.target ?? "--"}</dd>
+              <dt className="text-muted-foreground">Entry ETA</dt><dd className="text-right">{entryEta(candidate.trade_plan?.entry_timing)}</dd>
               <dt className="text-muted-foreground">Order</dt><dd className="text-right">{label(candidate.order_style || "revalidate")}</dd>
             </dl>
           </div>
@@ -629,6 +706,7 @@ export function TradingCockpit() {
             <SystemReadinessGate readiness={data.system_readiness} />
             <ExecutionQualityPanel quality={data.execution_quality} />
             <CommandCard command={data.command_card} dealer={data.dealer_regime} blockers={data.operations.risk_blockers} />
+            <ObservedMovesPanel moves={discovery?.top_precision_watches ?? []} onOpenChart={setChartSymbol} />
             <DecisionDesk data={data.decision_desk} />
             <LiveOpportunityPanel report={liveReport} connection={streamConnection} onOpenChart={setChartSymbol} />
             <SimpleSignalBoard signals={data.simple_signals?.signals ?? []} />

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.remote_dashboard_gateway import DashboardHTTPServer, _is_allowed_api_path
+from scripts.remote_dashboard_gateway import DashboardHTTPServer, _is_allowed_api_path, _trusted_tailscale_identity
 
 
 def test_dashboard_supervisor_rejects_stale_published_tunnel_hostname() -> None:
@@ -40,6 +40,26 @@ def test_remote_dashboard_gateway_allows_only_read_only_cockpit_get_paths() -> N
 
 def test_remote_dashboard_gateway_accept_queue_handles_parallel_module_bursts() -> None:
     assert DashboardHTTPServer.request_queue_size >= 64
+
+
+def test_tailscale_identity_auth_requires_enabled_loopback_proxy_and_tsnet_host() -> None:
+    headers = {"Host": "vibe-dashboard.example.ts.net", "Tailscale-User-Login": "owner@example.com"}
+
+    assert _trusted_tailscale_identity(headers, ("127.0.0.1", 50123), enabled=True)
+    assert not _trusted_tailscale_identity(headers, ("100.64.0.10", 50123), enabled=True)
+    assert not _trusted_tailscale_identity({**headers, "Host": "example.com"}, ("127.0.0.1", 50123), enabled=True)
+    assert not _trusted_tailscale_identity({"Host": headers["Host"]}, ("127.0.0.1", 50123), enabled=True)
+    assert not _trusted_tailscale_identity(headers, ("127.0.0.1", 50123), enabled=False)
+
+
+def test_dashboard_supervisor_enables_tailscale_identity_only_on_loopback_gateway() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    script = (root / "scripts" / "run_remote_trading_dashboard_supervisor.ps1").read_text(encoding="utf-8")
+
+    assert '"--host", "127.0.0.1"' in script
+    assert '"--trust-tailscale-identity"' in script
 
 
 def test_remote_dashboard_build_inlines_dynamic_imports_for_mobile_reliability() -> None:

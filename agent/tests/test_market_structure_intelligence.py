@@ -8,6 +8,7 @@ from scripts.market_structure_intelligence import (
     APLUS_TIMEFRAME_MATRIX,
     PATTERN_CATALOG,
     _ny_0800_0900_range_context,
+    _smt_divergence_context,
     analyze_market_structure,
     confirmed_swings,
     detect_cisd_universal_model,
@@ -70,6 +71,58 @@ def test_machine_readable_aplus_timeframe_matrix_matches_runtime_contract() -> N
     assert documented == runtime
     assert payload["authority"]["execution_enabled"] is False
     assert payload["authority"]["can_submit_orders"] is False
+    four_hour = next(row for row in runtime if row["timeframe"] == "4h")
+    assert four_hour == {
+        "timeframe": "4h",
+        "role": "higher_timeframe_bias",
+        "minimum_bars": 8,
+        "required_for_aplus": False,
+    }
+
+
+def test_level_map_and_clc_contract_expose_where_why_and_next_confirmation() -> None:
+    rows = _bars([100.0 + index * 0.08 for index in range(24)])
+    daily = _bars([92.0 + index * 0.3 for index in range(30)])
+    four_hour = _bars([96.0 + index * 0.5 for index in range(10)])
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 101.83, "ask": 101.85, "freshness": "live", "spread_bps": 1.97},
+        rvol=1.8,
+        average_dollar_volume=900_000_000,
+        direction_hint="bullish",
+        higher_timeframes={"1d": daily, "4h": four_hour},
+    )
+
+    levels = {row["id"]: row for row in result["liquidity_level_context"]["levels"]}
+    assert {"prior_close", "session_vwap"} <= set(levels)
+    assert result["liquidity_level_context"]["dealing_range"]["location"] in {"premium", "discount", "equilibrium"}
+    assert "nearest_upside" in result["liquidity_level_context"]
+    assert "nearest_downside" in result["liquidity_level_context"]
+    clc = result["clc_entry_context"]
+    assert clc["context"]["frames"]["4h"] == "bullish"
+    assert clc["confirmation"]["true_order_flow"] == "unavailable_without_tick_or_mbo"
+    assert len(clc["confirmation"]["sequence"]) == 3
+    assert clc["next_required"]
+    assert clc["execution_enabled"] is False
+    assert clc["can_submit_orders"] is False
+
+
+def test_smt_divergence_is_a_context_only_paired_index_price_proxy() -> None:
+    primary = _bars([100.0, 100.1, 100.2, 100.15, 100.3, 100.25, 100.2, 100.55])
+    peer = _bars([200.0, 200.1, 200.2, 200.15, 200.3, 200.25, 200.2, 200.25])
+    primary[-1]["h"] = max(float(row["h"]) for row in primary[:-1]) + 0.5
+    peer[-1]["h"] = max(float(row["h"]) for row in peer[:-1]) - 0.05
+
+    context = _smt_divergence_context(primary, {"SPY": peer})
+
+    assert context["status"] == "divergence_observed"
+    assert context["direction"] == "bearish"
+    assert context["peer_symbol"] == "SPY"
+    assert context["true_order_flow"] is False
+    assert context["score_effect"] == "none_until_local_validation"
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
 
 
 def test_cbc_strong_flip_requires_a_completed_two_sided_sweep_and_close_through() -> None:

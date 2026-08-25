@@ -867,6 +867,28 @@ export interface LiveStatus {
   global_halted: boolean;
 }
 
+export interface TradingEntryTiming {
+  status: "revalidate_now" | "awaiting_completed_bar" | "blocked" | "no_chase" | "invalidated" | "incomplete_plan" | string;
+  confirmation_timeframe: string;
+  earliest_review_at: string | null;
+  eta_minutes: number | null;
+  eta_definition: string;
+  entry_trigger: number | null;
+  entry_zone: {
+    status: "exact_source_trigger" | "unavailable" | string;
+    low: number | null;
+    high: number | null;
+    instruction: string;
+  };
+  invalidation: number | null;
+  target: number | null;
+  confirmation_required: string;
+  why: string[];
+  cancel_if: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingCandidate {
   plan_id?: string;
   symbol: string;
@@ -896,7 +918,7 @@ export interface TradingCandidate {
   decision_score?: number;
   grade?: string;
   score_label?: string;
-  lifecycle?: "confirmed" | "armed" | "too_late" | "invalid" | "research_only";
+  lifecycle?: "confirmed" | "armed" | "blocked" | "too_late" | "invalid" | "research_only";
   actionability?: "shadow_ready" | "wait" | "late_no_chase" | "invalid" | "research_only";
   next_action?: string;
   instrument_status?: string;
@@ -948,6 +970,7 @@ export interface TradingCandidate {
     reward_risk: number | null;
     time_window: string;
     risk_note: string;
+    entry_timing?: TradingEntryTiming;
   };
 }
 
@@ -967,6 +990,31 @@ export interface TradingSource {
   mode?: string | null;
   execution_enabled: boolean;
   can_submit_orders: boolean;
+}
+
+export interface TradingPrecisionWatch {
+  symbol: string;
+  score: number;
+  grade: string;
+  direction: string;
+  change_pct: number | null;
+  volume_pace_rvol_proxy: number | null;
+  setup: string;
+  state: string;
+  catalyst_available: boolean;
+  price_action_confirmation?: {
+    state?: string;
+    pattern?: string;
+    bar_completed_at?: string;
+  };
+  trade_levels?: {
+    confirmation_trigger?: number | null;
+    invalidation?: number | null;
+    target_2r?: number | null;
+    instruction?: string;
+  };
+  blockers?: string[];
+  entry_timing?: TradingEntryTiming;
 }
 
 export interface SimplePriceActionSignal {
@@ -1274,7 +1322,54 @@ export interface LiquidityLevelContext {
   status: "available" | "unavailable" | string;
   levels: LiquidityReferenceLevel[];
   active_sweeps: Array<{ level_id: string; level_label?: string; direction: string; status: string }>;
+  nearest_upside?: { id: string; label: string; price: number; source_label: string } | null;
+  nearest_downside?: { id: string; label: string; price: number; source_label: string } | null;
+  dealing_range?: { low: number; midpoint: number; high: number; location: "premium" | "discount" | "equilibrium" | string; source_label: string } | null;
   probability_status: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface SmtDivergenceContext {
+  status: string;
+  direction: "bullish" | "bearish" | "neutral" | string;
+  peer_symbol: string | null;
+  divergence: string | null;
+  method: string;
+  true_order_flow: false;
+  score_effect: "none_until_local_validation" | string;
+  reason: string;
+  probability: { status: string; value: number | null };
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface ClcEntryContext {
+  status: string;
+  direction: string;
+  next_required: string;
+  context: { status: string; frames: Record<string, string>; reason?: string };
+  location: {
+    status: string;
+    current_price: number | null;
+    entry_zone: { low: number | null; high: number | null };
+    reference_level?: number | null;
+    dealing_range?: LiquidityLevelContext["dealing_range"];
+    nearest_upside?: LiquidityLevelContext["nearest_upside"];
+    nearest_downside?: LiquidityLevelContext["nearest_downside"];
+  };
+  confirmation: {
+    status: string;
+    completed_bar_trigger: boolean;
+    quote_quality: string;
+    participation_proxy?: string;
+    smt_proxy?: string;
+    true_order_flow: "unavailable_without_tick_or_mbo" | string;
+    sequence: Array<{ step: number; name: string; status: string; requirement: string }>;
+  };
+  source_labels: string[];
+  score_effect: "none_separate_gate_only" | string;
   execution_enabled: false;
   can_submit_orders: false;
 }
@@ -1365,6 +1460,8 @@ export interface MarketStructureAnalysis {
   macro_context?: MacroTimingContext;
   strat_context?: StratContext;
   ny_0800_0900_range_context?: NyBalanceRangeContext;
+  smt_divergence_context?: SmtDivergenceContext;
+  clc_entry_context?: ClcEntryContext;
   freshness: "live" | "recent" | "stale" | "missing" | string;
   source_labels: string[];
   factor_scores?: Record<string, number | null>;
@@ -1402,6 +1499,61 @@ export interface LiveOpportunityCandidate {
   quote?: Record<string, unknown>;
   factor_scores?: Record<string, number>;
   market_structure?: MarketStructureAnalysis;
+  data_quality?: DataQualityContext;
+  market_risk_context?: MarketRiskContext;
+  session_risk_context?: SessionRiskContext;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface MarketRiskContext {
+  status: "available" | "stand_aside" | "stale" | "missing" | "wrong_session" | string;
+  required: boolean;
+  hard_veto: boolean;
+  macro_event_window: boolean;
+  max_impact: string;
+  allowed_playbooks: string[];
+  vetoes: string[];
+  active_caution_windows: Array<Record<string, unknown>>;
+  blockers: string[];
+  generated_at: string | null;
+  age_seconds: number | null;
+  source_label: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface SessionRiskContext {
+  phase: string;
+  status: string;
+  hard_veto: boolean;
+  reason: string;
+  calendar_status: string;
+  source_label: string;
+  evaluated_at: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface DataQualityContext {
+  status: "pass" | "degraded" | "blocked" | string;
+  blockers: string[];
+  warnings: string[];
+  bar_count: number;
+  latest_completed_bar_at: string | null;
+  completed_bar_lag_seconds: number | null;
+  missing_intraday_intervals: number;
+  quote_scope: "consolidated_sip" | "single_venue_iex_not_nbbo" | string;
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface DataQualitySummary {
+  status: "pass" | "degraded" | "blocked" | string;
+  blocked_symbols: string[];
+  degraded_symbols: string[];
+  source_labels: string[];
   execution_enabled: false;
   can_submit_orders: false;
 }
@@ -1422,6 +1574,9 @@ export interface LiveOpportunityReport {
     confirmation: string;
   }>;
   market_structure_watchlist?: MarketStructureWatchRow[];
+  market_risk_context?: MarketRiskContext;
+  session_risk_context?: SessionRiskContext;
+  data_quality_summary?: DataQualitySummary;
   feed: LiveOpportunityFeed;
   candidates: LiveOpportunityCandidate[];
   top_candidates: LiveOpportunityCandidate[];
@@ -1706,6 +1861,7 @@ export interface TradingDashboard {
     evidence_fresh: boolean;
     evidence_age_seconds: number | null;
     plan_id: string | null;
+    entry_timing?: TradingEntryTiming | null;
     execution_enabled: false;
     can_submit_orders: false;
   };
@@ -1801,7 +1957,7 @@ export interface TradingDashboard {
     };
     health?: string | null;
     session_status?: string | null;
-    top_precision_watches: Array<Record<string, unknown>>;
+    top_precision_watches: TradingPrecisionWatch[];
     move_coverage: {
       movers_audited?: number;
       detected_any_stage?: number;

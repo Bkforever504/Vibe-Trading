@@ -168,6 +168,9 @@ describe("trading primitives", () => {
       candidate_count: 1,
       setup_families: ["opening_range_break_retest"],
       market_structure_patterns: [{ id: "range_break_retest", complexity: "simple", role: "setup", confirmation: "break, retest, hold" }],
+      market_risk_context: { status: "stand_aside", required: true, hard_veto: true, macro_event_window: true, max_impact: "high", allowed_playbooks: ["stand_aside"], vetoes: ["dynamic_geopolitical_risk"], active_caution_windows: [], blockers: ["market_risk_stand_aside"], generated_at: "2026-08-21T14:09:00Z", age_seconds: 60, source_label: "market_catalyst_calendar", execution_enabled: false, can_submit_orders: false },
+      session_risk_context: { phase: "morning_session", status: "eligible_for_review", hard_veto: false, reason: "Regular-session timing gate is open.", calendar_status: "weekday_clock_only_exchange_calendar_pending", source_label: "us_equity_rth_policy_v1", evaluated_at: "2026-08-21T14:10:00Z", execution_enabled: false, can_submit_orders: false },
+      data_quality_summary: { status: "degraded", blocked_symbols: [], degraded_symbols: ["NVDA"], source_labels: ["completed_5m_bar_integrity_v1"], execution_enabled: false, can_submit_orders: false },
       market_structure_watchlist: [{
         symbol: "NVDA", decision: "READY_TO_REVIEW", grade: "A", score: 89,
         pattern_grade: {
@@ -211,6 +214,7 @@ describe("trading primitives", () => {
           { timeframe: "15m", role: "trigger_confirmation", minimum_bars: 8, completed_bars: 40, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
           { timeframe: "30m", role: "session_state", minimum_bars: 4, completed_bars: 20, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
           { timeframe: "60m", role: "structure_bias", minimum_bars: 4, completed_bars: 10, status: "available", provenance: "derived_from_completed_5m", required_for_aplus: true },
+          { timeframe: "4h", role: "higher_timeframe_bias", minimum_bars: 8, completed_bars: 10, status: "available", provenance: "supplied_completed_bars", required_for_aplus: false },
           { timeframe: "1d", role: "daily_regime", minimum_bars: 20, completed_bars: 30, status: "available", provenance: "supplied_completed_bars", required_for_aplus: true },
           { timeframe: "1w", role: "major_structure", minimum_bars: 8, completed_bars: 12, status: "available", provenance: "supplied_completed_bars", required_for_aplus: false },
         ], closed_bar_only: true, execution_enabled: false, can_submit_orders: false },
@@ -220,12 +224,14 @@ describe("trading primitives", () => {
           status: "available", levels: [
             { id: "pdh", label: "PDH", price: 182.4, side: "buy_side", source_label: "completed_prior_session_60m", freshness: "completed_period", historical_probability: { status: "unavailable_pending_local_outcomes", value: null }, execution_enabled: false, can_submit_orders: false },
             { id: "pdl", label: "PDL", price: 178.2, side: "sell_side", source_label: "completed_prior_session_60m", freshness: "completed_period", historical_probability: { status: "unavailable_pending_local_outcomes", value: null }, execution_enabled: false, can_submit_orders: false },
-          ], active_sweeps: [{ level_id: "pdh", direction: "bearish", status: "confirmed_reclaim" }], probability_status: "unavailable_pending_local_outcomes", execution_enabled: false, can_submit_orders: false,
+          ], active_sweeps: [{ level_id: "pdh", direction: "bearish", status: "confirmed_reclaim" }], nearest_upside: { id: "pdh", label: "PDH", price: 182.4, source_label: "completed_prior_session_60m" }, nearest_downside: { id: "pdl", label: "PDL", price: 178.2, source_label: "completed_prior_session_60m" }, dealing_range: { low: 179.2, midpoint: 180.8, high: 182.4, location: "premium", source_label: "last_24_completed_5m_bars" }, probability_status: "unavailable_pending_local_outcomes", execution_enabled: false, can_submit_orders: false,
         },
         participation_context: { status: "buy_pressure_accelerating", direction: "bullish", method: "ohlcv_participation_curvature_proxy_v1", true_order_flow: false, score: 71, reason: "Completed-bar participation is accelerating.", probability: { status: "unavailable_pending_local_outcomes", value: null }, source_labels: ["completed_ohlcv_proxy", "not_true_order_flow"], execution_enabled: false, can_submit_orders: false },
         macro_context: { status: "context_only_unvalidated", active_window: "ny_am_0950_1010", active: true, label: "NY AM 09:50–10:10 ET", source_label: "public_ict_macro_schedule_context", score_effect: "none_until_validated", execution_enabled: false, can_submit_orders: false },
         strat_context: { status: "context_available", current_scenario: "2u", sequence: ["1", "2d", "2u"], ftfc: { state: "bullish", strict: true, frame_count: 4, frames: { "5m": "bullish", "15m": "bullish", "60m": "bullish", "1d": "bullish" } }, magnitude: { direction: "bullish", target_label: "PDH", target: 182.4 }, probability: { status: "unavailable_pending_local_outcomes", value: null }, score_effect: "none_until_local_validation", source_labels: ["completed_ohlcv_strat_scenarios_v1"], execution_enabled: false, can_submit_orders: false },
         ny_0800_0900_range_context: { status: "cisd_confirmed_after_sweep", range: { high: 181.8, low: 179.2, bar_count: 12 }, first_sweep: { side: "sell_side", timestamp: "2026-08-21T13:05:00Z" }, cisd: { direction: "bullish", confirmed: true }, target: 181.8, historical_probability: { status: "unavailable_pending_local_outcomes", value: null }, external_claim_status: "excluded_until_independently_reproduced", source_labels: ["completed_0800_0900_et_bars", "ict_cisd_sequence_v1"], execution_enabled: false, can_submit_orders: false },
+        smt_divergence_context: { status: "divergence_observed", direction: "bullish", peer_symbol: "SPY", divergence: "asymmetric_sell_side_sweep", method: "paired_index_completed_bar_price_divergence_v1", true_order_flow: false, score_effect: "none_until_local_validation", reason: "One correlated instrument swept a completed-bar extreme while the other did not.", probability: { status: "unavailable_pending_local_outcomes", value: null }, source_labels: ["completed_5m_correlated_price_bars", "not_true_order_flow"], execution_enabled: false, can_submit_orders: false },
+        clc_entry_context: { status: "manual_review_ready", direction: "bullish", next_required: "All CLC observations are present; Kenny still decides whether to act manually.", context: { status: "complete", frames: { "60m": "bullish", "4h": "bullish", "1d": "bullish" }, reason: "Higher-timeframe bias from completed bars only." }, location: { status: "complete", current_price: 181.2, entry_zone: { low: 181.1, high: 181.3 }, reference_level: 180.1, dealing_range: { low: 179.2, midpoint: 180.8, high: 182.4, location: "premium", source_label: "last_24_completed_5m_bars" }, nearest_upside: { id: "pdh", label: "PDH", price: 182.4, source_label: "completed_prior_session_60m" }, nearest_downside: { id: "pdl", label: "PDL", price: 178.2, source_label: "completed_prior_session_60m" } }, confirmation: { status: "complete", completed_bar_trigger: true, quote_quality: "pass", participation_proxy: "buy_pressure_accelerating", smt_proxy: "divergence_observed", true_order_flow: "unavailable_without_tick_or_mbo", sequence: [{ step: 1, name: "context", status: "complete", requirement: "60m, 4H, and daily completed-bar bias agree." }, { step: 2, name: "location", status: "complete", requirement: "Price is at objective trigger geometry or a sourced market level." }, { step: 3, name: "confirmation", status: "complete", requirement: "Completed 5m trigger plus fresh, tradeable quote; 1m may refine but never originate." }] }, source_labels: ["clc_completed_bar_contract_v1"], score_effect: "none_separate_gate_only", execution_enabled: false, can_submit_orders: false },
       }],
       feed: { provider: "alpaca", feed: "iex", transport: "websocket", entitlement: "configured_not_verified", label: "alpaca_iex_stock_stream", execution_enabled: false, can_submit_orders: false },
       candidates: [{ candidate_id: "one", symbol: "NVDA", asset_class: "equity", setup_family: "opening_range_break_retest", direction: "bullish", reason: "completed retest", decision_score: 88, grade: "A", state: "READY_TO_REVIEW", freshness: "live", entry: 181.2, invalidation: 179.8, targets: [{ name: "target_2r", price: 184 }], reward_risk_after_friction: 1.91, rvol_time_of_day: 2.1, source_labels: ["alpaca_iex_stream"], blockers: [], execution_enabled: false, can_submit_orders: false }],
@@ -251,6 +257,7 @@ describe("trading primitives", () => {
     expect(screen.getByText(/6 bars/i)).toBeInTheDocument();
     expect(screen.getByText(/A\+ timeframe coverage/i)).toBeInTheDocument();
     expect(screen.getByText(/5M primary trigger/i)).toBeInTheDocument();
+    expect(screen.getByText(/4H higher timeframe bias/i)).toBeInTheDocument();
     expect(screen.getByText(/complete for aplus review/i)).toBeInTheDocument();
     expect(screen.getByText(/Grade A · 89.5/)).toBeInTheDocument();
     expect(screen.getByText(/all observed conditions aligned/i)).toBeInTheDocument();
@@ -266,6 +273,16 @@ describe("trading primitives", () => {
     expect(screen.getByText(/CISD confirmed after sweep/i)).toBeInTheDocument();
     expect(screen.getByText(/claimed rate excluded/i)).toBeInTheDocument();
     expect(screen.getByText(/probability unmeasured/i)).toBeInTheDocument();
+    expect(screen.getByText(/Context · Location · Confirmation/i)).toBeInTheDocument();
+    expect(screen.getByText(/manual review ready/i)).toBeInTheDocument();
+    expect(screen.getByText(/60M bullish · 4H bullish · 1D bullish/i)).toBeInTheDocument();
+    expect(screen.getByText(/Paired-index SMT proxy/i)).toBeInTheDocument();
+    expect(screen.getByText(/SPY · bullish divergence observed/i)).toBeInTheDocument();
+    expect(screen.getByText(/Upside PDH 182.40/i)).toBeInTheDocument();
+    expect(screen.getByText(/Market guardrails/i)).toBeInTheDocument();
+    expect(screen.getByText(/stand aside · high impact/i)).toBeInTheDocument();
+    expect(screen.getByText(/morning session/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 degraded symbol/i)).toBeInTheDocument();
     expect(screen.getByText(/manual review only/i)).toBeInTheDocument();
   });
 });

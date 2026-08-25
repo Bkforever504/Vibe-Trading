@@ -263,6 +263,9 @@ def test_cockpit_surfaces_streaming_opportunities_with_feed_provenance(tmp_path:
                 "entitlement": "configured_not_verified",
             },
             "market_structure_patterns": [{"id": "range_break_retest", "complexity": "simple", "role": "setup"}],
+            "market_risk_context": {"status": "stand_aside", "hard_veto": True, "source_label": "market_catalyst_calendar", "execution_enabled": False, "can_submit_orders": False},
+            "session_risk_context": {"phase": "morning_session", "hard_veto": False, "execution_enabled": False, "can_submit_orders": False},
+            "data_quality_summary": {"status": "degraded", "blocked_symbols": [], "degraded_symbols": ["NVDA"], "execution_enabled": False, "can_submit_orders": False},
             "market_structure_watchlist": [{
                 "symbol": "NVDA",
                 "decision": "READY_TO_REVIEW",
@@ -308,6 +311,9 @@ def test_cockpit_surfaces_streaming_opportunities_with_feed_provenance(tmp_path:
     assert cockpit["live_opportunities"]["decision_state"] == "READY_TO_REVIEW"
     assert cockpit["live_opportunities"]["market_structure_watchlist"][0]["best_setup"]["pattern_id"] == "range_break_retest"
     assert cockpit["live_opportunities"]["market_structure_patterns"][0]["complexity"] == "simple"
+    assert cockpit["live_opportunities"]["market_risk_context"]["hard_veto"] is True
+    assert cockpit["live_opportunities"]["session_risk_context"]["phase"] == "morning_session"
+    assert cockpit["live_opportunities"]["data_quality_summary"]["status"] == "degraded"
     assert candidate["symbol"] == "NVDA"
     assert candidate["entry"] == 181.2
     assert candidate["stop"] == 179.8
@@ -337,6 +343,49 @@ def test_cockpit_surfaces_cisd_promotion_status_as_read_only_discovery_evidence(
     assert status["n_outcomes"] == 47
     assert status["eligible_for_validated_promotion"] is False
     assert source["freshness"] == "live"
+
+
+def test_precision_watch_exposes_specific_entry_eta_and_levels(tmp_path: Path) -> None:
+    row = {
+        "symbol": "BMNR",
+        "state": "precision_watch",
+        "score": 81.5,
+        "grade": "A-",
+        "setup": "opening_range_breakout",
+        "direction": "bullish",
+        "price": 99.9,
+        "hard_gates": {"liquidity": True, "geometry": True},
+        "factor_scores": {"liquidity": 90, "magnitude": 82, "structure": 88},
+        "price_action_confirmation": {
+            "state": "waiting",
+            "bar_completed_at": "2026-08-19T14:55:00Z",
+        },
+        "trade_levels": {
+            "confirmation_trigger": 100,
+            "invalidation": 99,
+            "target_2r": 102,
+        },
+        "blockers": ["strategy_confirmation_and_revalidation_required"],
+    }
+    write_report(
+        tmp_path,
+        "intraday-opportunity-radar.json",
+        {"generated_at": "2026-08-19T14:59:58Z", "precision_watch": [row], "ranked_candidates": [row]},
+    )
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    watch = cockpit["discovery"]["top_precision_watches"][0]
+    timing = watch["entry_timing"]
+
+    assert timing["status"] == "awaiting_completed_bar"
+    assert timing["earliest_review_at"] == "2026-08-19T15:00:00Z"
+    assert timing["entry_trigger"] == 100.0
+    assert timing["invalidation"] == 99.0
+    assert timing["target"] == 102.0
+    assert "close beyond 100" in timing["confirmation_required"]
+    assert timing["eta_definition"].startswith("Earliest legitimate recheck")
+    assert timing["execution_enabled"] is False
+    assert timing["can_submit_orders"] is False
 
 
 def test_cockpit_surfaces_mes_v2_qualified_and_excluded_evidence(tmp_path: Path) -> None:
@@ -807,11 +856,67 @@ def test_decision_desk_separates_armed_from_confirmed_but_late(tmp_path: Path) -
 
     assert rows["EARLY"]["actionability"] == "wait"
     assert rows["EARLY"]["lifecycle"] == "armed"
+    timing = rows["EARLY"]["trade_plan"]["entry_timing"]
+    assert timing["status"] == "awaiting_completed_bar"
+    assert timing["confirmation_timeframe"] == "5m"
+    assert timing["earliest_review_at"] == "2026-08-19T15:00:00Z"
+    assert timing["eta_minutes"] == 0.0
+    assert "close beyond 100" in timing["confirmation_required"]
+    assert timing["entry_trigger"] == 100.0
+    assert timing["invalidation"] == 99.0
+    assert timing["execution_enabled"] is False
+    assert timing["can_submit_orders"] is False
+    assert cockpit["command_card"]["entry_timing"]["status"] == "awaiting_completed_bar"
+    assert cockpit["command_card"]["entry_timing"]["entry_trigger"] == 100.0
     assert rows["LATE"]["actionability"] == "late_no_chase"
     assert rows["LATE"]["move_consumed_pct"] == 60.0
     assert rows["LATE"]["decision_score"] < rows["LATE"]["setup_score"]
     assert cockpit["decision_desk"]["counts"]["wait"] == 1
     assert cockpit["decision_desk"]["counts"]["late_no_chase"] == 1
+
+
+def test_confirmed_candidate_with_failed_hard_gates_cannot_become_best_setup(tmp_path: Path) -> None:
+    write_report(
+        tmp_path,
+        "intraday-opportunity-radar.json",
+        {
+            "generated_at": "2026-08-19T14:59:58Z",
+            "ranked_candidates": [
+                {
+                    "symbol": "BLOCKED",
+                    "state": "filtered",
+                    "score": 94,
+                    "setup": "opening_range_breakout",
+                    "direction": "bullish",
+                    "price": 10.1,
+                    "hard_gates": {
+                        "price_floor": False,
+                        "dollar_liquidity": False,
+                        "geometry": True,
+                    },
+                    "factor_scores": {"liquidity": 25, "magnitude": 95, "structure": 92},
+                    "price_action_confirmation": {"state": "bullish_confirmed"},
+                    "trade_levels": {
+                        "confirmation_trigger": 10,
+                        "invalidation": 9,
+                        "target_2r": 12,
+                    },
+                    "blockers": ["strategy_confirmation_and_revalidation_required"],
+                }
+            ],
+        },
+    )
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    candidate = next(row for row in cockpit["candidates"] if row["symbol"] == "BLOCKED")
+
+    assert candidate["actionability"] == "research_only"
+    assert candidate["lifecycle"] == "blocked"
+    assert "price_floor" in candidate["blockers"]
+    assert "dollar_liquidity" in candidate["blockers"]
+    assert cockpit["headline"]["best_setup"] is None
+    assert cockpit["headline"]["state"] == "no_eligible_setup"
+    assert cockpit["decision_desk"]["counts"]["shadow_ready"] == 0
 
 
 def test_decision_desk_uses_one_dominant_plan_per_symbol(tmp_path: Path) -> None:

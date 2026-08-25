@@ -1,6 +1,6 @@
 import { Activity, Clock3, Crosshair, Layers3, Target } from "lucide-react";
 
-import type { LiquidityLevelContext, MacroTimingContext, NyBalanceRangeContext, ParticipationContext, StratContext } from "@/lib/api";
+import type { ClcEntryContext, LiquidityLevelContext, MacroTimingContext, NyBalanceRangeContext, ParticipationContext, SmtDivergenceContext, StratContext } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 function words(value: string): string {
@@ -17,18 +17,43 @@ export function StructureContextRail({
   macro,
   strat,
   balanceRange,
+  clc,
+  smt,
 }: {
   liquidity?: LiquidityLevelContext;
   participation?: ParticipationContext;
   macro?: MacroTimingContext;
   strat?: StratContext;
   balanceRange?: NyBalanceRangeContext;
+  clc?: ClcEntryContext;
+  smt?: SmtDivergenceContext;
 }) {
-  if (!liquidity && !participation && !macro && !strat && !balanceRange) return null;
+  if (!liquidity && !participation && !macro && !strat && !balanceRange && !clc && !smt) return null;
   const levels = liquidity?.levels.slice(0, 6) ?? [];
+  const clcFrames = clc?.context.frames ?? {};
 
   return (
-    <div className="grid gap-px border-b border-border bg-border md:grid-cols-2 xl:grid-cols-5" aria-label="Structure context">
+    <div className="grid gap-px border-b border-border bg-border md:grid-cols-2 xl:grid-cols-4" aria-label="Structure context">
+      {clc ? (
+        <div className="bg-card px-3 py-3 xl:col-span-2">
+          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-success">
+            <Target className="h-3.5 w-3.5" />Context · Location · Confirmation
+          </span>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <strong className={cn("mr-1 text-sm uppercase", clc.status === "manual_review_ready" ? "text-success" : clc.status === "blocked" ? "text-danger" : "text-warning")}>{words(clc.status)}</strong>
+            {[clc.context, clc.location, clc.confirmation].map((step, index) => (
+              <span key={index} className={cn("border px-2 py-1 text-[10px] uppercase", step.status === "complete" ? "border-success/30 text-success" : "border-warning/30 text-warning")}>
+                {index === 0 ? "Context" : index === 1 ? "Location" : "Confirmation"} · {words(step.status)}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-xs font-medium uppercase">
+            {(["60m", "4h", "1d"] as const).map((frame) => `${frame.toUpperCase()} ${clcFrames[frame] ?? "unavailable"}`).join(" · ")}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Next: {clc.next_required}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">True absorption/delta unavailable without tick or MBO · no automatic execution</p>
+        </div>
+      ) : null}
       <div className="bg-card px-3 py-3">
         <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
           <Crosshair className="h-3.5 w-3.5" />Liquidity map
@@ -45,7 +70,23 @@ export function StructureContextRail({
         <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
           {liquidity?.active_sweeps.length ? `${liquidity.active_sweeps.length} confirmed reclaim` : "No active reclaim"} · probability unmeasured
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {liquidity?.nearest_upside ? `Upside ${liquidity.nearest_upside.label} ${price(liquidity.nearest_upside.price)}` : "Upside target unavailable"}
+          {liquidity?.nearest_downside ? ` · Downside ${liquidity.nearest_downside.label} ${price(liquidity.nearest_downside.price)}` : ""}
+          {liquidity?.dealing_range ? ` · ${words(liquidity.dealing_range.location)}` : ""}
+        </p>
       </div>
+      {smt ? (
+        <div className="bg-card px-3 py-3">
+          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
+            <Layers3 className="h-3.5 w-3.5" />Paired-index SMT proxy
+          </span>
+          <p className={cn("mt-2 text-sm font-bold", smt.direction === "bullish" ? "text-success" : smt.direction === "bearish" ? "text-danger" : "text-foreground")}>
+            {smt.peer_symbol ? `${smt.peer_symbol} · ` : ""}{smt.direction} {words(smt.status)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Completed 5m price divergence · not order flow · no score effect</p>
+        </div>
+      ) : null}
       <div className="bg-card px-3 py-3">
         <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
           <Activity className="h-3.5 w-3.5" />Participation curvature

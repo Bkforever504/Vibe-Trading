@@ -22,6 +22,15 @@ function Test-Port([int]$Port) {
     return [bool](Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
 }
 
+function Wait-Port([int]$Port, [int]$TimeoutSeconds = 30) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        if (Test-Port $Port) { return $true }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    return $false
+}
+
 function Start-Backend {
     if (Test-Port 8899) { return }
     $script = Join-Path $PSScriptRoot "run_live_trading_dashboard_backend.ps1"
@@ -41,7 +50,8 @@ function Start-Gateway {
         "--frontend", $Frontend,
         "--backend", "http://127.0.0.1:8899",
         "--api-key-file", $ApiKeyFile,
-        "--token-file", $TokenFile
+        "--token-file", $TokenFile,
+        "--trust-tailscale-identity"
     ) -WindowStyle Hidden
     Write-SupervisorLog "Started read-only dashboard gateway on port 8898"
 }
@@ -148,9 +158,13 @@ Write-SupervisorLog "Dashboard supervisor started"
 while ($true) {
     try {
         Start-Backend
-        Start-Sleep -Seconds 2
+        if (-not (Wait-Port 8899 30)) {
+            throw "Dashboard backend did not listen on port 8899 within 30 seconds"
+        }
         Start-Gateway
-        Start-Sleep -Seconds 2
+        if (-not (Wait-Port 8898 15)) {
+            throw "Dashboard gateway did not listen on port 8898 within 15 seconds"
+        }
         Start-Tunnel
     } catch {
         Write-SupervisorLog "Supervisor recovery error: $($_.Exception.Message)"

@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.intraday_opportunity_radar import bar_features, fetch_intraday_bars
+from scripts.intraday_opportunity_radar import CORE_LIQUID_SYMBOLS, bar_features, fetch_intraday_bars
 from scripts.market_data_provider_registry import build_provider_registry
 from scripts.market_structure_intelligence import PATTERN_CATALOG, analyze_market_structure
 
@@ -33,6 +33,7 @@ from scripts.market_structure_intelligence import PATTERN_CATALOG, analyze_marke
 MARKET_TZ = ZoneInfo("America/New_York")
 DEFAULT_REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "live-opportunity-engine.json"
 DEFAULT_RADAR_PATH = Path.home() / ".vibe-trading" / "reports" / "intraday-opportunity-radar.json"
+DEFAULT_CATALYST_PATH = Path.home() / ".vibe-trading" / "reports" / "market-catalyst-calendar.json"
 SETUP_FAMILIES = (
     "catalyst_continuation",
     "opening_range_break_retest",
@@ -49,6 +50,60 @@ MAX_SPREAD_BPS = 35.0
 MIN_DOLLAR_LIQUIDITY = 20_000_000.0
 MIN_RVOL = 1.25
 ESTIMATED_SLIPPAGE_BPS_PER_SIDE = 5.0
+MAX_MARKET_RISK_AGE_SECONDS = 20 * 60.0
+MAX_COMPLETED_BAR_LAG_SECONDS = 10 * 60.0
+MAX_WEBSOCKET_SYMBOLS = 30
+REST_QUOTE_REFRESH_SECONDS = 5.0
+REST_BAR_REFRESH_SECONDS = 60.0
+NYSE_HOLIDAYS_2026 = frozenset({
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25",
+    "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+})
+NYSE_EARLY_CLOSES_2026 = frozenset({"2026-11-27", "2026-12-24"})
+
+
+def _with_core_context_symbols(symbols: list[str]) -> list[str]:
+    """Reserve every canonical liquid leader before filling the broker cap."""
+    normalized = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
+    return list(dict.fromkeys([*CORE_LIQUID_SYMBOLS, *normalized]))[:100]
+
+
+def _hybrid_symbol_partition(symbols: list[str]) -> tuple[list[str], list[str]]:
+    """Put the highest-priority names on WebSocket and retain full REST coverage."""
+    normalized = list(dict.fromkeys(
+        str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()
+    ))[:100]
+    return normalized[:MAX_WEBSOCKET_SYMBOLS], normalized[MAX_WEBSOCKET_SYMBOLS:]
+
+
+def _stream_coverage(
+    websocket_symbols: list[str],
+    rest_symbols: list[str],
+    *,
+    rest_quote_status: str,
+    rest_bar_status: str,
+) -> dict[str, Any]:
+    mandatory = list(CORE_LIQUID_SYMBOLS)
+    return {
+        "architecture": "hybrid_websocket_plus_rest",
+        "websocket_symbol_limit": MAX_WEBSOCKET_SYMBOLS,
+        "websocket_symbols": websocket_symbols,
+        "websocket_symbol_count": len(websocket_symbols),
+        "rest_symbols": rest_symbols,
+        "rest_symbol_count": len(rest_symbols),
+        "total_symbol_count": len(websocket_symbols) + len(rest_symbols),
+        "mandatory_core_symbols": mandatory,
+        "mandatory_core_on_websocket": [symbol for symbol in mandatory if symbol in websocket_symbols],
+        "mandatory_core_missing": [
+            symbol for symbol in mandatory
+            if symbol not in websocket_symbols and symbol not in rest_symbols
+        ],
+        "rest_quote_status": rest_quote_status,
+        "rest_bar_status": rest_bar_status,
+        "source_labels": ["alpaca_iex_websocket", "alpaca_iex_rest"],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
 
 
 def _finite(value: Any) -> float | None:
@@ -143,19 +198,203 @@ def _grade(score: float) -> str:
 def _quote_context(quote: dict[str, Any], now: datetime) -> dict[str, Any]:
     bid = _finite(quote.get("bid") if "bid" in quote else quote.get("bp"))
     ask = _finite(quote.get("ask") if "ask" in quote else quote.get("ap"))
+    bid_size = _finite(quote.get("bid_size") if "bid_size" in quote else quote.get("bs"))
+    ask_size = _finite(quote.get("ask_size") if "ask_size" in quote else quote.get("as"))
     stamp = _utc(quote.get("timestamp") or quote.get("t"))
-    midpoint = (bid + ask) / 2 if bid is not None and ask is not None and ask >= bid else None
+    if bid is None or ask is None or bid <= 0 or ask <= 0:
+        market_state = "invalid_or_missing"
+    elif bid > ask:
+        market_state = "crossed"
+    elif bid == ask:
+        market_state = "locked"
+    else:
+        market_state = "two_sided"
+    midpoint = (bid + ask) / 2 if market_state in {"two_sided", "locked"} else None
     spread_bps = (ask - bid) / midpoint * 10_000 if midpoint and bid is not None and ask is not None else None
     age = max(0.0, (now - stamp).total_seconds()) if stamp else None
     freshness = "live" if age is not None and age <= 5 else "recent" if age is not None and age <= MAX_QUOTE_AGE_SECONDS else "stale" if stamp else "missing"
+    depth_total = (bid_size or 0.0) + (ask_size or 0.0)
+    depth_imbalance = (bid_size - ask_size) / depth_total if bid_size is not None and ask_size is not None and depth_total > 0 else None
     return {
         "bid": bid,
         "ask": ask,
+        "bid_size": bid_size,
+        "ask_size": ask_size,
         "midpoint": round(midpoint, 4) if midpoint is not None else None,
         "spread_bps": round(spread_bps, 2) if spread_bps is not None else None,
+        "market_state": market_state,
+        "depth_imbalance": round(depth_imbalance, 4) if depth_imbalance is not None else None,
+        "depth_imbalance_status": "advisory_only_not_order_flow" if depth_imbalance is not None else "unavailable",
         "timestamp": stamp.isoformat().replace("+00:00", "Z") if stamp else None,
         "age_seconds": round(age, 2) if age is not None else None,
         "freshness": freshness,
+        "source_label": "alpaca_latest_quote",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _session_risk_context(now: datetime) -> dict[str, Any]:
+    """Classify manual-entry timing against the frozen official 2026 NYSE calendar."""
+    current = now.astimezone(MARKET_TZ)
+    minute = current.hour * 60 + current.minute
+    day = current.date().isoformat()
+    weekday = current.weekday() < 5
+    scheduled_close = 13 * 60 if day in NYSE_EARLY_CLOSES_2026 else 16 * 60
+    calendar_covered = current.year == 2026
+    if day in NYSE_HOLIDAYS_2026:
+        phase, hard_veto = "exchange_holiday", True
+    elif not calendar_covered:
+        phase, hard_veto = "calendar_coverage_unavailable", True
+    elif not weekday or minute < 9 * 60 + 30 or minute >= scheduled_close:
+        phase, hard_veto = "outside_regular_session", True
+    elif minute < 9 * 60 + 35:
+        phase, hard_veto = "opening_auction_buffer", True
+    elif minute >= scheduled_close - 10:
+        phase, hard_veto = "closing_auction_buffer", True
+    elif minute < 11 * 60 + 30:
+        phase, hard_veto = "morning_session", False
+    elif minute < 14 * 60:
+        phase, hard_veto = "midday_session", False
+    else:
+        phase, hard_veto = "afternoon_session", False
+    return {
+        "phase": phase,
+        "status": "stand_aside" if hard_veto else "eligible_for_review",
+        "hard_veto": hard_veto,
+        "reason": "Opening/closing auction buffers and times outside regular hours are not eligible for new manual entries." if hard_veto else "Regular-session timing gate is open; all other setup gates still apply.",
+        "calendar_status": "official_2026_calendar_frozen" if calendar_covered else "unsupported_year_fail_closed",
+        "scheduled_close_et": f"{scheduled_close // 60:02d}:{scheduled_close % 60:02d}",
+        "source_label": "nyse_2026_hours_calendar_plus_entry_buffer_policy_v1",
+        "evaluated_at": now.isoformat().replace("+00:00", "Z"),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _market_risk_context(report: dict[str, Any], *, now: datetime, required: bool) -> dict[str, Any]:
+    generated = _utc(report.get("generated_at"))
+    age = max(0.0, (now - generated).total_seconds()) if generated else None
+    today = report.get("today") if isinstance(report.get("today"), dict) else {}
+    current = now.astimezone(MARKET_TZ)
+    report_day = str(today.get("date") or "")
+    blockers: list[str] = []
+    if not report:
+        status = "missing"
+        if required:
+            blockers.append("market_risk_context_missing")
+    elif report_day and report_day != current.date().isoformat():
+        status = "wrong_session"
+        if required:
+            blockers.append("market_risk_context_wrong_session")
+    elif age is None or age > MAX_MARKET_RISK_AGE_SECONDS:
+        status = "stale"
+        if required:
+            blockers.append("market_risk_context_stale")
+    else:
+        status = "available"
+    dynamic = today.get("dynamic_risk") if isinstance(today.get("dynamic_risk"), dict) else {}
+    allowed = [str(value) for value in today.get("allowed_playbooks") or []]
+    vetoes = [str(value) for value in today.get("vetoes") or []]
+    active_windows: list[dict[str, Any]] = []
+    for window in today.get("caution_windows") or []:
+        if not isinstance(window, dict):
+            continue
+        try:
+            start_hour, start_minute = (int(value) for value in str(window.get("start_et")).split(":", 1))
+            end_hour, end_minute = (int(value) for value in str(window.get("end_et")).split(":", 1))
+        except (TypeError, ValueError):
+            continue
+        current_minute = current.hour * 60 + current.minute
+        if start_hour * 60 + start_minute <= current_minute <= end_hour * 60 + end_minute:
+            active_windows.append(dict(window))
+    explicit_stand_aside = (
+        allowed == ["stand_aside"]
+        or str(dynamic.get("recommended_posture") or "").lower() == "stand_aside"
+    )
+    hard_veto = bool(blockers) or (status == "available" and explicit_stand_aside)
+    if status == "available" and explicit_stand_aside:
+        status = "stand_aside"
+        blockers.append("market_risk_stand_aside")
+    macro_event_window = bool(active_windows) or (status == "stand_aside" and str(today.get("max_impact") or "").lower() == "high")
+    return {
+        "status": status,
+        "required": required,
+        "hard_veto": hard_veto,
+        "macro_event_window": macro_event_window,
+        "max_impact": today.get("max_impact") or "unknown",
+        "allowed_playbooks": allowed,
+        "vetoes": vetoes,
+        "active_caution_windows": active_windows,
+        "dynamic_risk": dynamic,
+        "blockers": blockers,
+        "generated_at": generated.isoformat().replace("+00:00", "Z") if generated else None,
+        "age_seconds": round(age, 1) if age is not None else None,
+        "source_label": str(report.get("provider") or "market_catalyst_calendar"),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _data_quality_context(
+    rows: list[dict[str, Any]],
+    quote: dict[str, Any],
+    *,
+    now: datetime,
+    consolidated_quote: bool = True,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    warnings: list[str] = []
+    stamps = [_utc(row.get("t") or row.get("timestamp")) for row in rows]
+    valid_stamps = [stamp for stamp in stamps if stamp is not None]
+    if quote.get("market_state") == "crossed":
+        blockers.append("crossed_quote")
+    elif quote.get("market_state") == "invalid_or_missing":
+        blockers.append("invalid_or_missing_quote")
+    elif quote.get("market_state") == "locked":
+        warnings.append("locked_quote")
+    malformed = any(
+        (high := _finite(row.get("h") if "h" in row else row.get("high"))) is None
+        or (low := _finite(row.get("l") if "l" in row else row.get("low"))) is None
+        or (open_price := _finite(row.get("o") if "o" in row else row.get("open"))) is None
+        or (close := _finite(row.get("c") if "c" in row else row.get("close"))) is None
+        or high < max(open_price, close, low)
+        or low > min(open_price, close, high)
+        for row in rows
+    )
+    if malformed:
+        blockers.append("malformed_ohlc")
+    if len(valid_stamps) != len(set(valid_stamps)):
+        blockers.append("duplicate_bar_timestamps")
+    if valid_stamps != sorted(valid_stamps):
+        blockers.append("out_of_order_bars")
+    if any(stamp > now + timedelta(seconds=30) for stamp in valid_stamps):
+        blockers.append("future_dated_bars")
+    session = _session_risk_context(now)
+    latest = max(valid_stamps, default=None)
+    completed_at = latest + timedelta(minutes=5) if latest else None
+    lag = max(0.0, (now - completed_at).total_seconds()) if completed_at else None
+    if not session["hard_veto"] and (lag is None or lag > MAX_COMPLETED_BAR_LAG_SECONDS):
+        blockers.append("stale_primary_bars")
+    recent = sorted(stamp for stamp in valid_stamps if stamp.astimezone(MARKET_TZ).date() == now.astimezone(MARKET_TZ).date())[-24:]
+    missing_intervals = sum(1 for left, right in zip(recent, recent[1:]) if (right - left).total_seconds() > 5 * 60 + 30)
+    if missing_intervals:
+        warnings.append("missing_intraday_bar_intervals")
+    if not consolidated_quote:
+        warnings.append("consolidated_nbbo_unavailable")
+    status = "blocked" if blockers else "degraded" if warnings else "pass"
+    return {
+        "status": status,
+        "blockers": list(dict.fromkeys(blockers)),
+        "warnings": list(dict.fromkeys(warnings)),
+        "bar_count": len(rows),
+        "latest_completed_bar_at": completed_at.isoformat().replace("+00:00", "Z") if completed_at else None,
+        "completed_bar_lag_seconds": round(lag, 1) if lag is not None else None,
+        "missing_intraday_intervals": missing_intervals,
+        "quote_scope": "consolidated_sip" if consolidated_quote else "single_venue_iex_not_nbbo",
+        "source_labels": ["completed_5m_bar_integrity_v1", "alpaca_latest_quote_integrity_v1"],
+        "execution_enabled": False,
+        "can_submit_orders": False,
     }
 
 
@@ -203,6 +442,35 @@ def _aggregate_rth_hourly(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def _aggregate_rth_four_hour(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate only complete eight-bar RTH blocks from completed 30m bars."""
+    buckets: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
+    for row in sorted(_bars_normalized(rows), key=lambda value: str(value.get("t") or "")):
+        stamp = _utc(row.get("t"))
+        if stamp is None:
+            continue
+        local = stamp.astimezone(MARKET_TZ)
+        minute_of_day = local.hour * 60 + local.minute
+        if minute_of_day < 9 * 60 + 30 or minute_of_day >= 16 * 60:
+            continue
+        elapsed = minute_of_day - (9 * 60 + 30)
+        buckets[(local.date().isoformat(), elapsed // 240)].append(row)
+    output: list[dict[str, Any]] = []
+    for key in sorted(buckets):
+        group = buckets[key]
+        if len(group) != 8:
+            continue
+        output.append({
+            "t": group[0].get("t"),
+            "o": float(group[0]["o"]),
+            "h": max(float(row["h"]) for row in group),
+            "l": min(float(row["l"]) for row in group),
+            "c": float(group[-1]["c"]),
+            "v": sum(float(row["v"]) for row in group),
+        })
+    return output
+
+
 def _filter_completed_period_bars(
     rows: list[dict[str, Any]], *, timeframe: str, now: datetime | None = None
 ) -> list[dict[str, Any]]:
@@ -222,7 +490,7 @@ def _filter_completed_period_bars(
 
 
 def _context_source_labels(higher_timeframes: Mapping[str, list[dict[str, Any]]] | None) -> list[str]:
-    aliases = {"1h": "60m", "1day": "1d", "1week": "1w"}
+    aliases = {"1h": "60m", "4hour": "4h", "1day": "1d", "1week": "1w"}
     labels: list[str] = []
     for name, rows in (higher_timeframes or {}).items():
         if not rows:
@@ -322,9 +590,10 @@ def _geometry(
 class LiveOpportunityEngine:
     """In-memory evaluator. Network transport is intentionally separate."""
 
-    def __init__(self, *, feed: str = "iex") -> None:
+    def __init__(self, *, feed: str = "iex", risk_report_path: Path | None = None) -> None:
         self.feed = feed if feed in {"iex", "sip"} else "iex"
         self.transport = "websocket"
+        self.risk_report_path = risk_report_path
         self._symbols: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
 
@@ -392,12 +661,28 @@ class LiveOpportunityEngine:
                     current[str(name)] = normalized
             state["higher_timeframes_refreshed_at"] = refreshed_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    def _candidates_for(self, symbol: str, state: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
+    def _correlated_bars_for(self, symbol: str) -> dict[str, list[dict[str, Any]]]:
+        peer = {"QQQ": "SPY", "SPY": "QQQ"}.get(symbol.upper())
+        if not peer:
+            return {}
+        rows = _bars_normalized((self._symbols.get(peer) or {}).get("bars") or [])
+        return {peer: rows} if rows else {}
+
+    def _candidates_for(
+        self,
+        symbol: str,
+        state: dict[str, Any],
+        now: datetime,
+        *,
+        market_risk: dict[str, Any],
+        session_risk: dict[str, Any],
+    ) -> list[dict[str, Any]]:
         rows = _bars_normalized(state.get("bars") or [])
         if len(rows) < 3:
             return []
         features = bar_features(rows)
         quote = _quote_context(state.get("quote") or {}, now)
+        data_quality = _data_quality_context(rows, quote, now=now, consolidated_quote=self.feed == "sip")
         previous_close = _finite(state.get("previous_close"))
         last_close = _finite(rows[-1].get("c"))
         stock_return = last_close / previous_close - 1 if last_close is not None and previous_close else None
@@ -419,6 +704,8 @@ class LiveOpportunityEngine:
             rvol=rvol,
             average_dollar_volume=average_dollar,
             higher_timeframes=state.get("higher_timeframes") or None,
+            correlated_bars=self._correlated_bars_for(symbol),
+            macro_event_window=bool(market_risk.get("macro_event_window")),
         )
         structure_by_direction: dict[str, dict[str, Any]] = {}
         probe_setup = structure_probe.get("best_setup") if isinstance(structure_probe.get("best_setup"), dict) else {}
@@ -443,11 +730,17 @@ class LiveOpportunityEngine:
                     average_dollar_volume=average_dollar,
                     direction_hint=direction,
                     higher_timeframes=state.get("higher_timeframes") or None,
+                    correlated_bars=self._correlated_bars_for(symbol),
+                    macro_event_window=bool(market_risk.get("macro_event_window")),
                 )
             market_structure = structure_by_direction[direction]
             if context_source_labels:
                 market_structure["source_labels"] = list(dict.fromkeys([*market_structure["source_labels"], *context_source_labels]))
             blockers: list[str] = []
+            blockers.extend(str(value) for value in data_quality.get("blockers") or [])
+            if session_risk.get("hard_veto"):
+                blockers.append(str(session_risk.get("phase") or "session_timing_blocked"))
+            blockers.extend(str(value) for value in market_risk.get("blockers") or [])
             if quote["freshness"] not in {"live", "recent"}:
                 blockers.append("stale_quote")
             if quote["spread_bps"] is None or float(quote["spread_bps"]) > MAX_SPREAD_BPS:
@@ -508,6 +801,9 @@ class LiveOpportunityEngine:
                     "relative_strength": round(relative_score, 1),
                 },
                 "market_structure": market_structure,
+                "data_quality": data_quality,
+                "market_risk_context": market_risk,
+                "session_risk_context": session_risk,
                 **geometry,
                 "execution_enabled": False,
                 "can_submit_orders": False,
@@ -517,11 +813,24 @@ class LiveOpportunityEngine:
 
     def snapshot(self, *, now: datetime | None = None) -> dict[str, Any]:
         now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        risk_required = self.risk_report_path is not None
+        market_risk = _market_risk_context(
+            _read_json(self.risk_report_path) if self.risk_report_path is not None else {},
+            now=now,
+            required=risk_required,
+        )
+        session_risk = _session_risk_context(now)
         with self._lock:
             candidates = [
                 row
                 for symbol, state in sorted(self._symbols.items())
-                for row in self._candidates_for(symbol, state, now)
+                for row in self._candidates_for(
+                    symbol,
+                    state,
+                    now,
+                    market_risk=market_risk,
+                    session_risk=session_risk,
+                )
             ]
             quote_times = [
                 str((state.get("quote") or {}).get("timestamp") or (state.get("quote") or {}).get("t") or "")
@@ -531,6 +840,7 @@ class LiveOpportunityEngine:
             for symbol, state in sorted(self._symbols.items()):
                 rows = _bars_normalized(state.get("bars") or [])
                 quote = _quote_context(state.get("quote") or {}, now)
+                data_quality = _data_quality_context(rows, quote, now=now, consolidated_quote=self.feed == "sip")
                 session_dollar = sum(float(row["c"]) * float(row["v"]) for row in rows)
                 average_dollar = _finite(state.get("average_dollar_volume"))
                 rvol = session_dollar / (average_dollar * _session_progress(now)) if average_dollar and average_dollar > 0 else None
@@ -540,6 +850,8 @@ class LiveOpportunityEngine:
                     rvol=rvol,
                     average_dollar_volume=average_dollar,
                     higher_timeframes=state.get("higher_timeframes") or None,
+                    correlated_bars=self._correlated_bars_for(symbol),
+                    macro_event_window=bool(market_risk.get("macro_event_window")),
                 )
                 context_source_labels = _context_source_labels(state.get("higher_timeframes"))
                 if context_source_labels:
@@ -562,6 +874,13 @@ class LiveOpportunityEngine:
                     "liquidity_level_context": analysis["liquidity_level_context"],
                     "participation_context": analysis["participation_context"],
                     "macro_context": analysis["macro_context"],
+                    "strat_context": analysis["strat_context"],
+                    "ny_0800_0900_range_context": analysis["ny_0800_0900_range_context"],
+                    "smt_divergence_context": analysis["smt_divergence_context"],
+                    "clc_entry_context": analysis["clc_entry_context"],
+                    "data_quality": data_quality,
+                    "market_risk_context": market_risk,
+                    "session_risk_context": session_risk,
                     "freshness": analysis["freshness"],
                     "source_labels": analysis["source_labels"],
                     "execution_enabled": False,
@@ -586,6 +905,16 @@ class LiveOpportunityEngine:
                 structure_watchlist,
                 key=lambda row: (-float(row["score"]), row["symbol"]),
             ),
+            "market_risk_context": market_risk,
+            "session_risk_context": session_risk,
+            "data_quality_summary": {
+                "status": "blocked" if any(row.get("data_quality", {}).get("status") == "blocked" for row in structure_watchlist) else "degraded" if any(row.get("data_quality", {}).get("status") == "degraded" for row in structure_watchlist) else "pass",
+                "blocked_symbols": [row["symbol"] for row in structure_watchlist if row.get("data_quality", {}).get("status") == "blocked"],
+                "degraded_symbols": [row["symbol"] for row in structure_watchlist if row.get("data_quality", {}).get("status") == "degraded"],
+                "source_labels": ["completed_5m_bar_integrity_v1", "alpaca_latest_quote_integrity_v1"],
+                "execution_enabled": False,
+                "can_submit_orders": False,
+            },
             "feed": feed,
             "providers": build_provider_registry(root=ROOT),
             "validation": _validation_snapshot(ROOT),
@@ -893,10 +1222,15 @@ def _fetch_completed_context_bars(
                 # Each missing frame is visible in coverage and fails its own
                 # gate closed without taking down the other read-only sources.
                 context[timeframe] = {}
+    context["4h"] = {
+        symbol: _aggregate_rth_four_hour(rows)[-120:]
+        for symbol, rows in context.get("30m", {}).items()
+        if rows
+    }
     return {
         symbol: {
             timeframe: context[timeframe].get(symbol) or []
-            for timeframe in ("15m", "30m", "60m", "1d", "1w")
+            for timeframe in ("15m", "30m", "60m", "4h", "1d", "1w")
         }
         for symbol in symbols
     }
@@ -911,6 +1245,8 @@ def run_rest_poll(
 ) -> int:
     """Fallback when the account's single Alpaca WebSocket is already in use."""
     engine.transport = "rest_polling"
+    websocket_symbols: list[str] = []
+    rest_symbols = list(symbols)
     next_bar_refresh = 0.0
     next_context_refresh = time.monotonic() + 15 * 60.0
     while not stop_event.is_set():
@@ -937,11 +1273,23 @@ def run_rest_poll(
             snapshot = engine.snapshot()
             snapshot["stream_status"] = "rest_polling_fallback"
             snapshot["stream_fallback_reason"] = "alpaca_websocket_connection_limit"
+            snapshot["stream_coverage"] = _stream_coverage(
+                websocket_symbols,
+                rest_symbols,
+                rest_quote_status="connected",
+                rest_bar_status="connected",
+            )
             _atomic_json(report_path, snapshot)
         except Exception as exc:
             failure = engine.snapshot()
             failure["stream_status"] = "rest_polling_degraded"
             failure["stream_error"] = type(exc).__name__
+            failure["stream_coverage"] = _stream_coverage(
+                websocket_symbols,
+                rest_symbols,
+                rest_quote_status=f"degraded_{type(exc).__name__}",
+                rest_bar_status=f"degraded_{type(exc).__name__}",
+            )
             failure["decision_state"] = "STAND_ASIDE"
             failure["ready_count"] = 0
             _atomic_json(report_path, failure)
@@ -963,6 +1311,7 @@ def run_stream(
     key, secret = _load_alpaca_credentials()
     if not key or not secret:
         raise RuntimeError("Alpaca market-data credentials are unavailable")
+    websocket_symbols, rest_symbols = _hybrid_symbol_partition(symbols)
     aggregator = FiveMinuteAggregator()
     delay = 1.0
     while not stop.is_set():
@@ -971,13 +1320,22 @@ def run_stream(
             _receive_control(ws, expected_type="success", expected_message="connected")
             ws.send(json.dumps({"action": "auth", "key": key, "secret": secret}))
             _receive_control(ws, expected_type="success", expected_message="authenticated")
-            ws.send(json.dumps({"action": "subscribe", "quotes": symbols, "bars": symbols}))
+            ws.send(json.dumps({"action": "subscribe", "quotes": websocket_symbols, "bars": websocket_symbols}))
             _receive_control(ws, expected_type="subscription")
+            if hasattr(ws, "settimeout"):
+                ws.settimeout(2.0)
             delay = 1.0
             last_write = 0.0
+            next_rest_quote_refresh = 0.0
+            next_rest_bar_refresh = 0.0
             next_context_refresh = time.monotonic() + 15 * 60.0
+            rest_quote_status = "not_required" if not rest_symbols else "pending"
+            rest_bar_status = "not_required" if not rest_symbols else "pending"
             while not stop.is_set():
-                messages = json.loads(ws.recv())
+                try:
+                    messages = json.loads(ws.recv())
+                except websocket.WebSocketTimeoutException:
+                    messages = []
                 for message in messages if isinstance(messages, list) else [messages]:
                     if not isinstance(message, dict):
                         continue
@@ -985,12 +1343,38 @@ def run_stream(
                         raise RuntimeError(f"alpaca_stream_error_{message.get('code', 'unknown')}")
                     symbol = str(message.get("S") or "").upper()
                     if message.get("T") == "q" and symbol:
-                        engine.update_quote(symbol, {"bid": message.get("bp"), "ask": message.get("ap"), "timestamp": message.get("t")})
+                        engine.update_quote(symbol, {
+                            "bid": message.get("bp"),
+                            "ask": message.get("ap"),
+                            "bid_size": message.get("bs"),
+                            "ask_size": message.get("as"),
+                            "timestamp": message.get("t"),
+                        })
                     elif message.get("T") == "b" and symbol:
                         completed = aggregator.add(symbol, message)
                         if completed:
                             engine.update_completed_bar(symbol, completed)
-                if time.monotonic() >= next_context_refresh:
+                current_tick = time.monotonic()
+                if rest_symbols and current_tick >= next_rest_quote_refresh:
+                    try:
+                        quotes = _fetch_latest_quotes(rest_symbols, feed=engine.feed)
+                        for symbol, quote in quotes.items():
+                            engine.update_quote(symbol, quote)
+                        rest_quote_status = "connected"
+                    except Exception as exc:
+                        rest_quote_status = f"degraded_{type(exc).__name__}"
+                    next_rest_quote_refresh = current_tick + REST_QUOTE_REFRESH_SECONDS
+                if rest_symbols and current_tick >= next_rest_bar_refresh:
+                    try:
+                        bars, _ = fetch_intraday_bars(rest_symbols, datetime.now(MARKET_TZ))
+                        for symbol, rows in bars.items():
+                            for bar in rows[-120:]:
+                                engine.update_completed_bar(symbol, bar)
+                        rest_bar_status = "connected"
+                    except Exception as exc:
+                        rest_bar_status = f"degraded_{type(exc).__name__}"
+                    next_rest_bar_refresh = current_tick + REST_BAR_REFRESH_SECONDS
+                if current_tick >= next_context_refresh:
                     refreshed = _fetch_completed_context_bars(symbols, feed=engine.feed)
                     refreshed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                     for symbol in symbols:
@@ -1000,11 +1384,17 @@ def run_stream(
                             refreshed_at=refreshed_at,
                         )
                     next_context_refresh = time.monotonic() + 15 * 60.0
-                if time.monotonic() - last_write >= 2.0:
+                if current_tick - last_write >= 2.0:
                     snapshot = engine.snapshot()
-                    snapshot["stream_status"] = "connected"
+                    snapshot["stream_status"] = "connected_hybrid" if rest_symbols else "connected"
+                    snapshot["stream_coverage"] = _stream_coverage(
+                        websocket_symbols,
+                        rest_symbols,
+                        rest_quote_status=rest_quote_status,
+                        rest_bar_status=rest_bar_status,
+                    )
                     _atomic_json(report_path, snapshot)
-                    last_write = time.monotonic()
+                    last_write = current_tick
             ws.close()
         except Exception as exc:
             if str(exc) == "alpaca_stream_error_406":
@@ -1048,7 +1438,8 @@ def main() -> int:
         symbols = [str(value) for value in radar.get("all_discovered_symbols") or []][:100]
     if not symbols:
         symbols = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMD", "TSLA"]
-    engine = LiveOpportunityEngine(feed=args.feed)
+    symbols = _with_core_context_symbols(symbols)
+    engine = LiveOpportunityEngine(feed=args.feed, risk_report_path=DEFAULT_CATALYST_PATH)
     context_rows = [
         row
         for key in ("ranked_candidates", "filtered_candidates")
