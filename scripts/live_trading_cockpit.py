@@ -32,6 +32,7 @@ REPORT_FILES: dict[str, str] = {
     "detection_scorecard": "detection-scorecard-rolling.json",
     "cisd_promotion": "cisd-promotion-status.json",
     "mes_v2_evidence": "mes-v2-evidence-status.json",
+    "mnq_smt_evidence": "mnq-smt-evidence-status.json",
     "pattern_grades": "pattern-grader-grades.json",
     "grade_calibration": "grade-probability-calibration.json",
     "live_opportunities": "live-opportunity-engine.json",
@@ -1989,6 +1990,7 @@ def build_cockpit(
             "scorecard_rolling": reports["detection_scorecard"],
             "cisd_promotion_status": reports["cisd_promotion"],
             "mes_v2_evidence_status": reports["mes_v2_evidence"],
+            "mnq_smt_evidence_status": reports["mnq_smt_evidence"],
             "pattern_grader": {
                 **reports["pattern_grades"],
                 "source": sources_by_name.get("pattern_grades", {}),

@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = "GLBX.MDP3"
 SUPPORTED_SCHEMAS = frozenset({"ohlcv-1m", "bbo-1s", "mbo"})
+SUPPORTED_INDEX_ROOTS = frozenset({"MES", "MNQ", "ES", "NQ"})
 CONTRACT_MONTH_CODES = {3: "H", 6: "M", 9: "U", 12: "Z"}
 DEFAULT_MAX_COST_USD = 5.0
 DEFAULT_MAX_QUOTE_AGE_SECONDS = 2.0
@@ -73,19 +74,27 @@ def _quarter_sequence(start_year: int):
         year += 1
 
 
-def mes_front_contract(value: date | datetime) -> ContractSelection:
-    """Select the MES contract, rolling eight calendar days before expiry."""
+def index_future_front_contract(root: str, value: date | datetime) -> ContractSelection:
+    """Select a frozen quarterly index future using the eight-day roll rule."""
+    normalized_root = str(root).strip().upper()
+    if normalized_root not in SUPPORTED_INDEX_ROOTS:
+        raise ValueError(f"unsupported CME equity-index future root: {normalized_root}")
     session_date = value.date() if isinstance(value, datetime) else value
     for year, month in _quarter_sequence(session_date.year):
         expiry = third_friday(year, month)
         roll_at = expiry - timedelta(days=8)
         if session_date < roll_at:
             return ContractSelection(
-                raw_symbol=f"MES{CONTRACT_MONTH_CODES[month]}{year % 10}",
+                raw_symbol=f"{normalized_root}{CONTRACT_MONTH_CODES[month]}{year % 10}",
                 expiry=expiry,
                 roll_at=roll_at,
             )
     raise AssertionError("unreachable")
+
+
+def mes_front_contract(value: date | datetime) -> ContractSelection:
+    """Backward-compatible MES contract selector."""
+    return index_future_front_contract("MES", value)
 
 
 def _utc(value: datetime) -> datetime:
@@ -95,7 +104,8 @@ def _utc(value: datetime) -> datetime:
 
 
 def historical_request(
-    *, schema: str, start: datetime, end: datetime
+    *, schema: str, start: datetime, end: datetime, root: str = "MES",
+    contract_date: date | None = None,
 ) -> tuple[dict[str, Any], ContractSelection]:
     if schema not in SUPPORTED_SCHEMAS:
         raise ValueError(f"unsupported Databento schema: {schema}")
@@ -104,10 +114,12 @@ def historical_request(
         raise ValueError("end must be after start")
     if schema == "mbo" and start_utc.time() != datetime.min.time():
         raise ValueError("MBO requests must start at midnight UTC to include the mandatory snapshot")
-    first = mes_front_contract(start_utc)
-    last = mes_front_contract(end_utc - timedelta(microseconds=1))
-    if first.raw_symbol != last.raw_symbol:
-        raise ValueError("request crosses the frozen eight-day MES roll boundary")
+    first = index_future_front_contract(root, contract_date or start_utc)
+    last = index_future_front_contract(root, end_utc - timedelta(microseconds=1))
+    if contract_date is None and first.raw_symbol != last.raw_symbol:
+        raise ValueError("request crosses the frozen eight-day index-future roll boundary")
+    if contract_date is not None and end_utc.date() > first.expiry:
+        raise ValueError("raw-contract context request extends beyond contract expiry")
     return (
         {
             "dataset": DATASET,
@@ -138,11 +150,20 @@ def fetch_historical_cache(
     client: Any | None = None,
     manifest_path: Path | None = None,
     reserve_cost: Callable[[float], None] | None = None,
+    root: str = "MES",
+    contract_date: date | None = None,
 ) -> dict[str, Any]:
     """Estimate first, enforce a hard cap, then atomically cache a DBN file."""
     if max_cost_usd < 0:
         raise ValueError("max_cost_usd cannot be negative")
-    request, contract = historical_request(schema=schema, start=start, end=end)
+    normalized_root = str(root).strip().upper()
+    request, contract = historical_request(
+        schema=schema,
+        start=start,
+        end=end,
+        root=normalized_root,
+        contract_date=contract_date,
+    )
     if client is None:
         import databento as db
 
@@ -161,7 +182,7 @@ def fetch_historical_cache(
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()[:20]
-    cache = cache_dir / f"mes_{contract.raw_symbol.lower()}_{schema}_{fingerprint}.dbn.zst"
+    cache = cache_dir / f"{normalized_root.lower()}_{contract.raw_symbol.lower()}_{schema}_{fingerprint}.dbn.zst"
     cache.parent.mkdir(parents=True, exist_ok=True)
     reused = cache.exists() and cache.stat().st_size > 0
     if not reused and estimate > max_cost_usd:
@@ -192,6 +213,7 @@ def fetch_historical_cache(
         "provider": "databento",
         "dataset": DATASET,
         "schema": schema,
+        "root": normalized_root,
         "raw_symbol": contract.raw_symbol,
         "stype_in": "raw_symbol",
         "start": request["start"].isoformat().replace("+00:00", "Z"),
@@ -199,6 +221,7 @@ def fetch_historical_cache(
         "expiry": contract.expiry.isoformat(),
         "roll_at": contract.roll_at.isoformat(),
         "roll_policy": "eight_calendar_days_before_quarterly_third_friday_expiry",
+        "contract_selected_for": contract_date.isoformat() if contract_date else None,
         "estimated_cost_usd": round(estimate, 6),
         "hard_cost_cap_usd": float(max_cost_usd),
         "cache": str(cache),

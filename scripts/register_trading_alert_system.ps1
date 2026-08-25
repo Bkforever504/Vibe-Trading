@@ -19,6 +19,7 @@ Set-Location $repo
 & "$repo\scripts\register_equity_orb_scout_v1_task.ps1"
 & "$repo\scripts\register_equity_orb_scout_v2_task.ps1"
 & "$repo\scripts\register_mnq_smt_family_shadow_task.ps1"
+& "$repo\scripts\register_mnq_smt_databento_regrader_task.ps1"
 & "$repo\scripts\register_shadow_ops_tasks.ps1"
 & "$repo\scripts\register_monday_checkin_task.ps1"
 
@@ -50,6 +51,7 @@ $expected = @(
     "EquityOrbScoutV2Entry",
     "EquityOrbScoutV2Resolve",
     "MnqSmtCisdFamilyShadow",
+    "MnqSmtDatabentoRegrade",
     "HMMRegimeScanner",
     "ShadowSystemHeartbeat",
     "SundayShadowPreflight",
@@ -85,7 +87,7 @@ $heartbeatCode = $LASTEXITCODE
 python scripts\sunday_shadow_preflight.py --no-network --no-notify
 $preflightCode = $LASTEXITCODE
 
-$summary = "Trading alert system registered: 14 shadow/monitoring tasks Ready; scanner smoke PASS; heartbeat exit=$heartbeatCode; preflight exit=$preflightCode; no order authority."
+$summary = "Trading alert system registered: 15 shadow/monitoring tasks Ready; scanner smoke PASS; heartbeat exit=$heartbeatCode; preflight exit=$preflightCode; no order authority."
 Write-Host $summary
 if (-not $SkipDiscordConfirmation) {
     python -m agent.notifier --message $summary

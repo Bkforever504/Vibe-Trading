@@ -25,6 +25,8 @@ REPORT_DIR = Path.home() / ".vibe-trading" / "reports"
 REPORT_PATH = REPORT_DIR / "shadow-system-heartbeat.json"
 HMM_PATH = REPORT_DIR / "hmm-regime.json"
 CATALYST_PATH = REPORT_DIR / "market-catalyst-calendar.json"
+DATABENTO_CAPABILITY_PATH = ROOT / "data" / "databento_mes_capability.json"
+MNQ_EVIDENCE_PATH = REPORT_DIR / "mnq-smt-evidence-status.json"
 
 MES_TASKS = (
     ("\\VibeTrade\\", "MesOrb0932V2Entry"),
@@ -39,7 +41,10 @@ SCOUT_TASKS = (
     ("\\VibeTrade\\", "EquityOrbScoutV2Entry"),
     ("\\VibeTrade\\", "EquityOrbScoutV2Resolve"),
 )
-MNQ_SMT_TASKS = (("\\VibeTrade\\", "MnqSmtCisdFamilyShadow"),)
+MNQ_SMT_TASKS = (
+    ("\\VibeTrade\\", "MnqSmtCisdFamilyShadow"),
+    ("\\VibeTrade\\", "MnqSmtDatabentoRegrade"),
+)
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
@@ -76,6 +81,7 @@ def report_freshness(path: Path, *, now: datetime, max_age_hours: float) -> dict
         payload = {}
     candidates = (
         payload.get("generated_at"),
+        payload.get("probed_at"),
         payload.get("timestamp"),
         payload.get("as_of"),
         payload.get("date"),
@@ -136,6 +142,8 @@ def build_report(
     task_rows: list[dict[str, Any]] | None = None,
     hmm_path: Path = HMM_PATH,
     catalyst_path: Path = CATALYST_PATH,
+    databento_capability_path: Path = DATABENTO_CAPABILITY_PATH,
+    mnq_evidence_path: Path = MNQ_EVIDENCE_PATH,
 ) -> dict[str, Any]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     tasks = task_rows if task_rows is not None else probe_tasks()
@@ -167,6 +175,8 @@ def build_report(
     )
     hmm = report_freshness(hmm_path, now=now, max_age_hours=72.0)
     catalyst = report_freshness(catalyst_path, now=now, max_age_hours=36.0)
+    databento_capability = report_freshness(databento_capability_path, now=now, max_age_hours=30.0)
+    mnq_evidence = report_freshness(mnq_evidence_path, now=now, max_age_hours=30.0)
     kill = kill_switch_active()
     healthy = (
         mes["alive"]
@@ -176,6 +186,8 @@ def build_report(
         and ops["alive"]
         and hmm["fresh"]
         and catalyst["fresh"]
+        and databento_capability["fresh"]
+        and mnq_evidence["fresh"]
         and not kill
     )
     return {
@@ -190,6 +202,8 @@ def build_report(
         "operations_tasks": ops,
         "hmm": hmm,
         "catalyst": catalyst,
+        "databento_capability": databento_capability,
+        "mnq_databento_evidence": mnq_evidence,
         "scanner_halts": scanner_halts,
         "kill_switch_active": kill,
         "execution_enabled": False,
@@ -209,6 +223,8 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"Options bot alive: {check(report['options_bot']['alive'])}",
             f"HMM fresh: {check(report['hmm']['fresh'])} (age={report['hmm']['age_hours']}h)",
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",
+            f"Databento probe fresh: {check(report['databento_capability']['fresh'])} (age={report['databento_capability']['age_hours']}h)",
+            f"MNQ MBO evidence fresh: {check(report['mnq_databento_evidence']['fresh'])} (age={report['mnq_databento_evidence']['age_hours']}h)",
             f"Kill switch: {'ACTIVE' if report['kill_switch_active'] else 'clear'}",
             "Monitoring only. No order authority.",
         ]

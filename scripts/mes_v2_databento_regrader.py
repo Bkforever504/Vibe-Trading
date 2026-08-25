@@ -39,7 +39,10 @@ OUTCOMES_PATH = DATA_DIR / "shadow_outcomes.jsonl"
 ATTEMPT_LOG = DATA_DIR / "mes_v2_databento_regrade_log.jsonl"
 ET = ZoneInfo("America/New_York")
 CT = ZoneInfo("America/Chicago")
-HISTORICAL_DELAY = timedelta(hours=25)
+# The current GLBX historical boundary trails real time by about eight hours.
+# Nine hours gives a safety margin; a provider-side range rejection still
+# fails closed and retries the next day.
+HISTORICAL_DELAY = timedelta(hours=9)
 RETRY_BACKOFF = timedelta(hours=24)
 MAX_FAILURE_ATTEMPTS = 3
 MAX_QUOTE_GAP_SECONDS = 30.0
@@ -162,7 +165,9 @@ def pending_plans(
             continue
         if prior_failures and now.astimezone(timezone.utc) - prior_failures[-1] < retry_backoff:
             continue
-        ended = _parse(terminal.get("resolved_at") or terminal.get("exit_timestamp") or terminal.get("timestamp"))
+        # A resolver may run well after the market exit.  Historical
+        # availability is measured from the actual exit, not job wall time.
+        ended = _parse(terminal.get("exit_timestamp") or terminal.get("resolved_at") or terminal.get("timestamp"))
         if now.astimezone(timezone.utc) - ended < HISTORICAL_DELAY:
             continue
         pending.append((entry, terminal))

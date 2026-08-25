@@ -1756,6 +1756,39 @@ export interface MesV2EvidenceStatus {
   can_submit_orders: false;
 }
 
+export interface MnqSmtFamilyEvidenceStatus {
+  schema_version: number;
+  provider: "mnq_smt_family_evidence_status";
+  generated_at: string;
+  source_labels: string[];
+  live_feed: {
+    provider: "databento";
+    dataset: "GLBX.MDP3";
+    status: string;
+    reason?: string | null;
+  };
+  evidence_planes: {
+    timely_discovery: string;
+    promotion_measurement: string;
+  };
+  approval_present: boolean;
+  candidates: Array<{
+    candidate_id: string;
+    family_id: string;
+    qualified_outcomes: number;
+    excluded_outcomes: number;
+    distinct_dates: number;
+    targets: { resolved_outcomes: number; distinct_dates: number; dates_per_regime: number };
+    regime_dates: Record<"trend" | "chop" | "high_vol" | "low_vol", number>;
+    status: string;
+    blockers: string[];
+    execution_enabled: false;
+    can_submit_orders: false;
+  }>;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingDailyReviewGate {
   status: "complete" | "attention_required" | "missing" | string;
   date: string | null;
@@ -1983,6 +2016,7 @@ export interface TradingDashboard {
     };
     cisd_promotion_status?: CisdPromotionStatus;
     mes_v2_evidence_status?: MesV2EvidenceStatus;
+    mnq_smt_evidence_status?: MnqSmtFamilyEvidenceStatus;
     pattern_grader?: {
       schema_version?: number;
       provider?: string;

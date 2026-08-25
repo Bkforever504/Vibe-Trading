@@ -104,12 +104,18 @@ def test_heartbeat_passes_ready_tasks_and_fresh_sources_then_fails_stale_hmm(tmp
     monkeypatch.setattr(heartbeat, "is_halted", lambda _name: False)
     monkeypatch.setattr(heartbeat, "read_state", lambda _name: {})
     monkeypatch.setattr(heartbeat, "kill_switch_active", lambda: False)
-    report = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst)
+    databento = tmp_path / "databento.json"
+    mnq_evidence = tmp_path / "mnq-evidence.json"
+    _fresh_report(databento, NOW)
+    _fresh_report(mnq_evidence, NOW)
+    report = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst,
+                                    databento_capability_path=databento, mnq_evidence_path=mnq_evidence)
     assert report["status"] == "PASS"
     assert "MES v2 alive: OK" in heartbeat.format_heartbeat(report)
 
     _fresh_report(hmm, NOW - timedelta(days=4))
-    stale = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst)
+    stale = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst,
+                                   databento_capability_path=databento, mnq_evidence_path=mnq_evidence)
     assert stale["status"] == "FAIL"
     assert stale["hmm"]["fresh"] is False
 

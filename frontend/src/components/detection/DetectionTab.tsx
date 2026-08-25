@@ -1,4 +1,4 @@
-import type { CisdPromotionStatus, DetectionPatternCoverage, MesV2EvidenceStatus, TradingDashboard } from "@/lib/api";
+import type { CisdPromotionStatus, DetectionPatternCoverage, MesV2EvidenceStatus, MnqSmtFamilyEvidenceStatus, TradingDashboard } from "@/lib/api";
 
 type Scorecard = NonNullable<NonNullable<TradingDashboard["discovery"]>["scorecard_rolling"]>;
 
@@ -7,6 +7,30 @@ interface DetectionTabProps {
   promotion?: CisdPromotionStatus;
   governance?: TradingDashboard["research_governance"];
   mesEvidence?: MesV2EvidenceStatus;
+  mnqEvidence?: MnqSmtFamilyEvidenceStatus;
+}
+
+function MnqEvidenceProgress({ evidence }: { evidence?: MnqSmtFamilyEvidenceStatus }) {
+  const candidates = evidence?.candidates ?? [];
+  return (
+    <section className="mt-4 border border-border bg-card" aria-labelledby="mnq-evidence-heading">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div><h2 id="mnq-evidence-heading" className="text-sm font-semibold">MNQ SMT / CISD Databento evidence</h2><p className="mt-0.5 text-xs text-muted-foreground">Four frozen ablations are reproduced from raw-contract OHLCV and resolved from reconstructed MBO. Proxy outcomes never count.</p></div>
+        <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${evidence?.live_feed.status === "available" ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}>Live CME {evidence?.live_feed.status ?? "not probed"}</span>
+      </div>
+      {candidates.length ? <div className="divide-y divide-border">{candidates.map((candidate) => <article key={candidate.candidate_id} className="p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><div className="font-semibold">{candidate.candidate_id}</div><div className="text-xs text-muted-foreground">{candidate.family_id}</div></div><span className="rounded bg-amber-500/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-500">{candidate.status.replace(/_/g, " ")}</span></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <ProgressStat label="Qualified MBO outcomes" value={candidate.qualified_outcomes} target={candidate.targets.resolved_outcomes} />
+          <ProgressStat label="Independent dates" value={candidate.distinct_dates} target={candidate.targets.distinct_dates} />
+          <div className="border border-border bg-background p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Regime dates</div><div className="mt-1 text-xs tabular-nums">Trend {candidate.regime_dates.trend} · Chop {candidate.regime_dates.chop}</div><div className="mt-1 text-xs tabular-nums">High vol {candidate.regime_dates.high_vol} · Low vol {candidate.regime_dates.low_vol}</div><div className="mt-2 text-xs text-muted-foreground">Need {candidate.targets.dates_per_regime} each</div></div>
+          <div className="border border-border bg-background p-3"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">Excluded proxy / invalid</div><div className="mt-1 text-lg font-bold tabular-nums">{candidate.excluded_outcomes}</div><div className="mt-2 text-xs text-muted-foreground">Approval {evidence?.approval_present ? "recorded" : "missing"}</div></div>
+        </div>
+        {candidate.blockers.length ? <p className="mt-2 text-xs text-amber-600">HOLD: {candidate.blockers.join(" · ").replace(/_/g, " ")}</p> : null}
+      </article>)}</div> : <p className="px-3 py-5 text-sm text-muted-foreground">No delayed MNQ MBO evidence yet. The first eligible market session is 2026-08-25.</p>}
+      <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">Live CME license absence blocks real-time Databento—not delayed regrading · execution_enabled=false · can_submit_orders=false</p>
+    </section>
+  );
 }
 
 function MesEvidenceProgress({ evidence }: { evidence?: MesV2EvidenceStatus }) {
@@ -139,7 +163,7 @@ function CoverageHeatmap({ coverage }: { coverage: DetectionPatternCoverage }) {
   );
 }
 
-export function DetectionTab({ scorecard, promotion, governance, mesEvidence }: DetectionTabProps) {
+export function DetectionTab({ scorecard, promotion, governance, mesEvidence, mnqEvidence }: DetectionTabProps) {
   const metrics = scorecard?.metrics;
   const coverage = scorecard?.pattern_coverage;
   const misses = scorecard?.top_missed_moves ?? [];
@@ -162,6 +186,7 @@ export function DetectionTab({ scorecard, promotion, governance, mesEvidence }: 
       <CisdProgress promotion={promotion} />
       <GovernanceControls governance={governance} />
       <MesEvidenceProgress evidence={mesEvidence} />
+      <MnqEvidenceProgress evidence={mnqEvidence} />
 
       {coverage ? (
         <section className="mt-4 border border-border bg-card" aria-labelledby="opportunity-coverage-heading">

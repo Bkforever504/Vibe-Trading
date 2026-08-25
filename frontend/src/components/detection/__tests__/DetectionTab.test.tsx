@@ -99,9 +99,34 @@ const mesEvidence = {
   can_submit_orders: false as const,
 };
 
+const mnqEvidence = {
+  schema_version: 1,
+  provider: "mnq_smt_family_evidence_status" as const,
+  generated_at: "2026-08-24T22:00:00Z",
+  source_labels: ["data/shadow_outcomes.jsonl"],
+  live_feed: { provider: "databento" as const, dataset: "GLBX.MDP3" as const, status: "unavailable", reason: "live_data_license_required" },
+  evidence_planes: { timely_discovery: "proxy_non_executable_not_promotion_eligible", promotion_measurement: "delayed_databento_mbo_regrade" },
+  approval_present: true,
+  candidates: [{
+    candidate_id: "mnq-cisd-only-v1",
+    family_id: "mnq-smt-cisd-family",
+    qualified_outcomes: 0,
+    excluded_outcomes: 1,
+    distinct_dates: 0,
+    targets: { resolved_outcomes: 100, distinct_dates: 30, dates_per_regime: 8 },
+    regime_dates: { trend: 0, chop: 0, high_vol: 0, low_vol: 0 },
+    status: "collecting_or_blocked",
+    blockers: ["natural_forward_sample_incomplete"],
+    execution_enabled: false as const,
+    can_submit_orders: false as const,
+  }],
+  execution_enabled: false as const,
+  can_submit_orders: false as const,
+};
+
 describe("DetectionTab", () => {
   it("renders family precision, recall, delta, and CISD evidence", () => {
-    render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} mesEvidence={mesEvidence} />);
+    render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} mesEvidence={mesEvidence} mnqEvidence={mnqEvidence} />);
 
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
     expect(screen.getByText("Opportunity coverage")).toBeInTheDocument();
@@ -125,6 +150,10 @@ describe("DetectionTab", () => {
     expect(screen.getByText("MES v2 forward evidence")).toBeInTheDocument();
     expect(screen.getByText("1 / 100")).toBeInTheDocument();
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
-    expect(screen.getByText(/natural forward sample incomplete/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/natural forward sample incomplete/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("MNQ SMT / CISD Databento evidence")).toBeInTheDocument();
+    expect(screen.getByText("mnq-cisd-only-v1")).toBeInTheDocument();
+    expect(screen.getByText(/Approval recorded/i)).toBeInTheDocument();
+    expect(screen.getByText(/Live CME license absence/i)).toBeInTheDocument();
   });
 });

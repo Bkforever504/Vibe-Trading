@@ -115,3 +115,15 @@ def test_scheduler_is_one_low_authority_five_minute_rth_family_task() -> None:
     assert 'ValidateSet("entry", "resolve", "cycle")' in runner
     assert '"cycle"' in runner
     assert ("\\VibeTrade\\", "MnqSmtCisdFamilyShadow") in heartbeat.EXPECTED_TASKS
+
+
+def test_delayed_databento_regrader_is_cost_capped_and_monitored() -> None:
+    root = Path(__file__).resolve().parents[2]
+    registration = (root / "scripts" / "register_mnq_smt_databento_regrader_task.ps1").read_text(encoding="utf-8")
+    runner = (root / "scripts" / "run_mnq_smt_family_databento_regrader.ps1").read_text(encoding="utf-8")
+    assert '-At "00:45"' in registration
+    assert '-RunLevel Limited' in registration
+    assert '-MultipleInstances IgnoreNew' in registration
+    assert '--max-daily-cost 5.00' in runner
+    assert 'KILL_SWITCH' in runner
+    assert ("\\VibeTrade\\", "MnqSmtDatabentoRegrade") in heartbeat.EXPECTED_TASKS

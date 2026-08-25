@@ -12,7 +12,7 @@ Set-Location C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\register_trading_alert_system.ps1
 ```
 
-The master setup registers and verifies 13 relevant Task Scheduler entries under
+The master setup registers and verifies 15 relevant Task Scheduler entries under
 `\VibeTrade\`:
 
 - MES ORB v2 entry and resolve
@@ -20,6 +20,8 @@ The master setup registers and verifies 13 relevant Task Scheduler entries under
 - MES v2 delayed Databento regrade
 - Equity ORB Scout v1 entry and resolve
 - Equity ORB Scout v2 entry and resolve
+- MNQ SMT/CISD four-ablation family cycle every completed five-minute RTH bar
+- MNQ SMT/CISD delayed Databento regrade at 00:45 CT daily
 - HMM regime producer at 08:40 CT on weekdays
 - System heartbeat at 09:00, 12:00, and 15:30 CT
 - Sunday preflight at 20:00 CT
@@ -62,11 +64,36 @@ python -c "from scripts.shadow_ops import clear_halt; print(clear_halt('equity-o
 
 The MES ORB scanner continues to reject stale/missing HMM context. The wrapper
 sends a specific Discord alert for that skip. The heartbeat marks HMM stale at
-more than 72 hours and catalyst data stale at more than 36 hours.
+more than 72 hours, catalyst data stale at more than 36 hours, and the
+Databento capability/MNQ evidence reports stale at more than 30 hours.
+
+## Databento evidence boundary
+
+The configured account currently supports historical `GLBX.MDP3` retrieval but
+the live CME gateway reports `live_data_license_required`. The system therefore
+keeps timely MNQ alerts labeled as non-executable proxy discovery. At 00:45 CT,
+after the current historical availability delay, the regrader:
+
+1. independently rebuilds each signal from raw MNQ/NQ/MES/ES one-minute bars;
+2. applies the frozen evidence-only regime labeler;
+3. reconstructs the full MNQ MBO book from its midnight snapshot;
+4. uses ask/bid for long entry/exit and bid/ask for short entry/exit;
+5. appends only integrity-complete post-preregistration outcomes to promotion evidence.
+
+The task estimates cost before every uncached download, attempts at most four
+plans, and enforces a $5.00 aggregate daily ceiling. Cached requests cost no
+additional allowance. It alerts on attempted regrades and fails closed on
+entitlement, range, contract, snapshot, gap, spread, or timestamp errors.
+
+If a Databento live CME license is later activated, the daily capability probe
+will change the dashboard status automatically. A separate reviewed live-stream
+collector with replay/backfill and deduplication is still required before live
+MBO can replace proxy discovery; a successful license probe alone never changes
+evidence eligibility or order authority.
 
 ## File-drop kill switch
 
-Create this exact file to stop the MES v2, equity scout, and Databento regrader
+Create this exact file to stop the MES v2, MNQ family, equity scout, and Databento regraders
 work on their next fire:
 
 ```powershell
@@ -91,7 +118,7 @@ report that the kill switch is engaged.
 ```powershell
 python scripts\shadow_system_heartbeat.py
 uv run --no-project --with yfinance --with pandas --with numpy python scripts\sunday_shadow_preflight.py
-Get-ScheduledTask -TaskPath "\VibeTrade\" | Where-Object TaskName -Match "Mes|EquityOrb|ShadowSystem|SundayShadow|EodShadow"
+Get-ScheduledTask -TaskPath "\VibeTrade\" | Where-Object TaskName -Match "Mes|Mnq|EquityOrb|ShadowSystem|SundayShadow|EodShadow"
 ```
 
 All components in this document are monitoring or shadow evidence systems:

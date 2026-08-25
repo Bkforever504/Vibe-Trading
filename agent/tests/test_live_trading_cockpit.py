@@ -413,6 +413,33 @@ def test_cockpit_surfaces_mes_v2_qualified_and_excluded_evidence(tmp_path: Path)
     assert source["freshness"] == "live"
 
 
+def test_cockpit_surfaces_mnq_databento_evidence_without_order_authority(tmp_path: Path) -> None:
+    write_report(tmp_path, "mnq-smt-evidence-status.json", {
+        "generated_at": "2026-08-19T14:59:58Z",
+        "provider": "mnq_smt_family_evidence_status",
+        "live_feed": {"status": "unavailable", "reason": "live_data_license_required"},
+        "approval_present": True,
+        "candidates": [{
+            "candidate_id": "mnq-cisd-only-v1",
+            "qualified_outcomes": 0,
+            "excluded_outcomes": 1,
+            "blockers": ["natural_forward_sample_incomplete"],
+        }],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    status = cockpit["discovery"]["mnq_smt_evidence_status"]
+    source = next(row for row in cockpit["sources"] if row["name"] == "mnq_smt_evidence")
+    assert status["live_feed"]["reason"] == "live_data_license_required"
+    assert status["candidates"][0]["excluded_outcomes"] == 1
+    assert status["execution_enabled"] is False
+    assert status["can_submit_orders"] is False
+    assert source["freshness"] == "live"
+
+
 def test_cockpit_surfaces_v2_research_governance_fail_closed(tmp_path: Path) -> None:
     write_report(tmp_path, "promotion_rules.json", {
         "schema_version": 2,
