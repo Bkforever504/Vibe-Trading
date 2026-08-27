@@ -100,3 +100,70 @@ def test_historical_loader_honors_requested_start_and_end(monkeypatch) -> None:
     assert captured["params"]["start"] == "2026-08-21T14:00:00Z"
     assert captured["params"]["end"] == "2026-08-21T15:00:00Z"
     assert captured["params"]["feed"] == "iex"
+
+
+def test_resolver_deduplicates_detections_and_reuses_symbol_session_bars() -> None:
+    first = _detection()
+    second = {
+        **_detection(),
+        "detection_id": "SPY-cisd-2",
+        "trigger_bar_ts": "2026-08-21T14:05:00Z",
+    }
+    calls: list[tuple] = []
+    bars = [
+        {"t": "2026-08-21T14:05:00Z", "o": 100.0, "h": 101.2, "l": 100.0, "c": 101.0},
+        {"t": "2026-08-21T14:10:00Z", "o": 101.0, "h": 102.2, "l": 100.8, "c": 102.0},
+        {"t": "2026-08-21T14:15:00Z", "o": 102.0, "h": 102.3, "l": 101.0, "c": 101.5},
+    ]
+
+    additions, warnings = resolve_rows(
+        [first, {**first, "probability": 0.7}, second],
+        [],
+        now=datetime(2026, 8, 21, 15, 30, tzinfo=timezone.utc),
+        bar_loader=lambda *args: calls.append(args) or bars,
+    )
+
+    assert warnings == []
+    assert len(additions) == 2
+    assert len(calls) == 1
+    assert {row["detection_id"] for row in additions} == {"SPY-cisd-1", "SPY-cisd-2"}
+
+
+def test_resolver_invokes_on_addition_for_every_snapshot_before_batch_return() -> None:
+    detection = _detection()
+    bars = [
+        {"t": "2026-08-21T14:05:00Z", "o": 100.0, "h": 101.2, "l": 100.0, "c": 101.0},
+        {"t": "2026-08-21T14:10:00Z", "o": 101.0, "h": 102.2, "l": 100.8, "c": 102.0},
+    ]
+    written: list[dict] = []
+
+    additions, _ = resolve_rows(
+        [detection],
+        [],
+        now=datetime(2026, 8, 21, 15, 30, tzinfo=timezone.utc),
+        bar_loader=lambda *_args: bars,
+        on_addition=written.append,
+    )
+
+    assert len(additions) == 1
+    assert len(written) == 1
+    assert written[0]["detection_id"] == additions[0]["detection_id"]
+
+
+def test_resolver_work_cap_prioritizes_higher_grades() -> None:
+    high = _detection()
+    low = {**_detection(), "detection_id": "SPY-low", "grade": "D"}
+    bars = [
+        {"t": "2026-08-21T14:05:00Z", "o": 100.0, "h": 101.2, "l": 100.0, "c": 101.0},
+        {"t": "2026-08-21T14:10:00Z", "o": 101.0, "h": 102.2, "l": 100.8, "c": 102.0},
+    ]
+
+    additions, _ = resolve_rows(
+        [low, high],
+        [],
+        now=datetime(2026, 8, 21, 15, 30, tzinfo=timezone.utc),
+        bar_loader=lambda *_args: bars,
+        max_due_detections=1,
+    )
+
+    assert [row["detection_id"] for row in additions] == ["SPY-cisd-1"]

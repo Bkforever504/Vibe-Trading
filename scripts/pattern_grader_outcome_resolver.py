@@ -24,6 +24,7 @@ SOURCE_LEDGER = ROOT / "data" / "pattern_grader_log.jsonl"
 OUTCOME_LEDGER = ROOT / "data" / "pattern_grader_outcomes.jsonl"
 HORIZONS = {"outcome_5m": timedelta(minutes=5), "outcome_15m": timedelta(minutes=15), "outcome_60m": timedelta(minutes=60)}
 BarLoader = Callable[[str, datetime, datetime], list[dict[str, Any]]]
+GRADE_PRIORITY = {"A+": 5, "A": 4, "B": 3, "C": 2, "D": 1}
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -218,13 +219,35 @@ def resolve_rows(
     *,
     now: datetime,
     bar_loader: BarLoader = _alpaca_loader,
+    max_due_detections: int | None = None,
+    session_bar_cache: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
+    attempted_detection_ids: set[str] | None = None,
+    on_addition: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     now = now.astimezone(timezone.utc)
     latest = {_detection_id(row): row for row in existing_outcomes if isinstance(row, dict)}
     additions: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
+    latest_detections: dict[str, dict[str, Any]] = {}
     for detection in detections:
+        if isinstance(detection, dict):
+            latest_detections[_detection_id(detection)] = detection
+    ordered = sorted(
+        latest_detections.values(),
+        key=lambda row: (
+            -GRADE_PRIORITY.get(str(row.get("grade") or "").upper(), 0),
+            bool(row.get("blockers")),
+            str(row.get("trigger_bar_ts") or row.get("triggered_at") or row.get("bar_close_ts") or ""),
+            _detection_id(row),
+        ),
+    )
+    session_bar_cache = session_bar_cache if session_bar_cache is not None else {}
+    attempted_detection_ids = attempted_detection_ids if attempted_detection_ids is not None else set()
+    due_processed = 0
+    for detection in ordered:
         detection_id = _detection_id(detection)
+        if detection_id in attempted_detection_ids:
+            continue
         trigger = _dt(detection.get("trigger_bar_ts") or detection.get("triggered_at") or detection.get("bar_close_ts"))
         symbol = str(detection.get("symbol") or detection.get("instrument") or "").upper()
         geometry = _geometry(detection)
@@ -235,7 +258,27 @@ def resolve_rows(
         due = [name for name, deadline in deadlines.items() if deadline <= now and detection.get(name) is None and (latest.get(detection_id) or {}).get(name) is None]
         if not due:
             continue
-        bars = bar_loader(symbol, trigger, max(deadlines[name] for name in due))
+        if max_due_detections is not None and due_processed >= max_due_detections:
+            continue
+        due_processed += 1
+        attempted_detection_ids.add(detection_id)
+        market_date = trigger.astimezone(MARKET_TZ).date()
+        cache_key = (symbol, market_date.isoformat())
+        if cache_key not in session_bar_cache:
+            session_start = datetime.combine(market_date, wall_time(4, 0), MARKET_TZ).astimezone(timezone.utc)
+            session_end = datetime.combine(market_date, wall_time(20, 0), MARKET_TZ).astimezone(timezone.utc)
+            session_end = min(session_end, now)
+            try:
+                session_bar_cache[cache_key] = bar_loader(symbol, session_start, session_end)
+            except Exception as exc:  # noqa: BLE001 - one bad symbol must not abort the outcome batch
+                session_bar_cache[cache_key] = []
+                warnings.append({
+                    "detection_id": detection_id,
+                    "symbol": symbol,
+                    "reason": "bar_loader_error",
+                    "error_type": type(exc).__name__,
+                })
+        bars = session_bar_cache[cache_key]
         if not bars:
             warnings.append({"detection_id": detection_id, "symbol": symbol, "reason": "forward_bars_unavailable"})
             continue
@@ -280,6 +323,8 @@ def resolve_rows(
                     break
             additions.append(snapshot)
             latest[detection_id] = snapshot
+            if on_addition is not None:
+                on_addition(snapshot)
         else:
             warnings.append({"detection_id": detection_id, "symbol": symbol, "reason": "no_completed_forward_bars_inside_due_horizon"})
     return additions, warnings
@@ -295,17 +340,73 @@ def _append(path: Path, rows: Iterable[dict[str, Any]]) -> None:
             handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
 
 
+def _durable_appender(path: Path) -> Callable[[dict[str, Any]], None]:
+    """Return a callback that fsyncs each snapshot so crashes cannot lose resolved outcomes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _write(row: dict[str, Any]) -> None:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+            handle.flush()
+            import os
+            os.fsync(handle.fileno())
+
+    return _write
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=SOURCE_LEDGER)
     parser.add_argument("--outcomes", type=Path, default=OUTCOME_LEDGER)
     parser.add_argument("--now")
+    parser.add_argument(
+        "--max-due-detections",
+        type=int,
+        default=5000,
+        help="Maximum unresolved detections attempted per run, highest grades first.",
+    )
+    parser.add_argument(
+        "--checkpoint-size",
+        type=int,
+        default=500,
+        help="Append completed snapshots after each batch so interruption cannot erase the whole run.",
+    )
     args = parser.parse_args()
     now = _dt(args.now) if args.now else datetime.now(timezone.utc)
     assert now is not None
-    additions, warnings = resolve_rows(_read_jsonl(args.source), _read_jsonl(args.outcomes), now=now)
-    _append(args.outcomes, additions)
-    print(json.dumps({"resolved_snapshots_appended": len(additions), "warnings": warnings, "execution_enabled": False, "can_submit_orders": False}, sort_keys=True))
+    detections = _read_jsonl(args.source)
+    outcomes = _read_jsonl(args.outcomes)
+    attempted: set[str] = set()
+    session_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    warning_rows: list[dict[str, Any]] = []
+    appended = 0
+    maximum = max(1, args.max_due_detections)
+    checkpoint = max(1, min(args.checkpoint_size, maximum))
+    durable_writer = _durable_appender(args.outcomes)
+    while len(attempted) < maximum:
+        before = len(attempted)
+        additions, warnings = resolve_rows(
+            detections,
+            outcomes,
+            now=now,
+            max_due_detections=min(checkpoint, maximum - len(attempted)),
+            session_bar_cache=session_cache,
+            attempted_detection_ids=attempted,
+            on_addition=durable_writer,
+        )
+        outcomes.extend(additions)
+        appended += len(additions)
+        warning_rows.extend(warnings)
+        if len(attempted) == before:
+            break
+    print(json.dumps({
+        "resolved_snapshots_appended": appended,
+        "attempted_detections": len(attempted),
+        "warning_count": len(warning_rows),
+        "warning_sample": warning_rows[:25],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }, sort_keys=True))
     return 0
 
 

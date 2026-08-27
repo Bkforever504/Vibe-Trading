@@ -27,6 +27,7 @@ HMM_PATH = REPORT_DIR / "hmm-regime.json"
 CATALYST_PATH = REPORT_DIR / "market-catalyst-calendar.json"
 DATABENTO_CAPABILITY_PATH = ROOT / "data" / "databento_mes_capability.json"
 MNQ_EVIDENCE_PATH = REPORT_DIR / "mnq-smt-evidence-status.json"
+PATTERN_OUTCOMES_LEDGER = ROOT / "data" / "pattern_grader_outcomes.jsonl"
 
 MES_TASKS = (
     ("\\VibeTrade\\", "MesOrb0932V2Entry"),
@@ -45,14 +46,30 @@ MNQ_SMT_TASKS = (
     ("\\VibeTrade\\", "MnqSmtCisdFamilyShadow"),
     ("\\VibeTrade\\", "MnqSmtDatabentoRegrade"),
 )
+PATTERN_GRADER_TASKS = (
+    ("\\VibeTrade\\", "PatternGrader-Scanner-Intraday"),
+    ("\\VibeTrade\\", "PatternGrader-Aggregator"),
+    ("\\", "PatternGrader-OutcomeResolver"),
+    ("\\", "CISD-PromotionTracker"),
+    ("\\", "PromoteValidatedPatterns"),
+)
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
-    ("\\VibeTrade\\", "ShadowSystemHeartbeat"),
     ("\\VibeTrade\\", "SundayShadowPreflight"),
+)
+# These are observability consumers, not upstream dependencies. The heartbeat
+# cannot require its own previous exit code, and the EOD check-in depends on
+# the heartbeat. Keeping either in OPS_TASKS creates a circular failure that
+# neither task can recover from after one red run.
+OBSERVABILITY_TASKS = (
+    ("\\VibeTrade\\", "ShadowSystemHeartbeat"),
     ("\\VibeTrade\\", "EodShadowCheckin"),
 )
-EXPECTED_TASKS = MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + OPTIONS_TASKS + OPS_TASKS
+EXPECTED_TASKS = (
+    MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + PATTERN_GRADER_TASKS
+    + OPTIONS_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
+)
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -70,6 +87,52 @@ def _parse_datetime(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def report_ledger_freshness(path: Path, *, now: datetime, max_age_hours: float) -> dict[str, Any]:
+    """Verify a JSONL append-only ledger has grown recently.
+
+    A resolver task can succeed (exit code 0) and still write zero rows. This
+    check reads the last usable timestamp from the tail of the file so the
+    heartbeat can see the difference between a task that ran and a task that
+    ran AND produced evidence.
+    """
+    if not path.exists():
+        return {"status": "missing", "fresh": False, "age_hours": None, "path": str(path), "row_count": 0}
+    row_count = 0
+    last_ts: datetime | None = None
+    try:
+        for raw in path.read_text(encoding="utf-8-sig").splitlines():
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                row = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            row_count += 1
+            for key in ("resolved_at", "generated_at", "scanned_at", "timestamp"):
+                parsed = _parse_datetime(row.get(key))
+                if parsed is not None:
+                    last_ts = parsed if last_ts is None or parsed > last_ts else last_ts
+                    break
+    except OSError:
+        return {"status": "unreadable", "fresh": False, "age_hours": None, "path": str(path), "row_count": 0}
+    if row_count == 0:
+        return {"status": "empty", "fresh": False, "age_hours": None, "path": str(path), "row_count": 0}
+    if last_ts is None:
+        return {"status": "no_timestamp", "fresh": False, "age_hours": None, "path": str(path), "row_count": row_count}
+    age = max(0.0, (now.astimezone(timezone.utc) - last_ts).total_seconds() / 3600.0)
+    return {
+        "status": "fresh" if age <= max_age_hours else "stale",
+        "fresh": age <= max_age_hours,
+        "age_hours": round(age, 2),
+        "last_row_at": last_ts.isoformat().replace("+00:00", "Z"),
+        "row_count": row_count,
+        "path": str(path),
+    }
 
 
 def report_freshness(path: Path, *, now: datetime, max_age_hours: float) -> dict[str, Any]:
@@ -144,14 +207,19 @@ def build_report(
     catalyst_path: Path = CATALYST_PATH,
     databento_capability_path: Path = DATABENTO_CAPABILITY_PATH,
     mnq_evidence_path: Path = MNQ_EVIDENCE_PATH,
+    pattern_outcomes_path: Path = PATTERN_OUTCOMES_LEDGER,
 ) -> dict[str, Any]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     tasks = task_rows if task_rows is not None else probe_tasks()
     mes = _task_group(tasks, MES_TASKS)
     scout = _task_group(tasks, SCOUT_TASKS)
     mnq_smt = _task_group(tasks, MNQ_SMT_TASKS)
+    pattern_grader = _task_group(tasks, PATTERN_GRADER_TASKS)
     options = _task_group(tasks, OPTIONS_TASKS)
     ops = _task_group(tasks, OPS_TASKS)
+    observability = _task_group(tasks, OBSERVABILITY_TASKS)
+    pattern_outcomes_ledger = report_ledger_freshness(pattern_outcomes_path, now=now, max_age_hours=30.0)
+    pattern_grader["alive"] = pattern_grader["alive"] and pattern_outcomes_ledger["fresh"]
     scanner_halts = {
         name: {"halted": is_halted(name), "state": read_state(name)}
         for name in (
@@ -182,12 +250,14 @@ def build_report(
         mes["alive"]
         and scout["alive"]
         and mnq_smt["alive"]
+        and pattern_grader["alive"]
         and options["alive"]
         and ops["alive"]
         and hmm["fresh"]
         and catalyst["fresh"]
         and databento_capability["fresh"]
         and mnq_evidence["fresh"]
+        and pattern_outcomes_ledger["fresh"]
         and not kill
     )
     return {
@@ -198,8 +268,11 @@ def build_report(
         "mes_v2": mes,
         "equity_scout": scout,
         "mnq_smt_family": mnq_smt,
+        "pattern_grader": pattern_grader,
+        "pattern_outcomes_ledger": pattern_outcomes_ledger,
         "options_bot": options,
         "operations_tasks": ops,
+        "observability_tasks": observability,
         "hmm": hmm,
         "catalyst": catalyst,
         "databento_capability": databento_capability,
@@ -220,6 +293,8 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"MES v2 alive: {check(report['mes_v2']['alive'])}",
             f"Equity scout alive: {check(report['equity_scout']['alive'])}",
             f"MNQ SMT family alive: {check(report['mnq_smt_family']['alive'])}",
+            f"Pattern grader alive: {check(report['pattern_grader']['alive'])}",
+            f"Pattern outcomes fresh: {check(report['pattern_outcomes_ledger']['fresh'])} (age={report['pattern_outcomes_ledger']['age_hours']}h, rows={report['pattern_outcomes_ledger']['row_count']})",
             f"Options bot alive: {check(report['options_bot']['alive'])}",
             f"HMM fresh: {check(report['hmm']['fresh'])} (age={report['hmm']['age_hours']}h)",
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",

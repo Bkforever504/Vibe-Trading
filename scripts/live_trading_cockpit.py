@@ -16,6 +16,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from scripts.dashboard_readiness import build_readiness
+from scripts.tactical_plan_builder import build_tactical_plan
 
 
 VIBE_HOME = Path.home() / ".vibe-trading"
@@ -71,15 +72,21 @@ REPORT_FILES: dict[str, str] = {
     "options_surface": "options-surface-intelligence.json",
     "options_heatmap": "options-liquidation-heatmap.json",
     "options_feed_qualification": "options-feed-qualification.json",
+    "options_reference_refresh": "options-reference-refresh.json",
     "move_ground_truth": "move-ground-truth-summary.json",
     "manual_execution_quality": "manual-execution-quality.json",
     "broker_fill_observer": "broker-fill-observer.json",
+    "flip_exit_quality": "flip-exit-quality.json",
+    "flip_exit_policy": "flip-exit-policy-comparison.json",
     "options_playbook": "adaptive-options-shadow-playbook.json",
     "premium_levels": "option-premium-levels.json",
     "vol_premium": "options-vol-premium.json",
     "shadow_consensus": "shadow-consensus-gate.json",
     "shadow_audit": "shadow-logger-audit.json",
     "daily_plan": "daily-trade-plan.json",
+    "zero_dte_expected_move": "zero-dte-expected-move-context.json",
+    "swing_continuation": "equity-ignition-continuation-shadow.json",
+    "elite_readiness": "elite-bot-readiness-scorecard.json",
 }
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -583,6 +590,10 @@ def _source_surface(
     provenance_qualified = bool(report) and (
         not require_provenance or bool(report.get("provider") and report.get("mode"))
     )
+    freshness = str(source.get("freshness") or "missing")
+    decision_eligible = provenance_qualified and freshness not in {
+        "stale", "missing", "clock_skew"
+    }
     safe_data = (
         {**report, "execution_enabled": False, "can_submit_orders": False}
         if provenance_qualified
@@ -599,9 +610,11 @@ def _source_surface(
         "mode": source.get("mode"),
         "generated_at": source.get("generated_at"),
         "age_seconds": source.get("age_seconds"),
-        "freshness": source.get("freshness", "missing"),
+        "freshness": freshness,
         "available": bool(report),
         "provenance_qualified": provenance_qualified,
+        "decision_eligible": decision_eligible,
+        "decision_blocker": None if decision_eligible else "stale_missing_or_unqualified_source",
         "data": safe_data,
         "execution_enabled": False,
         "can_submit_orders": False,
@@ -761,6 +774,9 @@ def _options_context(
         "feed_qualification": _source_surface(
             "options_feed_qualification", reports, sources_by_name, require_provenance=True
         ),
+        "reference_refresh": _source_surface(
+            "options_reference_refresh", reports, sources_by_name, require_provenance=True
+        ),
     }
     research_surfaces = [surfaces[key] for key in ("surface", "heatmap", "vol_premium")]
     qualified = [row for row in research_surfaces if row["provenance_qualified"]]
@@ -790,6 +806,210 @@ def _options_context(
             if qualified
             else "No provenance-qualified options context is available."
         ),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _expected_move_market_state(
+    symbol: str | None,
+    *,
+    market_force: dict[str, Any],
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+    options_context: dict[str, Any],
+    dealer_regime: dict[str, Any],
+) -> dict[str, Any]:
+    source = _source_surface(
+        "zero_dte_expected_move", reports, sources_by_name, require_provenance=True
+    )
+    scan = next(
+        (
+            _dict(row)
+            for row in _list(reports.get("zero_dte_expected_move", {}).get("scans"))
+            if _text(_dict(row).get("symbol")).upper() == _text(symbol).upper()
+            and _text(_dict(row).get("status")) == "ok"
+        ),
+        {},
+    )
+    expected_move_fresh = source.get("freshness") in {"live", "recent"}
+    qualified = bool(source.get("provenance_qualified")) and expected_move_fresh and bool(scan)
+    market_force_source = sources_by_name.get("market_force", {})
+    market_force_fresh = market_force_source.get("freshness") in {"live", "recent"}
+    labels = [str(value) for value in _list(scan.get("source_labels"))]
+    labels = labels if qualified else []
+    labels.extend(["atm_iv_and_opening_range_logs", "expected_move_is_not_a_price_target"] if qualified else [])
+    return {
+        "classification": market_force.get("classification") if market_force_fresh else None,
+        "gap_pct": _number(scan.get("gap_pct")) if qualified else None,
+        "spot": _number(scan.get("spot")) if qualified else None,
+        "atm_iv": _number(scan.get("atm_iv")) if qualified else None,
+        "expected_move_points": _number(scan.get("expected_move_points")) if qualified else None,
+        "expected_move_consumed_fraction": _number(scan.get("expected_move_consumed_fraction")) if qualified else None,
+        "opening_range_bucket": scan.get("opening_range_bucket") if qualified else None,
+        "options_context_status": options_context.get("status"),
+        "dealer_context_status": dealer_regime.get("status"),
+        "freshness": source.get("freshness", "missing"),
+        "decision_eligible": qualified,
+        "blocked_reason": None if qualified else "stale_or_unqualified_expected_move_source",
+        "source_labels": list(dict.fromkeys(labels)),
+        "source": source,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _htf_narrative_context(
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    report = reports.get("higher_timeframe", {})
+    source = _source_surface("higher_timeframe", reports, sources_by_name)
+    source_eligible = bool(source.get("decision_eligible"))
+    structure_rows = {
+        _text(row.get("symbol")).upper(): _dict(row)
+        for row in _list(reports.get("live_opportunities", {}).get("market_structure_watchlist"))
+        if _text(_dict(row).get("symbol"))
+    }
+    items: list[dict[str, Any]] = []
+    for raw in (_list(report.get("items")) if source_eligible else []):
+        row = _dict(raw)
+        symbol = _text(row.get("symbol")).upper()
+        structure = structure_rows.get(symbol, {})
+        liquidity = _dict(structure.get("liquidity_level_context"))
+        profile = _dict(structure.get("volume_profile_context"))
+        items.append({
+            "symbol": symbol,
+            "primary_bias": row.get("primary_bias"),
+            "weekly_bias": _dict(row.get("weekly_structure")).get("direction"),
+            "daily_bias": _dict(row.get("daily_structure")).get("direction"),
+            "intraday_bias": _dict(row.get("intraday_structure")).get("direction"),
+            "timeframe_alignment": _dict(structure.get("timeframe_alignment")).get("state"),
+            "dealing_range": liquidity.get("dealing_range"),
+            "nearest_upside": liquidity.get("nearest_upside"),
+            "nearest_downside": liquidity.get("nearest_downside"),
+            "volume_profile": profile,
+            "allowed_playbooks": [str(value) for value in _list(row.get("allowed_playbooks"))],
+            "reassessment_reasons": [str(value) for value in _list(row.get("veto_reasons"))],
+            "source_labels": ["completed_weekly_daily_intraday_map", "completed_bar_market_structure_context"],
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        })
+    return {
+        "status": "context_available" if source_eligible and items else "stale_source_blocked" if source.get("available") and not source_eligible else "unavailable",
+        "source": source,
+        "items": items,
+        "closed_bar_only": True,
+        "score_effect": "context_only_no_duplicate_confluence_credit",
+        "message": "Weekly, daily, and intraday context narrows scenarios; it never creates an entry by itself.",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _options_signal_matrix(
+    symbol: str | None,
+    *,
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+    options_context: dict[str, Any],
+    dealer_regime: dict[str, Any],
+    htf_narrative: dict[str, Any],
+) -> dict[str, Any]:
+    playbook_source = _source_surface("options_playbook", reports, sources_by_name)
+    playbook = next(
+        (
+            _dict(row)
+            for row in _list(reports.get("options_playbook", {}).get("rows"))
+            if _text(_dict(row).get("symbol")).upper() == _text(symbol).upper()
+        ),
+        {},
+    ) if playbook_source.get("decision_eligible") else {}
+    htf = next(
+        (
+            _dict(row)
+            for row in _list(htf_narrative.get("items"))
+            if _text(_dict(row).get("symbol")).upper() == _text(symbol).upper()
+        ),
+        {},
+    )
+    selected = _text(playbook.get("selected_playbook"), "none")
+    bias = _text(htf.get("primary_bias"), "unknown")
+    conflict = (bias == "bullish" and selected in {"long_put", "call_credit_spread", "bearish_debit_spread"}) or (
+        bias == "bearish" and selected in {"long_call", "put_credit_spread", "bullish_debit_spread"}
+    )
+    feed_qualified = options_context.get("manual_execution_reference_available") is True
+    return {
+        "status": "feed_blocked" if not feed_qualified else "conflict" if conflict else "partial_context" if playbook or dealer_regime.get("status") == "context_available" else "unavailable",
+        "decision": "NO_TRADE_OPTIONS" if not feed_qualified else "NO_TRADE" if conflict else "CONTEXT_ONLY",
+        "symbol": symbol,
+        "manual_execution_reference_available": feed_qualified,
+        "blockers": [] if feed_qualified else ["options_feed_not_qualified"],
+        "gex": {
+            "status": dealer_regime.get("status", "unavailable"),
+            "state": dealer_regime.get("net_gex_state", "unavailable"),
+            "claim_scope": "inferred_context_not_actual_dealer_inventory",
+        },
+        "dex": {
+            "status": "unavailable",
+            "state": None,
+            "reason": "No provenance-qualified dealer-delta-position source is configured.",
+        },
+        "net_drift": {
+            "status": "unavailable",
+            "state": None,
+            "reason": "No provenance-qualified real-time net-drift source is configured.",
+        },
+        "volatility_route": {
+            "selected_playbook": selected,
+            "condition_summary": _dict(playbook.get("condition_summary")),
+            "market_conditions": _list(playbook.get("market_conditions")),
+        },
+        "htf_bias": bias,
+        "conflict_reason": "options_route_conflicts_with_higher_timeframe_bias" if conflict else None,
+        "score_effect": "none_until_provenance_and_forward_validation",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _swing_continuation_surface(
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    report = reports.get("swing_continuation", {})
+    source = _source_surface("swing_continuation", reports, sources_by_name)
+    freshness = str(source.get("freshness") or "missing")
+    source_stale = freshness in {"stale", "missing", "clock_skew"}
+    needs_open_revalidation = freshness == "prior_session" and report.get("mode") != "next_open_revalidation"
+    candidates = [] if source_stale else [
+        {
+            **_dict(row),
+            **({"state": "REVALIDATION_REQUIRED"} if needs_open_revalidation else {}),
+            "blockers": list(dict.fromkeys([
+                *(str(value) for value in _list(_dict(row).get("blockers"))),
+                *(["next_open_revalidation_required"] if needs_open_revalidation else []),
+            ])),
+            "promotion_eligible": False,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+        for row in _list(report.get("candidates"))[:20]
+    ]
+    if source_stale:
+        status = "stale_source_blocked"
+    elif needs_open_revalidation:
+        status = "next_open_revalidation_required"
+    elif candidates:
+        status = "shadow_candidates_available"
+    else:
+        status = "unavailable"
+    return {
+        "status": status,
+        "source": source,
+        "promotion_eligible": False,
+        "candidates": candidates,
+        "message": "Completed-daily ignition/contraction/continuation challenger; next-session review only and opening-gap revalidation required.",
         "execution_enabled": False,
         "can_submit_orders": False,
     }
@@ -1604,7 +1824,9 @@ def _command_card(
     }
 
 
-def _dealer_gamma_regime(market_force: dict[str, Any]) -> dict[str, Any]:
+def _dealer_gamma_regime(
+    market_force: dict[str, Any], source: dict[str, Any] | None = None
+) -> dict[str, Any]:
     force = next(
         (_dict(row) for row in _list(market_force.get("forces")) if _dict(row).get("name") == "levels_gex"),
         {},
@@ -1614,7 +1836,8 @@ def _dealer_gamma_regime(market_force: dict[str, Any]) -> dict[str, Any]:
     negative = int(_number(evidence.get("negative_gamma")) or 0)
     positive = int(_number(evidence.get("positive_gamma")) or 0)
     net_state = "negative" if negative > positive else "positive" if positive > negative else "unavailable"
-    qualified = status not in {"missing", "unavailable"} and net_state != "unavailable"
+    source_fresh = not source or source.get("freshness") in {"live", "recent"}
+    qualified = source_fresh and status not in {"missing", "unavailable"} and net_state != "unavailable"
     if not qualified:
         route = "No gamma route. Use price action and the ordinary risk gates only."
     elif net_state == "negative":
@@ -1706,6 +1929,339 @@ def _execution_quality(
     }
 
 
+def _learning_progress_surface(
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Join discovery, grades, resolved outcomes, and calibration into one honest gate."""
+    move_report = reports.get("move_coverage", {})
+    move_summary = _dict(move_report.get("summary"))
+    scorecard = reports.get("detection_scorecard", {})
+    score_metrics = _dict(scorecard.get("metrics"))
+    calibration = reports.get("grade_calibration", {})
+    aplus = reports.get("aplus_review", {})
+    elite = reports.get("elite_readiness", {})
+    aplus_items = [_dict(row) for row in _list(aplus.get("items"))]
+
+    unique_items: dict[str, dict[str, Any]] = {}
+    for row in aplus_items:
+        key = _text(row.get("review_id")) or "|".join(
+            _text(row.get(name)) for name in ("symbol", "setup", "direction", "detected_at")
+        )
+        prior = unique_items.get(key, {})
+        if _text(row.get("outcome_review_status")) == "resolved" or not prior:
+            unique_items[key] = row
+    graded = list(unique_items.values())
+    resolved = [row for row in graded if _text(row.get("outcome_review_status")) == "resolved"]
+    realized_r: list[float] = []
+    wins = 0
+    for row in resolved:
+        outcome = _dict(row.get("outcome"))
+        value = _number(outcome.get("outcome_r") or outcome.get("realized_r"))
+        if value is None:
+            eod = _dict(outcome.get("outcome_eod"))
+            value = _number(eod.get("realized_r"))
+        if value is not None:
+            realized_r.append(value)
+            wins += int(value > 0)
+        elif outcome.get("won") is True:
+            wins += 1
+
+    movers = int(_number(move_summary.get("movers_audited")) or 0)
+    early = int(_number(move_summary.get("early_detection_count")) or 0)
+    actionable_early = int(_number(move_summary.get("actionable_early_count")) or 0)
+    risk_qualified = int(_number(move_summary.get("risk_gate_qualified_count")) or 0)
+    eligible_outcomes = int(_number(calibration.get("eligible_outcomes")) or 0)
+    skipped_outcomes = int(_number(calibration.get("skipped_outcomes")) or 0)
+    qualified_buckets = sum(
+        bool(_dict(row.get("probability")).get("calibration_qualified"))
+        for row in _list(calibration.get("buckets"))
+        if isinstance(row, dict)
+    )
+    sessions = int(_number(scorecard.get("sessions")) or 0)
+    precision = _number(score_metrics.get("precision_at_10_mean"))
+    recall = _number(score_metrics.get("recall_at_10"))
+    market_now = now.astimezone(ZoneInfo("America/New_York"))
+    move_date = _text(move_report.get("date"))
+    aplus_date = _text(aplus.get("date"))
+    current_session_complete = bool(
+        move_date
+        and move_date < market_now.date().isoformat()
+        or move_date == market_now.date().isoformat()
+        and (market_now.hour, market_now.minute) >= (16, 15)
+    )
+
+    blockers: list[str] = []
+    if not current_session_complete:
+        blockers.append("current_market_session_not_complete")
+    if move_date != aplus_date:
+        blockers.append("move_and_grade_review_dates_not_aligned")
+    if actionable_early <= 0:
+        blockers.append("no_actionable_early_movers")
+    if risk_qualified <= 0:
+        blockers.append("no_risk_gate_qualified_movers")
+    if precision is None or precision <= 0:
+        blockers.append("rolling_precision_at_10_not_positive")
+    if recall is None or recall <= 0:
+        blockers.append("rolling_recall_at_10_not_positive")
+    if sessions < 30:
+        blockers.append("fewer_than_30_independent_ranking_sessions")
+    if eligible_outcomes < 100:
+        blockers.append("fewer_than_100_calibration_eligible_outcomes")
+    if qualified_buckets <= 0:
+        blockers.append("no_ranking_qualified_probability_bucket")
+    if len(resolved) < len(graded):
+        blockers.append("top_tier_outcomes_pending")
+    if elite.get("all_categories_verified_10") is not True:
+        blockers.append("elite_readiness_categories_not_fully_verified")
+
+    return {
+        "status": "learning_loop_measured_live_locked" if blockers else "qualified_for_human_live_review",
+        "as_of_date": move_date or None,
+        "grade_review_date": aplus_date or None,
+        "current_session_complete": current_session_complete,
+        "broad_move_audit": {
+            "movers_audited": movers,
+            "source_discovery_recall_pct": _number(move_summary.get("source_discovery_recall_pct")),
+            "early_detection_count": early,
+            "early_detection_pct": round(100.0 * early / movers, 2) if movers else None,
+            "actionable_early_count": actionable_early,
+            "actionable_early_pct": round(100.0 * actionable_early / movers, 2) if movers else None,
+            "risk_gate_qualified_count": risk_qualified,
+            "late_detection_count": int(_number(move_summary.get("late_detection_count")) or 0),
+            "top_blockers": _list(move_summary.get("top_blockers"))[:6],
+            "denominator_note": "Broad same-day mover accountability; discovery is not an executable entry.",
+        },
+        "frozen_rank_validation": {
+            "sessions": sessions,
+            "ground_truth_count": int(_number(score_metrics.get("ground_truth_count")) or 0),
+            "precision_at_10": precision,
+            "recall_at_10": recall,
+            "root_cause_coverage": _number(score_metrics.get("root_cause_coverage")),
+            "denominator_note": "Frozen forward move labels matched to the ranking available at that timestamp.",
+        },
+        "graded_trade_outcomes": {
+            "unique_top_tier_setups": len(graded),
+            "resolved": len(resolved),
+            "pending": len(graded) - len(resolved),
+            "observed_wins": wins,
+            "observed_win_rate": round(wins / len(realized_r), 4) if realized_r else None,
+            "average_r": round(sum(realized_r) / len(realized_r), 4) if realized_r else None,
+            "outcome_sample_with_r": len(realized_r),
+            "blocked_or_incomplete": sum(
+                bool(_list(row.get("blockers"))) or not row.get("geometry_complete")
+                for row in graded
+            ),
+        },
+        "calibration": {
+            "eligible_outcomes": eligible_outcomes,
+            "embargoed_or_skipped_outcomes": skipped_outcomes,
+            "qualified_probability_buckets": qualified_buckets,
+            "minimum_outcomes": 100,
+            "minimum_independent_dates": 30,
+            "method": calibration.get("method"),
+        },
+        "evidence_readiness": {
+            "overall_score": _number(elite.get("overall_score")),
+            "status": _text(elite.get("status"), "unavailable"),
+            "all_categories_verified_10": elite.get("all_categories_verified_10") is True,
+            "priority_gaps": _list(elite.get("priority_gaps"))[:6],
+        },
+        "live_readiness": {
+            "ready": not blockers,
+            "blockers": blockers,
+            "message": (
+                "Inputs improve hypothesis coverage; only resolved, timestamp-correct outcomes improve live readiness."
+            ),
+        },
+        "sources": {
+            name: {
+                key: value
+                for key, value in _source_surface(name, reports, sources_by_name).items()
+                if key != "data"
+            }
+            for name in ("move_coverage", "detection_scorecard", "aplus_review", "grade_calibration", "elite_readiness")
+        },
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _exit_management_surface(
+    reports: dict[str, dict[str, Any]],
+    sources_by_name: dict[str, dict[str, Any]],
+    bot_status: dict[str, Any],
+) -> dict[str, Any]:
+    """Expose exit evidence without granting execution or inferring missing telemetry."""
+    quality = reports.get("flip_exit_quality", {})
+    policy = reports.get("flip_exit_policy", {})
+    open_trades = _dict(bot_status.get("open_trades"))
+    open_positions = sum(
+        int(_number(_dict(bucket).get("open")) or 0)
+        for bucket in open_trades.values()
+        if isinstance(bucket, dict)
+    )
+    portfolio_positions = int(
+        _number(_dict(bot_status.get("portfolio_concentration")).get("position_count")) or 0
+    )
+    open_positions = max(open_positions, portfolio_positions)
+
+    closed_count = int(_number(quality.get("closed_trade_count")) or 0)
+    complete_count = int(_number(quality.get("complete_count")) or 0)
+    coverage_pct = round(100.0 * complete_count / closed_count, 2) if closed_count else 0.0
+    complete_trades = [
+        _dict(row)
+        for row in _list(quality.get("trades"))
+        if _text(_dict(row).get("status")) == "complete"
+    ]
+    observed_winners = sum(
+        1 for row in complete_trades if (_number(row.get("realized_return_pct")) or 0) > 0
+    )
+    observed_ticket_win_rate = (
+        round(observed_winners / len(complete_trades), 3) if complete_trades else None
+    )
+
+    policies = _dict(policy.get("policies"))
+    best_name = _text(policy.get("best_challenger"))
+    best_metrics = _dict(policies.get(best_name))
+    best_avg = _number(best_metrics.get("avg_return_pct"))
+    best_pf = _number(best_metrics.get("profit_factor"))
+    holdout = _dict(policy.get("chronological_holdout"))
+    holdout_qualified = bool(
+        holdout.get("qualified")
+        or holdout.get("promotion_qualified")
+        or policy.get("chronological_holdout_qualified")
+    )
+    absolute_economics_positive = bool(
+        best_avg is not None and best_avg > 0 and best_pf is not None and best_pf > 1
+    )
+    evidence_qualified_for_human_review = bool(
+        policy.get("promotion_ready")
+        and absolute_economics_positive
+        and holdout_qualified
+    )
+    production_eligible = bool(
+        evidence_qualified_for_human_review and policy.get("promotion_authorized")
+    )
+    policy_blockers = [
+        str(value)
+        for value in [
+            *_list(policy.get("promotion_blockers")),
+            *_list(holdout.get("blockers")),
+        ]
+    ]
+    if not best_metrics:
+        policy_blockers.append("challenger_metrics_missing")
+    if best_avg is None or best_avg <= 0:
+        policy_blockers.append("challenger_average_return_not_positive")
+    if best_pf is None or best_pf <= 1:
+        policy_blockers.append("challenger_profit_factor_not_above_one")
+    if not holdout_qualified:
+        policy_blockers.append("chronological_holdout_not_qualified")
+    if not policy.get("promotion_ready"):
+        policy_blockers.append("research_promotion_gate_not_passed")
+    if evidence_qualified_for_human_review and not policy.get("promotion_authorized"):
+        policy_blockers.append("human_promotion_approval_required")
+
+    structural = _dict(policy.get("structural_tournament"))
+    structural_name = _text(structural.get("best_path"))
+    structural_metrics = _dict(_dict(structural.get("policies")).get(structural_name))
+    structural_avg = _number(structural_metrics.get("avg_return_pct"))
+    structural_pf = _number(structural_metrics.get("profit_factor"))
+    structural_review_qualified = bool(
+        structural.get("review_ready")
+        and structural_avg is not None
+        and structural_avg > 0
+        and structural_pf is not None
+        and structural_pf > 1
+    )
+
+    realized_pnl = _number(_dict(bot_status.get("outcome")).get("realized_pnl"))
+    is_flat = open_positions == 0
+    return {
+        "status": "flat" if is_flat else "active_unqualified",
+        "trail_state": "FLAT" if is_flat else "TELEMETRY_UNAVAILABLE",
+        "open_positions": open_positions,
+        "trigger_price": None,
+        "distance_to_trigger": None,
+        "trigger_eta_minutes": None,
+        "locked_r": None,
+        "next_ratchet": None,
+        "invalidation": None,
+        "eta_status": "not_applicable_flat" if is_flat else "blocked_unqualified_trail_telemetry",
+        "economics": {
+            "status": "flat_reconciled" if is_flat else "partial_realized_only",
+            "realized_pnl": realized_pnl,
+            "unrealized_pnl": 0.0 if is_flat else None,
+            "economic_pnl": realized_pnl if is_flat else None,
+            "message": (
+                "No position is open, so trail trigger and ETA fields are not applicable."
+                if is_flat
+                else "Open risk exists, but normalized trail-state and unrealized P&L telemetry are unavailable."
+            ),
+        },
+        "telemetry": {
+            "complete_observed_trades": complete_count,
+            "closed_trades": closed_count,
+            "coverage_pct": coverage_pct,
+            "insufficient_data_count": int(_number(quality.get("insufficient_data_count")) or 0),
+            "qualified": complete_count >= 30 and coverage_pct >= 80.0,
+        },
+        "basket_risk": {
+            "oldest_underwater_minutes": 0.0 if is_flat else None,
+            "largest_open_loss": 0.0 if is_flat else None,
+            "aggregate_open_risk": 0.0 if is_flat else None,
+            "add_on_count": 0 if is_flat else None,
+            "status": "not_applicable_flat" if is_flat else "unavailable_fail_closed",
+        },
+        "outcome_rates": {
+            "observed_closed_ticket_win_rate": observed_ticket_win_rate,
+            "observed_closed_ticket_sample": len(complete_trades),
+            "economic_basket_win_rate": None,
+            "economic_basket_sample": 0,
+            "status": "insufficient_reconciled_basket_outcomes",
+        },
+        "daily_locks": {
+            "loss": {"status": "not_exposed_by_status_report", "threshold": None},
+            "profit": {"status": "not_configured_or_not_exposed", "threshold": None},
+        },
+        "policy": {
+            "best_challenger": best_name or None,
+            "best_challenger_metrics": best_metrics,
+            "relative_improvement_pct_points": _number(
+                policy.get("best_challenger_avg_return_delta")
+            ),
+            "raw_promotion_ready": bool(policy.get("promotion_ready")),
+            "absolute_economics_positive": absolute_economics_positive,
+            "chronological_holdout_qualified": holdout_qualified,
+            "evidence_qualified_for_human_review": evidence_qualified_for_human_review,
+            "production_eligible": production_eligible,
+            "blockers": sorted(set(policy_blockers)),
+            "structural_best_path": structural_name or None,
+            "structural_best_metrics": structural_metrics,
+            "structural_review_qualified": structural_review_qualified,
+            "message": (
+                "A relative improvement is research evidence only until absolute expectancy, profit factor, and chronological holdout all qualify."
+            ),
+        },
+        "sources": {
+            "quality": _source_surface("flip_exit_quality", reports, sources_by_name),
+            "policy": _source_surface("flip_exit_policy", reports, sources_by_name),
+        },
+        "guardrails": {
+            "add_to_losers_allowed": False,
+            "hard_stop_required": True,
+            "hard_stop_status": "not_applicable_flat" if is_flat else "unverified_fail_closed",
+            "confirmation_required": True,
+            "copy_demo_to_live_allowed": False,
+        },
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def build_cockpit(
     *, report_dir: Path = REPORT_DIR, now: datetime | None = None
 ) -> dict[str, Any]:
@@ -1757,6 +2313,11 @@ def build_cockpit(
             if isinstance(row, dict) and row.get("symbol")
         }
     )
+    intraday_ranked = (
+        _list(intraday.get("actionable_ranked_candidates"))
+        if "actionable_ranked_candidates" in intraday
+        else _list(intraday.get("ranked_candidates"))
+    )
 
     candidates: list[dict[str, Any]] = []
     candidates.extend(_signal_candidate(row) for row in _list(signals.get("signals")) if isinstance(row, dict))
@@ -1764,7 +2325,7 @@ def build_cockpit(
     candidates.extend(_edge_candidate(row) for row in _list(daily_edge.get("morning_targets")) if isinstance(row, dict))
     candidates.extend(_stock_candidate(row) for row in _list(stock_screen.get("rankings"))[:12] if isinstance(row, dict))
     candidates.extend(_radar_candidate(row) for row in _list(radar.get("observations"))[:16] if isinstance(row, dict))
-    candidates.extend(_intraday_candidate(row) for row in _list(intraday.get("ranked_candidates"))[:24] if isinstance(row, dict))
+    candidates.extend(_intraday_candidate(row) for row in intraday_ranked[:24] if isinstance(row, dict))
     candidates.extend(
         _live_opportunity_candidate(row)
         for row in _list(live_opportunities.get("candidates"))[:24]
@@ -1835,6 +2396,34 @@ def build_cockpit(
     risk_blockers.extend(str(item) for item in _list(audit.get("issues")))
     risk_blockers.extend(str(item) for item in _list(reconciliation.get("issues")))
     risk_blockers.extend(str(item) for item in _list(broker_reconciliation.get("issues")))
+    primary_symbol = _text(_dict(primary_decision).get("symbol")) or None
+    options_context = _options_context(reports, sources_by_name)
+    dealer_regime = _dealer_gamma_regime(
+        market_force, sources_by_name.get("market_force", {})
+    )
+    htf_narrative = _htf_narrative_context(reports, sources_by_name)
+    tactical_plan = build_tactical_plan(
+        candidates,
+        primary_symbol=primary_symbol,
+        market_state=_expected_move_market_state(
+            primary_symbol,
+            market_force=market_force,
+            reports=reports,
+            sources_by_name=sources_by_name,
+            options_context=options_context,
+            dealer_regime=dealer_regime,
+        ),
+        now=now,
+    )
+    options_signal_matrix = _options_signal_matrix(
+        primary_symbol,
+        reports=reports,
+        sources_by_name=sources_by_name,
+        options_context=options_context,
+        dealer_regime=dealer_regime,
+        htf_narrative=htf_narrative,
+    )
+    swing_continuation = _swing_continuation_surface(reports, sources_by_name)
     command_card = _command_card(primary_decision, now=now)
     if broker_reconciliation.get("issues"):
         command_card = {
@@ -1847,7 +2436,7 @@ def build_cockpit(
         }
 
     return {
-        "schema_version": 11,
+        "schema_version": 12,
         "generated_at": now.isoformat(),
         "refresh_seconds": 15,
         "mode": "read_only_decision_support",
@@ -1881,11 +2470,19 @@ def build_cockpit(
             "can_submit_orders": False,
         },
         "command_card": command_card,
+        "tactical_plan": tactical_plan,
+        "htf_narrative": htf_narrative,
+        "options_signal_matrix": options_signal_matrix,
+        "swing_continuation": swing_continuation,
         "daily_review_gate": daily_review_gate,
         "system_readiness": system_readiness,
         "execution_quality": _execution_quality(reports, sources_by_name),
-        "dealer_regime": _dealer_gamma_regime(market_force),
-        "options_context": _options_context(reports, sources_by_name),
+        "learning_progress": _learning_progress_surface(
+            reports, sources_by_name, now=now
+        ),
+        "exit_management": _exit_management_surface(reports, sources_by_name, bot_status),
+        "dealer_regime": dealer_regime,
+        "options_context": options_context,
         "decision_desk": {
             "state_definitions": {
                 "shadow_ready": "Confirmed geometry with at least 1.25R reward remaining; still requires a fresh quote.",

@@ -1052,6 +1052,8 @@ export interface TradingEvidenceSource {
   freshness: TradingSource["freshness"];
   available: boolean;
   provenance_qualified: boolean;
+  decision_eligible?: boolean;
+  decision_blocker?: string | null;
   data: Record<string, unknown>;
   execution_enabled: false;
   can_submit_orders: false;
@@ -1104,6 +1106,7 @@ export interface TradingOptionsContext {
   heatmap: TradingEvidenceSource;
   vol_premium: TradingEvidenceSource;
   feed_qualification?: TradingEvidenceSource;
+  reference_refresh?: TradingEvidenceSource;
   manual_execution_reference_available?: boolean;
   price_discovery_qualified_count?: number;
   reason: string;
@@ -1330,10 +1333,71 @@ export interface LiquidityLevelContext {
   can_submit_orders: false;
 }
 
+export interface VolumeProfileContext {
+  status: "proxy_only" | "unavailable" | string;
+  poc: number | null;
+  vah: number | null;
+  val: number | null;
+  value_area_pct: number;
+  method: string;
+  true_trade_at_price: false;
+  score_effect: string;
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface ValueAreaReversionContext {
+  status: "confirmed_reclaim" | "reclaim_unconfirmed_volume" | "no_confirmed_reclaim" | "conflicting_reentry" | "unavailable" | string;
+  direction: "bullish" | "bearish" | "neutral" | string;
+  level_name: "VAH" | "VAL" | null;
+  level: number | null;
+  invalidation: number | null;
+  method: string;
+  reference_profile_excludes_signal_bar: true;
+  reference_profile?: { poc: number; vah: number; val: number };
+  volume_confirmation?: boolean;
+  breakout_volume?: number;
+  reentry_volume?: number;
+  reclaim_window_bars?: number;
+  true_trade_at_price: false;
+  score_effect: string;
+  source_labels: string[];
+  reason: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface EqualRelativeLiquidityContext {
+  status: "available" | "no_repeated_levels" | "unavailable" | string;
+  tolerance: number | null;
+  tolerance_method: string;
+  levels: Array<{
+    id: string;
+    kind: "equal_high" | "equal_low" | "relative_high" | "relative_low" | string;
+    side: "buy_side" | "sell_side" | string;
+    price: number;
+    tolerance: number;
+    touch_count: number;
+    first_touch_at: string | null;
+    last_touch_at: string | null;
+    sweep_status: "active" | "swept" | string;
+    swept_at: string | null;
+  }>;
+  score_effect: string;
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface SmtDivergenceContext {
   status: string;
   direction: "bullish" | "bearish" | "neutral" | string;
   peer_symbol: string | null;
+  peer_count?: number;
+  peer_results?: Array<{ peer_symbol: string; status: string; direction: string; divergence: string | null }>;
+  consensus_status?: string;
+  consensus_direction?: string;
   divergence: string | null;
   method: string;
   true_order_flow: false;
@@ -1456,6 +1520,9 @@ export interface MarketStructureAnalysis {
   timeframe_scan?: TimeframeScanRow[];
   timeframe_plan?: TimeframePlan;
   liquidity_level_context?: LiquidityLevelContext;
+  equal_relative_liquidity_context?: EqualRelativeLiquidityContext;
+  volume_profile_context?: VolumeProfileContext;
+  value_area_reversion_context?: ValueAreaReversionContext;
   participation_context?: ParticipationContext;
   macro_context?: MacroTimingContext;
   strat_context?: StratContext;
@@ -1813,6 +1880,19 @@ export interface TradingReadinessGate {
   can_submit_orders: false;
 }
 
+export interface TradingReadinessLane {
+  id: string;
+  ready: boolean;
+  status: "operational" | "fail_closed" | string;
+  percent: number;
+  gate_ids: string[];
+  failed_gates: string[];
+  failed_build_components: string[];
+  message: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingSystemReadiness {
   build: { status: string; percent: number; gates: TradingReadinessGate[] };
   runtime: { status: string; percent: number; gates: TradingReadinessGate[] };
@@ -1823,7 +1903,17 @@ export interface TradingSystemReadiness {
     independent_dates: number;
     message: string;
   };
+  lanes?: {
+    equity_scanner: TradingReadinessLane;
+    options_manual_reference: TradingReadinessLane;
+    research_evidence: TradingReadinessLane;
+    execution_observability: TradingReadinessLane;
+  };
   ready_for_manual_review: boolean;
+  ready_for_equity_manual_review?: boolean;
+  ready_for_options_manual_review?: boolean;
+  ready_for_research_promotion_review?: boolean;
+  all_lanes_ready?: boolean;
   probability_claims_qualified: boolean;
   execution_enabled: false;
   can_submit_orders: false;
@@ -1843,8 +1933,248 @@ export interface TradingExecutionQuality {
   can_submit_orders: false;
 }
 
+export interface TradingLearningProgress {
+  status: string;
+  as_of_date: string | null;
+  grade_review_date: string | null;
+  current_session_complete: boolean;
+  broad_move_audit: {
+    movers_audited: number;
+    source_discovery_recall_pct: number | null;
+    early_detection_count: number;
+    early_detection_pct: number | null;
+    actionable_early_count: number;
+    actionable_early_pct: number | null;
+    risk_gate_qualified_count: number;
+    late_detection_count: number;
+    top_blockers: Array<{ blocker: string; count: number }>;
+    denominator_note: string;
+  };
+  frozen_rank_validation: {
+    sessions: number;
+    ground_truth_count: number;
+    precision_at_10: number | null;
+    recall_at_10: number | null;
+    root_cause_coverage: number | null;
+    denominator_note: string;
+  };
+  graded_trade_outcomes: {
+    unique_top_tier_setups: number;
+    resolved: number;
+    pending: number;
+    observed_wins: number;
+    observed_win_rate: number | null;
+    average_r: number | null;
+    outcome_sample_with_r: number;
+    blocked_or_incomplete: number;
+  };
+  calibration: {
+    eligible_outcomes: number;
+    embargoed_or_skipped_outcomes: number;
+    qualified_probability_buckets: number;
+    minimum_outcomes: number;
+    minimum_independent_dates: number;
+    method?: string | null;
+  };
+  evidence_readiness: {
+    overall_score: number | null;
+    status: string;
+    all_categories_verified_10: boolean;
+    priority_gaps: Array<{ category?: string; score?: number; next_requirement?: string }>;
+  };
+  live_readiness: { ready: boolean; blockers: string[]; message: string };
+  sources: Record<string, TradingSource>;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingExitManagement {
+  status: "flat" | "active_unqualified" | string;
+  trail_state: "FLAT" | "TELEMETRY_UNAVAILABLE" | string;
+  open_positions: number;
+  trigger_price: number | null;
+  distance_to_trigger: number | null;
+  trigger_eta_minutes: number | null;
+  locked_r: number | null;
+  next_ratchet: number | null;
+  invalidation: number | null;
+  eta_status: string;
+  economics: {
+    status: string;
+    realized_pnl: number | null;
+    unrealized_pnl: number | null;
+    economic_pnl: number | null;
+    message: string;
+  };
+  telemetry: {
+    complete_observed_trades: number;
+    closed_trades: number;
+    coverage_pct: number;
+    insufficient_data_count: number;
+    qualified: boolean;
+  };
+  basket_risk: {
+    oldest_underwater_minutes: number | null;
+    largest_open_loss: number | null;
+    aggregate_open_risk: number | null;
+    add_on_count: number | null;
+    status: string;
+  };
+  outcome_rates: {
+    observed_closed_ticket_win_rate: number | null;
+    observed_closed_ticket_sample: number;
+    economic_basket_win_rate: number | null;
+    economic_basket_sample: number;
+    status: string;
+  };
+  daily_locks: {
+    loss: { status: string; threshold: number | null };
+    profit: { status: string; threshold: number | null };
+  };
+  policy: {
+    best_challenger: string | null;
+    best_challenger_metrics: Record<string, unknown>;
+    relative_improvement_pct_points: number | null;
+    raw_promotion_ready: boolean;
+    absolute_economics_positive: boolean;
+    chronological_holdout_qualified: boolean;
+    evidence_qualified_for_human_review: boolean;
+    production_eligible: boolean;
+    blockers: string[];
+    structural_best_path: string | null;
+    structural_best_metrics: Record<string, unknown>;
+    structural_review_qualified: boolean;
+    message: string;
+  };
+  sources: { quality: TradingSource; policy: TradingSource };
+  guardrails: {
+    add_to_losers_allowed: false;
+    hard_stop_required: true;
+    hard_stop_status: string;
+    confirmation_required: true;
+    copy_demo_to_live_allowed: false;
+  };
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingTacticalBranch {
+  state: "READY_TO_REVIEW" | "WAIT" | "NO_CHASE" | "INVALID" | "RESEARCH_ONLY" | "UNAVAILABLE" | string;
+  direction: string;
+  setup: string | null;
+  grade?: string;
+  decision_score?: number | null;
+  trigger: number | null;
+  entry_zone: { status: string; low: number | null; high: number | null };
+  confirmation_required: string;
+  retest_required: boolean;
+  stop: number | null;
+  t1: number | null;
+  t2: number | null;
+  time_stop?: Record<string, unknown> | null;
+  entry_timing?: TradingEntryTiming | null;
+  blockers: string[];
+  source?: string;
+  source_labels: string[];
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingTacticalPlan {
+  schema_version: number;
+  generated_at: string;
+  status: string;
+  symbol: string | null;
+  market_state: {
+    classification?: string | null;
+    gap_pct?: number | null;
+    spot?: number | null;
+    atm_iv?: number | null;
+    expected_move_points?: number | null;
+    expected_move_consumed_fraction?: number | null;
+    opening_range_bucket?: string | null;
+    options_context_status?: string;
+    dealer_context_status?: string;
+    freshness?: string;
+    decision_eligible?: boolean;
+    blocked_reason?: string | null;
+    source_labels: string[];
+  };
+  bull_case: TradingTacticalBranch;
+  bear_case: TradingTacticalBranch;
+  no_trade_zone: { status: string; low: number | null; high: number | null; instruction: string };
+  cross_checks: { level_consistency: "pass" | "fail"; conflicts: Array<Record<string, unknown>>; rule: string };
+  decision: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingHtfNarrative {
+  status: string;
+  source: TradingSource;
+  items: Array<{
+    symbol: string;
+    primary_bias?: string | null;
+    weekly_bias?: string | null;
+    daily_bias?: string | null;
+    intraday_bias?: string | null;
+    timeframe_alignment?: string | null;
+    dealing_range?: LiquidityLevelContext["dealing_range"];
+    nearest_upside?: LiquidityLevelContext["nearest_upside"];
+    nearest_downside?: LiquidityLevelContext["nearest_downside"];
+    volume_profile?: VolumeProfileContext | Record<string, unknown>;
+    allowed_playbooks: string[];
+    reassessment_reasons: string[];
+    source_labels: string[];
+    execution_enabled: false;
+    can_submit_orders: false;
+  }>;
+  closed_bar_only: true;
+  score_effect: string;
+  message: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingOptionsSignalMatrix {
+  status: string;
+  decision: "NO_TRADE" | "CONTEXT_ONLY" | string;
+  symbol: string | null;
+  manual_execution_reference_available?: boolean;
+  blockers?: string[];
+  gex: { status: string; state: string; claim_scope: string };
+  dex: { status: string; state: string | null; reason: string };
+  net_drift: { status: string; state: string | null; reason: string };
+  volatility_route: { selected_playbook: string; condition_summary: Record<string, unknown>; market_conditions: unknown[] };
+  htf_bias: string;
+  conflict_reason: string | null;
+  score_effect: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
+export interface TradingSwingContinuation {
+  status: string;
+  source: TradingSource;
+  promotion_eligible: false;
+  candidates: Array<Record<string, unknown> & {
+    symbol: string;
+    state: string;
+    grade?: string;
+    score?: number;
+    entry?: number;
+    stop?: number;
+    target_2r?: number;
+    execution_enabled: false;
+    can_submit_orders: false;
+  }>;
+  message: string;
+  execution_enabled: false;
+  can_submit_orders: false;
+}
+
 export interface TradingDashboard {
-  schema_version: 11;
+  schema_version: 12;
   generated_at: string;
   refresh_seconds: number;
   mode: string;
@@ -1898,9 +2228,15 @@ export interface TradingDashboard {
     execution_enabled: false;
     can_submit_orders: false;
   };
+  tactical_plan?: TradingTacticalPlan;
+  htf_narrative?: TradingHtfNarrative;
+  options_signal_matrix?: TradingOptionsSignalMatrix;
+  swing_continuation?: TradingSwingContinuation;
   daily_review_gate?: TradingDailyReviewGate;
   system_readiness?: TradingSystemReadiness;
   execution_quality?: TradingExecutionQuality;
+  learning_progress?: TradingLearningProgress;
+  exit_management?: TradingExitManagement;
   dealer_regime?: {
     status: "context_available" | "unavailable";
     source_status: string;
@@ -1995,6 +2331,12 @@ export interface TradingDashboard {
       movers_audited?: number;
       detected_any_stage?: number;
       detection_recall_pct?: number | null;
+      risk_gate_qualified_count?: number;
+      risk_gate_disqualified_count?: number;
+      risk_gate_unassessed_count?: number;
+      actionable_early_count?: number;
+      actionable_early_recall_of_risk_qualified_pct?: number | null;
+      top_blockers?: Array<{ blocker: string; count: number }>;
       classification_counts?: Record<string, number>;
       radar_snapshots_reviewed?: number;
     };
@@ -2005,6 +2347,10 @@ export interface TradingDashboard {
       metrics: {
         recall_at_10: number | null;
         precision_at_10_mean: number | null;
+        actionable_recall_at_10?: number | null;
+        actionable_precision_at_10_mean?: number | null;
+        discovery_recall_at_10?: number | null;
+        discovery_precision_at_10_mean?: number | null;
         ground_truth_count: number;
         root_cause_coverage: number | null;
       };

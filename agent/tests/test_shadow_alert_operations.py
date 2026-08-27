@@ -106,18 +106,61 @@ def test_heartbeat_passes_ready_tasks_and_fresh_sources_then_fails_stale_hmm(tmp
     monkeypatch.setattr(heartbeat, "kill_switch_active", lambda: False)
     databento = tmp_path / "databento.json"
     mnq_evidence = tmp_path / "mnq-evidence.json"
+    pattern_outcomes = tmp_path / "pattern_grader_outcomes.jsonl"
+    pattern_outcomes.write_text(
+        json.dumps({"resolved_at": NOW.isoformat().replace("+00:00", "Z"), "detection_id": "X"}) + "\n",
+        encoding="utf-8",
+    )
     _fresh_report(databento, NOW)
     _fresh_report(mnq_evidence, NOW)
     report = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst,
-                                    databento_capability_path=databento, mnq_evidence_path=mnq_evidence)
+                                    databento_capability_path=databento, mnq_evidence_path=mnq_evidence,
+                                    pattern_outcomes_path=pattern_outcomes)
     assert report["status"] == "PASS"
     assert "MES v2 alive: OK" in heartbeat.format_heartbeat(report)
+    assert "Pattern grader alive: OK" in heartbeat.format_heartbeat(report)
 
     _fresh_report(hmm, NOW - timedelta(days=4))
     stale = heartbeat.build_report(now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst,
-                                   databento_capability_path=databento, mnq_evidence_path=mnq_evidence)
+                                   databento_capability_path=databento, mnq_evidence_path=mnq_evidence,
+                                   pattern_outcomes_path=pattern_outcomes)
     assert stale["status"] == "FAIL"
     assert stale["hmm"]["fresh"] is False
+
+
+def test_heartbeat_fails_when_pattern_outcomes_ledger_did_not_grow(tmp_path: Path, monkeypatch) -> None:
+    hmm = tmp_path / "hmm.json"
+    catalyst = tmp_path / "catalyst.json"
+    databento = tmp_path / "databento.json"
+    mnq_evidence = tmp_path / "mnq-evidence.json"
+    _fresh_report(hmm)
+    _fresh_report(catalyst)
+    _fresh_report(databento, NOW)
+    _fresh_report(mnq_evidence, NOW)
+    monkeypatch.setattr(heartbeat, "is_halted", lambda _name: False)
+    monkeypatch.setattr(heartbeat, "read_state", lambda _name: {})
+    monkeypatch.setattr(heartbeat, "kill_switch_active", lambda: False)
+    stale_outcomes = tmp_path / "pattern_grader_outcomes.jsonl"
+    stale_outcomes.write_text(
+        json.dumps({"resolved_at": (NOW - timedelta(days=3)).isoformat().replace("+00:00", "Z")}) + "\n",
+        encoding="utf-8",
+    )
+
+    report = heartbeat.build_report(
+        now=NOW, task_rows=_ready_tasks(), hmm_path=hmm, catalyst_path=catalyst,
+        databento_capability_path=databento, mnq_evidence_path=mnq_evidence,
+        pattern_outcomes_path=stale_outcomes,
+    )
+    assert report["status"] == "FAIL"
+    assert report["pattern_outcomes_ledger"]["fresh"] is False
+    assert report["pattern_grader"]["alive"] is False
+
+
+def test_heartbeat_does_not_create_circular_dependency_on_its_consumers() -> None:
+    assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") in heartbeat.OBSERVABILITY_TASKS
+    assert ("\\VibeTrade\\", "EodShadowCheckin") in heartbeat.OBSERVABILITY_TASKS
+    assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") not in heartbeat.OPS_TASKS
+    assert ("\\VibeTrade\\", "EodShadowCheckin") not in heartbeat.OPS_TASKS
 
 
 def test_preflight_no_network_validates_spec_universe_tasks_and_sources(tmp_path: Path, monkeypatch) -> None:

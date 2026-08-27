@@ -34,6 +34,10 @@ import { LiveOpportunityPanel } from "@/components/trading/LiveOpportunityPanel"
 import { DailyReviewGate } from "@/components/trading/DailyReviewGate";
 import { SystemReadinessGate } from "@/components/trading/SystemReadinessGate";
 import { ExecutionQualityPanel } from "@/components/trading/ExecutionQualityPanel";
+import { ExitManagementPanel } from "@/components/trading/ExitManagementPanel";
+import { LearningProgressPanel } from "@/components/trading/LearningProgressPanel";
+import { TacticalPlanPanel } from "@/components/trading/TacticalPlanPanel";
+import { ScreenshotContextPanel } from "@/components/trading/ScreenshotContextPanel";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
@@ -703,9 +707,13 @@ export function TradingCockpit() {
               </div>
             </section>
             <DailyReviewGate gate={data.daily_review_gate} />
+            <LearningProgressPanel progress={data.learning_progress} />
             <SystemReadinessGate readiness={data.system_readiness} />
             <ExecutionQualityPanel quality={data.execution_quality} />
+            <ExitManagementPanel management={data.exit_management} />
             <CommandCard command={data.command_card} dealer={data.dealer_regime} blockers={data.operations.risk_blockers} />
+            <TacticalPlanPanel plan={data.tactical_plan} />
+            <ScreenshotContextPanel symbol={data.tactical_plan?.symbol} htf={data.htf_narrative} options={data.options_signal_matrix} swing={data.swing_continuation} />
             <ObservedMovesPanel moves={discovery?.top_precision_watches ?? []} onOpenChart={setChartSymbol} />
             <DecisionDesk data={data.decision_desk} />
             <LiveOpportunityPanel report={liveReport} connection={streamConnection} onOpenChart={setChartSymbol} />
@@ -718,13 +726,15 @@ export function TradingCockpit() {
                 </div>
                 <StatusPill>{discovery?.health ?? "missing"}</StatusPill>
               </div>
-              <div className="grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-3 xl:grid-cols-6">
+              <div className="grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-4 xl:grid-cols-8">
                 <Metric labelText="Discovered" value={String(discoveryCoverage.unique_symbols_discovered ?? 0)} detail="unique market symbols" />
                 <Metric labelText="Snapshots" value={String(discoveryCoverage.snapshot_symbols ?? 0)} detail={`${number(discoveryCoverage.snapshot_coverage_pct)}% coverage`} />
                 <Metric labelText="5m evaluated" value={String(discoveryCoverage.symbols_evaluated ?? 0)} detail={`${discoveryCoverage.symbols_with_5m_bars ?? 0} with bars`} />
                 <Metric labelText="Precision watch" value={String(discoveryCoverage.precision_watch_count ?? 0)} detail="quality watch, not entry" />
                 <Metric labelText="Mover audit" value={String(moveCoverage.movers_audited ?? 0)} detail={`${moveCoverage.radar_snapshots_reviewed ?? 0} radar snapshots`} />
                 <Metric labelText="Early / late" value={`${moveCoverage.classification_counts?.detected_early ?? 0} / ${moveCoverage.classification_counts?.detected_late ?? 0}`} detail={`${moveCoverage.classification_counts?.missed ?? 0} missed`} />
+                <Metric labelText="Risk-qualified / blocked" value={`${moveCoverage.risk_gate_qualified_count ?? 0} / ${moveCoverage.risk_gate_disqualified_count ?? 0}`} detail={`${moveCoverage.risk_gate_unassessed_count ?? 0} unassessed`} />
+                <Metric labelText="Actionable early" value={moveCoverage.actionable_early_recall_of_risk_qualified_pct == null ? "--" : `${number(moveCoverage.actionable_early_recall_of_risk_qualified_pct, 2)}%`} detail={`${moveCoverage.actionable_early_count ?? 0} of risk-qualified movers`} />
               </div>
             </section>
             <section className="grid gap-4 xl:grid-cols-3">

@@ -27,9 +27,15 @@ function Register-CisdTask([string]$Name, [string]$Script, [string]$CentralTime)
     Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 }
 
-# Host is Central Time; these correspond to 16:35, 16:40, and 16:45 ET.
-Register-CisdTask "PatternGrader-OutcomeResolver" "pattern_grader_outcome_resolver.py" "15:35"
-Register-CisdTask "CISD-PromotionTracker" "cisd_promotion_tracker.py" "15:40"
-Register-CisdTask "PromoteValidatedPatterns" "promote_validated_patterns.py" "15:45"
+# Host is Central Time; these correspond to 16:10, 16:20, and 16:30 ET.
+# Previously the resolver ran at 15:35 CT (an hour after the 15:00 close),
+# which serialized the close-of-day evidence into the evening review window
+# and left less than four hours before overnight reports fired. Pulled forward
+# to run immediately after the aggregator so the outcome ledger and promotion
+# gate finish before the health snapshot at 15:40 CT. Ordering is enforced by
+# market_schedule_alignment.ORDER_CHECKS.
+Register-CisdTask "PatternGrader-OutcomeResolver" "pattern_grader_outcome_resolver.py" "15:10"
+Register-CisdTask "CISD-PromotionTracker" "cisd_promotion_tracker.py" "15:20"
+Register-CisdTask "PromoteValidatedPatterns" "promote_validated_patterns.py" "15:30"
 
 Write-Host "Registered CISD outcome -> tracker -> promotion chain. All tasks remain non-execution."

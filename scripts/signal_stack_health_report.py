@@ -39,6 +39,25 @@ STRATEGY_ACTIVATION_DATES = {
 
 SIGNALS = [
     {
+        "name": "Pattern Grader",
+        "task": r"\VibeTrade\PatternGrader-Scanner-Intraday",
+        "log": ROOT / "data" / "pattern_grader_log.jsonl",
+        "activity_path": REPORT_DIR / "pattern-grader-grades.json",
+        "kind": "intraday",
+        "require_successful_task": True,
+        "max_hours_since_last_row": 6,
+        "require_activity_after_last_run": True,
+    },
+    {
+        "name": "Pattern Outcomes",
+        "task": r"\PatternGrader-OutcomeResolver",
+        "log": ROOT / "data" / "pattern_grader_outcomes.jsonl",
+        "kind": "close",
+        "require_successful_task": True,
+        "max_hours_since_last_row": 26,
+        "require_activity_after_last_run": True,
+    },
+    {
         "name": "Strat 30m",
         "task": r"\VibeTrade\Strat30mContinuationShadow",
         "log": ROOT / "data" / "strat_30m_continuation_shadow_log.jsonl",
@@ -249,6 +268,18 @@ SIGNALS = [
         "kind": "intraday",
     },
     {
+        "name": "Equity Swing Continuation",
+        "task": r"\VibeTrade\EquityIgnitionContinuationShadow",
+        "log": ROOT / "data" / "equity_ignition_continuation_shadow_log.jsonl",
+        "kind": "close",
+    },
+    {
+        "name": "Equity Swing Revalidate",
+        "task": r"\VibeTrade\EquityIgnitionContinuationRevalidate",
+        "log": ROOT / "data" / "equity_ignition_continuation_shadow_log.jsonl",
+        "kind": "morning",
+    },
+    {
         "name": "TTM Squeeze",
         "task": r"\VibeTrade\TTMSqueezeShadowLogger",
         "log": ROOT / "data" / "ttm_squeeze_shadow_log.jsonl",
@@ -438,7 +469,7 @@ def _latest_jsonl(path: Path) -> tuple[dict | None, int, str | None]:
 def _task_status(task_name: str) -> dict:
     try:
         proc = subprocess.run(
-            ["schtasks", "/Query", "/TN", task_name, "/FO", "LIST"],
+            ["schtasks", "/Query", "/TN", task_name, "/FO", "LIST", "/V"],
             check=False,
             capture_output=True,
             text=True,
@@ -463,7 +494,66 @@ def _task_status(task_name: str) -> dict:
         "status": parsed.get("status", "unknown"),
         "next_run_time": parsed.get("next_run_time", ""),
         "last_run_time": parsed.get("last_run_time", ""),
+        "last_result": parsed.get("last_result", ""),
     }
+
+
+def _task_failed(task: dict) -> bool:
+    """Return True only for a completed, non-zero task result.
+
+    Task Scheduler uses 0x41301/267009 while a task is running. A task that
+    has never run also has a non-success sentinel, so require a real last-run
+    timestamp before failing it closed.
+    """
+    if not task.get("available") or task.get("status") == "Running":
+        return False
+    last_run = _parse_task_datetime(str(task.get("last_run_time", "")))
+    if last_run is None or last_run.year <= 1999:
+        return False
+    raw = str(task.get("last_result", "")).strip()
+    try:
+        result = int(raw, 0)
+    except ValueError:
+        return bool(raw and raw.upper() not in {"N/A", "THE OPERATION COMPLETED SUCCESSFULLY."})
+    return result != 0
+
+
+def _latest_row_timestamp(row: dict | None) -> datetime | None:
+    """Extract wall-clock timestamp from a JSONL row across the schemas we log."""
+    if not row:
+        return None
+    for key in (
+        "resolved_at", "generated_at", "scanned_at", "timestamp", "logged_at",
+        "observed_at", "bar_close_ts", "trigger_bar_ts",
+    ):
+        raw = row.get(key)
+        if not raw:
+            continue
+        text = str(raw).replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError:
+            continue
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    return None
+
+
+def _json_document(path: Path | None) -> dict | None:
+    if path is None:
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _hours_since(then: datetime | None, now: datetime) -> float | None:
+    if then is None:
+        return None
+    return max(0.0, (now - then).total_seconds() / 3600.0)
 
 
 def _row_has_errors(row: dict | None) -> list[str]:
@@ -648,18 +738,52 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
             latest_row.get("date")
             or latest_row.get("generated_at", "")[:10]
             or latest_row.get("scanned_at", "")[:10]
+            or latest_row.get("resolved_at", "")[:10]
+            or latest_row.get("timestamp", "")[:10]
             or ""
         )
         errors = _row_has_errors(latest)
         stale_before_today = _is_before_today(latest_date, today_str)
         pending_today = stale_before_today and _pending_scheduled_run_today(task, today, now)
         task_disabled = task.get("status") == "Disabled"
+        task_required = bool(signal.get("require_successful_task"))
+        task_unavailable = task_required and not task.get("available")
+        task_failed = task_required and _task_failed(task)
+
+        # Stale-outcome detection: a task can exit 0 and still stop producing.
+        # Guard against the "healthy while broken" case by inspecting the last
+        # row's own timestamp and comparing to when the task last ran.
+        max_activity_hours = signal.get("max_hours_since_last_row")
+        activity_path = signal.get("activity_path")
+        activity_document = _json_document(activity_path) if isinstance(activity_path, Path) else None
+        latest_row_ts = _latest_row_timestamp(activity_document or latest)
+        activity_hours = _hours_since(latest_row_ts, now)
+        stale_activity = (
+            max_activity_hours is not None
+            and (latest is None or (activity_hours is not None and activity_hours > max_activity_hours))
+        )
+        last_run_ts = _parse_task_datetime(str(task.get("last_run_time", "")))
+        run_hours = _hours_since(last_run_ts, now)
+        empty_after_run = (
+            bool(signal.get("require_activity_after_last_run"))
+            and last_run_ts is not None
+            and (latest_row_ts is None or latest_row_ts < last_run_ts - timedelta(minutes=5))
+            and run_hours is not None
+            and run_hours < 24
+        )
+
         if task_disabled:
             # A deliberately disabled producer cannot be "stale"; it is not
             # expected to emit output. Tracked separately so it stays visible.
             health = "disabled"
+        elif task_unavailable or task_failed:
+            health = "error"
         elif latest is None:
             health = "missing"
+        elif empty_after_run:
+            health = "error"
+        elif stale_activity:
+            health = "stale"
         elif pending_today:
             health = "ok"
         elif stale_before_today:
@@ -673,10 +797,24 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
             warnings.append(parse_warning)
         if task.get("status") != "Ready":
             warnings.append(f"task_status={task.get('status')}")
+        if task_unavailable:
+            warnings.append("required_task_unavailable")
+        if task_failed:
+            warnings.append(f"task_last_result={task.get('last_result')}")
         if pending_today:
             warnings.append(f"pending_today latest_date={latest_date}")
         elif stale_before_today:
             warnings.append(f"latest_date={latest_date}")
+        if empty_after_run:
+            warnings.append(
+                f"empty_after_last_run last_run={task.get('last_run_time') or '?'} "
+                f"latest_row_ts={latest_row_ts.isoformat(timespec='seconds') if latest_row_ts else 'none'}"
+            )
+        if stale_activity and not empty_after_run:
+            hours_text = f"{activity_hours:.1f}" if activity_hours is not None else "none"
+            warnings.append(
+                f"no_new_rows_in={hours_text}h max_allowed={max_activity_hours}h"
+            )
         warnings.extend(errors)
         items.append({
             "name": signal["name"],
@@ -684,6 +822,7 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
             "task": signal["task"],
             "task_status": task,
             "log_path": str(signal["log"]),
+            "activity_path": str(activity_path) if activity_path else None,
             "row_count": row_count,
             "latest_date": latest_date,
             "health": health,

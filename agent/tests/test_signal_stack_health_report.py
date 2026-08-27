@@ -144,6 +144,113 @@ def test_signal_health_registry_has_unique_names() -> None:
     assert len(names) == len(set(names))
 
 
+def test_pattern_learning_tasks_are_registered_and_fail_closed() -> None:
+    names = {signal["name"]: signal for signal in report.SIGNALS}
+
+    assert names["Pattern Grader"]["task"] == r"\VibeTrade\PatternGrader-Scanner-Intraday"
+    assert names["Pattern Grader"]["activity_path"].name == "pattern-grader-grades.json"
+    assert names["Pattern Outcomes"]["task"] == r"\PatternGrader-OutcomeResolver"
+    assert names["Pattern Outcomes"]["require_successful_task"] is True
+
+
+def test_required_task_nonzero_last_result_is_error(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "outcomes.jsonl"
+    log.write_text('{"resolved_at":"2026-06-30T20:00:00Z"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{
+            "name": "Critical",
+            "task": r"\critical",
+            "log": log,
+            "kind": "close",
+            "require_successful_task": True,
+        }],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda _task: {
+            "available": True,
+            "status": "Ready",
+            "last_run_time": "6/30/2026 3:35:00 PM",
+            "last_result": "267014",
+            "next_run_time": "7/1/2026 3:35:00 PM",
+        },
+    )
+
+    built = report.build_report(today=date(2026, 6, 30), now=datetime(2026, 6, 30, 16, 0))
+
+    assert built["summary"]["error"] == 1
+    assert built["items"][0]["latest_date"] == "2026-06-30"
+    assert "task_last_result=267014" in built["items"][0]["warnings"]
+
+
+def test_task_succeeded_but_ledger_did_not_grow_reports_error(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "outcomes.jsonl"
+    log.write_text('{"resolved_at":"2026-06-29T20:00:00Z"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{
+            "name": "Silent Resolver",
+            "task": r"\silent",
+            "log": log,
+            "kind": "close",
+            "require_successful_task": True,
+            "require_activity_after_last_run": True,
+            "max_hours_since_last_row": 6,
+        }],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda _task: {
+            "available": True,
+            "status": "Ready",
+            "last_run_time": "6/30/2026 3:35:00 PM",
+            "last_result": "0",
+            "next_run_time": "7/1/2026 3:35:00 PM",
+        },
+    )
+
+    built = report.build_report(today=date(2026, 6, 30), now=datetime(2026, 6, 30, 16, 0))
+
+    assert built["items"][0]["health"] == "error"
+    assert any("empty_after_last_run" in warning for warning in built["items"][0]["warnings"])
+
+
+def test_stale_activity_marks_signal_stale_even_if_task_scheduled_today(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "grader.jsonl"
+    log.write_text('{"resolved_at":"2026-06-30T08:00:00-05:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        report,
+        "SIGNALS",
+        [{
+            "name": "Grader",
+            "task": r"\grader",
+            "log": log,
+            "kind": "intraday",
+            "max_hours_since_last_row": 4,
+        }],
+    )
+    monkeypatch.setattr(
+        report,
+        "_task_status",
+        lambda _task: {
+            "available": True,
+            "status": "Ready",
+            "last_run_time": "6/30/2026 8:00:00 AM",
+            "next_run_time": "6/30/2026 4:00:00 PM",
+        },
+    )
+
+    built = report.build_report(today=date(2026, 6, 30), now=datetime(2026, 6, 30, 15, 0))
+
+    assert built["items"][0]["health"] == "stale"
+    assert any("no_new_rows_in" in warning for warning in built["items"][0]["warnings"])
+
+
 def test_strategy_staleness_alerts_after_threshold(tmp_path: Path) -> None:
     trades = tmp_path / "flip-trades.json"
     trades.write_text(json.dumps([

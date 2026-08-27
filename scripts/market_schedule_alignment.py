@@ -32,6 +32,11 @@ OPTIONS_ENTRY_WINDOWS_ET = (("09:45", "10:30"), ("15:00", "15:45"))
 # covers the alignment task observing itself mid-run and other tasks observed
 # at their own start minute, while still flagging genuinely stuck tasks.
 RUNNING_GRACE_MINUTES = 30
+RUNNING_GRACE_MINUTES_BY_TASK = {
+    # Registered with an eight-hour execution limit and designed to maintain
+    # the market-data/event subscription for the session.
+    r"\Flip-Bot-Event-Monitor": 8 * 60,
+}
 
 
 def _minute_series(start: str, end: str, step_minutes: int) -> set[str]:
@@ -61,7 +66,9 @@ EXPECTED_TASKS = {
     r"\VibeTrade\RVIVRegimeScanner": {"08:37"},
     r"\VibeTrade\HurstRegimeScanner": {"08:38"},
     r"\VibeTrade\OpeningRangeBreadthScanner": {"08:40"},
-    r"\Flip-Bot-Exploration": {"08:40"},
+    # The exploration runner intentionally retries every 20 minutes through
+    # 12:20 CT; its own one-trade-per-day and safety gates prevent duplication.
+    r"\Flip-Bot-Exploration": _minute_series("08:40", "12:20", 20),
     r"\VibeTrade\TrendParticipationShadowEntry": {"08:47", "14:02"},
     r"\VibeTrade\TrendParticipationShadowMonitor": {"08:50"},
     # Regular-hours execution/watch.
@@ -103,7 +110,12 @@ EXPECTED_TASKS = {
     r"\VibeTrade\MarketBreadthUptrendScanner": {"15:31"},
     r"\VibeTrade\DistributionDayScanner": {"15:32"},
     r"\VibeTrade\SectorRotationRanker": {"15:33"},
-    r"\VibeTrade\SignalStackHealthReport": {"15:35"},
+    r"\VibeTrade\PatternGrader-Scanner-Intraday": {"08:35"},
+    r"\VibeTrade\PatternGrader-Aggregator": {"15:05"},
+    r"\PatternGrader-OutcomeResolver": {"15:10"},
+    r"\CISD-PromotionTracker": {"15:20"},
+    r"\PromoteValidatedPatterns": {"15:30"},
+    r"\VibeTrade\SignalStackHealthReport": {"15:40"},
     r"\VibeTrade\MarketForceScore": {"15:40"},
     r"\VibeTrade\ExposureCoach": {"15:45"},
     # Evening review chain.
@@ -137,6 +149,7 @@ EXPECTED_TASKS = {
 }
 
 EXPECTED_TASK_REPETITIONS = {
+    r"\VibeTrade\PatternGrader-Scanner-Intraday": {"interval": "PT5M", "duration": "PT6H30M"},
     r"\VibeTradingOptionsShadowTwin": {"interval": "PT1M", "duration": "PT6H10M"},
     r"\IWM-Bot-Monitor": {"interval": "PT1M", "duration": "PT6H25M"},
     r"\VibeTrade\TrendParticipationShadowMonitor": {"interval": "PT5M", "duration": "PT6H5M"},
@@ -148,6 +161,11 @@ ORDER_CHECKS = [
     ("open_scanners_before_trend", r"\VibeTrade\OpeningRangeBreadthScanner", r"\Flip-Bot-Trend-Entry"),
     ("opening_range_before_trend_shadow", r"\VibeTrade\OpeningRangeBreadthScanner", r"\VibeTrade\TrendParticipationShadowEntry"),
     ("close_context_before_market_force", r"\VibeTrade\SectorRotationRanker", r"\VibeTrade\MarketForceScore"),
+    ("pattern_scanner_before_aggregate", r"\VibeTrade\PatternGrader-Scanner-Intraday", r"\VibeTrade\PatternGrader-Aggregator"),
+    ("pattern_aggregate_before_outcomes", r"\VibeTrade\PatternGrader-Aggregator", r"\PatternGrader-OutcomeResolver"),
+    ("pattern_outcomes_before_health_report", r"\PatternGrader-OutcomeResolver", r"\VibeTrade\SignalStackHealthReport"),
+    ("pattern_outcomes_before_cisd_tracker", r"\PatternGrader-OutcomeResolver", r"\CISD-PromotionTracker"),
+    ("cisd_tracker_before_promotion", r"\CISD-PromotionTracker", r"\PromoteValidatedPatterns"),
     ("activity_before_outcome", r"\VibeTrade\DailyBotActivityExport", r"\VibeTrade\DailyOutcomeReviewer"),
     ("liquidity_before_universe_rank", r"\VibeTrade\OptionsLiquidityFeasibility", r"\VibeTrade\DailyOptionsUniverseRanker"),
     ("surface_before_universe_rank", r"\VibeTrade\OptionsSurfaceIntelligence", r"\VibeTrade\DailyOptionsUniverseRanker"),
@@ -360,13 +378,16 @@ def build_report(
         elif "Running" in status_values:
             last_run = last_runs.get(task)
             elapsed_minutes = (now - last_run).total_seconds() / 60 if last_run else None
-            if elapsed_minutes is not None and elapsed_minutes > RUNNING_GRACE_MINUTES:
+            running_grace_minutes = RUNNING_GRACE_MINUTES_BY_TASK.get(
+                task, RUNNING_GRACE_MINUTES
+            )
+            if elapsed_minutes is not None and elapsed_minutes > running_grace_minutes:
                 status_ok = False
                 issues.append({
                     "task": task,
                     "issue": "task_running_too_long",
                     "elapsed_minutes": round(elapsed_minutes, 1),
-                    "grace_minutes": RUNNING_GRACE_MINUTES,
+                    "grace_minutes": running_grace_minutes,
                     "last_run_time": last_run.isoformat(timespec="seconds"),
                 })
             elif elapsed_minutes is None:
