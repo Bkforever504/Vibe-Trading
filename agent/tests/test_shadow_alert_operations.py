@@ -128,6 +128,39 @@ def test_heartbeat_passes_ready_tasks_and_fresh_sources_then_fails_stale_hmm(tmp
     assert stale["hmm"]["fresh"] is False
 
 
+def test_stale_databento_research_does_not_fail_core_operations(tmp_path: Path, monkeypatch) -> None:
+    hmm = tmp_path / "hmm.json"
+    catalyst = tmp_path / "catalyst.json"
+    databento = tmp_path / "databento.json"
+    mnq_evidence = tmp_path / "mnq-evidence.json"
+    pattern_outcomes = tmp_path / "pattern_grader_outcomes.jsonl"
+    _fresh_report(hmm)
+    _fresh_report(catalyst)
+    _fresh_report(databento, NOW - timedelta(days=3))
+    _fresh_report(mnq_evidence, NOW - timedelta(days=3))
+    pattern_outcomes.write_text(
+        json.dumps({"resolved_at": NOW.isoformat().replace("+00:00", "Z")}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(heartbeat, "is_halted", lambda _name: False)
+    monkeypatch.setattr(heartbeat, "read_state", lambda _name: {})
+    monkeypatch.setattr(heartbeat, "kill_switch_active", lambda: False)
+
+    report = heartbeat.build_report(
+        now=NOW,
+        task_rows=_ready_tasks(),
+        hmm_path=hmm,
+        catalyst_path=catalyst,
+        databento_capability_path=databento,
+        mnq_evidence_path=mnq_evidence,
+        pattern_outcomes_path=pattern_outcomes,
+    )
+
+    assert report["status"] == "PASS"
+    assert report["status_scope"] == "core_scheduled_operations"
+    assert report["research_status"] == "DEGRADED"
+
+
 def test_heartbeat_fails_when_pattern_outcomes_ledger_did_not_grow(tmp_path: Path, monkeypatch) -> None:
     hmm = tmp_path / "hmm.json"
     catalyst = tmp_path / "catalyst.json"
@@ -157,10 +190,65 @@ def test_heartbeat_fails_when_pattern_outcomes_ledger_did_not_grow(tmp_path: Pat
 
 
 def test_heartbeat_does_not_create_circular_dependency_on_its_consumers() -> None:
+    assert ("\\", "IntradayOpportunityRadar") in heartbeat.EXPECTED_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "EodShadowCheckin") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") not in heartbeat.OPS_TASKS
     assert ("\\VibeTrade\\", "EodShadowCheckin") not in heartbeat.OPS_TASKS
+
+
+def test_scanner_gap_health_preserves_intraday_outage_after_recovery_and_close(
+    tmp_path: Path,
+) -> None:
+    now = datetime(2026, 8, 26, 15, 0, tzinfo=timezone.utc)  # 10:00 CT
+    fresh = tmp_path / "fresh.jsonl"
+    stale = tmp_path / "stale.jsonl"
+    fresh_stamps = [
+        datetime(2026, 8, 26, 13, 35, tzinfo=timezone.utc) + timedelta(minutes=10 * index)
+        for index in range(9)
+    ]
+    fresh.write_text("\n".join(json.dumps({"generated_at": stamp.isoformat()}) for stamp in fresh_stamps) + "\n", encoding="utf-8")
+    stale.write_text("\n".join(json.dumps({"generated_at": stamp.isoformat()}) for stamp in (
+        datetime(2026, 8, 26, 13, 35, tzinfo=timezone.utc),
+        datetime(2026, 8, 26, 13, 40, tzinfo=timezone.utc),
+        now - timedelta(minutes=5),
+    )) + "\n", encoding="utf-8")
+
+    report = heartbeat.report_scanner_gaps(
+        (("fresh", fresh), ("stale", stale)), now=now, max_gap_minutes=15
+    )
+
+    assert report["in_regular_session"] is True
+    assert report["any_stalled"] is True
+    assert report["status"] == "stalled"
+    assert {row["name"]: row["stalled"] for row in report["scanners"]} == {
+        "fresh": False,
+        "stale": True,
+    }
+
+    assert next(row for row in report["scanners"] if row["name"] == "stale")["observation_count"] == 3
+
+    after_hours = heartbeat.report_scanner_gaps(
+        (("stale", stale),), now=datetime(2026, 8, 26, 21, 30, tzinfo=timezone.utc), max_gap_minutes=15
+    )
+    assert after_hours["in_regular_session"] is False
+    assert after_hours["any_stalled"] is True
+    assert after_hours["worst_gap_minutes"] > 15
+
+
+def test_futures_coverage_reports_capability_without_implying_no_move(tmp_path: Path) -> None:
+    capability = tmp_path / "databento.json"
+    capability.write_text(json.dumps({"mbo_available": True}), encoding="utf-8")
+    assert heartbeat.report_futures_coverage(capability)["state"] == "live_mbo"
+
+    capability.write_text(json.dumps({"delayed_proxy": True}), encoding="utf-8")
+    assert heartbeat.report_futures_coverage(capability)["state"] == "delayed_proxy"
+
+    capability.write_text(json.dumps({"historical_regrade_supported": True}), encoding="utf-8")
+    assert heartbeat.report_futures_coverage(capability)["state"] == "delayed_proxy"
+
+    capability.write_text("{}", encoding="utf-8")
+    assert heartbeat.report_futures_coverage(capability)["state"] == "unavailable"
 
 
 def test_preflight_no_network_validates_spec_universe_tasks_and_sources(tmp_path: Path, monkeypatch) -> None:

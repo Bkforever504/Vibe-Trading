@@ -12,7 +12,7 @@ foreach ($job in $jobs) {
   if (-not (Test-Path -LiteralPath $runner)) { throw "Missing runner: $runner" }
   $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NonInteractive -ExecutionPolicy Bypass -File `"$runner`"" -WorkingDirectory $repo
   $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At $job.At
-  $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+  $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -StartWhenAvailable -WakeToRun -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
   Register-ScheduledTask -TaskName $job.Name -Action $action -Trigger $trigger -Settings $settings -RunLevel Limited -Force | Out-Null
 }
 Write-Host "Registered read-only Phase C detection tasks."

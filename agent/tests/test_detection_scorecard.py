@@ -51,7 +51,7 @@ def test_detection_scorecard_partitions_discovery_ranking_and_latency() -> None:
         ],
     }
     history = [
-        _snapshot("2026-08-21T14:05:00Z", [("WIN", "bullish")]),
+        _snapshot("2026-08-21T13:55:00Z", [("WIN", "bullish")]),
         _snapshot("2026-08-21T14:30:00Z", [("WIN", "bullish"), ("LATE", "bearish")]),
     ]
     report = build_scorecard(ground, history, k=1, regime="trend")
@@ -59,13 +59,371 @@ def test_detection_scorecard_partitions_discovery_ranking_and_latency() -> None:
 
     assert report["metrics"]["recall_at_k"] == 0.3333
     assert report["metrics"]["precision_at_k"] == 1.0
-    assert partitions == {"WIN": "correct_entry", "LATE": "ranking_miss", "MISS": "discovery_miss"}
+    assert partitions == {"WIN": "confirmation_miss", "LATE": "ranking_miss", "MISS": "discovery_miss"}
     assert report["per_regime"]["trend"] == report["metrics"]
     assert report["execution_enabled"] is False
 
     rolling = build_rolling([report])
     assert rolling["metrics"]["recall_at_10"] == 0.3333
-    assert len(rolling["top_missed_moves"]) == 2
+    assert rolling["metrics"]["actionable_recall_at_10"] == 0.3333
+    assert rolling["metrics"]["discovery_recall_at_10"] == 0.3333
+    assert rolling["summary"]["stage_counts"]["market_moves"] == 3
+    assert rolling["summary"]["staged_sessions"] == 1
+    assert rolling["latest_session"] == {
+        "date": "2026-08-21",
+        "stage_counts": report["summary"]["stage_counts"],
+        "market_coverage": report["market_coverage"],
+        "ground_truth_count": 3,
+        "market_move_window_count": 3,
+    }
+    assert len(rolling["top_missed_moves"]) == 3
+
+
+def test_detection_scorecard_uses_actionable_ranking_without_losing_discovery_metrics() -> None:
+    ground = {
+        "date": "2026-08-21",
+        "moves": [
+            {"move_id": "1", "date": "2026-08-21", "symbol": "SAFE", "direction": "bullish", "move_pct": 6, "move_start_at": "2026-08-21T14:00:00Z"},
+            {"move_id": "2", "date": "2026-08-21", "symbol": "CHASE", "direction": "bullish", "move_pct": 12, "move_start_at": "2026-08-21T14:00:00Z"},
+        ],
+    }
+    history = [{
+        "date": "2026-08-21",
+        "generated_at": "2026-08-21T13:55:00Z",
+        "all_discovered_symbols": ["SAFE", "CHASE"],
+        "ranked_candidates": [
+            {"symbol": "CHASE", "direction": "bullish", "state": "filtered"},
+            {"symbol": "SAFE", "direction": "bullish", "state": "precision_watch"},
+        ],
+        "actionable_ranked_candidates": [
+            {"symbol": "SAFE", "direction": "bullish", "state": "precision_watch", "ranking_score": 91},
+        ],
+    }]
+
+    report = build_scorecard(ground, history, k=1, regime="trend")
+    rows = {row["symbol"]: row for row in report["moves"]}
+
+    assert report["metrics"]["ranking_source"] == "actionable_ranked_candidates"
+    assert report["metrics"]["recall_at_k"] == 0.5
+    assert report["metrics"]["precision_at_k"] == 1.0
+    assert report["metrics"]["discovery_recall_at_k"] == 0.5
+    assert report["metrics"]["discovery_precision_at_k"] == 1.0
+    assert rows["SAFE"]["partition"] == "correct_entry"
+    assert rows["CHASE"]["partition"] == "ranking_miss"
+    assert rows["CHASE"]["first_discovery_rank"] == 1
+    assert rows["CHASE"]["first_actionable_rank"] is None
+
+
+def test_benchmark_ground_truth_uses_benchmark_lane_not_penny_stock_rank() -> None:
+    report = build_scorecard(
+        {
+            "date": "2026-08-21",
+            "moves": [{
+                "move_id": "QQQ:move",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bearish",
+                "move_start_at": "2026-08-21T14:00:00Z",
+                "horizon_end_ts": "2026-08-21T15:00:00Z",
+            }],
+        },
+        [{
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T13:55:00Z",
+            "all_discovered_symbols": ["PENNY", "QQQ"],
+            "ranked_candidates": [
+                {"symbol": "PENNY", "direction": "bullish", "ranking_score": 99},
+                {"symbol": "QQQ", "direction": "bearish", "ranking_score": 70},
+            ],
+            "actionable_ranked_candidates": [{"symbol": "PENNY", "direction": "bullish"}],
+            "benchmark_lane": {
+                "symbols": ["SPY", "QQQ", "IWM"],
+                "ranked_candidates": [{
+                    "symbol": "QQQ",
+                    "direction": "bearish",
+                    "lane_rank": 1,
+                    "confirmation_stage": "completed_5m_confirmed",
+                }],
+                "actionable_ranked_candidates": [{
+                    "symbol": "QQQ",
+                    "direction": "bearish",
+                    "lane_rank": 1,
+                    "confirmation_stage": "completed_5m_confirmed",
+                }],
+            },
+        }],
+    )
+
+    move = report["moves"][0]
+    assert move["ranking_lane"] == "benchmark"
+    assert move["first_discovery_rank"] == 1
+    assert move["first_actionable_rank"] == 1
+    assert move["radar_linkage"]["rank"] == 1
+    assert move["radar_linkage"]["execution_rank"] == 1
+    assert move["stages"]["execution_qualified"] is True
+
+
+def test_stale_prior_snapshot_is_a_coverage_miss_not_a_discovery() -> None:
+    report = build_scorecard(
+        {
+            "date": "2026-08-21",
+            "moves": [{
+                "move_id": "QQQ:late",
+                "symbol": "QQQ",
+                "direction": "bullish",
+                "move_start_at": "2026-08-21T15:45:00Z",
+            }],
+        },
+        [{
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T14:10:00Z",
+            "all_discovered_symbols": ["QQQ"],
+            "ranked_candidates": [{"symbol": "QQQ", "direction": "bullish"}],
+        }],
+    )
+
+    link = report["move_windows"][0]["radar_linkage"]
+    assert link["status"] == "stale_prior_snapshot"
+    assert link["snapshot_lead_minutes"] == 95.0
+    assert link["stale_rank"] == 1
+    assert link["rank"] is None
+    assert link["stages"]["discovered"] is False
+    assert report["metrics"]["recall_at_k"] == 0.0
+    assert report["metrics"]["discovery_recall_at_k"] == 0.0
+
+
+def test_rank_metrics_use_distinct_move_windows_not_duplicate_labels() -> None:
+    report = build_scorecard(
+        {
+            "date": "2026-08-21",
+            "moves": [
+                {"move_id": "QQQ:5m", "symbol": "QQQ", "timeframe": "5m", "direction": "bearish", "move_start_at": "2026-08-21T14:00:00Z", "horizon_end_ts": "2026-08-21T15:00:00Z"},
+                {"move_id": "QQQ:15m", "symbol": "QQQ", "timeframe": "15m", "direction": "bearish", "move_start_at": "2026-08-21T14:00:00Z", "horizon_end_ts": "2026-08-21T15:30:00Z"},
+            ],
+        },
+        [{
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T13:55:00Z",
+            "all_discovered_symbols": ["QQQ"],
+            "ranked_candidates": [{"symbol": "QQQ", "direction": "bearish"}],
+        }],
+    )
+
+    assert report["metrics"]["ground_truth_count"] == 1
+    assert report["metrics"]["ground_truth_label_count"] == 2
+    assert report["metrics"]["recall_at_k"] == 1.0
+    assert report["metrics"]["precision_at_k"] == 1.0
+
+
+def test_scorecard_links_nearest_prior_snapshot_and_clusters_overlapping_labels() -> None:
+    ground = {
+        "date": "2026-08-21",
+        "metrics_qualified": False,
+        "pair_status": [
+            {"instrument": "QQQ", "timeframe": "5m", "qualified": True},
+            {"instrument": "NQ", "timeframe": "5m", "qualified": False, "reason": "bars_unavailable_or_not_entitled"},
+        ],
+        "moves": [
+            {
+                "move_id": "QQQ:one",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bearish",
+                "move_start_at": "2026-08-21T14:00:00Z",
+                "horizon_end_ts": "2026-08-21T15:00:00Z",
+                "metrics_qualified": True,
+                "peak_favorable_short": 3.0,
+                "peak_adverse_short": 0.4,
+                "achievable_r_short": 5.0,
+                "realized_r_short": 2.0,
+            },
+            {
+                "move_id": "QQQ:two",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bearish",
+                "move_start_at": "2026-08-21T14:05:00Z",
+                "horizon_end_ts": "2026-08-21T15:05:00Z",
+                "metrics_qualified": True,
+                "peak_favorable_short": 4.0,
+                "peak_adverse_short": 0.2,
+                "achievable_r_short": 7.5,
+                "realized_r_short": 3.0,
+            },
+            {
+                "move_id": "QQQ:three",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bullish",
+                "move_start_at": "2026-08-21T14:30:00Z",
+                "horizon_end_ts": "2026-08-21T15:30:00Z",
+                "metrics_qualified": True,
+                "peak_favorable_long": 2.5,
+                "peak_adverse_long": 0.1,
+                "achievable_r_long": 4.0,
+                "realized_r_long": 1.5,
+            },
+        ],
+    }
+    history = [
+        {
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T13:55:00Z",
+            "all_discovered_symbols": ["QQQ"],
+            "ranked_candidates": [
+                {"symbol": "OTHER", "direction": "bullish"},
+                {
+                    "symbol": "QQQ",
+                    "direction": "bearish",
+                    "price_action_confirmation": {"state": "bearish_confirmed"},
+                },
+            ],
+            "actionable_ranked_candidates": [{"symbol": "QQQ", "direction": "bearish"}],
+        },
+        {
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T14:25:00Z",
+            "all_discovered_symbols": ["QQQ"],
+            "ranked_candidates": [
+                {
+                    "symbol": "QQQ",
+                    "direction": "bullish",
+                    "state": "precision_watch",
+                    "confirmation_stage": "completed_5m_confirmed",
+                    "blockers": ["strategy_confirmation_and_revalidation_required"],
+                }
+            ],
+            "actionable_ranked_candidates": [{"symbol": "QQQ", "direction": "bullish"}],
+        },
+    ]
+
+    report = build_scorecard(ground, history, k=10)
+
+    assert report["summary"]["stage_counts"] == {
+        "market_moves": 2,
+        "discovered": 2,
+        "setup_confirmed": 2,
+        "execution_qualified": 2,
+    }
+    assert len(report["moves"]) == 3  # legacy per-label denominator remains available
+    assert len(report["move_windows"]) == 2
+    bearish = next(row for row in report["move_windows"] if row["direction"] == "bearish")
+    assert bearish["constituent_move_ids"] == ["QQQ:one", "QQQ:two"]
+    assert bearish["radar_linkage"]["radar_snapshot_at"] == "2026-08-21T13:55:00Z"
+    assert bearish["outcome_linkage"]["mfe"] == 4.0
+    assert bearish["outcome_linkage"]["mae"] == 0.4
+    assert bearish["outcome_linkage"]["max_achievable_r"] == 7.5
+    assert bearish["outcome_linkage"]["direction_correct"] is True
+    assert bearish["outcome_linkage"]["rank"] == 2
+    assert bearish["outcome_linkage"]["latency_minutes"] == -5.0
+    assert bearish["outcome_linkage"]["fill_assumed"] is False
+    assert report["market_coverage"]["status"] == "partial"
+    assert report["market_coverage"]["unavailable_instruments"] == ["NQ"]
+    assert report["market_coverage"]["no_move_interpretation_allowed"] is False
+    assert report["metrics"]["ground_truth_count"] == 2
+    assert report["metrics"]["ground_truth_label_count"] == 3
+    assert report["metrics"]["market_move_window_count"] == 2
+
+
+def test_move_windows_deduplicate_one_economic_move_across_timeframes() -> None:
+    ground = {
+        "date": "2026-08-21",
+        "moves": [
+            {
+                "move_id": "QQQ:5m",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bearish",
+                "move_start_at": "2026-08-21T14:00:00Z",
+                "horizon_end_ts": "2026-08-21T15:00:00Z",
+                "peak_favorable_short": 3.0,
+                "peak_adverse_short": 0.4,
+                "achievable_r_short": 5.0,
+            },
+            {
+                "move_id": "QQQ:15m",
+                "symbol": "QQQ",
+                "timeframe": "15m",
+                "direction": "bearish",
+                "move_start_at": "2026-08-21T14:00:00Z",
+                "horizon_end_ts": "2026-08-21T15:30:00Z",
+                "peak_favorable_short": 4.0,
+                "peak_adverse_short": 0.2,
+                "achievable_r_short": 7.5,
+            },
+        ],
+    }
+    history = [{
+        "date": "2026-08-21",
+        "generated_at": "2026-08-21T13:55:00Z",
+        "all_discovered_symbols": ["QQQ"],
+        "ranked_candidates": [{"symbol": "QQQ", "direction": "bearish"}],
+    }]
+
+    report = build_scorecard(ground, history)
+
+    assert report["summary"]["stage_counts"]["market_moves"] == 1
+    assert report["metrics"]["market_move_window_count"] == 1
+    assert report["move_windows"][0]["timeframes"] == ["15m", "5m"]
+    assert report["move_windows"][0]["constituent_move_ids"] == ["QQQ:5m", "QQQ:15m"]
+
+
+def test_explicit_awaiting_confirmation_cannot_be_promoted_by_legacy_watch_state() -> None:
+    report = build_scorecard(
+        {
+            "date": "2026-08-21",
+            "moves": [{
+                "move_id": "QQQ:waiting",
+                "symbol": "QQQ",
+                "timeframe": "5m",
+                "direction": "bullish",
+                "move_start_at": "2026-08-21T14:00:00Z",
+            }],
+        },
+        [{
+            "date": "2026-08-21",
+            "generated_at": "2026-08-21T13:55:00Z",
+            "all_discovered_symbols": ["QQQ"],
+            "ranked_candidates": [{
+                "symbol": "QQQ",
+                "direction": "bullish",
+                "state": "precision_watch",
+                "setup_confirmed": True,
+                "confirmation_stage": "awaiting_completed_5m_confirmation",
+                "blockers": ["strategy_confirmation_and_revalidation_required"],
+            }],
+            "actionable_ranked_candidates": [{"symbol": "QQQ", "direction": "bullish"}],
+        }],
+    )
+
+    stages = report["move_windows"][0]["stages"]
+    assert stages == {
+        "market_move": True,
+        "discovered": True,
+        "setup_confirmed": False,
+        "execution_qualified": False,
+    }
+
+
+def test_unavailable_coverage_is_not_reported_as_no_market_move() -> None:
+    report = build_scorecard(
+        {
+            "date": "2026-08-21",
+            "metrics_qualified": False,
+            "ground_truth_status": "partial_fail_closed",
+            "pair_status": [
+                {"instrument": "NQ", "timeframe": "5m", "qualified": False, "reason": "bars_unavailable_or_not_entitled"}
+            ],
+            "moves": [],
+        },
+        [],
+    )
+
+    assert report["summary"]["stage_counts"]["market_moves"] == 0
+    assert report["market_coverage"]["status"] == "unavailable"
+    assert report["market_coverage"]["no_move_interpretation_allowed"] is False
+    assert "unknown, not evidence" in report["market_coverage"]["message"]
+    assert any("must not be interpreted as no move" in warning for warning in report["warnings"])
 
 
 def test_universe_delta_assigns_a_root_cause_to_every_truth_move() -> None:

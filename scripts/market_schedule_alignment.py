@@ -111,6 +111,15 @@ EXPECTED_TASKS = {
     r"\VibeTrade\DistributionDayScanner": {"15:32"},
     r"\VibeTrade\SectorRotationRanker": {"15:33"},
     r"\VibeTrade\PatternGrader-Scanner-Intraday": {"08:35"},
+    r"\IntradayOpportunityRadar": {
+        "08:35", "08:40", "08:45", "08:50", "08:55", "09:00", "09:05", "09:10",
+        "09:15", "09:20", "09:25", "09:30", "09:35", "09:40", "09:45", "09:50",
+        "09:55", "10:00", "10:05", "10:10", "10:15", "10:20", "10:30", "10:40",
+        "10:50", "11:00", "11:10", "11:20", "11:30", "11:40", "11:50", "12:00",
+        "12:10", "12:20", "12:30", "12:40", "12:50", "13:00", "13:10", "13:20",
+        "13:30", "13:40", "13:50", "14:00", "14:10", "14:20", "14:30", "15:02",
+    },
+    r"\DailyMoveCoverageReview": {"15:08"},
     r"\VibeTrade\PatternGrader-Aggregator": {"15:05"},
     r"\PatternGrader-OutcomeResolver": {"15:10"},
     r"\CISD-PromotionTracker": {"15:20"},
@@ -146,6 +155,12 @@ EXPECTED_TASKS = {
     r"\VibeTrade\EliteBotReadinessScorecard": {"20:03"},
     r"\VibeTrade\NightlyResearchLoop": {"20:05"},
     r"\VibeTradingNightlyOptionsNBBOEvidence": {"20:15"},
+    # Ground truth must land before the detection scorecard reads it, or the
+    # scorecard is one session stale (this happened on 2026-08-26 and hid the
+    # scanner's poor precision/recall against that day's real moves).
+    r"\VibeTradingMoveGroundTruth": {"16:30"},
+    r"\VibeTradingDetectionScorecard": {"17:15"},
+    r"\VibeTradingUniverseCoverageDelta": {"17:20"},
 }
 
 EXPECTED_TASK_REPETITIONS = {
@@ -164,6 +179,8 @@ ORDER_CHECKS = [
     ("pattern_scanner_before_aggregate", r"\VibeTrade\PatternGrader-Scanner-Intraday", r"\VibeTrade\PatternGrader-Aggregator"),
     ("pattern_aggregate_before_outcomes", r"\VibeTrade\PatternGrader-Aggregator", r"\PatternGrader-OutcomeResolver"),
     ("pattern_outcomes_before_health_report", r"\PatternGrader-OutcomeResolver", r"\VibeTrade\SignalStackHealthReport"),
+    ("ground_truth_before_detection_scorecard", r"\VibeTradingMoveGroundTruth", r"\VibeTradingDetectionScorecard"),
+    ("ground_truth_before_coverage_delta", r"\VibeTradingMoveGroundTruth", r"\VibeTradingUniverseCoverageDelta"),
     ("pattern_outcomes_before_cisd_tracker", r"\PatternGrader-OutcomeResolver", r"\CISD-PromotionTracker"),
     ("cisd_tracker_before_promotion", r"\CISD-PromotionTracker", r"\PromoteValidatedPatterns"),
     ("activity_before_outcome", r"\VibeTrade\DailyBotActivityExport", r"\VibeTrade\DailyOutcomeReviewer"),

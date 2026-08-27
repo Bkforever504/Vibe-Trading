@@ -9,10 +9,13 @@ from scripts.daily_move_coverage_review import build_review
 from scripts.intraday_opportunity_radar import (
     apply_cross_sectional_factor_consensus,
     bar_features,
+    build_report as build_intraday_report,
     coverage_trace,
     discovery_map,
     evaluate_candidate,
+    fetch_intraday_bars,
     nominate_symbols,
+    rank_candidates_by_lane,
     select_symbols_for_intraday_bars,
     symbols_from_report_payload,
 )
@@ -131,6 +134,183 @@ def test_bar_selection_reserves_liquid_mega_caps_before_ranked_quotas() -> None:
     assert set(("SPY", "QQQ", "IWM", "META", "AMZN", "GOOGL", "AMD")) <= set(selected)
 
 
+def test_bar_selection_reserves_official_movers_before_general_activity() -> None:
+    discovered = {
+        symbol: {"symbol": symbol, "sources": ["movers_gainers"], "source_ranks": {"movers_gainers": rank}}
+        for rank, symbol in enumerate(("M1", "M2", "M3", "M4", "M5"), start=1)
+    }
+    discovered.update({
+        symbol: {"symbol": symbol, "sources": ["known_liquid_leader"], "source_ranks": {}}
+        for symbol in ("SPY", "QQQ", "IWM")
+    })
+    discovered.update({
+        f"A{index}": {"symbol": f"A{index}", "sources": ["most_active_volume"], "source_ranks": {"most_active_volume": index}}
+        for index in range(10)
+    })
+    metrics = {symbol: {"gap_return": 0.001, "snapshot_volume": 1_000_000} for symbol in discovered}
+
+    selected = select_symbols_for_intraday_bars(discovered, metrics, limit=8)
+
+    assert selected[:3] == ["SPY", "QQQ", "IWM"]
+    assert set(("M1", "M2", "M3", "M4", "M5")) <= set(selected)
+
+
+def test_intraday_bar_fetch_batches_without_silent_symbol_truncation(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    class Response:
+        def __init__(self, symbols: list[str]) -> None:
+            self.symbols = symbols
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"bars": {symbol: [{"o": 1, "h": 1, "l": 1, "c": 1, "v": 1}] for symbol in self.symbols}}
+
+    def fake_get(_url, **kwargs):
+        symbols = str(kwargs["params"]["symbols"]).split(",")
+        calls.append(symbols)
+        return Response(symbols)
+
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.requests.get", fake_get)
+    symbols = [f"S{index}" for index in range(205)]
+
+    bars, errors = fetch_intraday_bars(symbols, NOW_ET)
+
+    assert errors == []
+    assert len(calls) == 3
+    assert max(map(len, calls)) <= 100
+    assert set(bars) == set(symbols)
+
+
+def test_intraday_bar_fetch_excludes_currently_forming_five_minute_bar(monkeypatch) -> None:
+    requested_ends: list[str] = []
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"bars": {}}
+
+    def fake_get(_url, **kwargs):
+        requested_ends.append(str(kwargs["params"]["end"]))
+        return Response()
+
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.requests.get", fake_get)
+
+    fetch_intraday_bars(["QQQ"], datetime(2026, 8, 20, 11, 3, tzinfo=ZoneInfo("America/New_York")))
+
+    requested_end = datetime.fromisoformat(requested_ends[0].replace("Z", "+00:00"))
+    assert requested_end.astimezone(ZoneInfo("America/New_York")).strftime("%H:%M") == "11:00"
+
+
+def test_completed_bar_failed_opening_range_breakout_is_bearish_reversal() -> None:
+    rows = [
+        {"t": "2026-08-20T13:30:00Z", "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5, "v": 1000},
+        {"t": "2026-08-20T13:35:00Z", "o": 100.5, "h": 100.8, "l": 99.8, "c": 100.2, "v": 1000},
+        {"t": "2026-08-20T13:40:00Z", "o": 100.2, "h": 100.7, "l": 99.9, "c": 100.4, "v": 1000},
+        {"t": "2026-08-20T13:45:00Z", "o": 101.2, "h": 102.0, "l": 100.0, "c": 100.5, "v": 1200},
+    ]
+
+    features = bar_features(rows)
+
+    assert features["price_action_state"] == "bearish_confirmed"
+    assert features["price_action_pattern"] == "failed_opening_range_breakout"
+    assert features["primary_reversal"]["observed_at"] == rows[-1]["t"]
+    assert features["primary_reversal"]["bar_basis"] == "completed_5m_only"
+    assert features["primary_reversal"]["can_submit_orders"] is False
+
+    candidate = evaluate_candidate(
+        {"symbol": "QQQ", "sources": ["known_liquid_leader", "most_active_volume"], "source_ranks": {}},
+        {"price": 100.5, "gap_return": 0.004, "spread_pct": 0.001, "snapshot_volume": 9_000_000},
+        features,
+        500_000_000,
+        [],
+        NOW_ET,
+    )
+    assert candidate["direction"] == "bearish"
+    assert candidate["setup"] == "failed_opening_range_breakout"
+    assert candidate["factor_scores"]["structure"] == 96.0
+    assert candidate["ranking_score"] >= candidate["score"] + 12.0
+    assert candidate["can_submit_orders"] is False
+
+
+def test_completed_bar_sweep_reclaim_and_vwap_reclaim_are_mechanical_observations() -> None:
+    sweep_rows = [
+        {"t": "1", "o": 100.0, "h": 101.0, "l": 98.0, "c": 100.0, "v": 1000},
+        {"t": "2", "o": 100.0, "h": 100.8, "l": 99.2, "c": 100.1, "v": 1000},
+        {"t": "3", "o": 100.1, "h": 100.7, "l": 99.1, "c": 100.0, "v": 1000},
+        {"t": "4", "o": 100.0, "h": 100.5, "l": 99.0, "c": 99.4, "v": 1000},
+        {"t": "5", "o": 99.1, "h": 100.2, "l": 98.8, "c": 99.8, "v": 1200},
+    ]
+    vwap_rows = [
+        {"t": "1", "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.4, "v": 1000},
+        {"t": "2", "o": 100.4, "h": 100.8, "l": 99.4, "c": 100.2, "v": 1000},
+        {"t": "3", "o": 100.2, "h": 100.7, "l": 99.3, "c": 99.8, "v": 1000},
+        {"t": "4", "o": 99.9, "h": 100.7, "l": 99.5, "c": 100.5, "v": 1200},
+    ]
+
+    sweep = bar_features(sweep_rows)
+    reclaim = bar_features(vwap_rows)
+
+    assert "sweep_and_reclaim" in {row["pattern"] for row in sweep["reversal_observations"]}
+    assert reclaim["price_action_pattern"] == "vwap_reclaim"
+    assert reclaim["confirmation_trigger"] == 100.7
+
+
+def test_benchmark_lane_ranks_only_benchmarks_and_ignores_penny_competition() -> None:
+    rows = [
+        {"symbol": "PENNY", "ranking_score": 99, "change_pct": 80, "confirmation_stage": "completed_5m_confirmed", "factor_consensus": {"score": 99}},
+        {"symbol": "QQQ", "ranking_score": 75, "change_pct": 0.7, "confirmation_stage": "completed_5m_confirmed", "factor_consensus": {"score": 1}},
+        {"symbol": "SPY", "ranking_score": 68, "change_pct": 0.4, "confirmation_stage": "awaiting_completed_5m_confirmation", "factor_consensus": {"score": 2}},
+        {"symbol": "IWM", "ranking_score": 72, "change_pct": 0.5, "confirmation_stage": "completed_5m_confirmed", "factor_consensus": {"score": 3}},
+    ]
+
+    enriched, benchmarks, broad = rank_candidates_by_lane(rows)
+
+    assert [row["symbol"] for row in benchmarks] == ["QQQ", "IWM", "SPY"]
+    assert [row["lane_rank"] for row in benchmarks] == [1, 2, 3]
+    assert broad[0]["symbol"] == "PENNY"
+    assert broad[0]["ranking_lane"] == "broad_mover"
+    assert {row["ranking_lane"] for row in enriched if row["symbol"] in {"SPY", "QQQ", "IWM"}} == {"benchmark"}
+
+
+def test_report_exposes_benchmark_lane_schema(monkeypatch) -> None:
+    screeners = {
+        "movers_gainers": [{"symbol": "PENNY", "percent_change": 80}],
+        "movers_losers": [],
+        "most_active_volume": [],
+        "most_active_trades": [],
+    }
+    symbols = ["SPY", "QQQ", "IWM", "PENNY"]
+    metrics = {
+        symbol: {"price": 100.0, "gap_return": 0.01, "spread_pct": 0.001, "snapshot_volume": 1_000_000}
+        for symbol in symbols
+    }
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.fetch_market_screeners", lambda: (screeners, []))
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.fetch_news", lambda *_args, **_kwargs: ([], []))
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.load_social_symbols", lambda *_args: [])
+    monkeypatch.setattr("scripts.intraday_opportunity_radar._read_json", lambda *_args: {})
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.fetch_snapshots", lambda *_args: ({symbol: metrics[symbol] for symbol in symbols}, []))
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.snapshot_metrics", lambda snapshot: snapshot)
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.select_symbols_for_intraday_bars", lambda *_args, **_kwargs: symbols)
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.fetch_intraday_bars", lambda *_args: ({symbol: _bars() for symbol in symbols}, []))
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.fetch_daily_liquidity", lambda *_args: ({symbol: 500_000_000 for symbol in symbols}, []))
+
+    report = build_intraday_report(NOW_ET)
+
+    lane = report["benchmark_lane"]
+    assert lane["symbols"] == ["SPY", "QQQ", "IWM"]
+    assert lane["counts"]["configured"] == 3
+    assert lane["counts"]["evaluated"] == 3
+    assert [row["symbol"] for row in lane["ranked_candidates"]] == ["SPY", "QQQ", "IWM"]
+    assert "actionable_ranked_candidates" in lane
+    assert all(row["ranking_lane"] == "benchmark" for row in lane["ranked_candidates"])
+    assert lane["can_submit_orders"] is False
+
+
 def test_large_but_illiquid_move_is_not_precision_watch() -> None:
     row = evaluate_candidate(
         {"symbol": "PENNY", "sources": ["movers_gainers"], "source_ranks": {}},
@@ -161,11 +341,46 @@ def test_liquid_confirmed_move_has_levels_but_no_order_authority() -> None:
     assert row["state"] == "precision_watch"
     assert row["price_action_confirmation"]["state"] == "bullish_confirmed"
     assert row["price_action_confirmation"]["pattern"] == "breakout_close"
+    assert row["discovery_stage"] == "structure_observed"
+    assert row["confirmation_stage"] == "completed_5m_confirmed"
     assert row["trade_levels"]["confirmation_trigger"] is not None
     assert row["trade_levels"]["invalidation"] is not None
     assert row["trade_levels"]["target_2r"] is not None
     assert row["execution_enabled"] is False
     assert "strategy_confirmation_and_revalidation_required" in row["blockers"]
+
+
+def test_already_extended_move_is_no_chase_and_cannot_enter_actionable_ranking() -> None:
+    row = evaluate_candidate(
+        {"symbol": "CHASE", "sources": ["movers_gainers", "most_active_volume"], "source_ranks": {}},
+        {"price": 12.0, "gap_return": 0.20, "spread_pct": 0.001, "snapshot_volume": 9_000_000},
+        bar_features(_bars()),
+        250_000_000,
+        [],
+        NOW_ET,
+    )
+
+    assert row["remaining_opportunity"]["status"] == "late_no_chase"
+    assert row["ranking_score"] < row["score"]
+    assert row["actionable_for_ranking"] is False
+    assert row["execution_enabled"] is False
+    assert row["can_submit_orders"] is False
+
+
+def test_unconfirmed_watch_cannot_enter_actionable_ranking() -> None:
+    rows = _bars()
+    rows[-1] = {**rows[-1], "h": 10.65, "l": 10.3, "o": 10.5, "c": 10.55}
+    row = evaluate_candidate(
+        {"symbol": "QQQ", "sources": ["known_liquid_leader", "most_active_volume"], "source_ranks": {}},
+        {"price": 10.55, "gap_return": 0.01, "spread_pct": 0.001, "snapshot_volume": 9_000_000},
+        bar_features(rows),
+        500_000_000,
+        [],
+        NOW_ET,
+    )
+
+    assert row["confirmation_stage"] == "awaiting_completed_5m_confirmation"
+    assert row["actionable_for_ranking"] is False
 
 
 def test_inverted_directional_levels_are_suppressed() -> None:

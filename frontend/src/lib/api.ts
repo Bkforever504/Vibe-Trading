@@ -1938,6 +1938,23 @@ export interface TradingLearningProgress {
   as_of_date: string | null;
   grade_review_date: string | null;
   current_session_complete: boolean;
+  opportunity_funnel?: {
+    stage_status: "measured_scorecard" | "measured_move_review" | "unavailable_legacy_evidence" | string;
+    market_moves: number | null;
+    discovered: number | null;
+    setup_confirmed: number | null;
+    execution_qualified: number | null;
+    discovery_recall_pct: number | null;
+    confirmation_recall_pct: number | null;
+    execution_recall_pct: number | null;
+    stage_definitions: Record<string, string>;
+    denominator_note: string;
+  };
+  market_data_coverage?: {
+    futures_coverage: "unavailable" | "delayed_proxy" | "live_mbo" | string;
+    details: Record<string, unknown>;
+    interpretation: string;
+  };
   broad_move_audit: {
     movers_audited: number;
     source_discovery_recall_pct: number | null;
@@ -1955,6 +1972,10 @@ export interface TradingLearningProgress {
     ground_truth_count: number;
     precision_at_10: number | null;
     recall_at_10: number | null;
+    discovery_precision_at_10?: number | null;
+    discovery_recall_at_10?: number | null;
+    actionable_precision_at_10?: number | null;
+    actionable_recall_at_10?: number | null;
     root_cause_coverage: number | null;
     denominator_note: string;
   };

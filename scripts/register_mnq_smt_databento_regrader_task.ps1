@@ -13,9 +13,10 @@ try { $null = $service.GetFolder("\VibeTrade") } catch { $null = $rootFolder.Cre
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$runner`""
 $trigger = New-ScheduledTaskTrigger -Daily -At "00:45"
 $settings = New-ScheduledTaskSettingsSet `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 60) `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 180) `
     -MultipleInstances IgnoreNew `
     -StartWhenAvailable `
+    -WakeToRun `
     -RunOnlyIfNetworkAvailable
 
 Register-ScheduledTask `

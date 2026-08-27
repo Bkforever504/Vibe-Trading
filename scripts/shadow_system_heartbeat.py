@@ -29,6 +29,23 @@ DATABENTO_CAPABILITY_PATH = ROOT / "data" / "databento_mes_capability.json"
 MNQ_EVIDENCE_PATH = REPORT_DIR / "mnq-smt-evidence-status.json"
 PATTERN_OUTCOMES_LEDGER = ROOT / "data" / "pattern_grader_outcomes.jsonl"
 
+# Intraday scanner ledgers whose freshness proves the scan cadence itself is
+# alive during regular trading hours. A >15-minute gap here on 2026-08-26
+# corresponded to the Modern Standby nap that silenced the radar from
+# 10:13-12:28 CT and let four qualified QQQ move windows pass unmeasured.
+# Only include artifacts that append once per scheduled scan. Strategy event
+# ledgers append only when a setup appears, so using them as cadence evidence
+# would falsely mark a healthy quiet scanner as stalled.
+INTRADAY_SCANNER_LEDGERS = (
+    ("marketwide_intraday_radar", ROOT / "data" / "intraday_opportunity_radar_cadence.jsonl"),
+)
+# The governed marketwide cadence begins at 08:35 CT. Starting freshness
+# enforcement earlier would create a guaranteed false alarm before its first
+# scheduled snapshot.
+MARKET_OPEN_CT = (8, 35)
+MARKET_CLOSE_CT = (15, 0)
+MAX_SCANNER_GAP_MINUTES = 15.0
+
 MES_TASKS = (
     ("\\VibeTrade\\", "MesOrb0932V2Entry"),
     ("\\VibeTrade\\", "MesOrb0932V2Resolve"),
@@ -44,6 +61,8 @@ SCOUT_TASKS = (
 )
 MNQ_SMT_TASKS = (
     ("\\VibeTrade\\", "MnqSmtCisdFamilyShadow"),
+)
+MNQ_EVIDENCE_TASKS = (
     ("\\VibeTrade\\", "MnqSmtDatabentoRegrade"),
 )
 PATTERN_GRADER_TASKS = (
@@ -54,6 +73,7 @@ PATTERN_GRADER_TASKS = (
     ("\\", "PromoteValidatedPatterns"),
 )
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
+RADAR_TASKS = (("\\", "IntradayOpportunityRadar"),)
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
     ("\\VibeTrade\\", "SundayShadowPreflight"),
@@ -67,8 +87,8 @@ OBSERVABILITY_TASKS = (
     ("\\VibeTrade\\", "EodShadowCheckin"),
 )
 EXPECTED_TASKS = (
-    MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + PATTERN_GRADER_TASKS
-    + OPTIONS_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
+    MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + MNQ_EVIDENCE_TASKS + PATTERN_GRADER_TASKS
+    + OPTIONS_TASKS + RADAR_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
 )
 
 
@@ -87,6 +107,187 @@ def _parse_datetime(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _in_regular_session(now_ct: datetime) -> bool:
+    open_dt = now_ct.replace(hour=MARKET_OPEN_CT[0], minute=MARKET_OPEN_CT[1], second=0, microsecond=0)
+    close_dt = now_ct.replace(hour=MARKET_CLOSE_CT[0], minute=MARKET_CLOSE_CT[1], second=0, microsecond=0)
+    return open_dt <= now_ct <= close_dt and now_ct.weekday() < 5
+
+
+def _latest_row_timestamp(path: Path) -> datetime | None:
+    if not path.exists():
+        return None
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            handle.seek(max(0, size - 200_000))
+            tail = handle.read().decode("utf-8-sig", errors="ignore")
+    except OSError:
+        return None
+    latest: datetime | None = None
+    # Only tail is needed for freshness; read at most ~200KB so this stays
+    # cheap even when the pattern ledger grows into hundreds of megabytes.
+    for raw in tail.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        for key in ("captured_at", "scanned_at", "generated_at", "as_of_et", "bar_close_ts", "trigger_bar_ts", "resolved_at", "timestamp"):
+            parsed = _parse_datetime(row.get(key))
+            if parsed is not None:
+                latest = parsed if latest is None or parsed > latest else latest
+                break
+    if latest is not None:
+        return latest
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+    except OSError:
+        return None
+
+
+def _session_row_timestamps(path: Path, session_date: date) -> list[datetime]:
+    """Read the compact cadence ledger and return ordered timestamps for one CT session."""
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return []
+    stamps: set[datetime] = set()
+    for raw in lines:
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        parsed = next(
+            (
+                value
+                for key in ("as_of_et", "generated_at", "captured_at", "scanned_at", "timestamp")
+                if (value := _parse_datetime(row.get(key))) is not None
+            ),
+            None,
+        )
+        if parsed is not None and parsed.astimezone(CT).date() == session_date:
+            stamps.add(parsed.astimezone(timezone.utc))
+    return sorted(stamps)
+
+
+def report_scanner_gaps(
+    ledgers: tuple[tuple[str, Path], ...] = INTRADAY_SCANNER_LEDGERS,
+    *,
+    now: datetime,
+    max_gap_minutes: float = MAX_SCANNER_GAP_MINUTES,
+) -> dict[str, Any]:
+    """Fail loudly when a cadence-emitting scanner ledger stops during RTH.
+
+    A scanner task can be Ready and its LastTaskResult 0, but if the host
+    slept through Modern Standby the ledger has no new rows for the entire
+    outage. This surfaces that gap so the heartbeat cannot report PASS while
+    the market was moving without us. Event-only strategy ledgers are excluded
+    because an absence of signals is not evidence that their task did not run.
+    """
+    now_ct = now.astimezone(CT)
+    in_rth = _in_regular_session(now_ct)
+    weekday = now_ct.weekday() < 5
+    open_ct = now_ct.replace(hour=MARKET_OPEN_CT[0], minute=MARKET_OPEN_CT[1], second=0, microsecond=0)
+    close_ct = now_ct.replace(hour=MARKET_CLOSE_CT[0], minute=MARKET_CLOSE_CT[1], second=0, microsecond=0)
+    session_started = weekday and now_ct >= open_ct
+    observation_end = min(now_ct, close_ct) if session_started else open_ct
+    scanners: list[dict[str, Any]] = []
+    worst_gap = 0.0
+    any_stalled = False
+    for name, path in ledgers:
+        observations = _session_row_timestamps(path, now_ct.date()) if session_started else []
+        latest = observations[-1] if observations else _latest_row_timestamp(path)
+        gap_candidates: list[tuple[float, datetime, datetime]] = []
+        if session_started:
+            boundaries = [open_ct.astimezone(timezone.utc), *observations, observation_end.astimezone(timezone.utc)]
+            for left, right in zip(boundaries, boundaries[1:]):
+                gap_candidates.append(((right - left).total_seconds() / 60.0, left, right))
+        worst = max(gap_candidates, default=(0.0, open_ct.astimezone(timezone.utc), open_ct.astimezone(timezone.utc)), key=lambda row: row[0])
+        gap_minutes = max(0.0, worst[0]) if session_started else None
+        stalled = bool(session_started and gap_minutes is not None and gap_minutes > max_gap_minutes)
+        if stalled:
+            any_stalled = True
+        if gap_minutes is not None:
+            worst_gap = max(worst_gap, gap_minutes)
+        scanners.append({
+            "name": name,
+            "path": str(path),
+            "latest_row_at": latest.isoformat().replace("+00:00", "Z") if latest else None,
+            "gap_minutes": round(gap_minutes, 2) if gap_minutes is not None else None,
+            "gap_start_at": worst[1].isoformat().replace("+00:00", "Z") if session_started else None,
+            "gap_end_at": worst[2].isoformat().replace("+00:00", "Z") if session_started else None,
+            "session_date": now_ct.date().isoformat() if session_started else None,
+            "observation_count": len(observations),
+            "stalled": stalled,
+        })
+    return {
+        "status": "stalled" if any_stalled else "healthy",
+        "in_regular_session": in_rth,
+        "session_started": session_started,
+        "max_gap_minutes": max_gap_minutes,
+        "worst_gap_minutes": round(worst_gap, 2),
+        "any_stalled": any_stalled,
+        "scanners": scanners,
+    }
+
+
+def report_futures_coverage(
+    databento_capability_path: Path = DATABENTO_CAPABILITY_PATH,
+) -> dict[str, Any]:
+    """Explicit futures-coverage state to prevent "no NQ moves" false-negatives.
+
+    Values:
+      - live_mbo:       Databento GLBX.MDP3 MBO entitlement confirmed active.
+      - delayed_proxy:  Only yfinance/CME-delayed proxy; not executable.
+      - unavailable:    No futures data at all.
+    """
+    payload: dict[str, Any] = {}
+    if databento_capability_path.exists():
+        try:
+            payload = json.loads(databento_capability_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    entitled = bool(
+        payload.get("glbx_mdp3_entitled")
+        or payload.get("mbo_available")
+        or payload.get("live_status") == "available"
+    )
+    proxy_ok = bool(
+        payload.get("yfinance_proxy_ok")
+        or payload.get("delayed_proxy")
+        or payload.get("historical_regrade_supported")
+    )
+    if entitled:
+        state = "live_mbo"
+    elif proxy_ok:
+        state = "delayed_proxy"
+    else:
+        state = "unavailable"
+    return {
+        "state": state,
+        "live_mbo": state == "live_mbo",
+        "delayed_proxy": state == "delayed_proxy",
+        "unavailable": state == "unavailable",
+        "source": str(databento_capability_path),
+        "raw_flags": {
+            "glbx_mdp3_entitled": payload.get("glbx_mdp3_entitled"),
+            "mbo_available": payload.get("mbo_available"),
+            "yfinance_proxy_ok": payload.get("yfinance_proxy_ok"),
+            "historical_regrade_supported": payload.get("historical_regrade_supported"),
+            "live_status": payload.get("live_status"),
+        },
+    }
 
 
 def report_ledger_freshness(path: Path, *, now: datetime, max_age_hours: float) -> dict[str, Any]:
@@ -214,12 +415,16 @@ def build_report(
     mes = _task_group(tasks, MES_TASKS)
     scout = _task_group(tasks, SCOUT_TASKS)
     mnq_smt = _task_group(tasks, MNQ_SMT_TASKS)
+    mnq_evidence_tasks = _task_group(tasks, MNQ_EVIDENCE_TASKS)
     pattern_grader = _task_group(tasks, PATTERN_GRADER_TASKS)
     options = _task_group(tasks, OPTIONS_TASKS)
+    radar = _task_group(tasks, RADAR_TASKS)
     ops = _task_group(tasks, OPS_TASKS)
     observability = _task_group(tasks, OBSERVABILITY_TASKS)
     pattern_outcomes_ledger = report_ledger_freshness(pattern_outcomes_path, now=now, max_age_hours=30.0)
     pattern_grader["alive"] = pattern_grader["alive"] and pattern_outcomes_ledger["fresh"]
+    scanner_gaps = report_scanner_gaps(now=now)
+    futures_coverage = report_futures_coverage(databento_capability_path)
     scanner_halts = {
         name: {"halted": is_halted(name), "state": read_state(name)}
         for name in (
@@ -252,25 +457,42 @@ def build_report(
         and mnq_smt["alive"]
         and pattern_grader["alive"]
         and options["alive"]
+        and radar["alive"]
         and ops["alive"]
         and hmm["fresh"]
         and catalyst["fresh"]
-        and databento_capability["fresh"]
-        and mnq_evidence["fresh"]
         and pattern_outcomes_ledger["fresh"]
+        and not scanner_gaps["any_stalled"]
         and not kill
+    )
+    research_status = (
+        "DEGRADED"
+        if (
+            not mnq_evidence_tasks["alive"]
+            or not databento_capability["fresh"]
+            or not mnq_evidence["fresh"]
+        )
+        else "LIVE"
+        if futures_coverage["state"] == "live_mbo"
+        else "DELAYED_ONLY"
+        if futures_coverage["state"] == "delayed_proxy"
+        else "UNAVAILABLE"
     )
     return {
         "schema_version": 1,
         "provider": "shadow_system_heartbeat",
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "status": "PASS" if healthy else "FAIL",
+        "status_scope": "core_scheduled_operations",
+        "research_status": research_status,
         "mes_v2": mes,
         "equity_scout": scout,
         "mnq_smt_family": mnq_smt,
+        "mnq_evidence_regrade": mnq_evidence_tasks,
         "pattern_grader": pattern_grader,
         "pattern_outcomes_ledger": pattern_outcomes_ledger,
         "options_bot": options,
+        "marketwide_radar": radar,
         "operations_tasks": ops,
         "observability_tasks": observability,
         "hmm": hmm,
@@ -278,6 +500,8 @@ def build_report(
         "databento_capability": databento_capability,
         "mnq_databento_evidence": mnq_evidence,
         "scanner_halts": scanner_halts,
+        "scanner_gaps": scanner_gaps,
+        "futures_coverage": futures_coverage,
         "kill_switch_active": kill,
         "execution_enabled": False,
         "can_submit_orders": False,
@@ -293,13 +517,18 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"MES v2 alive: {check(report['mes_v2']['alive'])}",
             f"Equity scout alive: {check(report['equity_scout']['alive'])}",
             f"MNQ SMT family alive: {check(report['mnq_smt_family']['alive'])}",
+            f"MNQ delayed evidence task: {check(report['mnq_evidence_regrade']['alive'])}",
             f"Pattern grader alive: {check(report['pattern_grader']['alive'])}",
             f"Pattern outcomes fresh: {check(report['pattern_outcomes_ledger']['fresh'])} (age={report['pattern_outcomes_ledger']['age_hours']}h, rows={report['pattern_outcomes_ledger']['row_count']})",
             f"Options bot alive: {check(report['options_bot']['alive'])}",
+            f"Marketwide radar alive: {check(report['marketwide_radar']['alive'])}",
             f"HMM fresh: {check(report['hmm']['fresh'])} (age={report['hmm']['age_hours']}h)",
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",
             f"Databento probe fresh: {check(report['databento_capability']['fresh'])} (age={report['databento_capability']['age_hours']}h)",
             f"MNQ MBO evidence fresh: {check(report['mnq_databento_evidence']['fresh'])} (age={report['mnq_databento_evidence']['age_hours']}h)",
+            f"Scanner gaps: {check(not report.get('scanner_gaps', {}).get('any_stalled', False))} (worst={report.get('scanner_gaps', {}).get('worst_gap_minutes', 0)}m, rth={report.get('scanner_gaps', {}).get('in_regular_session', False)})",
+            f"Futures coverage: {report.get('futures_coverage', {}).get('state', 'unknown')}",
+            f"Research evidence lane: {report.get('research_status', 'UNKNOWN')}",
             f"Kill switch: {'ACTIVE' if report['kill_switch_active'] else 'clear'}",
             "Monitoring only. No order authority.",
         ]

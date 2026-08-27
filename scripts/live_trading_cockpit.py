@@ -10,10 +10,15 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.dashboard_readiness import build_readiness
 from scripts.tactical_plan_builder import build_tactical_plan
@@ -62,6 +67,7 @@ REPORT_FILES: dict[str, str] = {
     "public_intake": "public-social-intake.json",
     "trending_symbols": "social-trending-symbols.json",
     "signal_health": "signal-stack-health.json",
+    "shadow_heartbeat": "shadow-system-heartbeat.json",
     "execution_audit": "execution-gate-audit.json",
     "paper_readiness": "flip-paper-operations-readiness.json",
     "live_readiness": "flip-live-readiness.json",
@@ -578,6 +584,46 @@ def _quarantined_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _compact_display_payload(value: Any, *, max_items: int = 20) -> Any:
+    """Bound repeated dashboard evidence without mutating source artifacts."""
+    if isinstance(value, dict):
+        return {
+            str(key): _compact_display_payload(item, max_items=max_items)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _compact_display_payload(item, max_items=max_items)
+            for item in value[:max_items]
+        ]
+    if isinstance(value, tuple):
+        return [
+            _compact_display_payload(item, max_items=max_items)
+            for item in value[:max_items]
+        ]
+    if isinstance(value, str) and len(value) > 4_000:
+        return value[:4_000] + "…[display truncated; source artifact preserved]"
+    return value
+
+
+def _candidate_display_evidence(value: Any) -> dict[str, Any]:
+    """Keep the audit fields used by the cockpit without duplicating source universes."""
+    evidence = _dict(value)
+    allowed = (
+        "candidate_id", "generated_at", "timestamp", "symbol", "setup", "state",
+        "status", "direction", "price", "change_pct", "gap_pct", "score",
+        "ranking_score", "factor_scores", "factor_consensus", "hard_gates",
+        "blockers", "price_action_confirmation", "remaining_opportunity",
+        "trade_levels", "next_session_plan", "no_trade_zone", "probability",
+        "catalyst_available", "catalyst_headlines", "source_labels", "sources",
+        "test_2025_2026", "rule",
+    )
+    return _compact_display_payload(
+        {key: evidence[key] for key in allowed if key in evidence},
+        max_items=5,
+    )
+
+
 def _source_surface(
     name: str,
     reports: dict[str, dict[str, Any]],
@@ -595,7 +641,11 @@ def _source_surface(
         "stale", "missing", "clock_skew"
     }
     safe_data = (
-        {**report, "execution_enabled": False, "can_submit_orders": False}
+        {
+            **_compact_display_payload(report),
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
         if provenance_qualified
         else {}
     )
@@ -1661,6 +1711,7 @@ def _enrich_candidate(
         "entry_timing": entry_timing,
     }
     row = {**row}
+    row["evidence"] = _candidate_display_evidence(row.get("evidence", {}))
     row["blockers"] = sorted(set(blockers))
     row["paper_consumable"] = bool(row.get("paper_consumable")) and not row["blockers"]
     probability["ranking_eligible"] = bool(probability.get("calibration_qualified")) and decision["actionability"] == "shadow_ready" and not row["blockers"]
@@ -1940,6 +1991,8 @@ def _learning_progress_surface(
     move_summary = _dict(move_report.get("summary"))
     scorecard = reports.get("detection_scorecard", {})
     score_metrics = _dict(scorecard.get("metrics"))
+    latest_score_session = _dict(scorecard.get("latest_session"))
+    heartbeat = reports.get("shadow_heartbeat", {})
     calibration = reports.get("grade_calibration", {})
     aplus = reports.get("aplus_review", {})
     elite = reports.get("elite_readiness", {})
@@ -1973,6 +2026,35 @@ def _learning_progress_surface(
     early = int(_number(move_summary.get("early_detection_count")) or 0)
     actionable_early = int(_number(move_summary.get("actionable_early_count")) or 0)
     risk_qualified = int(_number(move_summary.get("risk_gate_qualified_count")) or 0)
+    latest_score_stages = _dict(latest_score_session.get("stage_counts"))
+    move_report_stages = _dict(move_summary.get("stage_counts"))
+    stage_counts = latest_score_stages or move_report_stages
+    stage_status = (
+        "measured_scorecard"
+        if latest_score_stages
+        else "measured_move_review"
+        if move_report_stages
+        else "unavailable_legacy_evidence"
+    )
+
+    def stage_count(name: str) -> int | None:
+        value = _number(stage_counts.get(name))
+        return int(value) if name in stage_counts and value is not None else None
+
+    market_moves = stage_count("market_moves")
+    discovered = stage_count("discovered")
+    setup_confirmed = stage_count("setup_confirmed")
+    execution_qualified = stage_count("execution_qualified")
+    futures_coverage_value = heartbeat.get("futures_coverage")
+    if isinstance(futures_coverage_value, dict):
+        futures_coverage = _text(
+            futures_coverage_value.get("state") or futures_coverage_value.get("status"),
+            "unavailable",
+        )
+        futures_coverage_detail = futures_coverage_value
+    else:
+        futures_coverage = _text(futures_coverage_value, "unavailable")
+        futures_coverage_detail = {"status": futures_coverage}
     eligible_outcomes = int(_number(calibration.get("eligible_outcomes")) or 0)
     skipped_outcomes = int(_number(calibration.get("skipped_outcomes")) or 0)
     qualified_buckets = sum(
@@ -1984,7 +2066,7 @@ def _learning_progress_surface(
     precision = _number(score_metrics.get("precision_at_10_mean"))
     recall = _number(score_metrics.get("recall_at_10"))
     market_now = now.astimezone(ZoneInfo("America/New_York"))
-    move_date = _text(move_report.get("date"))
+    move_date = _text(latest_score_session.get("date") or move_report.get("date"))
     aplus_date = _text(aplus.get("date"))
     current_session_complete = bool(
         move_date
@@ -2022,6 +2104,47 @@ def _learning_progress_surface(
         "as_of_date": move_date or None,
         "grade_review_date": aplus_date or None,
         "current_session_complete": current_session_complete,
+        "opportunity_funnel": {
+            "stage_status": stage_status,
+            "market_moves": market_moves,
+            "discovered": discovered,
+            "setup_confirmed": setup_confirmed,
+            "execution_qualified": execution_qualified,
+            "discovery_recall_pct": (
+                round(100.0 * discovered / market_moves, 2)
+                if market_moves and discovered is not None else None
+            ),
+            "confirmation_recall_pct": (
+                round(100.0 * setup_confirmed / market_moves, 2)
+                if market_moves and setup_confirmed is not None else None
+            ),
+            "execution_recall_pct": (
+                round(100.0 * execution_qualified / market_moves, 2)
+                if market_moves and execution_qualified is not None
+                else None
+            ),
+            "stage_definitions": _dict(scorecard.get("stage_definitions")) or _dict(move_report.get("stage_definitions")) or {
+                "market_moves": "Independent moves that actually occurred in the audited market data.",
+                "discovered": "Moves whose symbol appeared in a timestamp-valid scanner snapshot before or during the move.",
+                "setup_confirmed": "Discovered moves with completed-bar setup confirmation before the useful entry window closed.",
+                "execution_qualified": "Confirmed setups that also passed geometry, liquidity, freshness, and risk gates.",
+            },
+            "denominator_note": (
+                "Each stage uses the same independent market-move denominator; a miss is never relabeled as no move."
+            ),
+        },
+        "market_data_coverage": {
+            "futures_coverage": futures_coverage,
+            "details": {
+                "heartbeat": futures_coverage_detail,
+                "latest_ground_truth": _dict(latest_score_session.get("market_coverage")),
+            },
+            "interpretation": (
+                "Futures misses are not scored as no-move outcomes when coverage is unavailable."
+                if futures_coverage == "unavailable"
+                else "Futures accountability uses the stated coverage tier."
+            ),
+        },
         "broad_move_audit": {
             "movers_audited": movers,
             "source_discovery_recall_pct": _number(move_summary.get("source_discovery_recall_pct")),
@@ -2039,6 +2162,18 @@ def _learning_progress_surface(
             "ground_truth_count": int(_number(score_metrics.get("ground_truth_count")) or 0),
             "precision_at_10": precision,
             "recall_at_10": recall,
+            "discovery_precision_at_10": _number(
+                score_metrics.get("discovery_precision_at_10_mean")
+                if score_metrics.get("discovery_precision_at_10_mean") is not None
+                else score_metrics.get("discovery_precision_at_10")
+            ),
+            "discovery_recall_at_10": _number(score_metrics.get("discovery_recall_at_10")),
+            "actionable_precision_at_10": _number(
+                score_metrics.get("actionable_precision_at_10_mean")
+                if score_metrics.get("actionable_precision_at_10_mean") is not None
+                else score_metrics.get("actionable_precision_at_10")
+            ),
+            "actionable_recall_at_10": _number(score_metrics.get("actionable_recall_at_10")),
             "root_cause_coverage": _number(score_metrics.get("root_cause_coverage")),
             "denominator_note": "Frozen forward move labels matched to the ranking available at that timestamp.",
         },
@@ -2082,7 +2217,7 @@ def _learning_progress_surface(
                 for key, value in _source_surface(name, reports, sources_by_name).items()
                 if key != "data"
             }
-            for name in ("move_coverage", "detection_scorecard", "aplus_review", "grade_calibration", "elite_readiness")
+            for name in ("move_coverage", "detection_scorecard", "aplus_review", "grade_calibration", "elite_readiness", "shadow_heartbeat")
         },
         "execution_enabled": False,
         "can_submit_orders": False,
@@ -2541,12 +2676,12 @@ def build_cockpit(
             ),
         },
         "evidence": {
-            "shadow_consensus": reports["shadow_consensus"],
-            "shadow_audit": reports["shadow_audit"],
-            "bottom_reversal": reports["bottom_evidence"],
+            "shadow_consensus": _compact_display_payload(reports["shadow_consensus"]),
+            "shadow_audit": _compact_display_payload(reports["shadow_audit"]),
+            "bottom_reversal": _compact_display_payload(reports["bottom_evidence"]),
             "scanner_leadership": _list(daily_edge.get("scanner_leadership")),
             "exit_accountability": _list(daily_edge.get("exit_accountability")),
-            "move_coverage": reports["move_coverage"],
+            "move_coverage": _compact_display_payload(reports["move_coverage"]),
             "retro": _evidence_group(
                 ("daily_eod", "daily_outcome", "aplus_review", "closed_postmortem", "missed_banger"),
                 reports,
@@ -2584,12 +2719,12 @@ def build_cockpit(
                 if isinstance(row, dict)
             ],
             "move_coverage": _dict(reports["move_coverage"].get("summary")),
-            "scorecard_rolling": reports["detection_scorecard"],
-            "cisd_promotion_status": reports["cisd_promotion"],
-            "mes_v2_evidence_status": reports["mes_v2_evidence"],
-            "mnq_smt_evidence_status": reports["mnq_smt_evidence"],
+            "scorecard_rolling": _compact_display_payload(reports["detection_scorecard"]),
+            "cisd_promotion_status": _compact_display_payload(reports["cisd_promotion"]),
+            "mes_v2_evidence_status": _compact_display_payload(reports["mes_v2_evidence"]),
+            "mnq_smt_evidence_status": _compact_display_payload(reports["mnq_smt_evidence"]),
             "pattern_grader": {
-                **reports["pattern_grades"],
+                **_compact_display_payload(reports["pattern_grades"]),
                 "source": sources_by_name.get("pattern_grades", {}),
                 "execution_enabled": False,
                 "can_submit_orders": False,
@@ -2615,7 +2750,7 @@ def build_cockpit(
             "session_risk_context": _dict(live_opportunities.get("session_risk_context")),
             "data_quality_summary": _dict(live_opportunities.get("data_quality_summary")),
             "top_candidates": _list(live_opportunities.get("top_candidates"))[:3],
-            "market_structure_patterns": _list(live_opportunities.get("market_structure_patterns")),
+            "market_structure_patterns": _list(live_opportunities.get("market_structure_patterns"))[:24],
             "market_structure_watchlist": _list(live_opportunities.get("market_structure_watchlist"))[:24],
             "execution_enabled": False,
             "can_submit_orders": False,

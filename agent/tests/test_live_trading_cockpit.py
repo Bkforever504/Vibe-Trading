@@ -12,6 +12,103 @@ from scripts.live_trading_cockpit import _apply_grade_calibration, _plan_id, bui
 NOW = datetime(2026, 8, 19, 15, 0, tzinfo=timezone.utc)
 
 
+def test_schema_v12_exposes_two_sided_tactical_context_and_shadow_swing_challenger(tmp_path: Path) -> None:
+    write_report(tmp_path, "market-force-score.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "market_force_score",
+        "mode": "read_only",
+        "classification": "bullish_lean",
+        "forces": [],
+    })
+    write_report(tmp_path, "zero-dte-expected-move-context.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "zero_dte_expected_move_context",
+        "mode": "shadow_only_research",
+        "scans": [{
+            "symbol": "SPY", "status": "ok", "spot": 768.5, "atm_iv": 0.139,
+            "expected_move_points": 6.72, "expected_move_consumed_fraction": 0.4,
+            "source_labels": ["opra_manual_reference", "spy_cash_proxy"],
+        }],
+    })
+    write_report(tmp_path, "higher-timeframe-market-map.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "higher_timeframe_market_map",
+        "mode": "read_only",
+        "items": [{
+            "symbol": "SPY", "primary_bias": "bullish",
+            "weekly_structure": {"direction": "bullish"},
+            "daily_structure": {"direction": "bullish"},
+            "intraday_structure": {"direction": "mixed"},
+            "allowed_playbooks": ["directional_long_call", "stand_aside"],
+            "veto_reasons": [],
+        }],
+    })
+    write_report(tmp_path, "equity-ignition-continuation-shadow.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "equity_ignition_continuation_shadow",
+        "mode": "read_only_shadow_research",
+        "promotion_eligible": False,
+        "candidates": [{
+            "symbol": "NVDA", "state": "SHADOW_READY", "grade": "A", "score": 90,
+            "entry": 181.2, "stop": 176.1, "target_2r": 191.4,
+            "execution_enabled": False, "can_submit_orders": False,
+        }],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+    candidates = []
+    for direction, setup, entry, stop, target in (
+        ("bullish", "range_break_retest_bull", 769.0, 768.0, 771.0),
+        ("bearish", "range_break_retest_bear", 768.0, 769.0, 766.0),
+    ):
+        candidates.append({
+            "symbol": "SPY", "setup_family": setup, "direction": direction,
+            "state": "WATCH", "decision_score": 84, "grade": "A-",
+            "entry": entry, "invalidation": stop,
+            "targets": [{"name": "target_1r", "price": target}],
+            "quote": {"bid": 768.45, "ask": 768.55, "midpoint": 768.5},
+            "blockers": [], "source_labels": ["alpaca_iex_websocket", "completed_5m_bars"],
+            "bar_completed_at": "2026-08-19T14:55:00Z",
+            "market_structure": {
+                "entry_plan": {"trigger": entry, "entry_zone": {"low": entry, "high": entry}},
+                "exit_plan": {"targets": [{"name": "target_1r", "price": target}]},
+                "liquidity_level_context": {"levels": []},
+                "volume_profile_context": {"status": "proxy_only", "poc": 768.5, "vah": 769.2, "val": 767.8},
+            },
+            "execution_enabled": False, "can_submit_orders": False,
+        })
+    write_report(tmp_path, "live-opportunity-engine.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "live_opportunity_engine",
+        "mode": "read_only_streaming_research",
+        "candidates": candidates,
+        "market_structure_watchlist": [],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+
+    assert cockpit["schema_version"] == 12
+    tactical = cockpit["tactical_plan"]
+    assert tactical["symbol"] == "SPY"
+    assert tactical["bull_case"]["trigger"] == 769.0
+    assert tactical["bear_case"]["trigger"] == 768.0
+    assert tactical["no_trade_zone"]["status"] == "available"
+    assert tactical["market_state"]["expected_move_points"] == 6.72
+    assert tactical["execution_enabled"] is False
+    assert tactical["can_submit_orders"] is False
+    assert cockpit["htf_narrative"]["items"][0]["weekly_bias"] == "bullish"
+    assert cockpit["htf_narrative"]["score_effect"] == "context_only_no_duplicate_confluence_credit"
+    assert cockpit["swing_continuation"]["promotion_eligible"] is False
+    assert cockpit["swing_continuation"]["candidates"][0]["symbol"] == "NVDA"
+    assert cockpit["options_signal_matrix"]["dex"]["status"] == "unavailable"
+    assert cockpit["options_signal_matrix"]["decision"] == "NO_TRADE_OPTIONS"
+    assert cockpit["options_signal_matrix"]["blockers"] == ["options_feed_not_qualified"]
+    assert cockpit["options_signal_matrix"]["execution_enabled"] is False
+    assert cockpit["options_signal_matrix"]["can_submit_orders"] is False
+
+
 def test_plan_id_is_stable_across_display_time_and_distinguishes_trigger_events() -> None:
     base = {
         "symbol": "SPY",
@@ -84,6 +181,130 @@ def test_display_calibration_cannot_rank_candidate() -> None:
 def write_report(report_dir: Path, filename: str, payload: dict) -> None:
     report_dir.mkdir(parents=True, exist_ok=True)
     (report_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_learning_progress_uses_latest_ground_truth_funnel_and_futures_coverage(
+    tmp_path: Path,
+) -> None:
+    write_report(tmp_path, "daily-move-coverage-review.json", {
+        "date": "2026-08-26",
+        "summary": {
+            "movers_audited": 100,
+            "early_detection_count": 43,
+            "actionable_early_count": 0,
+            "risk_gate_qualified_count": 0,
+        },
+    })
+    write_report(tmp_path, "detection-scorecard-rolling.json", {
+        "sessions": 4,
+        "stage_definitions": {"market_move": "Independent move window."},
+        "latest_session": {
+            "date": "2026-08-26",
+            "stage_counts": {
+                "market_moves": 5,
+                "discovered": 3,
+                "setup_confirmed": 1,
+                "execution_qualified": 0,
+            },
+            "market_coverage": {
+                "status": "partial",
+                "unavailable_instruments": ["NQ"],
+                "no_move_interpretation_allowed": False,
+            },
+        },
+        "metrics": {
+            "ground_truth_count": 12,
+            "discovery_precision_at_10_mean": 0.2,
+            "discovery_recall_at_10": 0.4,
+            "actionable_precision_at_10_mean": 0.0,
+            "actionable_recall_at_10": 0.0,
+        },
+    })
+    write_report(tmp_path, "shadow-system-heartbeat.json", {
+        "generated_at": "2026-08-26T20:00:00Z",
+        "futures_coverage": {"state": "unavailable", "unavailable": True},
+    })
+
+    learning = build_cockpit(report_dir=tmp_path, now=NOW)["learning_progress"]
+
+    assert learning["opportunity_funnel"]["market_moves"] == 5
+    assert learning["opportunity_funnel"]["discovered"] == 3
+    assert learning["opportunity_funnel"]["setup_confirmed"] == 1
+    assert learning["opportunity_funnel"]["execution_qualified"] == 0
+    assert learning["opportunity_funnel"]["discovery_recall_pct"] == 60.0
+    assert learning["market_data_coverage"]["futures_coverage"] == "unavailable"
+    assert learning["market_data_coverage"]["details"]["latest_ground_truth"]["status"] == "partial"
+    assert learning["frozen_rank_validation"]["discovery_precision_at_10"] == 0.2
+    assert learning["frozen_rank_validation"]["actionable_precision_at_10"] == 0.0
+
+    scorecard_path = tmp_path / "detection-scorecard-rolling.json"
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    scorecard["latest_session"]["stage_counts"] = {
+        "market_moves": 0,
+        "discovered": 0,
+        "setup_confirmed": 0,
+        "execution_qualified": 0,
+    }
+    scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
+    zero_funnel = build_cockpit(report_dir=tmp_path, now=NOW)["learning_progress"]["opportunity_funnel"]
+    assert zero_funnel["market_moves"] == 0
+    assert zero_funnel["discovered"] == 0
+
+
+def test_learning_progress_does_not_inflate_missing_stages_from_legacy_counts(tmp_path: Path) -> None:
+    write_report(tmp_path, "daily-move-coverage-review.json", {
+        "date": "2026-08-26",
+        "summary": {
+            "movers_audited": 100,
+            "early_detection_count": 43,
+            "actionable_early_count": 12,
+            "risk_gate_qualified_count": 7,
+        },
+    })
+
+    funnel = build_cockpit(report_dir=tmp_path, now=NOW)["learning_progress"]["opportunity_funnel"]
+
+    assert funnel["stage_status"] == "unavailable_legacy_evidence"
+    assert funnel["market_moves"] is None
+    assert funnel["discovered"] is None
+    assert funnel["setup_confirmed"] is None
+    assert funnel["execution_qualified"] is None
+
+
+def test_stale_expected_move_context_cannot_influence_current_tactical_plan(tmp_path: Path) -> None:
+    write_report(tmp_path, "trade-signal-generator.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "signals": [{
+            "symbol": "SPY", "setup": "break_retest", "direction": "bullish",
+            "paper_consumable": True, "blockers": [], "entry": 769.0,
+            "stop": 768.0, "targets": [{"price": 771.0}],
+        }],
+    })
+    write_report(tmp_path, "market-force-score.json", {
+        "generated_at": "2026-08-19T14:59:30Z",
+        "provider": "market_force_score", "mode": "read_only",
+        "classification": "bullish_lean", "forces": [],
+    })
+    write_report(tmp_path, "zero-dte-expected-move-context.json", {
+        "generated_at": "2026-07-14T14:00:00Z",
+        "provider": "zero_dte_expected_move_context", "mode": "shadow_only_research",
+        "scans": [{
+            "symbol": "SPY", "status": "ok", "spot": 650.0,
+            "atm_iv": 0.22, "expected_move_points": 9.5,
+            "source_labels": ["stale_manual_reference"],
+        }],
+    })
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    market_state = cockpit["tactical_plan"]["market_state"]
+
+    assert market_state["freshness"] == "stale"
+    assert market_state["decision_eligible"] is False
+    assert market_state["expected_move_points"] is None
+    assert market_state["atm_iv"] is None
+    assert market_state["spot"] is None
+    assert market_state["source_labels"] == []
+    assert market_state["blocked_reason"] == "stale_or_unqualified_expected_move_source"
 
 
 def test_cockpit_promotes_only_clear_paper_consumable_signal(tmp_path: Path) -> None:
@@ -532,7 +753,7 @@ def test_cockpit_surfaces_operational_readiness_and_execution_quality(tmp_path: 
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 11
+    assert cockpit["schema_version"] == 12
     assert cockpit["system_readiness"]["build"]["percent"] == 100.0
     assert cockpit["system_readiness"]["runtime"]["status"] == "attention_required"
     quality = cockpit["execution_quality"]
@@ -660,7 +881,7 @@ def test_schema_v6_exposes_provenance_gated_retro_journal_social_catalysts_and_o
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 11
+    assert cockpit["schema_version"] == 12
     for group_name in ("retro", "journal", "social"):
         group = cockpit["evidence"][group_name]
         assert group["execution_enabled"] is False
@@ -746,7 +967,7 @@ def test_trade_board_scores_factors_without_inventing_probability_or_contract(tm
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
     plan = cockpit["trade_board"]["stocks"][0]
 
-    assert cockpit["schema_version"] == 11
+    assert cockpit["schema_version"] == 12
     assert plan["grade"] in {"A+", "A", "A-", "B+", "B", "B-", "C", "D"}
     assert plan["probability"]["value"] is None
     assert plan["trade_plan"]["contract"] is None
@@ -900,6 +1121,45 @@ def test_decision_desk_separates_armed_from_confirmed_but_late(tmp_path: Path) -
     assert rows["LATE"]["decision_score"] < rows["LATE"]["setup_score"]
     assert cockpit["decision_desk"]["counts"]["wait"] == 1
     assert cockpit["decision_desk"]["counts"]["late_no_chase"] == 1
+
+
+def test_cockpit_prefers_actionable_intraday_ranking_when_available(tmp_path: Path) -> None:
+    blocked = {
+        "symbol": "CHASE",
+        "state": "filtered",
+        "score": 95,
+        "setup": "opening_range_breakout",
+        "direction": "bullish",
+        "price": 110,
+        "hard_gates": {"price_floor": True, "underlying_spread": False, "dollar_liquidity": True},
+        "factor_scores": {"liquidity": 50, "magnitude": 99, "structure": 80},
+        "trade_levels": {"confirmation_trigger": 100, "invalidation": 99, "target_2r": 102},
+        "blockers": ["underlying_spread", "strategy_confirmation_and_revalidation_required"],
+    }
+    safe = {
+        "symbol": "SAFE",
+        "state": "precision_watch",
+        "score": 88,
+        "ranking_score": 92,
+        "setup": "breakout_retest_hold",
+        "direction": "bullish",
+        "price": 100,
+        "hard_gates": {"price_floor": True, "underlying_spread": True, "dollar_liquidity": True},
+        "factor_scores": {"liquidity": 90, "magnitude": 70, "structure": 92},
+        "trade_levels": {"confirmation_trigger": 100.1, "invalidation": 99.5, "target_2r": 101.3},
+        "blockers": ["strategy_confirmation_and_revalidation_required"],
+    }
+    write_report(
+        tmp_path,
+        "intraday-opportunity-radar.json",
+        {"ranked_candidates": [blocked, safe], "actionable_ranked_candidates": [safe]},
+    )
+
+    cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
+    symbols = {row["symbol"] for row in cockpit["candidates"]}
+
+    assert "SAFE" in symbols
+    assert "CHASE" not in symbols
 
 
 def test_confirmed_candidate_with_failed_hard_gates_cannot_become_best_setup(tmp_path: Path) -> None:
@@ -1171,7 +1431,7 @@ def test_reconciliation_diff_forces_stand_aside_and_exposes_weekly_failures(tmp_
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 11
+    assert cockpit["schema_version"] == 12
     assert cockpit["command_card"]["state"] == "STAND_ASIDE"
     assert cockpit["command_card"]["color"] == "RED"
     assert cockpit["operations"]["failure_taxonomy_week"] == {"BAD_ENTRY": 2, "STALE_DATA": 1}

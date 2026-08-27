@@ -10,13 +10,17 @@ function number(value: number | null | undefined, digits = 2): string {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "--";
 }
 
+function count(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "--";
+}
+
 function words(value: string): string {
   return value.replace(/_/g, " ");
 }
 
 export function LearningProgressPanel({ progress }: { progress?: TradingLearningProgress }) {
   const ready = progress?.live_readiness.ready === true;
-  const move = progress?.broad_move_audit;
+  const funnel = progress?.opportunity_funnel;
   const rank = progress?.frozen_rank_validation;
   const graded = progress?.graded_trade_outcomes;
   const calibration = progress?.calibration;
@@ -27,9 +31,9 @@ export function LearningProgressPanel({ progress }: { progress?: TradingLearning
         <div className="flex items-start gap-2.5">
           <GraduationCap className="mt-0.5 h-4 w-4 text-primary" />
           <div>
-            <h2 className="text-sm font-semibold">Grade → outcome → live-readiness progress</h2>
+            <h2 className="text-sm font-semibold">Market move → discovery → execution progress</h2>
             <p className="mt-1 max-w-4xl text-xs text-muted-foreground">
-              Compares what was ranked before the move with frozen outcomes. Broad mover discovery is shown separately from executable ranking quality.
+              Compares what actually moved with what the scanner found, confirmed, and qualified before the opportunity expired.
             </p>
           </div>
         </div>
@@ -40,20 +44,27 @@ export function LearningProgressPanel({ progress }: { progress?: TradingLearning
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 text-xs md:grid-cols-4 xl:grid-cols-8">
-        <div><span className="font-medium">{move?.movers_audited ?? 0}</span><div className="text-muted-foreground">moves audited</div></div>
-        <div><span className="font-medium">{pct(move?.source_discovery_recall_pct)}</span><div className="text-muted-foreground">broad discovery</div></div>
-        <div><span className="font-medium">{pct(move?.early_detection_pct)}</span><div className="text-muted-foreground">detected early</div></div>
-        <div><span className="font-medium">{pct(move?.actionable_early_pct)}</span><div className="text-muted-foreground">actionable early</div></div>
-        <div><span className="font-medium">{pct(rank?.precision_at_10)}</span><div className="text-muted-foreground">frozen precision@10</div></div>
-        <div><span className="font-medium">{pct(rank?.recall_at_10)}</span><div className="text-muted-foreground">frozen recall@10</div></div>
+        <div><span className="font-medium">{count(funnel?.market_moves)}</span><div className="text-muted-foreground">moves actually happened</div></div>
+        <div><span className="font-medium">{count(funnel?.discovered)}</span><div className="text-muted-foreground">discovered · {pct(funnel?.discovery_recall_pct)}</div></div>
+        <div><span className="font-medium">{count(funnel?.setup_confirmed)}</span><div className="text-muted-foreground">setup confirmed · {pct(funnel?.confirmation_recall_pct)}</div></div>
+        <div><span className="font-medium">{count(funnel?.execution_qualified)}</span><div className="text-muted-foreground">execution qualified · {pct(funnel?.execution_recall_pct)}</div></div>
+        <div><span className="font-medium">{pct(rank?.discovery_precision_at_10 ?? rank?.precision_at_10)}</span><div className="text-muted-foreground">discovery precision@10</div></div>
+        <div><span className="font-medium">{pct(rank?.actionable_precision_at_10 ?? rank?.precision_at_10)}</span><div className="text-muted-foreground">actionable precision@10</div></div>
         <div><span className="font-medium">{graded?.resolved ?? 0}/{graded?.unique_top_tier_setups ?? 0}</span><div className="text-muted-foreground">top-grade outcomes · {graded?.blocked_or_incomplete ?? 0} blocked</div></div>
         <div><span className="font-medium">{number(graded?.average_r)}R</span><div className="text-muted-foreground">observed average</div></div>
+      </div>
+
+      <div className="mt-3 rounded-sm border border-border bg-muted/20 px-3 py-2 text-xs">
+        <span className="font-medium">Futures coverage: {words(progress?.market_data_coverage?.futures_coverage ?? "unavailable")}</span>
+        <span className="ml-2 text-muted-foreground">
+          {progress?.market_data_coverage?.interpretation ?? "Unavailable futures coverage is reported as unknown, never as no move."}
+        </span>
       </div>
 
       <div className="mt-3 grid gap-3 border-t border-border pt-3 text-xs md:grid-cols-3">
         <div>
           <div className="font-medium">Frozen rank evidence</div>
-          <p className="mt-1 text-muted-foreground">{rank?.sessions ?? 0}/30 sessions · {rank?.ground_truth_count ?? 0} labeled moves</p>
+          <p className="mt-1 text-muted-foreground">{rank?.sessions ?? 0}/30 sessions · {rank?.ground_truth_count ?? 0} labeled moves · recall {pct(rank?.discovery_recall_at_10 ?? rank?.recall_at_10)}</p>
         </div>
         <div>
           <div className="font-medium">Probability calibration</div>

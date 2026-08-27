@@ -43,6 +43,7 @@ from scripts.premarket_opportunity_radar import (  # noqa: E402
 VIBE_HOME = Path.home() / ".vibe-trading"
 REPORT_PATH = VIBE_HOME / "reports" / "intraday-opportunity-radar.json"
 LOG_PATH = ROOT / "data" / "intraday_opportunity_radar_log.jsonl"
+CADENCE_LOG_PATH = ROOT / "data" / "intraday_opportunity_radar_cadence.jsonl"
 SCREENER_BASE = "https://data.alpaca.markets/v1beta1/screener"
 MARKET_TZ = ZoneInfo("America/New_York")
 MIN_PRICE = 3.0
@@ -50,6 +51,7 @@ MIN_AVG_DOLLAR_VOLUME = 20_000_000.0
 MIN_CURRENT_DOLLAR_VOLUME = 5_000_000.0
 MAX_UNDERLYING_SPREAD_PCT = 0.015
 MAX_BAR_SYMBOLS = 100
+MAX_EVALUATED_SYMBOLS = 160
 CORE_BENCHMARKS = ("SPY", "QQQ", "IWM")
 CORE_LIQUID_SYMBOLS = (
     "SPY", "QQQ", "IWM", "DIA",
@@ -145,9 +147,9 @@ def coverage_trace(
 
 
 def select_symbols_for_intraday_bars(
-    discovered: dict[str, dict[str, Any]], metrics: dict[str, dict[str, Any]], limit: int = MAX_BAR_SYMBOLS,
+    discovered: dict[str, dict[str, Any]], metrics: dict[str, dict[str, Any]], limit: int = MAX_EVALUATED_SYMBOLS,
 ) -> list[str]:
-    """Reserve liquid core names, then balance magnitude, activity, and coverage."""
+    """Reserve liquid core and official movers before general activity quotas."""
     available = [symbol for symbol in discovered if symbol in metrics]
     by_magnitude = sorted(
         available,
@@ -177,6 +179,27 @@ def select_symbols_for_intraday_bars(
         reverse=True,
     )
     selected = [symbol for symbol in CORE_LIQUID_SYMBOLS if symbol in available][:limit]
+    official_movers = sorted(
+        (
+            symbol for symbol in available
+            if {"movers_gainers", "movers_losers"}.intersection(discovered[symbol].get("sources") or [])
+        ),
+        key=lambda symbol: (
+            min(
+                (
+                    int(rank) for source, rank in (discovered[symbol].get("source_ranks") or {}).items()
+                    if source in {"movers_gainers", "movers_losers"}
+                ),
+                default=10_000,
+            ),
+            -abs(_finite(metrics[symbol].get("gap_return")) or 0.0),
+        ),
+    )
+    for symbol in official_movers:
+        if symbol not in selected:
+            selected.append(symbol)
+        if len(selected) >= limit:
+            return selected[:limit]
     remaining = max(0, limit - len(selected))
     magnitude_quota = round(remaining * 0.50)
     activity_quota = round(remaining * 0.30)
@@ -284,37 +307,47 @@ def fetch_intraday_bars(symbols: list[str], now_et: datetime) -> tuple[dict[str,
     start_et = datetime.combine(now_et.date(), time(9, 30), MARKET_TZ)
     # Exclude the currently-forming 5-minute bar. Alerts must be causal and
     # reproducible from data that was complete at decision time.
+    # Alpaca's ``end`` bound is exclusive. Using the current five-minute
+    # boundary therefore includes the bar that ended on that boundary while
+    # excluding the bar that just started; subtracting another interval would
+    # add an avoidable five-minute detection delay.
     completed_through = now_et.replace(
         minute=now_et.minute - (now_et.minute % 5), second=0, microsecond=0
     )
-    params: dict[str, Any] = {
-        "symbols": ",".join(symbols[:MAX_BAR_SYMBOLS]),
-        "timeframe": "5Min",
-        "start": start_et.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "end": completed_through.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "adjustment": "raw",
-        "feed": "iex",
-        "limit": 10000,
-        "sort": "asc",
-    }
+    if completed_through <= start_et:
+        return {}, []
     output: dict[str, list[dict[str, Any]]] = {}
     errors: list[str] = []
-    token = None
-    for _ in range(4):
-        if token:
-            params["page_token"] = token
-        try:
-            response = requests.get("https://data.alpaca.markets/v2/stocks/bars", headers=_credentials(), params=params, timeout=25)
-            response.raise_for_status()
-            payload = response.json()
-        except Exception as exc:
-            errors.append(f"alpaca_intraday_bars:{type(exc).__name__}")
-            break
-        for symbol, rows in (payload.get("bars") or {}).items():
-            output.setdefault(str(symbol).upper(), []).extend(row for row in rows or [] if isinstance(row, dict))
-        token = payload.get("next_page_token")
-        if not token:
-            break
+    for offset in range(0, len(symbols), MAX_BAR_SYMBOLS):
+        chunk = symbols[offset : offset + MAX_BAR_SYMBOLS]
+        params: dict[str, Any] = {
+            "symbols": ",".join(chunk),
+            "timeframe": "5Min",
+            "start": start_et.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "end": completed_through.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "adjustment": "raw",
+            "feed": "iex",
+            "limit": 10000,
+            "sort": "asc",
+        }
+        token = None
+        for _ in range(4):
+            if token:
+                params["page_token"] = token
+            else:
+                params.pop("page_token", None)
+            try:
+                response = requests.get("https://data.alpaca.markets/v2/stocks/bars", headers=_credentials(), params=params, timeout=25)
+                response.raise_for_status()
+                payload = response.json()
+            except Exception as exc:
+                errors.append(f"alpaca_intraday_bars:{type(exc).__name__}:{','.join(chunk[:3])}")
+                break
+            for symbol, rows in (payload.get("bars") or {}).items():
+                output.setdefault(str(symbol).upper(), []).extend(row for row in rows or [] if isinstance(row, dict))
+            token = payload.get("next_page_token")
+            if not token:
+                break
     return output, errors
 
 
@@ -337,6 +370,9 @@ def bar_features(rows: list[dict[str, Any]]) -> dict[str, Any]:
     cumulative_pv = sum(float(row["c"]) * float(row["v"]) for row in completed)
     cumulative_volume = sum(float(row["v"]) for row in completed)
     vwap = cumulative_pv / cumulative_volume if cumulative_volume else None
+    prior_cumulative_pv = sum(float(row["c"]) * float(row["v"]) for row in completed[:-1])
+    prior_cumulative_volume = sum(float(row["v"]) for row in completed[:-1])
+    prior_vwap = prior_cumulative_pv / prior_cumulative_volume if prior_cumulative_volume else None
     range_width = session_high - session_low
     range_position = (close - session_low) / range_width if range_width > 0 else 0.5
     last = completed[-1]
@@ -374,7 +410,74 @@ def bar_features(rows: list[dict[str, Any]]) -> dict[str, Any]:
         and vwap is not None
         and close < vwap
     )
-    if bullish_retest_hold:
+    recent_reference = completed[max(0, len(completed) - 4) : -1]
+    recent_high = max(float(row["h"]) for row in recent_reference)
+    recent_low = min(float(row["l"]) for row in recent_reference)
+    reversal_observations: list[dict[str, Any]] = []
+
+    def observe(pattern: str, direction: str, reference_level: float) -> None:
+        reversal_observations.append({
+            "pattern": pattern,
+            "direction": direction,
+            "reference_level": round(reference_level, 4),
+            "observed_at": last.get("t"),
+            "bar_basis": "completed_5m_only",
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        })
+
+    failed_opening_range_breakout = bool(
+        float(last["h"]) > opening_high
+        and close < opening_high
+        and close < float(last["o"])
+    )
+    failed_opening_range_breakdown = bool(
+        float(last["l"]) < opening_low
+        and close > opening_low
+        and close > float(last["o"])
+    )
+    sweep_and_reject = bool(
+        float(last["h"]) > recent_high
+        and close < recent_high
+        and close < float(last["o"])
+    )
+    sweep_and_reclaim = bool(
+        float(last["l"]) < recent_low
+        and close > recent_low
+        and close > float(last["o"])
+    )
+    vwap_reclaim = bool(
+        vwap is not None
+        and prior_vwap is not None
+        and prior_close <= prior_vwap
+        and close > vwap
+        and close > float(last["o"])
+    )
+    vwap_reject = bool(
+        vwap is not None
+        and prior_vwap is not None
+        and prior_close >= prior_vwap
+        and close < vwap
+        and close < float(last["o"])
+    )
+    if failed_opening_range_breakout:
+        observe("failed_opening_range_breakout", "bearish", opening_high)
+    if failed_opening_range_breakdown:
+        observe("failed_opening_range_breakdown", "bullish", opening_low)
+    if sweep_and_reject:
+        observe("sweep_and_reject", "bearish", recent_high)
+    if sweep_and_reclaim:
+        observe("sweep_and_reclaim", "bullish", recent_low)
+    if vwap_reclaim:
+        observe("vwap_reclaim", "bullish", float(vwap))
+    if vwap_reject:
+        observe("vwap_reject", "bearish", float(vwap))
+
+    primary_reversal = reversal_observations[0] if reversal_observations else None
+    if primary_reversal is not None:
+        price_action_state = f"{primary_reversal['direction']}_confirmed"
+        price_action_pattern = str(primary_reversal["pattern"])
+    elif bullish_retest_hold:
         price_action_state, price_action_pattern = "bullish_confirmed", "breakout_retest_hold"
     elif bearish_retest_reject:
         price_action_state, price_action_pattern = "bearish_confirmed", "breakdown_retest_reject"
@@ -397,6 +500,7 @@ def bar_features(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "last_bar_low": round(float(completed[-1]["l"]), 4),
         "last_completed_bar_at": completed[-1].get("t"),
         "vwap_proxy": round(vwap, 4) if vwap is not None else None,
+        "prior_vwap_proxy": round(prior_vwap, 4) if prior_vwap is not None else None,
         "range_position": round(range_position, 4),
         "session_volume_5m": round(cumulative_volume),
         "above_vwap": bool(vwap is not None and close > vwap),
@@ -409,6 +513,10 @@ def bar_features(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "bearish_breakdown_close": bearish_breakdown_close,
         "bullish_retest_hold": bullish_retest_hold,
         "bearish_retest_reject": bearish_retest_reject,
+        "reversal_observations": reversal_observations,
+        "primary_reversal": primary_reversal,
+        "confirmation_trigger": round(float(last["h"]), 4) if price_action_state == "bullish_confirmed" else round(float(last["l"]), 4) if price_action_state == "bearish_confirmed" else None,
+        "invalidation_reference": round(float(last["l"]), 4) if price_action_state == "bullish_confirmed" else round(float(last["h"]), 4) if price_action_state == "bearish_confirmed" else None,
     }
 
 
@@ -524,6 +632,44 @@ def apply_cross_sectional_factor_consensus(candidates: list[dict[str, Any]]) -> 
     return enriched
 
 
+def rank_candidates_by_lane(
+    candidates: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Assign independent benchmark and broad-mover ranks.
+
+    Benchmark ordering intentionally excludes cross-sectional percentiles so
+    penny-stock magnitude and activity cannot displace SPY, QQQ, or IWM. The
+    lane is observational and does not grant execution authority.
+    """
+    benchmark = [row for row in candidates if row.get("symbol") in CORE_BENCHMARKS]
+    broad = [row for row in candidates if row.get("symbol") not in CORE_BENCHMARKS]
+    benchmark.sort(
+        key=lambda row: (
+            float(row.get("ranking_score") or 0),
+            row.get("confirmation_stage") == "completed_5m_confirmed",
+            bool(((row.get("price_action_confirmation") or {}).get("reversal_observations") or [])),
+            abs(float(row.get("change_pct") or 0)),
+        ),
+        reverse=True,
+    )
+    broad.sort(
+        key=lambda row: (
+            float(row.get("ranking_score") or 0),
+            float((row.get("factor_consensus") or {}).get("score") or 0),
+            abs(float(row.get("change_pct") or 0)),
+        ),
+        reverse=True,
+    )
+    for rank, row in enumerate(benchmark, start=1):
+        row["ranking_lane"] = "benchmark"
+        row["lane_rank"] = rank
+        row["benchmark_rank_score"] = round(float(row.get("ranking_score") or 0), 1)
+    for rank, row in enumerate(broad, start=1):
+        row["ranking_lane"] = "broad_mover"
+        row["lane_rank"] = rank
+    return candidates, benchmark, broad
+
+
 def evaluate_candidate(
     discovery: dict[str, Any],
     metrics: dict[str, Any],
@@ -550,8 +696,11 @@ def evaluate_candidate(
         else "bullish" if (change or 0) >= 0
         else "bearish"
     )
-    structure = "unconfirmed"
-    if direction == "bullish" and bars.get("above_opening_range") and bars.get("above_vwap"):
+    primary_reversal = bars.get("primary_reversal") if isinstance(bars.get("primary_reversal"), dict) else None
+    structure = str(primary_reversal.get("pattern")) if primary_reversal else "unconfirmed"
+    if primary_reversal:
+        pass
+    elif direction == "bullish" and bars.get("above_opening_range") and bars.get("above_vwap"):
         structure = "opening_range_breakout"
     elif direction == "bullish" and bars.get("above_vwap") and (range_position or 0) >= 0.72:
         structure = "trend_continuation"
@@ -581,7 +730,11 @@ def evaluate_candidate(
         liquidity_score += 20
     magnitude_score = min(abs(change or 0.0) * 500.0, 100.0)
     activity_score = min((pace_rvol or 0.0) * 35.0, 100.0)
-    structure_score = 92.0 if structure in {"opening_range_breakout", "opening_range_breakdown"} else 76.0 if structure in {"trend_continuation", "trend_breakdown"} else 42.0
+    reversal_patterns = {
+        "failed_opening_range_breakout", "failed_opening_range_breakdown",
+        "sweep_and_reclaim", "sweep_and_reject", "vwap_reclaim", "vwap_reject",
+    }
+    structure_score = 96.0 if structure in reversal_patterns else 92.0 if structure in {"opening_range_breakout", "opening_range_breakdown"} else 76.0 if structure in {"trend_continuation", "trend_breakdown"} else 42.0
     source_score = min(38.0 + len(sources) * 16.0, 100.0)
     catalyst_score = 88.0 if articles else 45.0
     score = round(
@@ -599,11 +752,11 @@ def evaluate_candidate(
 
     if direction == "bullish":
         if bars.get("price_action_state") == "bullish_confirmed":
-            trigger = _finite(bars.get("opening_range_high"))
+            trigger = _finite(bars.get("confirmation_trigger")) or _finite(bars.get("opening_range_high"))
         else:
             trigger = max(value for value in (_finite(bars.get("last_bar_high")), _finite(bars.get("opening_range_high"))) if value is not None) if bars.get("status") == "ok" else None
         stop_candidates = [
-            value for value in (_finite(bars.get("vwap_proxy")), _finite(bars.get("last_bar_low")))
+            value for value in (_finite(bars.get("invalidation_reference")), _finite(bars.get("vwap_proxy")), _finite(bars.get("last_bar_low")))
             if value is not None and trigger is not None and value < trigger
         ]
         invalidation = max(stop_candidates) if stop_candidates else None
@@ -611,11 +764,11 @@ def evaluate_candidate(
         target = trigger + 2 * risk if risk else None
     else:
         if bars.get("price_action_state") == "bearish_confirmed":
-            trigger = _finite(bars.get("opening_range_low"))
+            trigger = _finite(bars.get("confirmation_trigger")) or _finite(bars.get("opening_range_low"))
         else:
             trigger = min(value for value in (_finite(bars.get("last_bar_low")), _finite(bars.get("opening_range_low"))) if value is not None) if bars.get("status") == "ok" else None
         stop_candidates = [
-            value for value in (_finite(bars.get("vwap_proxy")), _finite(bars.get("last_bar_high")))
+            value for value in (_finite(bars.get("invalidation_reference")), _finite(bars.get("vwap_proxy")), _finite(bars.get("last_bar_high")))
             if value is not None and trigger is not None and value > trigger
         ]
         invalidation = min(stop_candidates) if stop_candidates else None
@@ -642,11 +795,53 @@ def evaluate_candidate(
 
     blockers = [name for name, passed in gates.items() if not passed]
     blockers.append("strategy_confirmation_and_revalidation_required")
+    planned_risk = risk if risk is not None and risk > 0 else None
+    consumed_fraction = None
+    remaining_reward_r = None
+    distance_to_trigger_r = None
+    if planned_risk is not None and price is not None and trigger is not None and target is not None:
+        distance_to_trigger_r = abs(price - trigger) / planned_risk
+        consumed_fraction = (
+            max(0.0, price - trigger) / max(target - trigger, 1e-9)
+            if direction == "bullish"
+            else max(0.0, trigger - price) / max(trigger - target, 1e-9)
+        )
+        remaining_reward_r = (target - price) / planned_risk if direction == "bullish" else (price - target) / planned_risk
+    late_no_chase = bool(
+        consumed_fraction is not None
+        and (consumed_fraction >= 0.50 or (remaining_reward_r is not None and remaining_reward_r < 1.0))
+    )
+    remaining_status = "late_no_chase" if late_no_chase else "confirmed_review" if str(bars.get("price_action_state")) in {"bullish_confirmed", "bearish_confirmed"} else "awaiting_confirmation"
+    discovery_stage = "structure_observed" if bars.get("status") == "ok" else "candidate_discovered"
+    confirmation_stage = "completed_5m_confirmed" if str(bars.get("price_action_state")) in {"bullish_confirmed", "bearish_confirmed"} else "awaiting_completed_5m_confirmation"
+    reversal_bonus = 8.0 if primary_reversal is not None else 0.0
+    ranking_score = max(
+        0.0,
+        score
+        + (4.0 if remaining_status == "confirmed_review" else 0.0)
+        + reversal_bonus
+        - min(max(consumed_fraction or 0.0, 0.0), 1.5) * 30.0
+        - (15.0 if late_no_chase else 0.0),
+    )
+    # Actionable ranking is deliberately stricter than discovery ranking: a
+    # symbol must pass every setup/risk gate and still have enough move left.
+    actionable_for_ranking = (
+        state in {"watch", "precision_watch"}
+        and confirmation_stage == "completed_5m_confirmed"
+        and all(bool(value) for value in gates.values())
+        and not late_no_chase
+    )
     return {
         "symbol": symbol,
         "state": state,
         "grade": grade,
         "score": score,
+        "ranking_score": round(ranking_score, 1),
+        "actionable_for_ranking": actionable_for_ranking,
+        "ranking_lane": "benchmark" if symbol in CORE_BENCHMARKS else "broad_mover",
+        "lane_rank": None,
+        "discovery_stage": discovery_stage,
+        "confirmation_stage": confirmation_stage,
         "direction": direction,
         "setup": structure,
         "price": round(price, 4) if price is not None else None,
@@ -666,13 +861,25 @@ def evaluate_candidate(
             "state": bars.get("price_action_state", "waiting"),
             "pattern": bars.get("price_action_pattern", "no_closed_bar_confirmation"),
             "bar_completed_at": bars.get("last_completed_bar_at"),
-            "definition": "closed_5m_opening_range_vwap_break_or_retest_confirmation",
+            "definition": "closed_5m_break_retest_or_mechanical_reversal_confirmation",
+            "reversal_observations": bars.get("reversal_observations") or [],
+            "execution_enabled": False,
+            "can_submit_orders": False,
         },
         "trade_levels": {
             "confirmation_trigger": round(trigger, 4) if trigger is not None else None,
             "invalidation": round(invalidation, 4) if invalidation is not None else None,
             "target_2r": round(target, 4) if target is not None else None,
             "instruction": "wait_for_completed_5m_break_and_retest_then_revalidate_quote",
+        },
+        "remaining_opportunity": {
+            "status": remaining_status,
+            "move_consumed_fraction": round(consumed_fraction, 4) if consumed_fraction is not None else None,
+            "remaining_reward_r": round(remaining_reward_r, 3) if remaining_reward_r is not None else None,
+            "distance_to_trigger_r": round(distance_to_trigger_r, 3) if distance_to_trigger_r is not None else None,
+            "rule": "no_chase_when_half_of_planned_2r_move_is_consumed_or_less_than_1r_remains",
+            "execution_enabled": False,
+            "can_submit_orders": False,
         },
         "factor_scores": {
             "magnitude": round(magnitude_score, 1),
@@ -724,11 +931,21 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         for symbol in ranked_for_bars
     ]
     candidates = apply_cross_sectional_factor_consensus(candidates)
+    candidates, benchmark_ranked, _broad_ranked = rank_candidates_by_lane(candidates)
     candidates.sort(
         key=lambda row: (
             float(row.get("score") or 0),
             float((row.get("factor_consensus") or {}).get("score") or 0),
             abs(float(row.get("change_pct") or 0)),
+        ),
+        reverse=True,
+    )
+    actionable_ranked = sorted(
+        (row for row in candidates if row.get("actionable_for_ranking") is True),
+        key=lambda row: (
+            float(row.get("ranking_score") or 0),
+            float((row.get("factor_consensus") or {}).get("score") or 0),
+            float((row.get("remaining_opportunity") or {}).get("remaining_reward_r") or 0),
         ),
         reverse=True,
     )
@@ -739,7 +956,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         for source in set(item.get("sources") or []):
             nomination_source_counts[source] = nomination_source_counts.get(source, 0) + 1
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "provider": "alpaca_marketwide_intraday_discovery",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "as_of_et": now_et.isoformat(),
@@ -754,6 +971,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
             "symbols_with_5m_bars": len(bars),
             "symbols_evaluated": len(candidates),
             "precision_watch_count": len(precision),
+            "actionable_ranked_count": len(actionable_ranked),
             "factor_consensus_complete_count": sum(
                 (row.get("factor_consensus") or {}).get("status") == "complete" for row in candidates
             ),
@@ -767,8 +985,25 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         "market_movers": normalized_movers(screeners),
         "all_discovered_symbols": sorted(discovered),
         "coverage_trace": coverage_trace(discovered, snapshots, ranked_for_bars, bars),
+        "benchmark_lane": {
+            "symbols": list(CORE_BENCHMARKS),
+            "ranked_candidates": benchmark_ranked,
+            "actionable_ranked_candidates": [
+                row for row in benchmark_ranked if row.get("actionable_for_ranking") is True
+            ],
+            "counts": {
+                "configured": len(CORE_BENCHMARKS),
+                "evaluated": len(benchmark_ranked),
+                "confirmed": sum(row.get("confirmation_stage") == "completed_5m_confirmed" for row in benchmark_ranked),
+                "reversal_observed": sum(bool(((row.get("price_action_confirmation") or {}).get("reversal_observations") or [])) for row in benchmark_ranked),
+            },
+            "ranking_basis": "independent_absolute_score_completed_5m_confirmation_no_broad_mover_competition",
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
         "precision_watch": precision,
         "ranked_candidates": candidates,
+        "actionable_ranked_candidates": actionable_ranked,
         "filtered_candidates": filtered,
         "errors": errors,
         "operational_health": "ok" if discovered and snapshots and not errors else "degraded",
@@ -783,21 +1018,42 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
     }
 
 
-def write_report(report: dict[str, Any], report_path: Path = REPORT_PATH, log_path: Path = LOG_PATH) -> None:
+def write_report(
+    report: dict[str, Any],
+    report_path: Path = REPORT_PATH,
+    log_path: Path = LOG_PATH,
+    cadence_log_path: Path | None = None,
+) -> None:
     _atomic_json(report_path, report)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(report, separators=(",", ":"), sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    if cadence_log_path is not None:
+        cadence_log_path.parent.mkdir(parents=True, exist_ok=True)
+        cadence_row = {
+            "generated_at": report.get("generated_at"),
+            "as_of_et": report.get("as_of_et"),
+            "date": report.get("date"),
+            "operational_health": report.get("operational_health"),
+            "errors": len(report.get("errors") or []),
+        }
+        with cadence_log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(cadence_row, separators=(",", ":"), sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report-path", type=Path, default=REPORT_PATH)
     parser.add_argument("--log-path", type=Path, default=LOG_PATH)
+    parser.add_argument("--cadence-log-path", type=Path, default=CADENCE_LOG_PATH)
     parser.add_argument("--print", action="store_true", dest="print_report")
     args = parser.parse_args()
     report = build_report()
-    write_report(report, args.report_path, args.log_path)
+    write_report(report, args.report_path, args.log_path, args.cadence_log_path)
     if args.print_report:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

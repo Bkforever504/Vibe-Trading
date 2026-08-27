@@ -34,6 +34,20 @@ def test_build_report_passes_when_expected_times_present() -> None:
     assert report["aligned_count"] == report["task_count"]
 
 
+def test_flip_exploration_expected_schedule_matches_registered_retry_window() -> None:
+    assert alignment.EXPECTED_TASKS[r"\Flip-Bot-Exploration"] == {
+        "08:40", "09:00", "09:20", "09:40", "10:00", "10:20",
+        "10:40", "11:00", "11:20", "11:40", "12:00", "12:20",
+    }
+
+
+def test_marketwide_radar_full_intraday_cadence_is_governed() -> None:
+    times = alignment.EXPECTED_TASKS[r"\IntradayOpportunityRadar"]
+    assert len(times) == 48
+    assert {"08:35", "10:20", "10:30", "14:30", "15:02"} <= times
+    assert alignment.EXPECTED_TASKS[r"\DailyMoveCoverageReview"] == {"15:08"}
+
+
 def test_build_report_flags_missing_expected_time() -> None:
     bad_task = r"\Flip-Bot-Entry"
     report = alignment.build_report(_rows_from_expected({bad_task: {"08:40"}}))
@@ -138,6 +152,19 @@ def test_long_running_task_is_flagged_as_stuck() -> None:
         issue.get("task") == task and issue.get("issue") == "task_running_too_long"
         for issue in report["issues"]
     )
+
+
+def test_session_event_monitor_uses_its_registered_eight_hour_runtime() -> None:
+    from datetime import datetime
+
+    task = r"\Flip-Bot-Event-Monitor"
+    now = datetime(2026, 7, 24, 12, 0, 0)
+    rows = _override_status(_rows_from_expected(), task, "Running", "07/24/2026 08:27:00 AM")
+
+    report = alignment.build_report(rows, now=now)
+
+    assert report["passed"] is True
+    assert not any(issue.get("task") == task for issue in report["issues"])
 
 
 def test_disabled_task_is_still_not_ready() -> None:
