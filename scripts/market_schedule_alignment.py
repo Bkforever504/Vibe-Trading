@@ -111,14 +111,12 @@ EXPECTED_TASKS = {
     r"\VibeTrade\DistributionDayScanner": {"15:32"},
     r"\VibeTrade\SectorRotationRanker": {"15:33"},
     r"\VibeTrade\PatternGrader-Scanner-Intraday": {"08:35"},
-    r"\IntradayOpportunityRadar": {
-        "08:35", "08:40", "08:45", "08:50", "08:55", "09:00", "09:05", "09:10",
-        "09:15", "09:20", "09:25", "09:30", "09:35", "09:40", "09:45", "09:50",
-        "09:55", "10:00", "10:05", "10:10", "10:15", "10:20", "10:30", "10:40",
-        "10:50", "11:00", "11:10", "11:20", "11:30", "11:40", "11:50", "12:00",
-        "12:10", "12:20", "12:30", "12:40", "12:50", "13:00", "13:10", "13:20",
-        "13:30", "13:40", "13:50", "14:00", "14:10", "14:20", "14:30", "15:02",
-    },
+    r"\IntradayOpportunityRadar": (
+        _minute_series("08:35", "10:05", 5)
+        | _minute_series("10:15", "14:45", 10)
+        | {"15:00"}
+    ),
+    r"\VibeTrade\APlusSpotlight": {"08:39"},
     r"\DailyMoveCoverageReview": {"15:08"},
     r"\VibeTrade\PatternGrader-Aggregator": {"15:05"},
     r"\PatternGrader-OutcomeResolver": {"15:10"},
@@ -164,6 +162,7 @@ EXPECTED_TASKS = {
 }
 
 EXPECTED_TASK_REPETITIONS = {
+    r"\VibeTrade\APlusSpotlight": {"interval": "PT5M", "duration": "PT6H21M"},
     r"\VibeTrade\PatternGrader-Scanner-Intraday": {"interval": "PT5M", "duration": "PT6H30M"},
     r"\VibeTradingOptionsShadowTwin": {"interval": "PT1M", "duration": "PT6H10M"},
     r"\IWM-Bot-Monitor": {"interval": "PT1M", "duration": "PT6H25M"},

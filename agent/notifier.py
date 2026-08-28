@@ -135,6 +135,55 @@ def send_discord(
     return {"status": "sent", "sent": True, "chunks": sent}
 
 
+def send_discord_embed(
+    *,
+    title: str,
+    description: str,
+    color: int = 0xE53935,
+    fields: list[dict[str, Any]] | None = None,
+    content: str = "",
+    webhook_url: str | None = None,
+    transport: Callable[[str, dict[str, Any], float], None] = _post_json,
+    timeout: float = 10.0,
+    attempts: int = 2,
+    allow_mentions: bool = True,
+) -> dict[str, Any]:
+    """Send a Discord embed (colored side-bar, rich fields). Optional @here mention via content."""
+    webhook = webhook_url or _env_value(WEBHOOK_KEY)
+    if not webhook:
+        return {"status": "not_configured", "sent": False, "chunks": 0}
+    _validate_webhook(webhook)
+    embed: dict[str, Any] = {
+        "title": redact(title)[:256],
+        "description": redact(description)[:4096],
+        "color": int(color) & 0xFFFFFF,
+    }
+    if fields:
+        embed["fields"] = [
+            {"name": redact(str(f.get("name", "")))[:256],
+             "value": redact(str(f.get("value", "")))[:1024],
+             "inline": bool(f.get("inline", False))}
+            for f in fields[:25]
+        ]
+    payload: dict[str, Any] = {
+        "content": redact(content)[:MAX_CONTENT],
+        "embeds": [embed],
+        "allowed_mentions": {"parse": ["everyone"] if allow_mentions else []},
+    }
+    try:
+        for attempt in range(max(1, attempts)):
+            try:
+                transport(webhook, payload, timeout)
+                return {"status": "sent", "sent": True, "chunks": 1}
+            except (urllib.error.URLError, TimeoutError, RuntimeError):
+                if attempt + 1 >= max(1, attempts):
+                    raise
+                time.sleep(0.5)
+    except Exception as exc:
+        return {"status": "send_failed", "sent": False, "chunks": 0, "error_type": type(exc).__name__}
+    return {"status": "send_failed", "sent": False, "chunks": 0}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--message", required=True)

@@ -1,13 +1,48 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import generate_dashboard as dashboard
+
+
+ET = ZoneInfo("America/New_York")
+
+
+def test_aplus_spotlight_hides_stale_or_prior_day_cards() -> None:
+    now = datetime(2026, 8, 27, 10, 30, tzinfo=ET)
+    setup = {"symbol": "CRM"}
+
+    assert dashboard._current_aplus_setups(
+        {
+            "date": "2026-08-27",
+            "generated_at": "2026-08-27T14:25:00Z",
+            "setups": [setup],
+        },
+        now,
+    ) == [setup]
+    assert dashboard._current_aplus_setups(
+        {
+            "date": "2026-08-27",
+            "generated_at": "2026-08-27T14:00:00Z",
+            "setups": [setup],
+        },
+        now,
+    ) == []
+    assert dashboard._current_aplus_setups(
+        {
+            "date": "2026-08-26",
+            "generated_at": "2026-08-27T14:25:00Z",
+            "setups": [setup],
+        },
+        now,
+    ) == []
 
 
 def test_flip_trade_stats_split_all_time_and_post_fix() -> None:

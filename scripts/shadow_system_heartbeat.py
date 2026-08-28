@@ -74,6 +74,7 @@ PATTERN_GRADER_TASKS = (
 )
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 RADAR_TASKS = (("\\", "IntradayOpportunityRadar"),)
+APLUS_TASKS = (("\\VibeTrade\\", "APlusSpotlight"),)
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
     ("\\VibeTrade\\", "SundayShadowPreflight"),
@@ -88,7 +89,7 @@ OBSERVABILITY_TASKS = (
 )
 EXPECTED_TASKS = (
     MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + MNQ_EVIDENCE_TASKS + PATTERN_GRADER_TASKS
-    + OPTIONS_TASKS + RADAR_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
+    + OPTIONS_TASKS + RADAR_TASKS + APLUS_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
 )
 
 
@@ -419,6 +420,7 @@ def build_report(
     pattern_grader = _task_group(tasks, PATTERN_GRADER_TASKS)
     options = _task_group(tasks, OPTIONS_TASKS)
     radar = _task_group(tasks, RADAR_TASKS)
+    aplus = _task_group(tasks, APLUS_TASKS)
     ops = _task_group(tasks, OPS_TASKS)
     observability = _task_group(tasks, OBSERVABILITY_TASKS)
     pattern_outcomes_ledger = report_ledger_freshness(pattern_outcomes_path, now=now, max_age_hours=30.0)
@@ -458,6 +460,7 @@ def build_report(
         and pattern_grader["alive"]
         and options["alive"]
         and radar["alive"]
+        and aplus["alive"]
         and ops["alive"]
         and hmm["fresh"]
         and catalyst["fresh"]
@@ -493,6 +496,7 @@ def build_report(
         "pattern_outcomes_ledger": pattern_outcomes_ledger,
         "options_bot": options,
         "marketwide_radar": radar,
+        "aplus_spotlight": aplus,
         "operations_tasks": ops,
         "observability_tasks": observability,
         "hmm": hmm,
@@ -522,6 +526,7 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"Pattern outcomes fresh: {check(report['pattern_outcomes_ledger']['fresh'])} (age={report['pattern_outcomes_ledger']['age_hours']}h, rows={report['pattern_outcomes_ledger']['row_count']})",
             f"Options bot alive: {check(report['options_bot']['alive'])}",
             f"Marketwide radar alive: {check(report['marketwide_radar']['alive'])}",
+            f"A+ spotlight alive: {check(report['aplus_spotlight']['alive'])}",
             f"HMM fresh: {check(report['hmm']['fresh'])} (age={report['hmm']['age_hours']}h)",
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",
             f"Databento probe fresh: {check(report['databento_capability']['fresh'])} (age={report['databento_capability']['age_hours']}h)",

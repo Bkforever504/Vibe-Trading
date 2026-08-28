@@ -29,7 +29,8 @@ def test_synthetic_detection_outcome_scorecard_calibration_and_cockpit_chain(tmp
         "regime": "trend", "execution_enabled": False, "can_submit_orders": False,
     }
     truth = {
-        "date": "2026-08-21", "ground_truth_status": "qualified", "metrics_qualified": True,
+        "date": "2026-08-21", "generated_at": "2026-08-24T20:59:00Z",
+        "ground_truth_status": "qualified", "metrics_qualified": True,
         "pattern_annotation_qualified": False, "producer_healthy": True,
         "moves": [{
             "move_id": "SPY:5m:2026-08-21T14:30:00Z", "date": "2026-08-21",
@@ -57,6 +58,26 @@ def test_synthetic_detection_outcome_scorecard_calibration_and_cockpit_chain(tmp
         "generated_at": "2026-08-24T20:59:00Z",
         "scan_reconciliation": {"denominator_reconciled": True, "producer_failure_count": 0},
     })
+    _write(tmp_path, "intraday-opportunity-radar.json", {
+        "generated_at": "2026-08-24T20:59:20Z",
+        "operational_health": "ok",
+        "errors": [],
+        "coverage": {
+            "snapshot_coverage_pct": 99.0,
+            "symbols_evaluated": 160,
+            "symbols_with_5m_bars": 155,
+            "reserved_liquid_core": [
+                "SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN",
+                "META", "GOOGL", "TSLA", "AMD", "AVGO", "MSTR", "COIN",
+            ],
+        },
+    })
+    _write(tmp_path, "live-opportunity-engine.json", {
+        "generated_at": "2026-08-24T20:59:40Z",
+        "stream_status": "connected_hybrid",
+        "candidate_count": 1,
+        "stream_coverage": {"mandatory_core_missing": []},
+    })
     _write(tmp_path, "move-ground-truth-summary.json", truth)
     _write(tmp_path, "detection-scorecard-rolling.json", rolling)
     _write(tmp_path, "grade-probability-calibration.json", calibration)
@@ -65,7 +86,12 @@ def test_synthetic_detection_outcome_scorecard_calibration_and_cockpit_chain(tmp
         "summary": {"overall_review_coverage_pct": 100.0}, "source_inventory": [],
     })
     _write(tmp_path, "options-feed-qualification.json", {
-        "generated_at": "2026-08-24T20:59:58Z", "status": "context_only",
+        "generated_at": "2026-08-24T20:59:58Z",
+        "status": "manual_execution_reference_available",
+        "summary": {"manual_execution_qualified": 1},
+    })
+    _write(tmp_path, "options-reference-refresh.json", {
+        "generated_at": "2026-08-24T20:59:50Z", "captured_count": 10,
     })
     _write(tmp_path, "manual-execution-quality.json", {
         "generated_at": "2026-08-24T20:59:00Z", "status": "awaiting_observations",
@@ -76,9 +102,11 @@ def test_synthetic_detection_outcome_scorecard_calibration_and_cockpit_chain(tmp
 
     cockpit = build_cockpit(report_dir=tmp_path, now=NOW)
 
-    assert cockpit["schema_version"] == 11
+    assert cockpit["schema_version"] == 12
     assert cockpit["system_readiness"]["build"]["percent"] == 100.0
-    assert cockpit["system_readiness"]["runtime"]["percent"] == 100.0
+    assert cockpit["system_readiness"]["runtime"]["percent"] == 100.0, [
+        gate for gate in cockpit["system_readiness"]["runtime"]["gates"] if not gate["ready"]
+    ]
     assert cockpit["system_readiness"]["ready_for_manual_review"] is True
     assert cockpit["system_readiness"]["probability_claims_qualified"] is False
     assert cockpit["discovery"]["scorecard_rolling"]["pattern_coverage"]["opportunity_coverage"]["recall"] == 1.0

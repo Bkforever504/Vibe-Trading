@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 try:
     from options_reporting import dedupe_options_trade_records
@@ -26,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 VIBE_HOME = Path.home() / ".vibe-trading"
 REPORT_DIR = VIBE_HOME / "reports"
 OUTPUT_PATH = VIBE_HOME / "dashboard.html"
+ET = ZoneInfo("America/New_York")
 
 FLIP_TRADES_PATH = VIBE_HOME / "flip-trades.json"
 OPTIONS_TRADES_PATH = VIBE_HOME / "options-trades.json"
@@ -63,6 +65,7 @@ REPORTS = {
     "openalice": REPORT_DIR / "openalice-repo-intake-audit.json",
     "incentive_safety": REPORT_DIR / "agent-incentive-safety-audit.json",
     "activity": REPORT_DIR / "daily-bot-activity-2026-07-03.csv",
+    "aplus_spotlight": REPORT_DIR / "aplus-spotlight.json",
 }
 
 
@@ -426,6 +429,69 @@ def section(title: str, body: str, subtitle: str = "") -> str:
       <div class="section-head"><h2>{esc(title)}</h2>{sub}</div>
       {body}
     </section>"""
+
+
+def _current_aplus_setups(data: dict[str, Any], now: datetime | None = None) -> list[dict[str, Any]]:
+    now = (now or datetime.now(ET)).astimezone(ET)
+    if str(data.get("date") or "") != now.date().isoformat():
+        return []
+    generated_text = str(data.get("generated_at") or "")
+    try:
+        generated = datetime.fromisoformat(generated_text.replace("Z", "+00:00"))
+    except ValueError:
+        return []
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=timezone.utc)
+    age_minutes = (now.astimezone(timezone.utc) - generated.astimezone(timezone.utc)).total_seconds() / 60.0
+    if not -2.0 <= age_minutes <= 20.0:
+        return []
+    setups = data.get("setups")
+    return [row for row in setups if isinstance(row, dict)] if isinstance(setups, list) else []
+
+
+def render_aplus_spotlight(model: dict[str, Any]) -> str:
+    data = model.get("aplus_spotlight") if isinstance(model.get("aplus_spotlight"), dict) else {}
+    setups = _current_aplus_setups(data)
+    if not setups:
+        return """
+    <div class="aplus-spotlight aplus-idle">
+      <div class="aplus-head"><span>A+ Setup Spotlight</span><span class="aplus-count">0</span></div>
+      <div class="aplus-sub">No confirmed A+ setups are live. Spotlight will flash red the moment score >= 93 confirms.</div>
+    </div>"""
+    cards: list[str] = []
+    for setup in setups[:12]:
+        direction = str(setup.get("direction") or "").lower()
+        dir_cls = "dir-bull" if direction.startswith("bull") else "dir-bear" if direction.startswith("bear") else ""
+        arrow = "▲" if dir_cls == "dir-bull" else "▼" if dir_cls == "dir-bear" else "◆"
+        entry = safe_float(setup.get("entry"), 0.0)
+        stop = safe_float(setup.get("invalidation"), 0.0)
+        target = safe_float(setup.get("target"), 0.0)
+        risk = safe_float(setup.get("risk_per_share"), 0.0)
+        reward = safe_float(setup.get("reward_per_share"), 0.0)
+        rr = (reward / risk) if risk else 0.0
+        setup_name = str(setup.get("setup") or "").replace("_", " ").title() or "Setup"
+        score = safe_float(setup.get("score"), 0.0)
+        cards.append(
+            f"""
+        <div class="aplus-card">
+          <div class="row-title"><span class="{dir_cls}">{arrow} {esc(str(setup.get('symbol') or '?'))}</span>
+            <span style="font-size:12px;opacity:0.85">· {esc(setup_name)} · score {score:.1f}</span></div>
+          <div class="lvl"><span>Entry</span><b>{entry:.2f}</b></div>
+          <div class="lvl"><span>Stop</span><b>{stop:.2f}</b></div>
+          <div class="lvl"><span>Target 2R</span><b>{target:.2f}</b></div>
+          <div class="lvl"><span>Risk / R:R</span><b>${risk:.2f} · {rr:.2f}R</b></div>
+        </div>"""
+        )
+    generated = esc(str(data.get("generated_at") or ""))
+    return f"""
+    <div class="aplus-spotlight">
+      <div class="aplus-head">
+        <span>★ A+ Setup Spotlight ★</span>
+        <span class="aplus-count">{len(setups)}</span>
+      </div>
+      <div class="aplus-sub">Confirmed 5m · grade A · score >= 93 · actionable rank · updated {generated}</div>
+      <div class="aplus-list">{''.join(cards)}</div>
+    </div>"""
 
 
 def render_overview(model: dict[str, Any]) -> str:
@@ -1925,6 +1991,64 @@ def render_html(model: dict[str, Any]) -> str:
     .compact   {{ grid-template-columns:repeat(6,minmax(0,1fr)); }}
     .table-wrap {{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }}
     .panel {{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:12px; }}
+    /* === A+ SPOTLIGHT === */
+    @keyframes aplus-pulse {{
+      0%,100% {{ box-shadow: 0 0 0 0 rgba(229,57,53,0.55), 0 0 32px rgba(229,57,53,0.35); }}
+      50%     {{ box-shadow: 0 0 0 8px rgba(229,57,53,0.00), 0 0 48px rgba(229,57,53,0.55); }}
+    }}
+    @keyframes aplus-shimmer {{
+      0%   {{ background-position: 0% 50%; }}
+      100% {{ background-position: 200% 50%; }}
+    }}
+    .aplus-spotlight {{
+      background: linear-gradient(120deg,#7f0d0d 0%,#e53935 25%,#ffab00 50%,#e53935 75%,#7f0d0d 100%);
+      background-size: 200% 200%;
+      animation: aplus-shimmer 6s linear infinite, aplus-pulse 2.4s ease-in-out infinite;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      color: #fff;
+      border: 2px solid #fff3;
+    }}
+    .aplus-spotlight .aplus-head {{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      font-family: var(--sans); font-weight: 900;
+      font-size: 26px; letter-spacing: 1.5px; text-transform: uppercase;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.55);
+    }}
+    .aplus-spotlight .aplus-count {{
+      font-size: 44px; font-weight: 900; line-height: 1;
+      padding: 4px 16px; border-radius: 12px;
+      background: rgba(0,0,0,0.35); border: 2px solid #fff;
+    }}
+    .aplus-spotlight .aplus-list {{
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 12px; margin-top: 16px;
+    }}
+    .aplus-spotlight .aplus-card {{
+      background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.25); border-radius: 10px;
+      padding: 12px 14px; font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 13px;
+    }}
+    .aplus-spotlight .aplus-card .row-title {{
+      font-family: var(--sans); font-size: 18px; font-weight: 800; letter-spacing: 0.5px;
+      display:flex; align-items:center; gap:8px; margin-bottom:6px;
+    }}
+    .aplus-spotlight .aplus-card .dir-bull {{ color: #7fff9c; }}
+    .aplus-spotlight .aplus-card .dir-bear {{ color: #ffb0b0; }}
+    .aplus-spotlight .aplus-card .lvl {{ display:flex; justify-content:space-between; padding: 2px 0; }}
+    .aplus-spotlight .aplus-card .lvl b {{ color: #ffe082; }}
+    .aplus-spotlight .aplus-empty {{
+      font-family: var(--sans); font-size: 14px; opacity: 0.9; margin-top: 8px;
+    }}
+    .aplus-spotlight .aplus-sub {{
+      font-family: var(--sans); font-size: 12px; opacity: 0.85; margin-top: 4px;
+    }}
+    /* Dim spotlight to a slim badge when no A+ setup is live */
+    .aplus-spotlight.aplus-idle {{
+      background: linear-gradient(120deg,#1e293b,#111827);
+      animation: none; border: 1px solid var(--border); color: var(--dim);
+    }}
+    .aplus-spotlight.aplus-idle .aplus-head {{ font-size:14px; letter-spacing:1px; }}
+    .aplus-spotlight.aplus-idle .aplus-count {{ font-size:14px; background:transparent; border:1px solid var(--border); color:var(--dim); }}
   </style>
 </head>
 <body>
@@ -1939,6 +2063,8 @@ def render_html(model: dict[str, Any]) -> str:
       <h1>Control Room</h1>
       <p>Read-only · No execution controls · No broker calls · Regenerate: <code>python scripts/generate_dashboard.py</code></p>
     </div>
+
+    {render_aplus_spotlight(model)}
 
     <div id="overview" class="section">
       <div class="section-label"><h2>Overview</h2><p>Account, audit, market force, and daily verdict</p></div>

@@ -43,6 +43,34 @@ def test_notifier_rejects_non_discord_or_non_https_webhooks() -> None:
         notifier.send_discord("x", webhook_url="http://discord.com/api/webhooks/1/2")
 
 
+def test_embed_notifier_allows_here_only_when_explicitly_enabled() -> None:
+    sent: list[tuple[str, dict, float]] = []
+    result = notifier.send_discord_embed(
+        title="A+ CRM",
+        description="confirmed",
+        content="@here A+ trade alert",
+        fields=[{"name": "Entry", "value": "250.00", "inline": True}],
+        webhook_url="https://discord.com/api/webhooks/fixture/token",
+        transport=lambda url, payload, timeout: sent.append((url, payload, timeout)),
+        allow_mentions=True,
+    )
+
+    assert result["sent"] is True
+    assert sent[0][1]["allowed_mentions"] == {"parse": ["everyone"]}
+    assert sent[0][1]["embeds"][0]["color"] == 0xE53935
+
+    sent.clear()
+    notifier.send_discord_embed(
+        title="A+ CRM",
+        description="confirmed",
+        content="@here A+ trade alert",
+        webhook_url="https://discord.com/api/webhooks/fixture/token",
+        transport=lambda url, payload, timeout: sent.append((url, payload, timeout)),
+        allow_mentions=False,
+    )
+    assert sent[0][1]["allowed_mentions"] == {"parse": []}
+
+
 def test_failure_counter_auto_halts_at_three_and_kill_switch_is_file_drop(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(shadow_ops, "HEALTH_DIR", tmp_path / "health")
     monkeypatch.setattr(shadow_ops, "KILL_SWITCH", tmp_path / "KILL_SWITCH")
@@ -117,6 +145,7 @@ def test_heartbeat_passes_ready_tasks_and_fresh_sources_then_fails_stale_hmm(tmp
                                     databento_capability_path=databento, mnq_evidence_path=mnq_evidence,
                                     pattern_outcomes_path=pattern_outcomes)
     assert report["status"] == "PASS"
+    assert report["aplus_spotlight"]["alive"] is True
     assert "MES v2 alive: OK" in heartbeat.format_heartbeat(report)
     assert "Pattern grader alive: OK" in heartbeat.format_heartbeat(report)
 
@@ -191,6 +220,7 @@ def test_heartbeat_fails_when_pattern_outcomes_ledger_did_not_grow(tmp_path: Pat
 
 def test_heartbeat_does_not_create_circular_dependency_on_its_consumers() -> None:
     assert ("\\", "IntradayOpportunityRadar") in heartbeat.EXPECTED_TASKS
+    assert ("\\VibeTrade\\", "APlusSpotlight") in heartbeat.EXPECTED_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "EodShadowCheckin") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") not in heartbeat.OPS_TASKS

@@ -44,7 +44,9 @@ def test_flip_exploration_expected_schedule_matches_registered_retry_window() ->
 def test_marketwide_radar_full_intraday_cadence_is_governed() -> None:
     times = alignment.EXPECTED_TASKS[r"\IntradayOpportunityRadar"]
     assert len(times) == 48
-    assert {"08:35", "10:20", "10:30", "14:30", "15:02"} <= times
+    assert {"08:35", "10:05", "10:15", "14:45", "15:00"} <= times
+    ordered = sorted(int(value[:2]) * 60 + int(value[3:]) for value in times)
+    assert max(right - left for left, right in zip(ordered, ordered[1:])) <= 15
     assert alignment.EXPECTED_TASKS[r"\DailyMoveCoverageReview"] == {"15:08"}
 
 
