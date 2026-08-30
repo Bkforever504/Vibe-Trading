@@ -26,6 +26,10 @@ REPORT_PATH = VIBE_HOME / "reports" / "needs-review-queue.json"
 
 REVIEW_VERDICTS = {"possibly_too_strict", "needs_review"}
 KALSHI_REVIEW_REASONS = {"contracts_above_limit", "notional_above_limit"}
+# Kalshi sizing rejections are informational; retire them from the daily queue
+# after this window so June items don't sit forever alongside actionable blocks.
+MAX_KALSHI_QUEUE_AGE_DAYS = 14
+MAX_QUEUE_ITEM_AGE_DAYS = 45
 
 
 def _priority_for(review: dict[str, Any]) -> str:
@@ -108,15 +112,47 @@ def build_queue(
         market_force_path=market_force_path,
         lookback_days=lookback_days,
     )
+    today = date.today()
     candidates = []
+    seen_review_keys: set[tuple[Any, ...]] = set()
     for row in intelligence.get("recent_reviews", []):
         is_review_verdict = row.get("verdict") in REVIEW_VERDICTS
         is_kalshi_sizing_review = (
             row.get("guard_source") == "kalshi"
             and row.get("reason") in KALSHI_REVIEW_REASONS
         )
+        row_date_str = str(row.get("date") or "")
+        age_days: int | None = None
+        try:
+            age_days = (today - date.fromisoformat(row_date_str[:10])).days
+        except ValueError:
+            age_days = None
+        if age_days is not None:
+            if is_kalshi_sizing_review and not is_review_verdict and age_days > MAX_KALSHI_QUEUE_AGE_DAYS:
+                continue
+            if age_days > MAX_QUEUE_ITEM_AGE_DAYS:
+                continue
         if is_review_verdict or is_kalshi_sizing_review:
-            candidates.append(_queue_item(row))
+            item = _queue_item(row)
+            # Guard ledgers can contain the same rejection more than once when
+            # separate review passes ingest overlapping source files. Keep one
+            # decision row without hiding distinct price/size observations.
+            review_key = (
+                item.get("date"),
+                item.get("guard_source"),
+                item.get("bot"),
+                item.get("market_ticker") or item.get("symbol"),
+                item.get("reason"),
+                item.get("side"),
+                item.get("price_cents"),
+                item.get("contracts"),
+                item.get("estimated_notional"),
+                item.get("max_notional"),
+            )
+            if review_key in seen_review_keys:
+                continue
+            seen_review_keys.add(review_key)
+            candidates.append(item)
     priority_order = {"high": 0, "medium": 1, "low": 2}
     candidates.sort(
         key=lambda row: (

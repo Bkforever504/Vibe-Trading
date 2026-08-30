@@ -1,0 +1,32 @@
+{
+  "can_submit_orders": false,
+  "development_events_added": 2,
+  "execution_enabled": false,
+  "experiment_wide_family_size": 2,
+  "family_specs_added": 2,
+  "generated_at": "2026-08-24T02:34:08.974839Z",
+  "invalid_specs": 0,
+  "mode": "read_only_research_governance",
+  "orders_submitted": 0,
+  "proposed_events_added": 2,
+  "provider": "weekly_candidate_intake",
+  "results": [
+    {
+      "action": "promoted_to_development",
+      "candidate_id": "mes-orb-0932-vix-v2",
+      "errors": [],
+      "spec_path": "research/preregistrations/mes_orb_0932_vix_v2.md",
+      "valid": true
+    },
+    {
+      "action": "promoted_to_development",
+      "candidate_id": "mes-reopen-drift-v2",
+      "errors": [],
+      "spec_path": "research/preregistrations/mes_reopen_drift_v2.md",
+      "valid": true
+    }
+  ],
+  "schema_version": 1,
+  "specs_seen": 2,
+  "valid_specs": 2
+}

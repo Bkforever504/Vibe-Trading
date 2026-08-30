@@ -155,3 +155,34 @@ def test_kalshi_contract_limit_gets_medium_review_action(tmp_path: Path) -> None
     assert item["guard_source"] == "kalshi"
     assert item["market_ticker"] == "KXHIGHNY-26JUN30-T95"
     assert "contract cap unchanged" in item["next_action"]
+
+
+def test_duplicate_guard_reviews_are_collapsed_without_merging_distinct_sizes(tmp_path: Path) -> None:
+    guard = tmp_path / "kalshi-guard-blocks.jsonl"
+    outcome = tmp_path / "outcome.jsonl"
+    market_force = tmp_path / "market_force.jsonl"
+    base = {
+        "reason": "contracts_above_limit",
+        "details": {
+            "checked_at": "2026-06-30T14:00:00Z",
+            "market_ticker": "KXHIGHNY-26JUN30-T95",
+            "side": "yes",
+            "price_cents": 40,
+            "contracts": 5,
+            "edge": 0.12,
+        },
+    }
+    distinct = json.loads(json.dumps(base))
+    distinct["details"]["contracts"] = 6
+    _write_jsonl(guard, [base, base, distinct])
+    _write_jsonl(outcome, [])
+    _write_jsonl(market_force, [])
+
+    report = queue.build_queue(
+        guard_paths=[guard],
+        outcome_path=outcome,
+        market_force_path=market_force,
+    )
+
+    assert report["queue_count"] == 2
+    assert {item["contracts"] for item in report["items"]} == {5.0, 6.0}

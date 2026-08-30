@@ -6,7 +6,7 @@ const scorecard = {
   schema_version: 1,
   generated_at: "2026-08-22T12:00:00Z",
   sessions: 1,
-  metrics: { recall_at_10: 0.75, precision_at_10_mean: 0.5, ground_truth_count: 4, root_cause_coverage: 1 },
+  metrics: { recall_at_10: 0.75, precision_at_10_mean: 0.5, actionable_recall_at_10: 0.75, actionable_precision_at_10_mean: 0.5, discovery_recall_at_10: 1, discovery_precision_at_10_mean: 0.8, ground_truth_count: 4, root_cause_coverage: 1 },
   top_missed_moves: [],
   daily: [],
   pattern_coverage: {
@@ -129,6 +129,8 @@ describe("DetectionTab", () => {
     render(<DetectionTab scorecard={scorecard} promotion={promotion} governance={governance} mesEvidence={mesEvidence} mnqEvidence={mnqEvidence} />);
 
     expect(screen.getByText("liquidity delivery")).toBeInTheDocument();
+    expect(screen.getByText("Actionable recall@10")).toBeInTheDocument();
+    expect(screen.getByText("Discovery recall@10")).toBeInTheDocument();
     expect(screen.getByText("Opportunity coverage")).toBeInTheDocument();
     expect(screen.getAllByText("Not measured").length).toBeGreaterThanOrEqual(3);
     expect(screen.getByText("55.6%")).toBeInTheDocument();

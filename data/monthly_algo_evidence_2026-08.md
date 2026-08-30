@@ -1,6 +1,6 @@
 # Algorithm Operations Evidence Packet - 2026-08
 
-Generated: 2026-08-21T21:20:19.234473Z
+Generated: 2026-08-28T23:55:16.975298Z
 
 ## Authority
 
@@ -14,9 +14,9 @@ Generated: 2026-08-21T21:20:19.234473Z
 | Lane | State | N | Stable reviews | Paper review eligible | Reasons |
 |---|---|---:|---:|---|---|
 | mes_reopen_drift | suspended | 438 | 0/2 | False | decay_suspend, retrospective_only_independent_bootstrap_crosses_zero |
-| qqq_mean_reversion | research_only | 136 | 3/2 | False | development_only_failed_experiment_wide_multiple_testing |
+| qqq_mean_reversion | research_only | 136 | 7/2 | False | development_only_failed_experiment_wide_multiple_testing |
 | trend_participation | collecting | 0 | 0/2 | False | fewer_than_30_resolved_observations, bootstrap_lower_bound_not_positive, placebo_insufficient_n, decay_insufficient_n |
-| volatility_premium | suspended | 43 | 0/2 | False | bootstrap_lower_bound_not_positive, placebo_fail, decay_watch |
+| volatility_premium | suspended | 63 | 0/2 | False | bootstrap_lower_bound_not_positive, placebo_fail, decay_watch |
 
 ## Edge Evidence
 
@@ -25,11 +25,11 @@ Generated: 2026-08-21T21:20:19.234473Z
 | mes_reopen_drift | 438 | 12.2643 | 1.34 | pass | suspend | [3.5941, 20.7837] |
 | qqq_mean_reversion | 136 | 51.9018 | 2.1421 | pass | stable | [26.8263, 77.0041] |
 | trend_participation | 0 | n/a | n/a | insufficient_n | insufficient_n | [n/a, n/a] |
-| volatility_premium | 43 | -22.093 | 0.1163 | fail | watch | [-47.5174, -4.3709] |
+| volatility_premium | 63 | -20.9365 | 0.1441 | fail | watch | [-36.9056, -7.8563] |
 
 ## Portfolio Dependence
 
-Status: `single_active_lane`
+Status: `cash_only`
 
 | Pair | Overlap | Return corr | Loss-event corr | Joint-loss lift | Status |
 |---|---:|---:|---:|---:|---|
@@ -43,8 +43,8 @@ Status: `single_active_lane`
 ## Execution Reality
 
 - Status: `insufficient_forward_fills`
-- Forward fill samples: `2`
-- Modeled mid-to-executable gap: `11.3387%`
+- Forward fill samples: `3`
+- Modeled mid-to-executable gap: `10.316%`
 - Observed average adverse fill versus signal ask: `0.0%`
 - Observed p95 adverse fill versus signal ask: `0.0%`
 

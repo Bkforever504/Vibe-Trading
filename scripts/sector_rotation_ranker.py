@@ -154,6 +154,7 @@ def build_report(symbols: list[str] | None = None) -> dict[str, Any]:
         "source": data_source(),
         "mode": "context_only",
         "execution_enabled": False,
+        "can_submit_orders": False,
         "rotation": rotation,
         "force_score": float(rotation.get("force_score") or 0.0),
         "warnings": [

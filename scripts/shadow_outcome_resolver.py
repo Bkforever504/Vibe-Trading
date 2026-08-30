@@ -25,6 +25,7 @@ LEDGER_NAMES = (
     "mes_reopen_drift_v2_shadow_log.jsonl",
     "equity_orb_scout_v1_shadow_log.jsonl",
     "equity_orb_scout_v2_shadow_log.jsonl",
+    "equity_ignition_continuation_shadow_log.jsonl",
     "event_gap_continuation_shadow_log.jsonl",
     "momentum_edge_ensemble_shadow_log.jsonl",
     "gex_level_reaction_shadow_log.jsonl",

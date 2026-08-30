@@ -600,6 +600,241 @@ def _liquidity_target_map(
     }
 
 
+def _equal_relative_liquidity_context(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Map repeated confirmed swing prices as context, never as an entry signal.
+
+    TradingView's referenced visual uses configurable tick tolerance. The
+    backend does not always receive authoritative instrument tick metadata, so
+    this implementation uses a clearly labeled volatility-scaled proxy and
+    withholds all grade weight until local outcomes validate it.
+    """
+    normalized = _normalize(rows)
+    base = {
+        "status": "unavailable",
+        "tolerance": None,
+        "tolerance_method": "max_0.005pct_price_or_5pct_atr_proxy",
+        "levels": [],
+        "score_effect": "context_only_pending_local_validation",
+        "source_labels": ["completed_5m_ohlcv", "volatility_scaled_equal_level_proxy"],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+    if len(normalized) < 7:
+        return base
+    current = abs(float(normalized[-1]["c"]))
+    tolerance = max(current * 0.00005, _atr(normalized) * 0.05)
+    exact_tolerance = max(current * 1e-8, 1e-9)
+    pivots: list[dict[str, Any]] = []
+    for index in range(2, len(normalized) - 2):
+        row = normalized[index]
+        window = normalized[index - 2 : index + 3]
+        high = float(row["h"])
+        low = float(row["l"])
+        other_highs = [float(item["h"]) for offset, item in enumerate(window) if offset != 2]
+        other_lows = [float(item["l"]) for offset, item in enumerate(window) if offset != 2]
+        if high >= max(other_highs) and any(high > value for value in other_highs):
+            pivots.append({"index": index, "side": "buy_side", "price": high, "timestamp": row.get("t")})
+        if low <= min(other_lows) and any(low < value for value in other_lows):
+            pivots.append({"index": index, "side": "sell_side", "price": low, "timestamp": row.get("t")})
+
+    levels: list[dict[str, Any]] = []
+    used: set[int] = set()
+    for pivot_index, pivot in enumerate(pivots):
+        if pivot_index in used:
+            continue
+        matches = [pivot_index]
+        for other_index in range(pivot_index + 1, len(pivots)):
+            other = pivots[other_index]
+            if other["side"] != pivot["side"] or int(other["index"]) - int(pivot["index"]) < 3:
+                continue
+            if abs(float(other["price"]) - float(pivot["price"])) <= tolerance:
+                matches.append(other_index)
+        if len(matches) < 2:
+            continue
+        used.update(matches)
+        touches = [pivots[index] for index in matches]
+        prices = [float(item["price"]) for item in touches]
+        level_price = sum(prices) / len(prices)
+        last_touch_index = max(int(item["index"]) for item in touches)
+        sweep = next(
+            (
+                item for item in normalized[last_touch_index + 1 :]
+                if (
+                    pivot["side"] == "buy_side" and float(item["c"]) > level_price + tolerance
+                ) or (
+                    pivot["side"] == "sell_side" and float(item["c"]) < level_price - tolerance
+                )
+            ),
+            None,
+        )
+        exact = max(prices) - min(prices) <= exact_tolerance
+        kind = ("equal_high" if exact else "relative_high") if pivot["side"] == "buy_side" else ("equal_low" if exact else "relative_low")
+        levels.append({
+            "id": f"{kind}_{len(levels) + 1}",
+            "kind": kind,
+            "side": pivot["side"],
+            "price": _round(level_price),
+            "tolerance": _round(tolerance),
+            "touch_count": len(touches),
+            "first_touch_at": touches[0].get("timestamp"),
+            "last_touch_at": touches[-1].get("timestamp"),
+            "sweep_status": "swept" if sweep else "active",
+            "swept_at": sweep.get("t") if sweep else None,
+        })
+    return {**base, "status": "available" if levels else "no_repeated_levels", "tolerance": _round(tolerance), "levels": levels}
+
+
+def _volume_profile_context(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Approximate VAH/VAL/POC from completed bars without claiming trade prints."""
+    normalized = _normalize(rows)
+    if len(normalized) < 3:
+        return {
+            "status": "unavailable",
+            "poc": None,
+            "vah": None,
+            "val": None,
+            "value_area_pct": 70.0,
+            "method": "completed_bar_typical_price_volume_histogram_v1",
+            "true_trade_at_price": False,
+            "score_effect": "none_until_tick_validation",
+            "source_labels": ["completed_5m_ohlcv", "not_exchange_volume_at_price"],
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        }
+    low = min(float(row["l"]) for row in normalized)
+    high = max(float(row["h"]) for row in normalized)
+    width = high - low
+    if width <= 0:
+        return _volume_profile_context([])
+    bin_count = min(32, max(8, int(len(normalized) ** 0.5 * 4)))
+    step = width / bin_count
+    volumes = [0.0] * bin_count
+    for row in normalized:
+        typical = (float(row["h"]) + float(row["l"]) + float(row["c"])) / 3.0
+        index = min(bin_count - 1, max(0, int((typical - low) / step)))
+        volumes[index] += max(0.0, float(row.get("v") or 0.0))
+    total = sum(volumes)
+    if total <= 0:
+        return _volume_profile_context([])
+    centers = [low + (index + 0.5) * step for index in range(bin_count)]
+    poc_index = max(range(bin_count), key=volumes.__getitem__)
+    # Keep the value area contiguous around POC. Selecting globally highest
+    # bins can create holes and imply a false VAH/VAL span.
+    selected: set[int] = {poc_index}
+    running = volumes[poc_index]
+    low_index = poc_index
+    high_index = poc_index
+    while running / total < 0.70 and (low_index > 0 or high_index < bin_count - 1):
+        lower_volume = volumes[low_index - 1] if low_index > 0 else -1.0
+        upper_volume = volumes[high_index + 1] if high_index < bin_count - 1 else -1.0
+        if upper_volume > lower_volume:
+            high_index += 1
+            selected.add(high_index)
+            running += volumes[high_index]
+        else:
+            low_index -= 1
+            selected.add(low_index)
+            running += volumes[low_index]
+    return {
+        "status": "proxy_only",
+        "poc": _round(centers[poc_index]),
+        "vah": _round(max(centers[index] for index in selected)),
+        "val": _round(min(centers[index] for index in selected)),
+        "value_area_pct": 70.0,
+        "method": "completed_bar_typical_price_volume_histogram_v1",
+        "true_trade_at_price": False,
+        "score_effect": "none_until_tick_validation",
+        "source_labels": ["completed_5m_ohlcv", "typical_price_bin_volume_proxy", "not_exchange_volume_at_price"],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def _value_area_reversion_context(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Describe a completed-bar VAH/VAL re-entry against a prior-bar proxy profile.
+
+    The reference profile deliberately excludes the signal bar. This prevents
+    the bar being evaluated from moving its own VAH/VAL threshold. The result
+    is context only because OHLCV bars are not exchange trade-at-price data.
+    """
+    normalized = _normalize(rows)
+    base = {
+        "method": "prior_completed_bar_profile_reentry_v1",
+        "reference_profile_excludes_signal_bar": True,
+        "true_trade_at_price": False,
+        "score_effect": "none_until_tick_validation",
+        "source_labels": [
+            "completed_5m_ohlcv",
+            "prior_bar_typical_price_volume_profile_proxy",
+            "not_exchange_volume_at_price",
+        ],
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+    if len(normalized) < 4:
+        return {
+            **base,
+            "status": "unavailable",
+            "direction": "neutral",
+            "level_name": None,
+            "level": None,
+            "invalidation": None,
+            "reason": "Need a prior completed profile plus a completed signal bar.",
+        }
+    profile = _volume_profile_context(normalized[:-1])
+    if profile.get("status") != "proxy_only":
+        return {
+            **base,
+            "status": "unavailable",
+            "direction": "neutral",
+            "level_name": None,
+            "level": None,
+            "invalidation": None,
+            "reason": "Prior completed-bar profile is unavailable.",
+        }
+    prior, signal = normalized[-2], normalized[-1]
+    val = float(profile["val"])
+    vah = float(profile["vah"])
+    prior_close = float(prior["c"])
+    signal_close = float(signal["c"])
+    breakout_volume = max(0.0, float(prior.get("v") or 0.0))
+    reentry_volume = max(0.0, float(signal.get("v") or 0.0))
+    volume_confirmation = breakout_volume > 0 and reentry_volume > breakout_volume
+    bullish_price_reentry = prior_close < val and float(signal["l"]) <= val and signal_close > val
+    bearish_price_reentry = prior_close > vah and float(signal["h"]) >= vah and signal_close < vah
+    bullish = bullish_price_reentry and volume_confirmation
+    bearish = bearish_price_reentry and volume_confirmation
+    if bullish and not bearish:
+        status, direction, level_name, level, invalidation = "confirmed_reclaim", "bullish", "VAL", val, float(signal["l"])
+        reason = "A completed bar closed back above prior-profile VAL after price was below value."
+    elif bearish and not bullish:
+        status, direction, level_name, level, invalidation = "confirmed_reclaim", "bearish", "VAH", vah, float(signal["h"])
+        reason = "A completed bar closed back below prior-profile VAH after price was above value."
+    elif bullish and bearish:
+        status, direction, level_name, level, invalidation = "conflicting_reentry", "neutral", None, None, None
+        reason = "The completed bar crossed both proxy value-area boundaries; treat as unstable context."
+    elif bullish_price_reentry or bearish_price_reentry:
+        status, direction, level_name, level, invalidation = "reclaim_unconfirmed_volume", "neutral", "VAL" if bullish_price_reentry else "VAH", val if bullish_price_reentry else vah, None
+        reason = "Price closed back inside the proxy value area, but re-entry volume did not exceed breakout volume."
+    else:
+        status, direction, level_name, level, invalidation = "no_confirmed_reclaim", "neutral", None, None, None
+        reason = "No completed close back inside a prior proxy value-area boundary."
+    return {
+        **base,
+        "status": status,
+        "direction": direction,
+        "level_name": level_name,
+        "level": _round(level) if level is not None else None,
+        "invalidation": _round(invalidation) if invalidation is not None else None,
+        "reference_profile": {"poc": profile["poc"], "vah": profile["vah"], "val": profile["val"]},
+        "volume_confirmation": volume_confirmation,
+        "breakout_volume": _round(breakout_volume, 1),
+        "reentry_volume": _round(reentry_volume, 1),
+        "reclaim_window_bars": 1,
+        "reason": reason,
+    }
+
+
 def _session_liquidity_patterns(
     rows: Sequence[Mapping[str, Any]], levels: Sequence[Mapping[str, Any]], atr: float
 ) -> list[dict[str, Any]]:
@@ -701,38 +936,68 @@ def _smt_divergence_context(
             "divergence": None,
             "reason": "Need at least eight completed bars for both correlated instruments.",
         }
-    peer_symbol, peer = peers[0]
     primary = primary[-8:]
-    peer = peer[-8:]
     primary_high = float(primary[-1]["h"]) > max(float(row["h"]) for row in primary[:-1])
-    peer_high = float(peer[-1]["h"]) > max(float(row["h"]) for row in peer[:-1])
     primary_low = float(primary[-1]["l"]) < min(float(row["l"]) for row in primary[:-1])
-    peer_low = float(peer[-1]["l"]) < min(float(row["l"]) for row in peer[:-1])
-    high_divergence = primary_high != peer_high
-    low_divergence = primary_low != peer_low
-    if high_divergence and low_divergence:
-        status, direction, divergence = "conflicting_divergence", "neutral", "both_high_and_low_asymmetry"
-    elif high_divergence:
-        status, direction, divergence = "divergence_observed", "bearish", "asymmetric_buy_side_sweep"
-    elif low_divergence:
-        status, direction, divergence = "divergence_observed", "bullish", "asymmetric_sell_side_sweep"
+    peer_results: list[dict[str, Any]] = []
+    for peer_symbol, peer_rows in peers:
+        peer = peer_rows[-8:]
+        peer_high = float(peer[-1]["h"]) > max(float(row["h"]) for row in peer[:-1])
+        peer_low = float(peer[-1]["l"]) < min(float(row["l"]) for row in peer[:-1])
+        high_divergence = primary_high != peer_high
+        low_divergence = primary_low != peer_low
+        if high_divergence and low_divergence:
+            peer_status, peer_direction, divergence = "conflicting_divergence", "neutral", "both_high_and_low_asymmetry"
+        elif high_divergence:
+            peer_status, peer_direction, divergence = "divergence_observed", "bearish", "asymmetric_buy_side_sweep"
+        elif low_divergence:
+            peer_status, peer_direction, divergence = "divergence_observed", "bullish", "asymmetric_sell_side_sweep"
+        else:
+            peer_status, peer_direction, divergence = "no_divergence", "neutral", None
+        peer_results.append({
+            "peer_symbol": peer_symbol,
+            "status": peer_status,
+            "direction": peer_direction,
+            "divergence": divergence,
+            "legs": {
+                "primary_took_prior_high": primary_high,
+                "peer_took_prior_high": peer_high,
+                "primary_took_prior_low": primary_low,
+                "peer_took_prior_low": peer_low,
+            },
+        })
+    directional = {row["direction"] for row in peer_results if row["direction"] in {"bullish", "bearish"}}
+    if len(directional) > 1:
+        consensus_status, consensus_direction = "mixed_peer_evidence", "neutral"
+    elif len(directional) == 1:
+        consensus_direction = next(iter(directional))
+        matching_count = sum(row["direction"] == consensus_direction for row in peer_results)
+        consensus_status = "peer_consensus" if matching_count == len(peer_results) and len(peer_results) > 1 else "single_or_partial_peer_signal"
     else:
-        status, direction, divergence = "no_divergence", "neutral", None
+        consensus_status, consensus_direction = "no_peer_divergence", "neutral"
+    first_signal = next((row for row in peer_results if row["status"] != "no_divergence"), peer_results[0])
+    status = "conflicting_divergence" if consensus_status == "mixed_peer_evidence" else str(first_signal["status"])
+    direction = consensus_direction
+    divergence = first_signal["divergence"] if direction != "neutral" else None
+    peer_symbol = str(first_signal["peer_symbol"])
     return {
         **base,
         "status": status,
         "direction": direction,
         "peer_symbol": peer_symbol,
+        "peer_count": len(peer_results),
+        "peer_results": peer_results,
+        "consensus_status": consensus_status,
+        "consensus_direction": consensus_direction,
         "divergence": divergence,
-        "legs": {
-            "primary_took_prior_high": primary_high,
-            "peer_took_prior_high": peer_high,
-            "primary_took_prior_low": primary_low,
-            "peer_took_prior_low": peer_low,
-        },
+        "legs": first_signal["legs"],
         "reason": (
-            "One correlated instrument swept a completed-bar extreme while the other did not."
-            if status == "divergence_observed"
+            "Multiple peer comparisons disagree; do not treat SMT as directional confirmation."
+            if consensus_status == "mixed_peer_evidence"
+            else "Correlated completed-bar comparisons agree on the same asymmetric sweep direction."
+            if consensus_status == "peer_consensus"
+            else "One correlated instrument swept a completed-bar extreme while the other did not."
+            if direction in {"bullish", "bearish"}
             else "No single-sided paired-index sweep is currently confirmed."
         ),
     }
@@ -1455,6 +1720,9 @@ def _empty_result(quote: Mapping[str, Any], bars: int) -> dict[str, Any]:
             "can_submit_orders": False,
         },
         "liquidity_level_context": {"status": "unavailable", "levels": [], "active_sweeps": [], "nearest_upside": None, "nearest_downside": None, "dealing_range": None, "probability_status": "unavailable_pending_local_outcomes", "execution_enabled": False, "can_submit_orders": False},
+        "equal_relative_liquidity_context": _equal_relative_liquidity_context([]),
+        "volume_profile_context": _volume_profile_context([]),
+        "value_area_reversion_context": _value_area_reversion_context([]),
         "participation_context": _participation_context([]),
         "smt_divergence_context": _smt_divergence_context([], None),
         "clc_entry_context": {
@@ -1712,6 +1980,9 @@ def analyze_market_structure(
             "execution_enabled": False,
             "can_submit_orders": False,
         },
+        "equal_relative_liquidity_context": _equal_relative_liquidity_context(rows),
+        "volume_profile_context": _volume_profile_context(rows),
+        "value_area_reversion_context": _value_area_reversion_context(rows),
         "participation_context": participation,
         "smt_divergence_context": smt_context,
         "clc_entry_context": clc_context,

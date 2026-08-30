@@ -83,3 +83,102 @@ def test_structural_tournament_counts_only_forward_underlying_marks(tmp_path) ->
     assert set(tournament["policies"]) == {
         "current_ratchet", "structural_5m_close_trail", "structural_vwap_trail"
     }
+
+
+def _write_policy_paths(path, *, positive_winners: int, negative_losers: int) -> None:
+    rows = []
+    path_number = 0
+    total = positive_winners + negative_losers
+    for index in range(total):
+        day = (index % 10) + 1
+        path_number += 1
+        base = {
+            "schema_version": 3,
+            "data_quality": "current_session_lifecycle",
+            "execution_mode": "shadow_only",
+            "date": f"2026-07-{day:02d}",
+            "symbol": "SPY",
+            "right": "CALL",
+            "option_symbol": f"SPY{path_number}",
+            "lifecycle_id": f"life-{path_number}",
+        }
+        if index < positive_winners:
+            bids = (1.0, 1.8, 2.4, 2.1)
+        else:
+            bids = (1.0, 0.8)
+        for mark_index, bid in enumerate(bids):
+            rows.append({
+                **base,
+                "event_type": "shadow_exit" if mark_index == len(bids) - 1 else "shadow_mark",
+                "scanned_at": f"2026-07-{day:02d}T14:{30 + mark_index:02d}:00Z",
+                "selection_ask": 1.0,
+                "selection_bid": bid,
+            })
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+
+def test_promotion_blocks_relative_improvement_with_negative_absolute_expectancy(
+    tmp_path, monkeypatch
+) -> None:
+    paths = []
+    for index in range(100):
+        paths.append({
+            "lifecycle_id": f"life-{index}",
+            "date": f"2026-07-{(index % 10) + 1:02d}",
+            "symbol": "SPY",
+            "returns": [0.0, -20.0],
+            "observations": [],
+        })
+    monkeypatch.setattr(policy, "load_executable_paths", lambda _path: paths)
+
+    def losing_but_better(_returns, policy_name):
+        value = -10.0 if policy_name == "current_all_out_75" else -5.0
+        return {"return_pct": value, "reason": "test", "best_return_pct": 0.0}
+
+    monkeypatch.setattr(policy, "simulate_path", losing_but_better)
+    report = policy.build_report(tmp_path / "unused.jsonl")
+
+    assert report["best_challenger_avg_return_delta"] == 5.0
+    assert report["promotion_ready"] is False
+    assert "challenger_avg_return_not_positive" in report["promotion_blockers"]
+    assert "challenger_profit_factor_not_above_one" in report["promotion_blockers"]
+    assert report["chronological_holdout"]["qualified"] is False
+
+
+def test_promotion_accepts_positive_challenger_after_chronological_holdout(tmp_path) -> None:
+    path = tmp_path / "shadow.jsonl"
+    _write_policy_paths(path, positive_winners=80, negative_losers=20)
+
+    report = policy.build_report(path)
+
+    assert report["best_challenger"] == "ratchet_runner_no_target"
+    assert report["policies"]["ratchet_runner_no_target"]["avg_return_pct"] > 0
+    assert report["policies"]["ratchet_runner_no_target"]["profit_factor"] > 1
+    assert report["chronological_holdout"]["qualified"] is True
+    assert report["chronological_holdout"]["candidate_selected_on"] == "training_dates_only"
+    assert report["promotion_blockers"] == []
+    assert report["promotion_ready"] is True
+    assert report["promotion_authorized"] is False
+
+
+def test_structural_review_blocks_losing_relative_winner(tmp_path, monkeypatch) -> None:
+    paths = [{
+        "lifecycle_id": f"life-{index}",
+        "date": f"2026-07-{(index % 10) + 1:02d}",
+        "symbol": "SPY",
+        "returns": [0.0, 10.0],
+        "observations": [{"underlying_mark_status": "observed_forward"}],
+    } for index in range(20)]
+    monkeypatch.setattr(policy, "load_executable_paths", lambda _path: paths)
+    monkeypatch.setattr(policy, "simulate_structural_exit_tournament", lambda _observations: {
+        "current_ratchet": {"hypothetical_exit_pct": -10.0, "exit_trigger": "test"},
+        "structural_vwap_trail": {"hypothetical_exit_pct": -5.0, "exit_trigger": "test"},
+        "structural_5m_close_trail": {"hypothetical_exit_pct": -8.0, "exit_trigger": "test"},
+    })
+
+    tournament = policy.build_report(tmp_path / "unused.jsonl")["structural_tournament"]
+
+    assert tournament["best_path_avg_return_delta_vs_current_ratchet"] == 5.0
+    assert tournament["review_ready"] is False
+    assert "structural_avg_return_not_positive" in tournament["review_blockers"]
+    assert "structural_profit_factor_not_above_one" in tournament["review_blockers"]

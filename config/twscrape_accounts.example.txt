@@ -1,0 +1,19 @@
+# twscrape account seed file — DO NOT COMMIT REAL CREDENTIALS
+# Format: username:password:email:email_password
+# One account per line. Comments start with #.
+#
+# Setup:
+#   1. Copy this file to config/twscrape_accounts.txt (git-ignored)
+#   2. Add 1-3 throwaway X accounts (created via burner email + phone)
+#   3. Run: .venv/Scripts/python.exe -m twscrape add_accounts config/twscrape_accounts.txt user:pass:email:emailpass
+#   4. Login all: .venv/Scripts/python.exe -m twscrape login_accounts
+#   5. Verify: .venv/Scripts/python.exe -m twscrape accounts
+#
+# Once seeded, edit scripts/x_intake_scanner.py to prefer twscrape over tweety
+# (swap _fetch_via_tweety for a twscrape.AccountsPool + API call).
+#
+# Rate limits per account (as of 2026): ~50 search/min, ~150 user tweets/min.
+# 3 accounts = comfortable coverage for FinTwit + broad lanes at 15-min cadence.
+
+# example_burner_1:Str0ngPass!:burner1@protonmail.com:EmailPass1
+# example_burner_2:Str0ngPass!:burner2@protonmail.com:EmailPass2

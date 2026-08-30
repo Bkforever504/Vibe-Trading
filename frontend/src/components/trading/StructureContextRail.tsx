@@ -1,6 +1,6 @@
 import { Activity, Clock3, Crosshair, Layers3, Target } from "lucide-react";
 
-import type { ClcEntryContext, LiquidityLevelContext, MacroTimingContext, NyBalanceRangeContext, ParticipationContext, SmtDivergenceContext, StratContext } from "@/lib/api";
+import type { ClcEntryContext, EqualRelativeLiquidityContext, LiquidityLevelContext, MacroTimingContext, NyBalanceRangeContext, ParticipationContext, SmtDivergenceContext, StratContext, ValueAreaReversionContext, VolumeProfileContext } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 function words(value: string): string {
@@ -19,6 +19,9 @@ export function StructureContextRail({
   balanceRange,
   clc,
   smt,
+  profile,
+  valueAreaReversion,
+  equalRelativeLiquidity,
 }: {
   liquidity?: LiquidityLevelContext;
   participation?: ParticipationContext;
@@ -27,9 +30,17 @@ export function StructureContextRail({
   balanceRange?: NyBalanceRangeContext;
   clc?: ClcEntryContext;
   smt?: SmtDivergenceContext;
+  profile?: VolumeProfileContext;
+  valueAreaReversion?: ValueAreaReversionContext;
+  equalRelativeLiquidity?: EqualRelativeLiquidityContext;
 }) {
-  if (!liquidity && !participation && !macro && !strat && !balanceRange && !clc && !smt) return null;
-  const levels = liquidity?.levels.slice(0, 6) ?? [];
+  if (!liquidity && !participation && !macro && !strat && !balanceRange && !clc && !smt && !profile && !valueAreaReversion && !equalRelativeLiquidity) return null;
+  const priority = ["pmh", "pml", "pdh", "pdl", "session_vwap", "orh", "orl", "pwh", "pwl", "prior_close"];
+  const priorityRank = (id: string) => {
+    const index = priority.indexOf(id);
+    return index === -1 ? priority.length : index;
+  };
+  const levels = [...(liquidity?.levels ?? [])].sort((left, right) => priorityRank(left.id) - priorityRank(right.id)).slice(0, 6);
   const clcFrames = clc?.context.frames ?? {};
 
   return (
@@ -76,15 +87,43 @@ export function StructureContextRail({
           {liquidity?.dealing_range ? ` · ${words(liquidity.dealing_range.location)}` : ""}
         </p>
       </div>
+      <div className="bg-card px-3 py-3">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
+          <Activity className="h-3.5 w-3.5" />Volume profile proxy
+        </span>
+        <p className="mt-2 text-sm font-bold">POC {profile?.poc == null ? "--" : price(profile.poc)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">VAL {profile?.val == null ? "--" : price(profile.val)} · VAH {profile?.vah == null ? "--" : price(profile.vah)}</p>
+        <p className={cn("mt-1 text-xs font-medium", valueAreaReversion?.direction === "bullish" ? "text-success" : valueAreaReversion?.direction === "bearish" ? "text-danger" : "text-muted-foreground")}>
+          {valueAreaReversion?.status === "confirmed_reclaim"
+            ? `${valueAreaReversion.direction.toUpperCase()} ${valueAreaReversion.level_name} reclaim ${valueAreaReversion.level == null ? "" : price(valueAreaReversion.level)}`
+            : words(valueAreaReversion?.status ?? "no confirmed reclaim")}
+        </p>
+        <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">Completed-bar proxy · not exchange volume-at-price · zero grade weight</p>
+      </div>
       {smt ? (
         <div className="bg-card px-3 py-3">
           <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
             <Layers3 className="h-3.5 w-3.5" />Paired-index SMT proxy
           </span>
           <p className={cn("mt-2 text-sm font-bold", smt.direction === "bullish" ? "text-success" : smt.direction === "bearish" ? "text-danger" : "text-foreground")}>
-            {smt.peer_symbol ? `${smt.peer_symbol} · ` : ""}{smt.direction} {words(smt.status)}
+            {smt.peer_symbol ? `${smt.peer_symbol}${smt.peer_count && smt.peer_count > 1 ? ` +${smt.peer_count - 1}` : ""} · ` : ""}{smt.direction} {words(smt.consensus_status ?? smt.status)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Completed 5m price divergence · not order flow · no score effect</p>
+        </div>
+      ) : null}
+      {equalRelativeLiquidity?.levels.length ? (
+        <div className="bg-card px-3 py-3">
+          <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-info">
+            <Crosshair className="h-3.5 w-3.5" />Equal / relative liquidity
+          </span>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {equalRelativeLiquidity.levels.slice(0, 4).map((level) => (
+              <span key={level.id} className={cn("border px-2 py-1 text-xs", level.sweep_status === "swept" ? "border-muted text-muted-foreground" : "border-info/30 text-foreground")}>
+                <strong>{level.kind === "equal_high" ? "EQH" : level.kind === "equal_low" ? "EQL" : level.kind === "relative_high" ? "REH" : "REL"}</strong> {price(level.price)} · {level.touch_count} touches
+              </span>
+            ))}
+          </div>
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">Completed-bar volatility proxy · visual context only · zero grade weight</p>
         </div>
       ) : null}
       <div className="bg-card px-3 py-3">

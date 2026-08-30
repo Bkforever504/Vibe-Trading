@@ -172,10 +172,12 @@ export function DetectionTab({ scorecard, promotion, governance, mesEvidence, mn
   const cisd = coverage?.cisd_hypothesis;
   return (
     <>
-      <div className="mt-4 grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
         {[
-          ["Rolling recall@10", pct(metrics?.recall_at_10)],
-          ["Mean precision@10", pct(metrics?.precision_at_10_mean)],
+          ["Actionable recall@10", pct(metrics?.actionable_recall_at_10 ?? metrics?.recall_at_10)],
+          ["Actionable precision@10", pct(metrics?.actionable_precision_at_10_mean ?? metrics?.precision_at_10_mean)],
+          ["Discovery recall@10", pct(metrics?.discovery_recall_at_10)],
+          ["Discovery precision@10", pct(metrics?.discovery_precision_at_10_mean)],
           ["Ground-truth moves", String(metrics?.ground_truth_count ?? 0)],
           ["Miss RCA coverage", pct(metrics?.root_cause_coverage)],
         ].map(([name, value]) => <div key={name} className="bg-card p-4"><div className="text-[10px] uppercase tracking-wide text-muted-foreground">{name}</div><div className="mt-1 text-2xl font-bold">{value}</div></div>)}

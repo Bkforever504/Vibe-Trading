@@ -5,6 +5,7 @@ Read-only research. It never submits orders or changes live settings.
 from __future__ import annotations
 
 import argparse
+import math
 import json
 import statistics
 import sys
@@ -35,6 +36,11 @@ STOP_PCT = -30.0
 RATCHET_ARM_PCT = 40.0
 RATCHET_GIVEBACK_PCT = 15.0
 RUNNER_FRACTION = 0.40
+MIN_PROMOTION_PATHS = 100
+MIN_INDEPENDENT_DATES = 10
+MIN_HOLDOUT_DATES = 3
+MIN_HOLDOUT_PATHS = 20
+HOLDOUT_DATE_FRACTION = 0.30
 
 
 def _lock_floor(best: float) -> float:
@@ -144,6 +150,129 @@ def _summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _positive_absolute_expectancy(summary: dict[str, Any]) -> bool:
+    avg_return = summary.get("avg_return_pct")
+    profit_factor = summary.get("profit_factor")
+    return bool(
+        avg_return is not None
+        and float(avg_return) > 0
+        and profit_factor is not None
+        and float(profit_factor) > 1
+    )
+
+
+def _valid_path_date(value: Any) -> str | None:
+    candidate = str(value or "")[:10]
+    try:
+        return datetime.strptime(candidate, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
+
+
+def _chronological_holdout(
+    results: dict[str, list[dict[str, Any]]],
+    policies: tuple[str, ...],
+) -> dict[str, Any]:
+    dated_rows = {
+        policy: [row for row in rows if _valid_path_date(row.get("date"))]
+        for policy, rows in results.items()
+    }
+    independent_dates = sorted({
+        _valid_path_date(row.get("date"))
+        for rows in dated_rows.values()
+        for row in rows
+        if _valid_path_date(row.get("date"))
+    })
+    blockers: list[str] = []
+    if len(independent_dates) < MIN_INDEPENDENT_DATES:
+        blockers.append("insufficient_independent_dates")
+
+    holdout_date_count = max(
+        MIN_HOLDOUT_DATES,
+        math.ceil(len(independent_dates) * HOLDOUT_DATE_FRACTION),
+    ) if independent_dates else 0
+    if holdout_date_count >= len(independent_dates):
+        training_dates: list[str] = []
+        holdout_dates = independent_dates
+    else:
+        training_dates = independent_dates[:-holdout_date_count]
+        holdout_dates = independent_dates[-holdout_date_count:]
+    training_date_set = set(training_dates)
+    holdout_date_set = set(holdout_dates)
+    training_summaries = {
+        policy: _summary([
+            row for row in dated_rows[policy]
+            if _valid_path_date(row.get("date")) in training_date_set
+        ])
+        for policy in policies
+    }
+    holdout_summaries = {
+        policy: _summary([
+            row for row in dated_rows[policy]
+            if _valid_path_date(row.get("date")) in holdout_date_set
+        ])
+        for policy in policies
+    }
+    challengers = tuple(policy for policy in policies if policy != "current_all_out_75")
+    candidate = max(
+        challengers,
+        key=lambda policy: float(training_summaries[policy]["avg_return_pct"] or -9999),
+        default=None,
+    ) if training_dates else None
+    training_delta = None
+    holdout_delta = None
+    if candidate:
+        training_avg = training_summaries[candidate].get("avg_return_pct")
+        training_baseline_avg = training_summaries["current_all_out_75"].get("avg_return_pct")
+        if training_avg is not None and training_baseline_avg is not None:
+            training_delta = round(float(training_avg) - float(training_baseline_avg), 2)
+        holdout_avg = holdout_summaries[candidate].get("avg_return_pct")
+        holdout_baseline_avg = holdout_summaries["current_all_out_75"].get("avg_return_pct")
+        if holdout_avg is not None and holdout_baseline_avg is not None:
+            holdout_delta = round(float(holdout_avg) - float(holdout_baseline_avg), 2)
+
+    holdout_path_count = (
+        int(holdout_summaries[candidate].get("sample_count") or 0) if candidate else 0
+    )
+    if holdout_path_count < MIN_HOLDOUT_PATHS:
+        blockers.append("insufficient_holdout_paths")
+    if candidate is None:
+        blockers.append("no_training_selected_challenger")
+    else:
+        if training_delta is None or training_delta <= 0:
+            blockers.append("training_delta_not_positive")
+        if not _positive_absolute_expectancy(training_summaries[candidate]):
+            blockers.append("training_absolute_expectancy_not_positive")
+        if holdout_delta is None or holdout_delta <= 0:
+            blockers.append("holdout_delta_not_positive")
+        if not _positive_absolute_expectancy(holdout_summaries[candidate]):
+            blockers.append("holdout_absolute_expectancy_not_positive")
+
+    return {
+        "qualified": not blockers,
+        "reason": "chronological_holdout_qualified" if not blockers else "chronological_holdout_blocked",
+        "blockers": blockers,
+        "split_method": "latest_30pct_of_unique_trading_dates",
+        "candidate_selected_on": "training_dates_only",
+        "minimum_independent_dates": MIN_INDEPENDENT_DATES,
+        "minimum_holdout_dates": MIN_HOLDOUT_DATES,
+        "minimum_holdout_paths": MIN_HOLDOUT_PATHS,
+        "independent_date_count": len(independent_dates),
+        "training_dates": training_dates,
+        "holdout_dates": holdout_dates,
+        "training_path_count": (
+            int(training_summaries[candidate].get("sample_count") or 0) if candidate else 0
+        ),
+        "holdout_path_count": holdout_path_count,
+        "candidate_policy": candidate,
+        "training_candidate_summary": training_summaries.get(candidate) if candidate else None,
+        "training_avg_return_delta_vs_current": training_delta,
+        "holdout_candidate_summary": holdout_summaries.get(candidate) if candidate else None,
+        "holdout_baseline_summary": holdout_summaries.get("current_all_out_75"),
+        "holdout_avg_return_delta_vs_current": holdout_delta,
+    }
+
+
 def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
     paths = load_executable_paths(path)
     policies = ("current_all_out_75", "ratchet_runner_no_target", "partial_60_runner_40")
@@ -151,7 +280,12 @@ def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
     for path_row in paths:
         for policy in policies:
             result = simulate_path(path_row["returns"], policy)
-            results[policy].append({**result, "lifecycle_id": path_row["lifecycle_id"], "symbol": path_row["symbol"]})
+            results[policy].append({
+                **result,
+                "lifecycle_id": path_row["lifecycle_id"],
+                "date": path_row["date"],
+                "symbol": path_row["symbol"],
+            })
     summaries = {policy: _summary(rows) for policy, rows in results.items()}
     baseline = summaries["current_all_out_75"]
     for policy, summary in summaries.items():
@@ -166,6 +300,25 @@ def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
         default=None,
     )
     delta = summaries.get(challenger, {}).get("avg_return_delta_vs_current") if challenger else None
+    holdout = _chronological_holdout(results, policies)
+    promotion_blockers: list[str] = []
+    if len(paths) < MIN_PROMOTION_PATHS:
+        promotion_blockers.append("insufficient_executable_completed_paths")
+    if challenger is None:
+        promotion_blockers.append("no_challenger")
+    else:
+        challenger_summary = summaries[challenger]
+        if delta is None or float(delta) <= 0:
+            promotion_blockers.append("challenger_avg_return_delta_not_positive")
+        if challenger_summary.get("avg_return_pct") is None or float(challenger_summary["avg_return_pct"]) <= 0:
+            promotion_blockers.append("challenger_avg_return_not_positive")
+        profit_factor = challenger_summary.get("profit_factor")
+        if profit_factor is None or float(profit_factor) <= 1:
+            promotion_blockers.append("challenger_profit_factor_not_above_one")
+        if holdout.get("candidate_policy") != challenger:
+            promotion_blockers.append("full_sample_winner_differs_from_training_selected_challenger")
+    if not holdout["qualified"]:
+        promotion_blockers.append("chronological_holdout_not_qualified")
     structural_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
     complete_structural_paths = 0
     for path_row in paths:
@@ -200,6 +353,23 @@ def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
         winner_avg = structural_summary[structural_winner].get("avg_return_pct")
         if winner_avg is not None:
             structural_delta = round(float(winner_avg) - float(structural_baseline), 2)
+    structural_blockers: list[str] = []
+    if complete_structural_paths < 20:
+        structural_blockers.append("insufficient_complete_forward_paths")
+    if structural_winner in (None, "current_ratchet"):
+        structural_blockers.append("no_structural_challenger_winner")
+    else:
+        structural_winner_summary = structural_summary[structural_winner]
+        if structural_delta is None or structural_delta <= 0:
+            structural_blockers.append("structural_avg_return_delta_not_positive")
+        if (
+            structural_winner_summary.get("avg_return_pct") is None
+            or float(structural_winner_summary["avg_return_pct"]) <= 0
+        ):
+            structural_blockers.append("structural_avg_return_not_positive")
+        structural_profit_factor = structural_winner_summary.get("profit_factor")
+        if structural_profit_factor is None or float(structural_profit_factor) <= 1:
+            structural_blockers.append("structural_profit_factor_not_above_one")
     return {
         "provider": "flip_exit_policy_comparison",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -211,10 +381,20 @@ def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
         "policies": summaries,
         "best_challenger": challenger,
         "best_challenger_avg_return_delta": delta,
-        "promotion_ready": bool(len(paths) >= 100 and delta is not None and float(delta) > 0),
+        "promotion_ready": not promotion_blockers,
+        "promotion_reason": (
+            "evidence_qualified_for_human_review_only"
+            if not promotion_blockers
+            else "promotion_evidence_blocked"
+        ),
+        "promotion_blockers": promotion_blockers,
+        "promotion_authorized": False,
+        "chronological_holdout": holdout,
         "promotion_requirements": {
-            "minimum_executable_completed_paths": 100,
+            "minimum_executable_completed_paths": MIN_PROMOTION_PATHS,
             "positive_challenger_avg_return_delta": True,
+            "positive_challenger_avg_return": True,
+            "challenger_profit_factor_above_one": True,
             "chronological_holdout_required": True,
             "human_approval_required": True,
         },
@@ -223,12 +403,13 @@ def build_report(path: Path = SHADOW_LOG_PATH) -> dict[str, Any]:
             "policies": structural_summary,
             "best_path": structural_winner,
             "best_path_avg_return_delta_vs_current_ratchet": structural_delta,
-            "review_ready": bool(
-                complete_structural_paths >= 20
-                and structural_winner not in (None, "current_ratchet")
-                and structural_delta is not None
-                and structural_delta > 0
+            "review_ready": not structural_blockers,
+            "review_reason": (
+                "evidence_qualified_for_human_review_only"
+                if not structural_blockers
+                else "structural_review_evidence_blocked"
             ),
+            "review_blockers": structural_blockers,
             "human_approval_required": True,
             "execution_behavior_changed": False,
         },

@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-08-24T02:34:08Z",
+  "evidence_status": "current_real_shadow_evidence_not_yet_available",
+  "results": [
+    {
+      "candidate_id": "mes-orb-0932-vix-v2",
+      "preregistration_schema": "hypothesis-v2",
+      "n_resolved": 0,
+      "distinct_sessions": 0,
+      "change_type": "new_detector",
+      "data_integrity": {
+        "source_repair_detected": false
+      },
+      "universe": {
+        "version": "cme-mes-front-month-roll8-v1",
+        "hash": "sha256:aabaf0268d8e08c686b4ea20d251550f6de0663d59ce363543e76e35595eb567",
+        "membership_as_of": "2026-08-22",
+        "drift_status": "frozen"
+      },
+      "execution_enabled": false,
+      "can_submit_orders": false
+    },
+    {
+      "candidate_id": "mes-reopen-drift-v2",
+      "preregistration_schema": "hypothesis-v2",
+      "n_resolved": 0,
+      "distinct_sessions": 0,
+      "change_type": "new_detector",
+      "data_integrity": {
+        "source_repair_detected": false
+      },
+      "universe": {
+        "version": "cme-mes-front-month-roll8-v1",
+        "hash": "sha256:aabaf0268d8e08c686b4ea20d251550f6de0663d59ce363543e76e35595eb567",
+        "membership_as_of": "2026-08-22",
+        "drift_status": "frozen"
+      },
+      "execution_enabled": false,
+      "can_submit_orders": false
+    }
+  ],
+  "execution_enabled": false,
+  "can_submit_orders": false
+}

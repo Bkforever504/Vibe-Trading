@@ -9,6 +9,7 @@ from scripts.market_structure_intelligence import (
     PATTERN_CATALOG,
     _ny_0800_0900_range_context,
     _smt_divergence_context,
+    _value_area_reversion_context,
     analyze_market_structure,
     confirmed_swings,
     detect_cisd_universal_model,
@@ -108,6 +109,52 @@ def test_level_map_and_clc_contract_expose_where_why_and_next_confirmation() -> 
     assert clc["can_submit_orders"] is False
 
 
+def test_equal_relative_liquidity_context_maps_retests_and_sweeps_without_score_weight() -> None:
+    rows = _bars([100.0, 101.0, 102.0, 101.0, 100.0, 101.0, 102.01, 101.0, 100.0, 102.6])
+
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 102.59, "ask": 102.61, "freshness": "live", "spread_bps": 1.95},
+        rvol=1.5,
+        average_dollar_volume=500_000_000,
+        direction_hint="bullish",
+    )
+    context = result["equal_relative_liquidity_context"]
+
+    assert context["status"] == "available"
+    assert any(level["kind"] == "relative_high" for level in context["levels"])
+    relative_high = next(level for level in context["levels"] if level["kind"] == "relative_high")
+    assert relative_high["touch_count"] == 2
+    assert relative_high["sweep_status"] == "swept"
+    assert context["score_effect"] == "context_only_pending_local_validation"
+    assert context["source_labels"] == ["completed_5m_ohlcv", "volatility_scaled_equal_level_proxy"]
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
+
+
+def test_volume_profile_is_labeled_bar_proxy_and_never_changes_grade() -> None:
+    rows = _bars(
+        [100.0, 100.1, 100.2, 100.1, 100.2, 100.3, 100.2, 100.4, 100.5, 100.45],
+        volumes=[100_000, 120_000, 500_000, 650_000, 700_000, 140_000, 110_000, 100_000, 90_000, 80_000],
+    )
+    result = analyze_market_structure(
+        rows,
+        quote={"bid": 100.44, "ask": 100.46, "freshness": "live", "spread_bps": 1.99},
+        rvol=1.8,
+        average_dollar_volume=900_000_000,
+    )
+
+    profile = result["volume_profile_context"]
+    assert profile["status"] == "proxy_only"
+    assert profile["poc"] is not None
+    assert profile["val"] <= profile["poc"] <= profile["vah"]
+    assert profile["method"] == "completed_bar_typical_price_volume_histogram_v1"
+    assert profile["true_trade_at_price"] is False
+    assert profile["score_effect"] == "none_until_tick_validation"
+    assert profile["execution_enabled"] is False
+    assert profile["can_submit_orders"] is False
+
+
 def test_smt_divergence_is_a_context_only_paired_index_price_proxy() -> None:
     primary = _bars([100.0, 100.1, 100.2, 100.15, 100.3, 100.25, 100.2, 100.55])
     peer = _bars([200.0, 200.1, 200.2, 200.15, 200.3, 200.25, 200.2, 200.25])
@@ -123,6 +170,61 @@ def test_smt_divergence_is_a_context_only_paired_index_price_proxy() -> None:
     assert context["score_effect"] == "none_until_local_validation"
     assert context["execution_enabled"] is False
     assert context["can_submit_orders"] is False
+
+
+def test_smt_divergence_reports_each_peer_and_requires_agreement_for_consensus() -> None:
+    primary = _bars([100.0, 100.1, 100.2, 100.15, 100.3, 100.25, 100.2, 100.55])
+    agreeing_peer = _bars([200.0, 200.1, 200.2, 200.15, 200.3, 200.25, 200.2, 200.25])
+    conflicting_peer = _bars([300.0, 300.1, 300.2, 300.15, 300.3, 300.25, 300.2, 300.55])
+    primary[-1]["h"] = max(float(row["h"]) for row in primary[:-1]) + 0.5
+    agreeing_peer[-1]["h"] = max(float(row["h"]) for row in agreeing_peer[:-1]) - 0.05
+    conflicting_peer[-1]["h"] = max(float(row["h"]) for row in conflicting_peer[:-1]) + 0.5
+    conflicting_peer[-1]["l"] = min(float(row["l"]) for row in conflicting_peer[:-1]) - 0.5
+
+    context = _smt_divergence_context(primary, {"SPY": agreeing_peer, "DIA": conflicting_peer})
+
+    assert context["peer_count"] == 2
+    assert {row["peer_symbol"] for row in context["peer_results"]} == {"SPY", "DIA"}
+    assert context["consensus_status"] == "mixed_peer_evidence"
+    assert context["consensus_direction"] == "neutral"
+    assert context["score_effect"] == "none_until_local_validation"
+
+
+def test_value_area_reversion_uses_prior_completed_profile_and_has_zero_grade_weight() -> None:
+    rows = _bars(
+        [100.0, 100.0, 100.05, 100.0, 100.05, 100.0, 100.05, 100.0, 98.0, 100.1],
+        volumes=[500_000, 600_000, 700_000, 650_000, 700_000, 650_000, 600_000, 550_000, 80_000, 120_000],
+    )
+    rows[-2].update({"o": 98.2, "h": 98.3, "l": 97.8, "c": 98.0})
+    rows[-1].update({"o": 98.0, "h": 100.3, "l": 97.9, "c": 100.1})
+
+    context = _value_area_reversion_context(rows)
+
+    assert context["status"] == "confirmed_reclaim"
+    assert context["direction"] == "bullish"
+    assert context["level_name"] == "VAL"
+    assert context["volume_confirmation"] is True
+    assert context["reentry_volume"] > context["breakout_volume"]
+    assert context["reference_profile_excludes_signal_bar"] is True
+    assert context["score_effect"] == "none_until_tick_validation"
+    assert context["true_trade_at_price"] is False
+    assert context["execution_enabled"] is False
+    assert context["can_submit_orders"] is False
+
+
+def test_value_area_price_reentry_without_volume_confirmation_is_not_a_signal() -> None:
+    rows = _bars(
+        [100.0, 100.0, 100.05, 100.0, 100.05, 100.0, 100.05, 100.0, 98.0, 100.1],
+        volumes=[500_000, 600_000, 700_000, 650_000, 700_000, 650_000, 600_000, 550_000, 180_000, 120_000],
+    )
+    rows[-2].update({"o": 98.2, "h": 98.3, "l": 97.8, "c": 98.0})
+    rows[-1].update({"o": 98.0, "h": 100.3, "l": 97.9, "c": 100.1})
+
+    context = _value_area_reversion_context(rows)
+
+    assert context["status"] == "reclaim_unconfirmed_volume"
+    assert context["direction"] == "neutral"
+    assert context["volume_confirmation"] is False
 
 
 def test_cbc_strong_flip_requires_a_completed_two_sided_sweep_and_close_through() -> None:

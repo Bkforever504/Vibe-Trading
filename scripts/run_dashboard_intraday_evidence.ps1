@@ -28,6 +28,7 @@ function Invoke-ReadOnlyProducer {
     }
 }
 
+Invoke-ReadOnlyProducer "options-reference-refresh" @("scripts\options_reference_refresh.py")
 Invoke-ReadOnlyProducer "options-feed" @("scripts\options_feed_qualification.py")
 Invoke-ReadOnlyProducer "manual-quality" @("scripts\manual_execution_quality.py")
 Invoke-ReadOnlyProducer "broker-fill" @("scripts\broker_fill_observer.py")

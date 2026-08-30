@@ -1,0 +1,6 @@
+{
+  "agent": "codex",
+  "claimed": true,
+  "claimed_at": "2026-08-27T00:23:41Z",
+  "task": "Rewrite scanner ranking and coverage accountability: benchmark lane, four-stage discovery/confirmation/execution model, reversal scoring, MFE/MAE linkage. Do not touch scheduler registration, shadow_system_heartbeat.py, or market_schedule_alignment.py."
+}

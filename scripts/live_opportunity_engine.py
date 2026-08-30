@@ -872,6 +872,8 @@ class LiveOpportunityEngine:
                     "timeframe_scan": analysis["timeframe_scan"],
                     "timeframe_plan": analysis["timeframe_plan"],
                     "liquidity_level_context": analysis["liquidity_level_context"],
+                    "volume_profile_context": analysis["volume_profile_context"],
+                    "value_area_reversion_context": analysis["value_area_reversion_context"],
                     "participation_context": analysis["participation_context"],
                     "macro_context": analysis["macro_context"],
                     "strat_context": analysis["strat_context"],

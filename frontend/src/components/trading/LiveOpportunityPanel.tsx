@@ -171,6 +171,9 @@ export function LiveOpportunityPanel({
           balanceRange={bestStructure.ny_0800_0900_range_context}
           clc={bestStructure.clc_entry_context}
           smt={bestStructure.smt_divergence_context}
+          profile={bestStructure.volume_profile_context}
+          valueAreaReversion={bestStructure.value_area_reversion_context}
+          equalRelativeLiquidity={bestStructure.equal_relative_liquidity_context}
         />
         {canonicalGrade ? (
           <div className="border-b border-border bg-card px-3 py-3">

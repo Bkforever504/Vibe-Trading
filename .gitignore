@@ -131,3 +131,6 @@ data/*.json
 !data/hypothesis_ledger.schema.json
 !data/*_schema.json
 
+
+# twscrape credentials
+config/twscrape_accounts.txt

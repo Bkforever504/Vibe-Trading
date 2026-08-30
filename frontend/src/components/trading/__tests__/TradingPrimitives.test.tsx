@@ -32,6 +32,7 @@ import { LiveOpportunityPanel } from "../LiveOpportunityPanel";
 import { DailyReviewGate } from "../DailyReviewGate";
 import { SystemReadinessGate } from "../SystemReadinessGate";
 import { ExecutionQualityPanel } from "../ExecutionQualityPanel";
+import { StructureContextRail } from "../StructureContextRail";
 import { useDashboardPrefs } from "@/stores/dashboardPrefs";
 
 const source = (name: string, available = true) => ({
@@ -81,7 +82,7 @@ describe("trading primitives", () => {
 
   it("shows provenance status for options and context-only social evidence", () => {
     render(<><OptionsContextPanel context={{ status: "context_available", completeness: "complete", surface: source("surface"), heatmap: source("heatmap"), vol_premium: source("vol_premium"), feed_qualification: source("options_feed_qualification"), manual_execution_reference_available: true, price_discovery_qualified_count: 2, reason: "Qualified", execution_enabled: false, can_submit_orders: false }} /><SocialEvidencePanel social={{ verified_trader: source("verified_trader"), public_intake: source("public_intake"), trending_symbols: source("trending_symbols"), execution_enabled: false, can_submit_orders: false }} /></>);
-    expect(screen.getAllByText("Qualified").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Current and qualified").length).toBeGreaterThan(0);
     expect(screen.getByText("Current OPRA-qualified")).toBeInTheDocument();
     expect(screen.getByText(/never an entry trigger/i)).toBeInTheDocument();
   });
@@ -118,7 +119,16 @@ describe("trading primitives", () => {
       build: { status: "installed", percent: 100, gates: [] },
       runtime: { status: "attention_required", percent: 75, gates: [{ id: "move_ground_truth", ready: false, reason: "independent MOVE denominator qualified", generated_at: null, execution_enabled: false, can_submit_orders: false }] },
       evidence: { status: "collecting", ranking_qualified_bucket_count: 0, eligible_outcomes: 12, independent_dates: 4, message: "Setup grades are not probabilities." },
-      ready_for_manual_review: false,
+      lanes: {
+        equity_scanner: { id: "equity_scanner", ready: true, status: "operational", percent: 100, gate_ids: ["pattern_scanner"], failed_gates: [], failed_build_components: [], message: "Equity lane is current.", execution_enabled: false, can_submit_orders: false },
+        options_manual_reference: { id: "options_manual_reference", ready: false, status: "fail_closed", percent: 75, gate_ids: ["options_feed_gate"], failed_gates: ["options_feed_gate"], failed_build_components: [], message: "Options are blocked.", execution_enabled: false, can_submit_orders: false },
+        research_evidence: { id: "research_evidence", ready: false, status: "fail_closed", percent: 75, gate_ids: ["move_ground_truth"], failed_gates: ["move_ground_truth"], failed_build_components: [], message: "Research evidence is incomplete.", execution_enabled: false, can_submit_orders: false },
+        execution_observability: { id: "execution_observability", ready: true, status: "operational", percent: 100, gate_ids: [], failed_gates: [], failed_build_components: [], message: "Observers are available.", execution_enabled: false, can_submit_orders: false },
+      },
+      ready_for_manual_review: true,
+      ready_for_equity_manual_review: true,
+      ready_for_options_manual_review: false,
+      ready_for_research_promotion_review: false,
       probability_claims_qualified: false,
       execution_enabled: false,
       can_submit_orders: false,
@@ -126,7 +136,10 @@ describe("trading primitives", () => {
 
     expect(screen.getByText("System readiness")).toBeInTheDocument();
     expect(screen.getByText("100.0% installed")).toBeInTheDocument();
-    expect(screen.getByText("75.0% live")).toBeInTheDocument();
+    expect(screen.getByText("75.0% all producers")).toBeInTheDocument();
+    expect(screen.getByText("Equity scanner ready")).toBeInTheDocument();
+    expect(screen.getByText("options manual reference").parentElement).toHaveTextContent("Fail closed");
+    expect(screen.getByText("research evidence").parentElement).toHaveTextContent("Fail closed");
     expect(screen.getByText(/move ground truth/i)).toBeInTheDocument();
     expect(screen.getByText(/collecting evidence/i)).toBeInTheDocument();
   });
@@ -150,6 +163,20 @@ describe("trading primitives", () => {
     expect(screen.getByText("1 manual follow-up")).toBeInTheDocument();
     expect(screen.getByText("1 linkage issue")).toBeInTheDocument();
     expect(screen.getByText(/observation only/i)).toBeInTheDocument();
+  });
+
+  it("labels multi-peer SMT disagreement and value-area reclaim as proxy context", () => {
+    render(<StructureContextRail
+      profile={{ status: "proxy_only", poc: 100, vah: 101, val: 99, value_area_pct: 70, method: "completed_bar_typical_price_volume_histogram_v1", true_trade_at_price: false, score_effect: "none_until_tick_validation", source_labels: ["not_exchange_volume_at_price"], execution_enabled: false, can_submit_orders: false }}
+      valueAreaReversion={{ status: "confirmed_reclaim", direction: "bullish", level_name: "VAL", level: 99, invalidation: 98.5, method: "prior_completed_bar_profile_reentry_v1", reference_profile_excludes_signal_bar: true, reference_profile: { poc: 100, vah: 101, val: 99 }, true_trade_at_price: false, score_effect: "none_until_tick_validation", source_labels: ["not_exchange_volume_at_price"], reason: "Completed reclaim.", execution_enabled: false, can_submit_orders: false }}
+      smt={{ status: "conflicting_divergence", direction: "neutral", peer_symbol: "SPY", peer_count: 2, consensus_status: "mixed_peer_evidence", consensus_direction: "neutral", peer_results: [], divergence: null, method: "paired_index_completed_bar_price_divergence_v1", true_order_flow: false, score_effect: "none_until_local_validation", reason: "Peers disagree.", probability: { status: "unavailable", value: null }, source_labels: ["completed_5m_correlated_price_bars"], execution_enabled: false, can_submit_orders: false }}
+      equalRelativeLiquidity={{ status: "available", tolerance: 0.02, tolerance_method: "volatility_scaled", levels: [{ id: "relative_high_1", kind: "relative_high", side: "buy_side", price: 102.12, tolerance: 0.02, touch_count: 2, first_touch_at: "2026-08-25T14:00:00Z", last_touch_at: "2026-08-25T14:20:00Z", sweep_status: "active", swept_at: null }], score_effect: "context_only_pending_local_validation", source_labels: ["completed_5m_ohlcv"], execution_enabled: false, can_submit_orders: false }}
+    />);
+
+    expect(screen.getByText(/BULLISH VAL reclaim 99.00/i)).toBeInTheDocument();
+    expect(screen.getByText(/SPY \+1 · neutral mixed peer evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/not exchange volume-at-price/i)).toBeInTheDocument();
+    expect(screen.getByText("REH").parentElement).toHaveTextContent("REH 102.12 · 2 touches");
   });
 
   it("changes the sizing preference from its input", () => {

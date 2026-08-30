@@ -15,7 +15,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const dashboard = {
-  schema_version: 11,
+  schema_version: 12,
   generated_at: '2026-08-19T14:00:00Z',
   refresh_seconds: 15,
   mode: 'read_only_decision_support',
@@ -182,6 +182,20 @@ const dashboard = {
     reason: 'no provenance-qualified 0dte scans',
     execution_authority: false,
   },
+  tactical_plan: {
+    schema_version: 1,
+    generated_at: '2026-08-19T14:00:00Z',
+    status: 'WAIT_FOR_CONFIRMATION',
+    symbol: 'SPY',
+    market_state: { classification: 'bullish_lean', expected_move_points: 6.2, atm_iv: 0.15, freshness: 'live', source_labels: ['expected_move'] },
+    bull_case: { state: 'WAIT', direction: 'bullish', setup: 'range_break_retest', trigger: 772, entry_zone: { status: 'source_defined', low: 772, high: 772 }, confirmation_required: 'Wait for completed 5m close and retest.', retest_required: true, stop: 770.9, t1: 773.1, t2: 774.2, entry_timing: null, blockers: [], source_labels: ['completed_5m_bars'], execution_enabled: false, can_submit_orders: false },
+    bear_case: { state: 'UNAVAILABLE', direction: 'bearish', setup: null, trigger: null, entry_zone: { status: 'unavailable', low: null, high: null }, confirmation_required: 'No source-qualified branch is available.', retest_required: true, stop: null, t1: null, t2: null, entry_timing: null, blockers: ['directional_branch_unavailable'], source_labels: [], execution_enabled: false, can_submit_orders: false },
+    no_trade_zone: { status: 'unavailable', low: null, high: null, instruction: 'Need both branches.' },
+    cross_checks: { level_consistency: 'pass', conflicts: [], rule: 'Conflicts fail closed.' },
+    decision: 'WAIT_FOR_CONFIRMATION',
+    execution_enabled: false,
+    can_submit_orders: false,
+  },
   candidates: [],
   sources: [],
   warnings: [],
@@ -207,8 +221,10 @@ describe('TradingCockpit', () => {
     expect(screen.getByText(/Primary instruction/i)).toBeInTheDocument()
     expect(screen.getByText(/No source-defined two-sided no-trade zone/i)).toBeInTheDocument()
     expect(screen.getByText(/Dealer gamma route/i)).toBeInTheDocument()
+    expect(screen.getByText(/Two-sided tactical plan/i)).toBeInTheDocument()
+    expect(screen.getByText(/If price confirms up/i)).toBeInTheDocument()
     expect(screen.getByText(/No gamma route/i)).toBeInTheDocument()
-    expect(screen.getByText(/stand-aside blockers/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/stand-aside blockers/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Risk budget/i)).toBeInTheDocument()
     expect(screen.getByText(/Social evidence/i)).toBeInTheDocument()
     expect(screen.getAllByText(/read only/i).length).toBeGreaterThan(0)
@@ -260,7 +276,7 @@ describe('TradingCockpit', () => {
             },
           },
         ],
-        move_coverage: { movers_audited: 100, classification_counts: { detected_early: 4, detected_late: 49, missed: 0 }, radar_snapshots_reviewed: 24 },
+        move_coverage: { movers_audited: 100, risk_gate_qualified_count: 14, risk_gate_disqualified_count: 70, risk_gate_unassessed_count: 16, actionable_early_count: 4, actionable_early_recall_of_risk_qualified_pct: 28.57, classification_counts: { detected_early: 4, detected_late: 49, missed: 0 }, radar_snapshots_reviewed: 24 },
         execution_enabled: false,
         can_submit_orders: false,
       },
@@ -276,5 +292,7 @@ describe('TradingCockpit', () => {
     expect(screen.getByText(/completed 5m close beyond 24.9/i)).toBeInTheDocument()
     expect(screen.getByText(/trigger 24.9.*invalid 24.72.*T2 25.26/i)).toBeInTheDocument()
     expect(screen.getByText(/change=8.437%/i)).toBeInTheDocument()
+    expect(screen.getByText("14 / 70")).toBeInTheDocument()
+    expect(screen.getByText(/28\.57%/)).toBeInTheDocument()
   })
 })
