@@ -17,7 +17,7 @@ import os
 import sys
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from zoneinfo import ZoneInfo
 
 import requests
@@ -80,6 +80,18 @@ FACTOR_CONSENSUS_WEIGHTS = {
     "discovery_breadth": 0.08,
     "catalyst": 0.05,
 }
+
+# Reuse the frozen Equity ORB v2 sector taxonomy.  This is deliberately a
+# *context* input: a missing or unmapped sector cannot block discovery,
+# confirmation, or any existing risk gate.
+try:
+    from scripts.equity_orb_scout_v2_shadow import SECTOR_ETFS, _SYMBOL_TO_SECTOR
+except ModuleNotFoundError:  # Direct ``python scripts\\...`` scheduler entrypoint.
+    from equity_orb_scout_v2_shadow import SECTOR_ETFS, _SYMBOL_TO_SECTOR
+
+SECTOR_CONTEXT_ETFS = tuple(sorted(set(SECTOR_ETFS.values())))
+QQQ_SPY_MATERIAL_RELATIVE_MOVE = 0.001  # 10 bp of completed session return.
+SECTOR_RANKING_ADJUSTMENT = 4.0
 
 
 def _valid_symbol(value: Any) -> str | None:
@@ -280,22 +292,43 @@ def discovery_map(sources: dict[str, list[dict[str, Any]]]) -> dict[str, dict[st
     return output
 
 
+MOVERS_MIN_PRICE = 5.0
+MOVERS_MIN_ABS_PERCENT_CHANGE = 3.0
+
+
 def normalized_movers(sources: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Return movers filtered to tradeable names.
+
+    Alpaca's top-gainer feed is dominated by sub-dollar warrants (e.g. GFAIW at
+    $0.004 +140%). Those cannot be traded meaningfully — enforce a price floor
+    and a minimum absolute percent move so the panel surfaces actionable names.
+    """
     rows: list[dict[str, Any]] = []
     for source_name in ("movers_gainers", "movers_losers"):
         direction = "gainer" if source_name.endswith("gainers") else "loser"
-        for rank, row in enumerate(sources.get(source_name) or [], start=1):
+        kept_rank = 0
+        for row in sources.get(source_name) or []:
             symbol = str(row.get("symbol") or "").strip().upper()
             if not symbol:
                 continue
+            if "." in symbol or symbol.endswith(("W", "WS")):
+                # Warrants (e.g. GFAIW, AAC.WS) rarely have real option/equity liquidity.
+                continue
+            price = _finite(row.get("price"))
+            pct = _finite(row.get("percent_change"))
+            if price is None or price < MOVERS_MIN_PRICE:
+                continue
+            if pct is None or abs(pct) < MOVERS_MIN_ABS_PERCENT_CHANGE:
+                continue
+            kept_rank += 1
             rows.append(
                 {
                     "symbol": symbol,
                     "direction": direction,
-                    "rank": rank,
-                    "price": _finite(row.get("price")),
+                    "rank": kept_rank,
+                    "price": price,
                     "change": _finite(row.get("change")),
-                    "percent_change": _finite(row.get("percent_change")),
+                    "percent_change": pct,
                 }
             )
     return rows
@@ -670,6 +703,119 @@ def rank_candidates_by_lane(
     return candidates, benchmark, broad
 
 
+def _sector_for_symbol(symbol: str) -> str | None:
+    symbol = str(symbol or "").upper()
+    for sector, etf in SECTOR_ETFS.items():
+        if symbol == etf:
+            return sector
+    sector = _SYMBOL_TO_SECTOR.get(symbol)
+    return None if sector in {None, "index", "unknown"} else str(sector)
+
+
+def _context_return(metrics: Mapping[str, Mapping[str, Any]], symbol: str) -> float | None:
+    row = metrics.get(symbol.upper()) or {}
+    return _finite(row.get("gap_return"))
+
+
+def market_context_for_candidate(
+    candidate: Mapping[str, Any], metrics: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Build a transparent, non-gating sector and QQQ/SPY context record."""
+    symbol = str(candidate.get("symbol") or "").upper()
+    direction = str(candidate.get("direction") or "").lower()
+    stock_return = _context_return(metrics, symbol)
+    spy_return = _context_return(metrics, "SPY")
+    qqq_return = _context_return(metrics, "QQQ")
+    sector = _sector_for_symbol(symbol)
+    sector_etf = SECTOR_ETFS.get(sector or "")
+    sector_return = _context_return(metrics, sector_etf or "") if sector_etf else None
+    ranked_sectors = sorted(
+        (
+            (etf, value)
+            for etf in SECTOR_CONTEXT_ETFS
+            if (value := _context_return(metrics, etf)) is not None
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    sector_rank = next((index for index, (etf, _) in enumerate(ranked_sectors, start=1) if etf == sector_etf), None)
+    sector_total = len(ranked_sectors)
+    sector_vs_spy = sector_return - spy_return if sector_return is not None and spy_return is not None else None
+    stock_vs_sector = stock_return - sector_return if stock_return is not None and sector_return is not None else None
+    qqq_vs_spy = qqq_return - spy_return if qqq_return is not None and spy_return is not None else None
+
+    if qqq_vs_spy is None:
+        qqq_spy_regime = "unavailable"
+    elif qqq_vs_spy >= QQQ_SPY_MATERIAL_RELATIVE_MOVE:
+        qqq_spy_regime = "qqq_leading_spy"
+    elif qqq_vs_spy <= -QQQ_SPY_MATERIAL_RELATIVE_MOVE:
+        qqq_spy_regime = "qqq_lagging_spy"
+    else:
+        qqq_spy_regime = "balanced"
+
+    sector_alignment = "unavailable"
+    if sector_vs_spy is not None and stock_vs_sector is not None:
+        if direction.startswith("bull") and sector_vs_spy >= 0 and stock_vs_sector >= 0:
+            sector_alignment = "supportive"
+        elif direction.startswith("bear") and sector_vs_spy <= 0 and stock_vs_sector <= 0:
+            sector_alignment = "supportive"
+        elif direction.startswith("bull") and (sector_vs_spy < 0 or stock_vs_sector < 0):
+            sector_alignment = "conflicting"
+        elif direction.startswith("bear") and (sector_vs_spy > 0 or stock_vs_sector > 0):
+            sector_alignment = "conflicting"
+        else:
+            sector_alignment = "neutral"
+
+    # The QQQ/SPY relationship is a broad market diagnostic.  It only changes
+    # a context label for stocks; the sector relationship supplies the modest
+    # rank adjustment.  This prevents one index pair from forcing a trade.
+    intermarket_alignment = "neutral"
+    if direction.startswith("bull") and qqq_spy_regime == "qqq_leading_spy":
+        intermarket_alignment = "supportive"
+    elif direction.startswith("bear") and qqq_spy_regime == "qqq_leading_spy":
+        intermarket_alignment = "caution_shorts"
+    elif direction.startswith("bear") and qqq_spy_regime == "qqq_lagging_spy":
+        intermarket_alignment = "supportive"
+    elif direction.startswith("bull") and qqq_spy_regime == "qqq_lagging_spy":
+        intermarket_alignment = "caution_longs"
+
+    adjustment = (
+        SECTOR_RANKING_ADJUSTMENT if sector_alignment == "supportive"
+        else -SECTOR_RANKING_ADJUSTMENT if sector_alignment == "conflicting"
+        else 0.0
+    )
+    available = stock_return is not None and spy_return is not None and qqq_return is not None
+    return {
+        "status": "available" if available and sector_alignment != "unavailable" else "partial" if available else "unavailable",
+        "sector": sector,
+        "sector_etf": sector_etf,
+        "sector_session_return_pct": round(sector_return * 100.0, 3) if sector_return is not None else None,
+        "sector_vs_spy_pct": round(sector_vs_spy * 100.0, 3) if sector_vs_spy is not None else None,
+        "stock_vs_sector_pct": round(stock_vs_sector * 100.0, 3) if stock_vs_sector is not None else None,
+        "sector_rank": sector_rank,
+        "sector_total": sector_total,
+        "sector_alignment": sector_alignment,
+        "qqq_vs_spy_pct": round(qqq_vs_spy * 100.0, 3) if qqq_vs_spy is not None else None,
+        "qqq_spy_regime": qqq_spy_regime,
+        "intermarket_alignment": intermarket_alignment,
+        "ranking_adjustment": adjustment,
+        "authority": "context_only_no_gate_or_sizing_effect",
+    }
+
+
+def apply_market_context(
+    candidates: list[dict[str, Any]], metrics: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Attach context and adjust ordering without changing setup score or gates."""
+    for candidate in candidates:
+        context = market_context_for_candidate(candidate, metrics)
+        base_rank = float(candidate.get("ranking_score") or 0.0)
+        candidate["market_context"] = context
+        candidate["ranking_context_adjustment"] = context["ranking_adjustment"]
+        candidate["ranking_score"] = round(max(0.0, base_rank + float(context["ranking_adjustment"])), 1)
+    return candidates
+
+
 def evaluate_candidate(
     discovery: dict[str, Any],
     metrics: dict[str, Any],
@@ -794,7 +940,9 @@ def evaluate_candidate(
         state = "filtered"
 
     blockers = [name for name, passed in gates.items() if not passed]
-    blockers.append("strategy_confirmation_and_revalidation_required")
+    confirmation_completed = str(bars.get("price_action_state")) in {"bullish_confirmed", "bearish_confirmed"}
+    if not confirmation_completed:
+        blockers.append("strategy_confirmation_and_revalidation_required")
     planned_risk = risk if risk is not None and risk > 0 else None
     consumed_fraction = None
     remaining_reward_r = None
@@ -856,6 +1004,9 @@ def evaluate_candidate(
         "catalyst_headlines": articles[:3],
         "hard_gates": gates,
         "blockers": blockers,
+        "entry": round(trigger, 4) if trigger is not None else None,
+        "invalidation": round(invalidation, 4) if invalidation is not None else None,
+        "target": round(target, 4) if target is not None else None,
         "structure": bars,
         "price_action_confirmation": {
             "state": bars.get("price_action_state", "waiting"),
@@ -913,6 +1064,13 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
     snapshots, more_errors = fetch_snapshots(symbols)
     errors.extend(more_errors)
     metrics = {symbol: snapshot_metrics(snapshot) for symbol, snapshot in snapshots.items()}
+    # Fetch the small context basket separately so an optional sector ETF
+    # outage is visible in the report without turning a healthy core scanner
+    # into an error state or removing a stock from bar evaluation.
+    context_symbols = list(dict.fromkeys(("SPY", "QQQ", *SECTOR_CONTEXT_ETFS)))
+    context_snapshots, context_errors = fetch_snapshots(context_symbols)
+    context_metrics = {symbol: snapshot_metrics(snapshot) for symbol, snapshot in context_snapshots.items()}
+    metrics.update(context_metrics)
     ranked_for_bars = select_symbols_for_intraday_bars(discovered, metrics)
     bars, more_errors = fetch_intraday_bars(ranked_for_bars, now_et)
     errors.extend(more_errors)
@@ -931,6 +1089,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         for symbol in ranked_for_bars
     ]
     candidates = apply_cross_sectional_factor_consensus(candidates)
+    candidates = apply_market_context(candidates, metrics)
     candidates, benchmark_ranked, _broad_ranked = rank_candidates_by_lane(candidates)
     candidates.sort(
         key=lambda row: (
@@ -967,7 +1126,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         "can_submit_orders": False,
         "coverage": {
             "unique_symbols_discovered": len(discovered),
-            "snapshot_symbols": len(snapshots),
+            "snapshot_symbols": sum(symbol in snapshots for symbol in discovered),
             "symbols_with_5m_bars": len(bars),
             "symbols_evaluated": len(candidates),
             "precision_watch_count": len(precision),
@@ -981,6 +1140,17 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
             "snapshot_coverage_pct": round(len(snapshots) / len(discovered) * 100.0, 2) if discovered else 0.0,
             "reserved_benchmarks": [symbol for symbol in CORE_BENCHMARKS if symbol in ranked_for_bars],
             "reserved_liquid_core": [symbol for symbol in CORE_LIQUID_SYMBOLS if symbol in ranked_for_bars],
+            "market_context": {
+                "status": "available" if len(context_snapshots) == len(context_symbols) else "partial" if context_snapshots else "unavailable",
+                "requested_symbols": context_symbols,
+                "available_symbols": sorted(context_snapshots),
+                "missing_symbols": sorted(set(context_symbols) - set(context_snapshots)),
+                "error_count": len(context_errors),
+                "candidate_context_available_count": sum(
+                    (row.get("market_context") or {}).get("status") == "available" for row in candidates
+                ),
+                "authority": "context_only_no_gate_or_sizing_effect",
+            },
         },
         "market_movers": normalized_movers(screeners),
         "all_discovered_symbols": sorted(discovered),
@@ -1013,6 +1183,12 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
             "Volume pace is a session-progress proxy, not exchange-wide RVOL.",
             "Confirmation levels are watch levels, not orders.",
             "Cross-sectional factor consensus is a relative diagnostic, not probability of profit.",
+            "Sector ETF and QQQ/SPY context adjusts rank only; it never creates an entry, changes position size, or overrides a completed 5-minute confirmation.",
+            *(
+                [f"Market context incomplete: {','.join(sorted(set(context_symbols) - set(context_snapshots)))}"]
+                if len(context_snapshots) != len(context_symbols)
+                else []
+            ),
             "No paper or live order authority.",
         ],
     }

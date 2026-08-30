@@ -6,6 +6,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Set-Location "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
+. (Join-Path $PSScriptRoot "resolve_vibe_python.ps1")
+$Python = Get-VibePython
 
-uv run --no-project --with yfinance --with pandas --with numpy python scripts\shadow_alert_runner.py --scanner equity-orb-scout-v2 --mode $Mode
+& $Python scripts\shadow_alert_runner.py --scanner equity-orb-scout-v2 --mode $Mode
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

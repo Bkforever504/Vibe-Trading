@@ -1,10 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$python = Join-Path $repo ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python)) {
-    $python = "python"
-}
+. (Join-Path $PSScriptRoot "resolve_vibe_python.ps1")
+$python = Get-VibePython
 
 Push-Location $repo
 try {
@@ -26,4 +24,3 @@ try {
 finally {
     Pop-Location
 }
-

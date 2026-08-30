@@ -66,6 +66,7 @@ REPORTS = {
     "incentive_safety": REPORT_DIR / "agent-incentive-safety-audit.json",
     "activity": REPORT_DIR / "daily-bot-activity-2026-07-03.csv",
     "aplus_spotlight": REPORT_DIR / "aplus-spotlight.json",
+    "bplus_spotlight": REPORT_DIR / "bplus-spotlight.json",
 }
 
 
@@ -449,15 +450,7 @@ def _current_aplus_setups(data: dict[str, Any], now: datetime | None = None) -> 
     return [row for row in setups if isinstance(row, dict)] if isinstance(setups, list) else []
 
 
-def render_aplus_spotlight(model: dict[str, Any]) -> str:
-    data = model.get("aplus_spotlight") if isinstance(model.get("aplus_spotlight"), dict) else {}
-    setups = _current_aplus_setups(data)
-    if not setups:
-        return """
-    <div class="aplus-spotlight aplus-idle">
-      <div class="aplus-head"><span>A+ Setup Spotlight</span><span class="aplus-count">0</span></div>
-      <div class="aplus-sub">No confirmed A+ setups are live. Spotlight will flash red the moment score >= 93 confirms.</div>
-    </div>"""
+def _render_spotlight_cards(setups: list[dict[str, Any]], *, wrapper_cls: str) -> str:
     cards: list[str] = []
     for setup in setups[:12]:
         direction = str(setup.get("direction") or "").lower()
@@ -471,17 +464,38 @@ def render_aplus_spotlight(model: dict[str, Any]) -> str:
         rr = (reward / risk) if risk else 0.0
         setup_name = str(setup.get("setup") or "").replace("_", " ").title() or "Setup"
         score = safe_float(setup.get("score"), 0.0)
+        grade = esc(str(setup.get("grade") or ""))
+        grade_suffix = f" · {grade}" if grade else ""
+        context = setup.get("market_context") if isinstance(setup.get("market_context"), dict) else {}
+        sector = str(context.get("sector_etf") or context.get("sector") or "context unavailable")
+        alignment = str(context.get("sector_alignment") or "unavailable")
+        qqq_spy = context.get("qqq_vs_spy_pct")
+        qqq_text = f"QQQ-SPY {safe_float(qqq_spy):+.3f}%" if qqq_spy is not None else "QQQ-SPY unavailable"
         cards.append(
             f"""
-        <div class="aplus-card">
+        <div class="{wrapper_cls}-card">
           <div class="row-title"><span class="{dir_cls}">{arrow} {esc(str(setup.get('symbol') or '?'))}</span>
-            <span style="font-size:12px;opacity:0.85">· {esc(setup_name)} · score {score:.1f}</span></div>
+            <span style="font-size:12px;opacity:0.85">· {esc(setup_name)}{grade_suffix} · score {score:.1f}</span></div>
           <div class="lvl"><span>Entry</span><b>{entry:.2f}</b></div>
           <div class="lvl"><span>Stop</span><b>{stop:.2f}</b></div>
           <div class="lvl"><span>Target 2R</span><b>{target:.2f}</b></div>
           <div class="lvl"><span>Risk / R:R</span><b>${risk:.2f} · {rr:.2f}R</b></div>
+          <div class="lvl"><span>Context</span><b>{esc(sector)} · {esc(alignment)}</b></div>
+          <div class="lvl"><span>Intermarket</span><b>{esc(qqq_text)}</b></div>
         </div>"""
         )
+    return "".join(cards)
+
+
+def render_aplus_spotlight(model: dict[str, Any]) -> str:
+    data = model.get("aplus_spotlight") if isinstance(model.get("aplus_spotlight"), dict) else {}
+    setups = _current_aplus_setups(data)
+    if not setups:
+        return """
+    <div class="aplus-spotlight aplus-idle">
+      <div class="aplus-head"><span>A+ Setup Spotlight</span><span class="aplus-count">0</span></div>
+      <div class="aplus-sub">No confirmed A+ setups are live. Spotlight will flash red the moment score >= 93 confirms.</div>
+    </div>"""
     generated = esc(str(data.get("generated_at") or ""))
     return f"""
     <div class="aplus-spotlight">
@@ -490,7 +504,28 @@ def render_aplus_spotlight(model: dict[str, Any]) -> str:
         <span class="aplus-count">{len(setups)}</span>
       </div>
       <div class="aplus-sub">Confirmed 5m · grade A · score >= 93 · actionable rank · updated {generated}</div>
-      <div class="aplus-list">{''.join(cards)}</div>
+      <div class="aplus-list">{_render_spotlight_cards(setups, wrapper_cls='aplus')}</div>
+    </div>"""
+
+
+def render_bplus_spotlight(model: dict[str, Any]) -> str:
+    data = model.get("bplus_spotlight") if isinstance(model.get("bplus_spotlight"), dict) else {}
+    setups = _current_aplus_setups(data)
+    if not setups:
+        return """
+    <div class="bplus-spotlight bplus-idle">
+      <div class="bplus-head"><span>B+ Setup Watch</span><span class="bplus-count">0</span></div>
+      <div class="bplus-sub">No confirmed B+ / A- setups are live. Watch will glow amber when score >= 75 confirms.</div>
+    </div>"""
+    generated = esc(str(data.get("generated_at") or ""))
+    return f"""
+    <div class="bplus-spotlight">
+      <div class="bplus-head">
+        <span>⚡ B+ Setup Watch ⚡</span>
+        <span class="bplus-count">{len(setups)}</span>
+      </div>
+      <div class="bplus-sub">Confirmed 5m · grade B+ / A- · score >= 75 · actionable rank · updated {generated}</div>
+      <div class="bplus-list">{_render_spotlight_cards(setups, wrapper_cls='bplus')}</div>
     </div>"""
 
 
@@ -2049,6 +2084,57 @@ def render_html(model: dict[str, Any]) -> str:
     }}
     .aplus-spotlight.aplus-idle .aplus-head {{ font-size:14px; letter-spacing:1px; }}
     .aplus-spotlight.aplus-idle .aplus-count {{ font-size:14px; background:transparent; border:1px solid var(--border); color:var(--dim); }}
+    /* === B+ SPOTLIGHT (amber, second tier) === */
+    @keyframes bplus-glow {{
+      0%,100% {{ box-shadow: 0 0 0 0 rgba(255,179,0,0.35), 0 0 22px rgba(255,179,0,0.30); }}
+      50%     {{ box-shadow: 0 0 0 6px rgba(255,179,0,0.00), 0 0 30px rgba(255,179,0,0.45); }}
+    }}
+    .bplus-spotlight {{
+      background: linear-gradient(120deg,#3a2a05 0%,#ffb300 45%,#ffca28 55%,#3a2a05 100%);
+      background-size: 200% 200%;
+      animation: aplus-shimmer 8s linear infinite, bplus-glow 3.2s ease-in-out infinite;
+      border-radius: var(--radius);
+      padding: 16px 22px;
+      margin-bottom: 16px;
+      color: #1a1200;
+      border: 2px solid #fff5;
+    }}
+    .bplus-spotlight .bplus-head {{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      font-family: var(--sans); font-weight: 900;
+      font-size: 22px; letter-spacing: 1.2px; text-transform: uppercase;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    }}
+    .bplus-spotlight .bplus-count {{
+      font-size: 34px; font-weight: 900; line-height: 1;
+      padding: 3px 14px; border-radius: 10px;
+      background: rgba(0,0,0,0.30); color:#fff; border: 2px solid #fff;
+    }}
+    .bplus-spotlight .bplus-list {{
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 10px; margin-top: 12px;
+    }}
+    .bplus-spotlight .bplus-card {{
+      background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.25); border-radius: 10px;
+      padding: 10px 12px; font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 13px; color:#fff;
+    }}
+    .bplus-spotlight .bplus-card .row-title {{
+      font-family: var(--sans); font-size: 16px; font-weight: 800; letter-spacing: 0.4px;
+      display:flex; align-items:center; gap:8px; margin-bottom:4px; color:#fff;
+    }}
+    .bplus-spotlight .bplus-card .dir-bull {{ color: #7fff9c; }}
+    .bplus-spotlight .bplus-card .dir-bear {{ color: #ffb0b0; }}
+    .bplus-spotlight .bplus-card .lvl {{ display:flex; justify-content:space-between; padding: 2px 0; }}
+    .bplus-spotlight .bplus-card .lvl b {{ color: #ffe082; }}
+    .bplus-spotlight .bplus-sub {{
+      font-family: var(--sans); font-size: 12px; opacity: 0.9; margin-top: 4px; color:#1a1200;
+    }}
+    .bplus-spotlight.bplus-idle {{
+      background: linear-gradient(120deg,#1e293b,#111827);
+      animation: none; border: 1px solid var(--border); color: var(--dim);
+    }}
+    .bplus-spotlight.bplus-idle .bplus-head {{ font-size:14px; letter-spacing:1px; color:var(--dim); }}
+    .bplus-spotlight.bplus-idle .bplus-count {{ font-size:14px; background:transparent; border:1px solid var(--border); color:var(--dim); }}
+    .bplus-spotlight.bplus-idle .bplus-sub {{ color:var(--dim); }}
   </style>
 </head>
 <body>
@@ -2065,6 +2151,8 @@ def render_html(model: dict[str, Any]) -> str:
     </div>
 
     {render_aplus_spotlight(model)}
+
+    {render_bplus_spotlight(model)}
 
     <div id="overview" class="section">
       <div class="section-label"><h2>Overview</h2><p>Account, audit, market force, and daily verdict</p></div>

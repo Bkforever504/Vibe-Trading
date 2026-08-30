@@ -2,5 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repo = "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
 Set-Location $repo
+. (Join-Path $PSScriptRoot "resolve_vibe_python.ps1")
+$Python = Get-VibePython
 
-uv run --no-project --with alpaca-py --with pandas --with yfinance python scripts\realized_implied_vol_scanner.py --print
+& $Python scripts\realized_implied_vol_scanner.py --print

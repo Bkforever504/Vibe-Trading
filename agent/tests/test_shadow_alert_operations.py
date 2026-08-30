@@ -16,6 +16,35 @@ from scripts import sunday_shadow_preflight as preflight
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
 
 
+def test_scanner_runners_use_policy_safe_system_python_resolver() -> None:
+    root = Path(__file__).resolve().parents[2]
+    resolver = (root / "scripts" / "resolve_vibe_python.ps1").read_text(encoding="utf-8")
+    runner_names = (
+        "run_deep_liquid_universe_scanner.ps1",
+        "run_equity_orb_scout_v1_shadow.ps1",
+        "run_equity_orb_scout_v2_shadow.ps1",
+        "run_gex_scanner.ps1",
+        "run_hurst_regime_scanner.ps1",
+        "run_ivr_scanner.ps1",
+        "run_liquid_options_edge_shadow.ps1",
+        "run_micro_momentum_paper.ps1",
+        "run_mnq_smt_family_databento_regrader.ps1",
+        "run_opening_range_breadth_scanner.ps1",
+        "run_portfolio_concentration_monitor.ps1",
+        "run_premarket_ema_retest_shadow_logger.ps1",
+        "run_profitability_control_plane.ps1",
+        "run_realized_implied_vol_scanner.ps1",
+    )
+
+    assert "Get-Command python -CommandType Application" in resolver
+    assert "repository .venv" in resolver
+    for runner_name in runner_names:
+        runner = (root / "scripts" / runner_name).read_text(encoding="utf-8")
+        assert "Get-VibePython" in runner
+        assert ".venv/Scripts/python.exe" not in runner
+        assert ".venv\\Scripts\\python.exe" not in runner
+
+
 def test_notifier_uses_env_first_redacts_and_disables_mentions(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/file/token\n", encoding="utf-8")

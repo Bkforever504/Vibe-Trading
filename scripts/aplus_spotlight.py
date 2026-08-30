@@ -34,11 +34,43 @@ SPOTLIGHT_LOG = ROOT / "data" / "aplus_spotlight_log.jsonl"
 SPOTLIGHT_REPORT = Path.home() / ".vibe-trading" / "reports" / "aplus-spotlight.json"
 ALERTED_STATE = Path.home() / ".vibe-trading" / "state" / "aplus_alerted.json"
 
+BPLUS_LOG = ROOT / "data" / "bplus_spotlight_log.jsonl"
+BPLUS_REPORT = Path.home() / ".vibe-trading" / "reports" / "bplus-spotlight.json"
+BPLUS_ALERTED_STATE = Path.home() / ".vibe-trading" / "state" / "bplus_alerted.json"
+
 MIN_SCORE = 93.0
 MAX_SIGNAL_AGE_MINUTES = 15.0
 EMBED_COLOR_APLUS = 0xE53935  # red — highest attention
+EMBED_COLOR_BPLUS = 0xFFB300  # amber — high attention, secondary tier
 CONFIRMED_STATES = {"bullish_confirmed", "bearish_confirmed"}
 ET = ZoneInfo("America/New_York")
+
+TIERS: dict[str, dict[str, Any]] = {
+    "aplus": {
+        "label": "A+",
+        "min_score": 93.0,
+        "allowed_grades": {"A"},
+        "color": EMBED_COLOR_APLUS,
+        "content_prefix": "@here  ★ **A+ TRADE ALERT** ★",
+        "title_prefix": "🚨  A+ SETUP",
+        "state_path": ALERTED_STATE,
+        "log_path": SPOTLIGHT_LOG,
+        "report_path": SPOTLIGHT_REPORT,
+        "provider": "aplus_spotlight",
+    },
+    "bplus": {
+        "label": "B+",
+        "min_score": 75.0,
+        "allowed_grades": {"B+", "A-"},
+        "color": EMBED_COLOR_BPLUS,
+        "content_prefix": "★ **B+ trade watch** ★",
+        "title_prefix": "⚡  B+ SETUP",
+        "state_path": BPLUS_ALERTED_STATE,
+        "log_path": BPLUS_LOG,
+        "report_path": BPLUS_REPORT,
+        "provider": "bplus_spotlight",
+    },
+}
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -91,11 +123,12 @@ def _is_recent(value: Any, *, now: datetime, max_age_minutes: float) -> bool:
     return -2.0 <= age_minutes <= max_age_minutes
 
 
-def _is_aplus_actionable(row: Mapping[str, Any]) -> bool:
-    if str(row.get("grade") or "").upper() != "A":
+def _is_tier_actionable(row: Mapping[str, Any], tier: Mapping[str, Any]) -> bool:
+    grade = str(row.get("grade") or "").upper()
+    if grade not in {g.upper() for g in tier["allowed_grades"]}:
         return False
     score = row.get("score")
-    if not isinstance(score, (int, float)) or float(score) < MIN_SCORE:
+    if not isinstance(score, (int, float)) or float(score) < float(tier["min_score"]):
         return False
     if not row.get("actionable_for_ranking"):
         return False
@@ -115,6 +148,10 @@ def _is_aplus_actionable(row: Mapping[str, Any]) -> bool:
     if direction.startswith("bear"):
         return target < entry < invalidation
     return False
+
+
+def _is_aplus_actionable(row: Mapping[str, Any]) -> bool:
+    return _is_tier_actionable(row, TIERS["aplus"])
 
 
 def _extract_levels(row: Mapping[str, Any]) -> tuple[float | None, float | None, float | None]:
@@ -148,11 +185,11 @@ def _fingerprint(row: Mapping[str, Any]) -> str:
     )
 
 
-def _load_alerted(now: datetime | None = None) -> set[str]:
-    if not ALERTED_STATE.exists():
+def _load_alerted(now: datetime | None = None, state_path: Path = ALERTED_STATE) -> set[str]:
+    if not state_path.exists():
         return set()
     try:
-        data = json.loads(ALERTED_STATE.read_text(encoding="utf-8"))
+        data = json.loads(state_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return set()
     today = (now or datetime.now(ET)).astimezone(ET).date().isoformat()
@@ -174,46 +211,51 @@ def _atomic_write_json(path: Path, payload: Mapping[str, Any], *, indent: int | 
         temporary.unlink(missing_ok=True)
 
 
-def _save_alerted(fingerprints: set[str], now: datetime | None = None) -> None:
+def _save_alerted(fingerprints: set[str], now: datetime | None = None, state_path: Path = ALERTED_STATE) -> None:
     today = (now or datetime.now(ET)).astimezone(ET).date().isoformat()
-    _atomic_write_json(ALERTED_STATE, {"date": today, "fingerprints": sorted(fingerprints)})
+    _atomic_write_json(state_path, {"date": today, "fingerprints": sorted(fingerprints)})
 
 
-def collect_fresh_aplus(
+def collect_fresh_for_tier(
+    tier: Mapping[str, Any],
     radar_log: Path = RADAR_LOG,
     already_alerted: set[str] | None = None,
     *,
     now: datetime | None = None,
     max_age_minutes: float = MAX_SIGNAL_AGE_MINUTES,
+    excluded_fingerprints: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     already_alerted = already_alerted or set()
+    excluded_fingerprints = excluded_fingerprints or set()
     now = (now or datetime.now(ET)).astimezone(ET)
     today = now.date().isoformat()
     reports = _read_jsonl(radar_log)
     seen_fp: set[str] = set()
     fresh: list[dict[str, Any]] = []
-    for report in reversed(reports):  # newest first — de-dup keeps most recent obs
+    for report in reversed(reports):
         as_of = str(report.get("as_of_et") or report.get("timestamp") or "")
         if not as_of.startswith(today):
             continue
         if not _is_recent(as_of, now=now, max_age_minutes=max_age_minutes):
             continue
         for candidate in _walk_candidates(report):
-            if not _is_aplus_actionable(candidate):
+            if not _is_tier_actionable(candidate, tier):
                 continue
             confirmation = candidate.get("price_action_confirmation") or {}
             completed_at = confirmation.get("bar_completed_at") if isinstance(confirmation, Mapping) else None
             if not _is_recent(completed_at, now=now, max_age_minutes=max_age_minutes):
                 continue
             fp = _fingerprint(candidate)
-            if not fp or fp in seen_fp or fp in already_alerted:
+            if not fp or fp in seen_fp or fp in already_alerted or fp in excluded_fingerprints:
                 continue
             seen_fp.add(fp)
             entry, invalidation, target = _extract_levels(candidate)
             fresh.append(
                 {
                     "fingerprint": fp,
+                    "tier": tier["label"],
                     "symbol": str(candidate.get("symbol") or "").upper(),
+                    "grade": str(candidate.get("grade") or ""),
                     "direction": str(candidate.get("direction") or ""),
                     "setup": str(candidate.get("setup") or ""),
                     "score": float(candidate.get("score") or 0.0),
@@ -229,10 +271,27 @@ def collect_fresh_aplus(
                     "state": candidate.get("state"),
                     "confirmation_stage": candidate.get("confirmation_stage"),
                     "confirmation_completed_at": completed_at,
+                    "market_context": candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {},
                 }
             )
     fresh.sort(key=lambda row: (-(row.get("ranking_score") or row.get("score") or 0.0), row["symbol"]))
     return fresh
+
+
+def collect_fresh_aplus(
+    radar_log: Path = RADAR_LOG,
+    already_alerted: set[str] | None = None,
+    *,
+    now: datetime | None = None,
+    max_age_minutes: float = MAX_SIGNAL_AGE_MINUTES,
+) -> list[dict[str, Any]]:
+    return collect_fresh_for_tier(
+        TIERS["aplus"],
+        radar_log=radar_log,
+        already_alerted=already_alerted,
+        now=now,
+        max_age_minutes=max_age_minutes,
+    )
 
 
 def _direction_emoji(direction: str) -> str:
@@ -258,6 +317,17 @@ def format_setup_fields(setup: Mapping[str, Any]) -> list[dict[str, Any]]:
         else:
             catalyst_lines.append(str(headline))
     catalyst = " · ".join(line for line in catalyst_lines if line) or "no headline"
+    grade_display = setup.get("grade") or setup.get("tier") or "?"
+    context = setup.get("market_context") if isinstance(setup.get("market_context"), Mapping) else {}
+    sector = str(context.get("sector_etf") or context.get("sector") or "unavailable")
+    sector_alignment = str(context.get("sector_alignment") or "unavailable")
+    qqq_spy = context.get("qqq_vs_spy_pct")
+    qqq_regime = str(context.get("qqq_spy_regime") or "unavailable")
+    context_value = (
+        f"```\nSector {sector} · {sector_alignment}\nQQQ-SPY {float(qqq_spy):+.3f}% · {qqq_regime}\n```"
+        if isinstance(qqq_spy, (int, float))
+        else f"```\nSector {sector} · {sector_alignment}\nQQQ-SPY unavailable\n```"
+    )
     return [
         {
             "name": "Entry / Stop / Target",
@@ -279,21 +349,30 @@ def format_setup_fields(setup: Mapping[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "name": "Score",
-            "value": f"```\ngrade  A\nscore  {setup['score']:.1f}\nrank   {setup.get('ranking_score') or '-'}\n```",
+            "value": f"```\ngrade  {grade_display}\nscore  {setup['score']:.1f}\nrank   {setup.get('ranking_score') or '-'}\n```",
             "inline": True,
         },
+        {"name": "Market Context", "value": context_value, "inline": False},
         {"name": "Catalyst", "value": f"_{catalyst}_"[:1024], "inline": False},
     ]
 
 
-def send_spotlight(setups: list[dict[str, Any]], mention: bool = True) -> dict[str, Any]:
+def send_spotlight(
+    setups: list[dict[str, Any]],
+    mention: bool = True,
+    *,
+    tier: Mapping[str, Any] = TIERS["aplus"],
+) -> dict[str, Any]:
     if not setups:
         return {"status": "no_new_setups", "sent": 0}
     sent = 0
     results = []
     for setup in setups:
         arrow = _direction_emoji(setup["direction"])
-        title = f"🚨  A+ SETUP  {arrow}  {setup['symbol']}  ·  {setup['setup'].replace('_', ' ').title()}"
+        title = (
+            f"{tier['title_prefix']}  {arrow}  {setup['symbol']}  ·  "
+            f"{setup['setup'].replace('_', ' ').title()}"
+        )
         description = (
             f"**{setup['symbol']}** · **{setup['direction'].upper()}** · confirmed 5m · "
             f"score **{setup['score']:.1f}**\n"
@@ -302,9 +381,9 @@ def send_spotlight(setups: list[dict[str, Any]], mention: bool = True) -> dict[s
         result = send_discord_embed(
             title=title,
             description=description,
-            color=EMBED_COLOR_APLUS,
+            color=tier["color"],
             fields=format_setup_fields(setup),
-            content="@here  ★ **A+ TRADE ALERT** ★" if mention else "",
+            content=tier["content_prefix"] if mention else "",
             allow_mentions=mention,
         )
         results.append({"fingerprint": setup["fingerprint"], "symbol": setup["symbol"], "result": result})
@@ -327,34 +406,84 @@ def successful_fingerprints(
     return delivered
 
 
-def append_log(fresh: list[dict[str, Any]], send_result: Mapping[str, Any]) -> None:
-    SPOTLIGHT_LOG.parent.mkdir(parents=True, exist_ok=True)
+def append_log(
+    fresh: list[dict[str, Any]],
+    send_result: Mapping[str, Any],
+    *,
+    tier: Mapping[str, Any] = TIERS["aplus"],
+) -> None:
+    log_path: Path = tier["log_path"]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "date": datetime.now(ET).date().isoformat(),
-        "provider": "aplus_spotlight",
+        "provider": tier["provider"],
+        "tier": tier["label"],
         "mode": "read_only",
         "execution_enabled": False,
         "setup_count": len(fresh),
         "setups": fresh,
         "notification": {k: v for k, v in send_result.items() if k != "results"},
     }
-    with SPOTLIGHT_LOG.open("a", encoding="utf-8") as f:
+    with log_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, separators=(",", ":")) + "\n")
 
 
-def write_report(fresh: list[dict[str, Any]]) -> Path:
-    SPOTLIGHT_REPORT.parent.mkdir(parents=True, exist_ok=True)
+def write_report(
+    fresh: list[dict[str, Any]],
+    *,
+    tier: Mapping[str, Any] = TIERS["aplus"],
+) -> Path:
+    report_path: Path = tier["report_path"]
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "date": datetime.now(ET).date().isoformat(),
-        "provider": "aplus_spotlight",
+        "provider": tier["provider"],
+        "tier": tier["label"],
         "mode": "read_only",
         "setup_count": len(fresh),
         "setups": fresh,
     }
-    _atomic_write_json(SPOTLIGHT_REPORT, payload, indent=2)
-    return SPOTLIGHT_REPORT
+    _atomic_write_json(report_path, payload, indent=2)
+    return report_path
+
+
+def _run_tier(
+    tier: Mapping[str, Any],
+    *,
+    now: datetime,
+    dry_run: bool,
+    mention: bool,
+    excluded_fingerprints: set[str],
+) -> dict[str, Any]:
+    alerted = _load_alerted(now, state_path=tier["state_path"])
+    live = collect_fresh_for_tier(
+        tier,
+        now=now,
+        excluded_fingerprints=excluded_fingerprints,
+    )
+    fresh = [setup for setup in live if setup["fingerprint"] not in alerted]
+    if dry_run or not fresh:
+        send_result = {
+            "status": "dry_run" if dry_run else "no_new_setups",
+            "sent": 0,
+            "attempts": len(fresh),
+        }
+    else:
+        send_result = send_spotlight(fresh, mention=mention, tier=tier)
+        alerted.update(successful_fingerprints(fresh, send_result))
+        _save_alerted(alerted, now, state_path=tier["state_path"])
+
+    append_log(fresh, send_result, tier=tier)
+    write_report(live, tier=tier)
+    return {
+        "tier": tier["label"],
+        "live_setups": len(live),
+        "fresh_setups": len(fresh),
+        "notification": send_result,
+        "live_fingerprints": {setup["fingerprint"] for setup in live},
+    }
 
 
 def main() -> int:
@@ -362,36 +491,36 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Detect but do not post to Discord.")
     parser.add_argument("--no-mention", action="store_true", help="Suppress @here mention.")
     parser.add_argument("--print", action="store_true", help="Print JSON summary to stdout.")
+    parser.add_argument(
+        "--tier",
+        choices=("aplus", "bplus", "all"),
+        default="all",
+        help="Which spotlight tier(s) to evaluate.",
+    )
     args = parser.parse_args()
 
     now = datetime.now(ET)
-    alerted = _load_alerted(now)
-    live = collect_fresh_aplus(now=now)
-    fresh = [setup for setup in live if setup["fingerprint"] not in alerted]
-    if args.dry_run or not fresh:
-        send_result = {"status": "dry_run" if args.dry_run else "no_new_setups", "sent": 0, "attempts": len(fresh)}
-    else:
-        send_result = send_spotlight(fresh, mention=not args.no_mention)
-        alerted.update(successful_fingerprints(fresh, send_result))
-        _save_alerted(alerted, now)
+    tier_order = ("aplus", "bplus") if args.tier == "all" else (args.tier,)
 
-    append_log(fresh, send_result)
-    # The dashboard shows all still-live setups; the alert state only controls
-    # Discord delivery and must not make a live card disappear on the next run.
-    write_report(live)
+    summary: dict[str, Any] = {"date": now.date().isoformat(), "tiers": {}}
+    # A+ hits take priority; suppress a duplicate B+ alert on the same setup.
+    excluded_fingerprints: set[str] = set()
+    for tier_key in tier_order:
+        tier = TIERS[tier_key]
+        # B+ requires B+/A- grades, so A+ collisions are already impossible;
+        # still pass excluded_fingerprints for symmetry and future-proofing.
+        result = _run_tier(
+            tier,
+            now=now,
+            dry_run=args.dry_run,
+            mention=not args.no_mention,
+            excluded_fingerprints=excluded_fingerprints,
+        )
+        excluded_fingerprints |= result.pop("live_fingerprints")
+        summary["tiers"][tier_key] = result
 
     if args.print:
-        print(
-            json.dumps(
-                {
-                    "date": now.date().isoformat(),
-                    "live_setups": len(live),
-                    "fresh_setups": len(fresh),
-                    "notification": send_result,
-                },
-                indent=2,
-            )
-        )
+        print(json.dumps(summary, indent=2))
     return 0
 
 

@@ -5,8 +5,10 @@ $logDir = Join-Path $HOME ".vibe-trading\logs"
 $logPath = Join-Path $logDir "liquid-options-edge-shadow.log"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 Set-Location $projectRoot
+. (Join-Path $scriptDir "resolve_vibe_python.ps1")
+$Python = Get-VibePython
 $ErrorActionPreference = "Continue"
-& uv run --no-project --python 3.12 --with alpaca-py --with pandas --with numpy --with pyarrow python scripts/liquid_options_edge_shadow.py *>> $logPath
+& $Python scripts/liquid_options_edge_shadow.py *>> $logPath
 $exitCode = $LASTEXITCODE
 $ErrorActionPreference = "Stop"
 if ($exitCode -ne 0) {

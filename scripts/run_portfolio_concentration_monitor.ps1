@@ -1,3 +1,5 @@
 $ErrorActionPreference = "Stop"
 Set-Location "C:\Users\kenne\Desktop\MAILK-Repos\Vibe-Trading"
-uv run --no-project --with alpaca-py python scripts/portfolio_concentration_monitor.py --print
+. (Join-Path $PSScriptRoot "resolve_vibe_python.ps1")
+$Python = Get-VibePython
+& $Python scripts/portfolio_concentration_monitor.py --print

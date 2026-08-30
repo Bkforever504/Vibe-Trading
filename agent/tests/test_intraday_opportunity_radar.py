@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from scripts.daily_move_coverage_review import build_review
 from scripts.intraday_opportunity_radar import (
     apply_cross_sectional_factor_consensus,
+    apply_market_context,
     bar_features,
     build_report as build_intraday_report,
     coverage_trace,
@@ -153,6 +154,44 @@ def test_bar_selection_reserves_official_movers_before_general_activity() -> Non
 
     assert selected[:3] == ["SPY", "QQQ", "IWM"]
     assert set(("M1", "M2", "M3", "M4", "M5")) <= set(selected)
+
+
+def test_sector_and_qqq_spy_context_adjust_rank_without_becoming_a_gate() -> None:
+    candidates = [
+        {"symbol": "AAPL", "direction": "bullish", "ranking_score": 90.0, "hard_gates": {"existing": True}},
+        {"symbol": "AAPL", "direction": "bearish", "ranking_score": 90.0, "hard_gates": {"existing": True}},
+    ]
+    metrics = {
+        "SPY": {"gap_return": 0.010},
+        "QQQ": {"gap_return": 0.022},
+        "XLK": {"gap_return": 0.018},
+        "AAPL": {"gap_return": 0.030},
+        "XLF": {"gap_return": 0.002},
+    }
+
+    enriched = apply_market_context(candidates, metrics)
+
+    long_context = enriched[0]["market_context"]
+    short_context = enriched[1]["market_context"]
+    assert long_context["sector"] == "tech"
+    assert long_context["sector_etf"] == "XLK"
+    assert long_context["sector_alignment"] == "supportive"
+    assert long_context["qqq_spy_regime"] == "qqq_leading_spy"
+    assert enriched[0]["ranking_score"] == 94.0
+    assert short_context["sector_alignment"] == "conflicting"
+    assert enriched[1]["ranking_score"] == 86.0
+    assert enriched[0]["hard_gates"] == {"existing": True}
+
+
+def test_missing_market_context_is_visible_but_never_penalizes_or_blocks() -> None:
+    candidate = {"symbol": "UNKNOWN", "direction": "bullish", "ranking_score": 77.0, "hard_gates": {"existing": True}}
+
+    enriched = apply_market_context([candidate], {"UNKNOWN": {"gap_return": 0.04}})
+
+    assert enriched[0]["ranking_score"] == 77.0
+    assert enriched[0]["market_context"]["status"] == "unavailable"
+    assert enriched[0]["market_context"]["ranking_adjustment"] == 0.0
+    assert enriched[0]["hard_gates"] == {"existing": True}
 
 
 def test_intraday_bar_fetch_batches_without_silent_symbol_truncation(monkeypatch) -> None:
@@ -309,6 +348,14 @@ def test_report_exposes_benchmark_lane_schema(monkeypatch) -> None:
     assert "actionable_ranked_candidates" in lane
     assert all(row["ranking_lane"] == "benchmark" for row in lane["ranked_candidates"])
     assert lane["can_submit_orders"] is False
+    # The context basket is intentionally optional: partial ETF coverage must
+    # be explicit without turning the core discovery scanner into a false
+    # failure or silently suppressing its candidates.
+    context = report["coverage"]["market_context"]
+    assert context["status"] == "partial"
+    assert context["error_count"] == 0
+    assert report["operational_health"] == "ok"
+    assert any(warning.startswith("Market context incomplete:") for warning in report["warnings"])
 
 
 def test_large_but_illiquid_move_is_not_precision_watch() -> None:
@@ -347,6 +394,22 @@ def test_liquid_confirmed_move_has_levels_but_no_order_authority() -> None:
     assert row["trade_levels"]["invalidation"] is not None
     assert row["trade_levels"]["target_2r"] is not None
     assert row["execution_enabled"] is False
+    assert "strategy_confirmation_and_revalidation_required" not in row["blockers"]
+    assert row["entry"] == row["trade_levels"]["confirmation_trigger"]
+    assert row["invalidation"] == row["trade_levels"]["invalidation"]
+
+
+def test_unconfirmed_setup_still_flags_revalidation_blocker() -> None:
+    unconfirmed_bars = bar_features(_bars())
+    unconfirmed_bars["price_action_state"] = "waiting"
+    row = evaluate_candidate(
+        {"symbol": "WAIT", "sources": ["movers_gainers", "most_active_volume"], "source_ranks": {}},
+        {"price": 11.0, "gap_return": 0.12, "spread_pct": 0.001, "snapshot_volume": 9_000_000},
+        unconfirmed_bars,
+        250_000_000,
+        [{"headline": "Material company update"}],
+        NOW_ET,
+    )
     assert "strategy_confirmation_and_revalidation_required" in row["blockers"]
 
 

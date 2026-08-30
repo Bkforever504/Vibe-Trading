@@ -115,6 +115,29 @@ def test_successful_fingerprints_only_returns_delivered_alerts(monkeypatch) -> N
     assert spotlight.successful_fingerprints(setups, result) == {"one"}
 
 
+def test_spotlight_preserves_and_displays_market_context(tmp_path: Path) -> None:
+    radar = tmp_path / "radar.jsonl"
+    candidate = _candidate(market_context={
+        "sector_etf": "XLK",
+        "sector_alignment": "supportive",
+        "qqq_vs_spy_pct": 0.42,
+        "qqq_spy_regime": "qqq_leading_spy",
+    })
+    _write_snapshot(radar, "2026-08-27T10:00:00-04:00", [candidate])
+
+    rows = spotlight.collect_fresh_aplus(
+        radar,
+        now=datetime(2026, 8, 27, 10, 5, tzinfo=ET),
+        max_age_minutes=15,
+    )
+    fields = spotlight.format_setup_fields(rows[0])
+
+    assert rows[0]["market_context"]["sector_etf"] == "XLK"
+    context_field = next(field for field in fields if field["name"] == "Market Context")
+    assert "XLK" in context_field["value"]
+    assert "qqq_leading_spy" in context_field["value"]
+
+
 def test_scheduler_contract_is_wake_capable_and_staggered_after_radar() -> None:
     root = Path(__file__).resolve().parents[2]
     registration = (root / "scripts" / "register_aplus_spotlight_task.ps1").read_text(encoding="utf-8")

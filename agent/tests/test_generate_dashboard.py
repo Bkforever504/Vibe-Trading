@@ -45,6 +45,23 @@ def test_aplus_spotlight_hides_stale_or_prior_day_cards() -> None:
     ) == []
 
 
+def test_spotlight_card_displays_market_context_when_available() -> None:
+    html = dashboard._render_spotlight_cards([
+        {
+            "symbol": "AAPL", "direction": "bullish", "setup": "opening_range_breakout",
+            "score": 94.0, "entry": 200.0, "invalidation": 198.0, "target": 204.0,
+            "risk_per_share": 2.0, "reward_per_share": 4.0,
+            "market_context": {
+                "sector_etf": "XLK", "sector_alignment": "supportive", "qqq_vs_spy_pct": 0.42,
+            },
+        }
+    ], wrapper_cls="aplus")
+
+    assert "XLK" in html
+    assert "supportive" in html
+    assert "QQQ-SPY +0.420%" in html
+
+
 def test_flip_trade_stats_split_all_time_and_post_fix() -> None:
     trades = [
         {"status": "closed", "entry_date": "2026-06-23", "pnl": -11557.5},
