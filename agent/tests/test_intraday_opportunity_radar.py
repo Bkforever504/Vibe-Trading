@@ -413,6 +413,14 @@ def test_unconfirmed_setup_still_flags_revalidation_blocker() -> None:
     assert "strategy_confirmation_and_revalidation_required" in row["blockers"]
 
 
+def test_intraday_radar_runner_updates_spy_level_monitor_before_alerting() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")
+
+    assert "spy_level_reaction_shadow.py" in runner
+    assert runner.index("spy_level_reaction_shadow.py") < runner.index("simple_price_action_alerts.py")
+
+
 def test_already_extended_move_is_no_chase_and_cannot_enter_actionable_ranking() -> None:
     row = evaluate_candidate(
         {"symbol": "CHASE", "sources": ["movers_gainers", "most_active_volume"], "source_ranks": {}},

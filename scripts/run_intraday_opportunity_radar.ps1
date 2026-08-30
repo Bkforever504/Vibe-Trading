@@ -9,6 +9,8 @@ Set-Location $WorkingDir
 try {
     python scripts\intraday_opportunity_radar.py *>> $LogPath
     if ($LASTEXITCODE -ne 0) { throw "intraday radar exited $LASTEXITCODE" }
+    python scripts\spy_level_reaction_shadow.py *>> $LogPath
+    if ($LASTEXITCODE -ne 0) { throw "SPY mapped-level reaction monitor exited $LASTEXITCODE" }
     python scripts\simple_price_action_alerts.py --alert *>> $LogPath
     if ($LASTEXITCODE -ne 0) { throw "simple price action alerts exited $LASTEXITCODE" }
     python scripts\daily_move_coverage_review.py *>> $LogPath

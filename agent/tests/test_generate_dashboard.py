@@ -62,6 +62,26 @@ def test_spotlight_card_displays_market_context_when_available() -> None:
     assert "QQQ-SPY +0.420%" in html
 
 
+def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
+    html = dashboard.render_spy_level_reaction({
+        "spy_level_reaction": {
+            "operational_health": "ok",
+            "level_map": {"levels": [{"name": "previous_day_high", "price": 101.0}]},
+            "summary": {"confirmed_reactions": 1, "extended_no_chase": 0},
+            "reactions": [{
+                "level_name": "previous_day_high", "level": 101.0, "direction": "bearish",
+                "status": "CONFIRMED_REACTION", "reaction_points": 0.52,
+                "observed_at": "2026-08-28T09:45:00-04:00",
+            }],
+        }
+    })
+
+    assert "SPY Mapped-Level Reactions" in html
+    assert "previous_day_high" in html
+    assert "CONFIRMED_REACTION" in html
+    assert "options-premium prediction" in html
+
+
 def test_flip_trade_stats_split_all_time_and_post_fix() -> None:
     trades = [
         {"status": "closed", "entry_date": "2026-06-23", "pnl": -11557.5},

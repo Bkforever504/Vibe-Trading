@@ -67,6 +67,7 @@ REPORTS = {
     "activity": REPORT_DIR / "daily-bot-activity-2026-07-03.csv",
     "aplus_spotlight": REPORT_DIR / "aplus-spotlight.json",
     "bplus_spotlight": REPORT_DIR / "bplus-spotlight.json",
+    "spy_level_reaction": REPORT_DIR / "spy-level-reaction-shadow.json",
 }
 
 
@@ -408,6 +409,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "activity_path": activity_path,
         "flip_trades": load_json(FLIP_TRADES_PATH, []),
         "options_state": options_state,
+        "spy_level_reaction": load_json(paths["spy_level_reaction"], {}),
     }
     model["positions_by_symbol"] = {str(pos.get("symbol")): pos for pos in positions if isinstance(pos, dict)}
     model["chart_data"] = build_chart_data(model)
@@ -527,6 +529,52 @@ def render_bplus_spotlight(model: dict[str, Any]) -> str:
       <div class="bplus-sub">Confirmed 5m · grade B+ / A- · score >= 75 · actionable rank · updated {generated}</div>
       <div class="bplus-list">{_render_spotlight_cards(setups, wrapper_cls='bplus')}</div>
     </div>"""
+
+
+def render_spy_level_reaction(model: dict[str, Any]) -> str:
+    """Render the explicit pre-mapped SPY level-reaction monitor as context only."""
+    data = model.get("spy_level_reaction") if isinstance(model.get("spy_level_reaction"), dict) else {}
+    level_map = data.get("level_map") if isinstance(data.get("level_map"), dict) else {}
+    levels = level_map.get("levels") if isinstance(level_map.get("levels"), list) else []
+    reactions = data.get("reactions") if isinstance(data.get("reactions"), list) else []
+    health = str(data.get("operational_health") or "unavailable")
+    rows: list[str] = []
+    for reaction in reactions[:8]:
+        if not isinstance(reaction, dict):
+            continue
+        status = str(reaction.get("status") or "unknown")
+        rows.append(
+            "<tr>"
+            f"<td>{esc(reaction.get('level_name'))}</td>"
+            f"<td>{safe_float(reaction.get('level')):.2f}</td>"
+            f"<td>{esc(reaction.get('direction'))}</td>"
+            f"<td><span class='{cls_for_health(status)}'>{esc(status)}</span></td>"
+            f"<td>{safe_float(reaction.get('reaction_points')):.2f}</td>"
+            f"<td>{esc(reaction.get('observed_at'))}</td>"
+            "</tr>"
+        )
+    map_text = ", ".join(
+        f"{esc(level.get('name'))} {safe_float(level.get('price')):.2f}"
+        for level in levels[:7]
+        if isinstance(level, dict)
+    ) or "No completed-session levels yet."
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    return section(
+        "SPY Mapped-Level Reactions",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Monitor", health.upper(), "completed 5m only", cls_for_health(health))}
+          {stat_card("Confirmed", str(safe_int(summary.get('confirmed_reactions'))), "$0.40-$0.80 underlying reaction", "good")}
+          {stat_card("No-Chase", str(safe_int(summary.get('extended_no_chase'))), "> $0.80 reaction is not upgraded", "warn")}
+        </div>
+        <p><strong>Mapped levels:</strong> {map_text}</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Level</th><th>Price</th><th>Direction</th><th>State</th><th>Reaction</th><th>Completed bar</th></tr></thead>
+          <tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar level reaction is active. Wait at mapped support/resistance; do not chase a move already extended.</td></tr>'}</tbody>
+        </table></div>
+        """,
+        "Shadow context only · underlying SPY move is not an options-premium prediction · no order authority",
+    )
 
 
 def render_overview(model: dict[str, Any]) -> str:
@@ -2153,6 +2201,8 @@ def render_html(model: dict[str, Any]) -> str:
     {render_aplus_spotlight(model)}
 
     {render_bplus_spotlight(model)}
+
+    {render_spy_level_reaction(model)}
 
     <div id="overview" class="section">
       <div class="section-label"><h2>Overview</h2><p>Account, audit, market force, and daily verdict</p></div>
