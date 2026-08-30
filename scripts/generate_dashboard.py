@@ -69,6 +69,8 @@ REPORTS = {
     "bplus_spotlight": REPORT_DIR / "bplus-spotlight.json",
     "spy_level_reaction": REPORT_DIR / "spy-level-reaction-shadow.json",
     "spy_level_outcomes": REPORT_DIR / "spy-level-reaction-outcomes.json",
+    "adversarial_audit": REPORT_DIR / "adversarial-strategy-audit.json",
+    "elite_readiness": REPORT_DIR / "elite-bot-readiness-scorecard.json",
 }
 
 
@@ -412,6 +414,8 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "options_state": options_state,
         "spy_level_reaction": load_json(paths["spy_level_reaction"], {}),
         "spy_level_outcomes": load_json(paths["spy_level_outcomes"], {}),
+        "adversarial_audit": load_json(paths["adversarial_audit"], {}),
+        "elite_readiness": load_json(paths["elite_readiness"], {}),
     }
     model["positions_by_symbol"] = {str(pos.get("symbol")): pos for pos in positions if isinstance(pos, dict)}
     model["chart_data"] = build_chart_data(model)
@@ -629,6 +633,37 @@ def render_spy_level_outcomes(model: dict[str, Any]) -> str:
         <p><strong>Promotion blockers:</strong> {esc(blockers)}</p>
         """,
         "Shadow-only outcome slices · breadth and QQQ/SPY-sector context remain challengers · not option P&L or a live signal",
+    )
+
+
+def render_overfit_guard(model: dict[str, Any]) -> str:
+    """Make the fail-closed evidence state visible beside attractive setup cards."""
+    audit = model.get("adversarial_audit") if isinstance(model.get("adversarial_audit"), dict) else {}
+    readiness = model.get("elite_readiness") if isinstance(model.get("elite_readiness"), dict) else {}
+    summary = audit.get("summary") if isinstance(audit.get("summary"), dict) else {}
+    blockers: list[str] = []
+    for subject in audit.get("subjects") or []:
+        if not isinstance(subject, dict) or subject.get("passed") is True:
+            continue
+        name = str(subject.get("subject_id") or "candidate")
+        failed = ", ".join(str(item).replace("_", " ") for item in (subject.get("failed_checks") or [])[:3])
+        blockers.append(f"{name}: {failed or 'audit incomplete'}")
+    readiness_status = str(readiness.get("status") or "evidence_building")
+    score = readiness.get("overall_score")
+    verdict = "BLOCKED" if safe_int(summary.get("blocked_count")) or readiness_status != "verified_elite" else "HUMAN REVIEW ONLY"
+    tone = "bad" if verdict == "BLOCKED" else "warn"
+    return section(
+        "Overfit Guard",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Evidence State", verdict, "never grants order authority", tone)}
+          {stat_card("Adversarial Audits", f"{safe_int(summary.get('passed_count'))} pass / {safe_int(summary.get('blocked_count'))} blocked", "missing evidence fails closed", tone)}
+          {stat_card("System Readiness", f"{safe_float(score):.1f}/10" if score is not None else "unavailable", readiness_status.replace('_', ' '), tone)}
+        </div>
+        <p><strong>Why blocked:</strong> {esc('; '.join(blockers) or 'No completed adversarial manifest is available, so promotion remains blocked.')}</p>
+        <p><strong>Required before any human review:</strong> frozen rules, point-in-time timestamps, independent review, chronological forward outcomes, cost stress, parameter-neighbor and regime stability, and a positive bootstrap lower bound.</p>
+        """,
+        "Fail-closed governance · scores and social labels are research only · no automatic promotion or order authority",
     )
 
 
@@ -2252,6 +2287,8 @@ def render_html(model: dict[str, Any]) -> str:
       <h1>Control Room</h1>
       <p>Read-only · No execution controls · No broker calls · Regenerate: <code>python scripts/generate_dashboard.py</code></p>
     </div>
+
+    {render_overfit_guard(model)}
 
     {render_aplus_spotlight(model)}
 

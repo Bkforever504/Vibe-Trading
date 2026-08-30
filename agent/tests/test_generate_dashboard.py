@@ -111,6 +111,25 @@ def test_dashboard_renders_frozen_gap_outcome_slices_as_blocked_research() -> No
     assert "not option P&amp;L" in html
 
 
+def test_dashboard_overfit_guard_surfaces_a_failed_adversarial_audit() -> None:
+    html = dashboard.render_overfit_guard({
+        "adversarial_audit": {
+            "summary": {"passed_count": 0, "blocked_count": 1},
+            "subjects": [{
+                "subject_id": "fresh-orb", "passed": False,
+                "failed_checks": ["forward_expectancy_positive", "deflated_sharpe_passed"],
+            }],
+        },
+        "elite_readiness": {"overall_score": 6.1, "status": "evidence_building"},
+    })
+
+    assert "Overfit Guard" in html
+    assert "BLOCKED" in html
+    assert "fresh-orb" in html
+    assert "deflated sharpe passed" in html
+    assert "no automatic promotion" in html
+
+
 def test_flip_trade_stats_split_all_time_and_post_fix() -> None:
     trades = [
         {"status": "closed", "entry_date": "2026-06-23", "pnl": -11557.5},
