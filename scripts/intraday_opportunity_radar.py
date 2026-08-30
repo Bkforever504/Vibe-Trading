@@ -803,6 +803,51 @@ def market_context_for_candidate(
     }
 
 
+def market_context_snapshot(metrics: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    """Publish one auditable QQQ/SPY and sector snapshot for downstream research.
+
+    This is deliberately separate from candidate ranking.  Consumers can retain
+    the same point-in-time context alongside an observation without silently
+    turning relative strength into an entry rule.
+    """
+    spy_return = _context_return(metrics, "SPY")
+    qqq_return = _context_return(metrics, "QQQ")
+    qqq_vs_spy = qqq_return - spy_return if qqq_return is not None and spy_return is not None else None
+    if qqq_vs_spy is None:
+        regime = "unavailable"
+    elif qqq_vs_spy >= QQQ_SPY_MATERIAL_RELATIVE_MOVE:
+        regime = "qqq_leading_spy"
+    elif qqq_vs_spy <= -QQQ_SPY_MATERIAL_RELATIVE_MOVE:
+        regime = "qqq_lagging_spy"
+    else:
+        regime = "balanced"
+    sectors = sorted(
+        (
+            {
+                "etf": etf,
+                "session_return_pct": round(value * 100.0, 3),
+                "vs_spy_pct": round((value - spy_return) * 100.0, 3) if spy_return is not None else None,
+            }
+            for etf in SECTOR_CONTEXT_ETFS
+            if (value := _context_return(metrics, etf)) is not None
+        ),
+        key=lambda row: float(row["session_return_pct"]),
+        reverse=True,
+    )
+    return {
+        "status": "available" if spy_return is not None and qqq_return is not None and len(sectors) >= 2 else "partial" if (spy_return is not None or qqq_return is not None or sectors) else "unavailable",
+        "spy_session_return_pct": round(spy_return * 100.0, 3) if spy_return is not None else None,
+        "qqq_session_return_pct": round(qqq_return * 100.0, 3) if qqq_return is not None else None,
+        "qqq_vs_spy_pct": round(qqq_vs_spy * 100.0, 3) if qqq_vs_spy is not None else None,
+        "qqq_spy_regime": regime,
+        "sector_leaders": sectors[:3],
+        "sector_laggards": list(reversed(sectors[-3:])),
+        "sector_count": len(sectors),
+        "return_basis": "snapshot_session_return_proxy",
+        "authority": "context_only_no_gate_or_sizing_effect",
+    }
+
+
 def apply_market_context(
     candidates: list[dict[str, Any]], metrics: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -1071,6 +1116,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
     context_snapshots, context_errors = fetch_snapshots(context_symbols)
     context_metrics = {symbol: snapshot_metrics(snapshot) for symbol, snapshot in context_snapshots.items()}
     metrics.update(context_metrics)
+    context_snapshot = market_context_snapshot(metrics)
     ranked_for_bars = select_symbols_for_intraday_bars(discovered, metrics)
     bars, more_errors = fetch_intraday_bars(ranked_for_bars, now_et)
     errors.extend(more_errors)
@@ -1151,6 +1197,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
                 ),
                 "authority": "context_only_no_gate_or_sizing_effect",
             },
+            "market_context_snapshot": context_snapshot,
         },
         "market_movers": normalized_movers(screeners),
         "all_discovered_symbols": sorted(discovered),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from scripts import spy_level_reaction_shadow as monitor
@@ -58,3 +59,35 @@ def test_report_disclaims_option_premium_prediction() -> None:
 
     assert "options_premium_target_pct" not in report
     assert any("options-premium" in warning for warning in report["limitations"])
+
+
+def test_gap_breadth_and_intermarket_context_are_frozen_without_creating_authority() -> None:
+    breadth = monitor.breadth_context_from_report(
+        {"date": "2026-08-28", "breadth": {"status": "ok", "uptrend_status": "mixed", "pct_above_50dma": 52.0}},
+        session_date="2026-08-28",
+    )
+    intermarket = monitor.intermarket_context_from_radar({
+        "generated_at": "2026-08-28T14:00:00Z",
+        "coverage": {"market_context_snapshot": {
+            "status": "available", "qqq_vs_spy_pct": 0.24, "qqq_spy_regime": "qqq_leading_spy",
+            "sector_leaders": [{"etf": "XLK", "vs_spy_pct": 0.31}],
+        }},
+    })
+
+    report = monitor.evaluate_rows(_rows(), now_et=NOW, breadth_context=breadth, intermarket_context=intermarket)
+
+    assert report["gap_context"]["fill_bucket"] in {"unfilled", "filled_within_15m", "filled_within_30m", "filled_within_60m", "filled_after_60m", "flat_open"}
+    assert report["breadth_context"]["regime"] == "mixed"
+    assert report["breadth_context"]["authority"] == "challenger_only_no_gate_or_sizing_effect"
+    assert report["intermarket_context"]["qqq_spy_regime"] == "qqq_leading_spy"
+    assert report["execution_enabled"] is False
+
+
+def test_reaction_ledger_dedupes_completed_bar_observations(tmp_path: Path) -> None:
+    report = monitor.evaluate_rows(_rows(), now_et=NOW)
+    ledger = tmp_path / "reactions.jsonl"
+
+    assert monitor.append_reaction_events(report, ledger_path=ledger) >= 1
+    assert monitor.append_reaction_events(report, ledger_path=ledger) == 0
+    rows = [line for line in ledger.read_text(encoding="utf-8").splitlines() if line]
+    assert rows

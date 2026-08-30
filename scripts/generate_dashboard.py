@@ -68,6 +68,7 @@ REPORTS = {
     "aplus_spotlight": REPORT_DIR / "aplus-spotlight.json",
     "bplus_spotlight": REPORT_DIR / "bplus-spotlight.json",
     "spy_level_reaction": REPORT_DIR / "spy-level-reaction-shadow.json",
+    "spy_level_outcomes": REPORT_DIR / "spy-level-reaction-outcomes.json",
 }
 
 
@@ -410,6 +411,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "flip_trades": load_json(FLIP_TRADES_PATH, []),
         "options_state": options_state,
         "spy_level_reaction": load_json(paths["spy_level_reaction"], {}),
+        "spy_level_outcomes": load_json(paths["spy_level_outcomes"], {}),
     }
     model["positions_by_symbol"] = {str(pos.get("symbol")): pos for pos in positions if isinstance(pos, dict)}
     model["chart_data"] = build_chart_data(model)
@@ -559,6 +561,16 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
         if isinstance(level, dict)
     ) or "No completed-session levels yet."
     summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    gap = data.get("gap_context") if isinstance(data.get("gap_context"), dict) else {}
+    breadth = data.get("breadth_context") if isinstance(data.get("breadth_context"), dict) else {}
+    intermarket = data.get("intermarket_context") if isinstance(data.get("intermarket_context"), dict) else {}
+    leaders = intermarket.get("sector_leaders") if isinstance(intermarket.get("sector_leaders"), list) else []
+    leader_text = ", ".join(
+        f"{esc(item.get('etf'))} {safe_float(item.get('vs_spy_pct')):+.3f}%"
+        for item in leaders[:3] if isinstance(item, dict)
+    ) or "unavailable"
+    qqq_vs_spy = intermarket.get("qqq_vs_spy_pct")
+    qqq_text = f"{safe_float(qqq_vs_spy):+.3f}%" if qqq_vs_spy is not None else "unavailable"
     return section(
         "SPY Mapped-Level Reactions",
         f"""
@@ -566,14 +578,57 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
           {stat_card("Monitor", health.upper(), "completed 5m only", cls_for_health(health))}
           {stat_card("Confirmed", str(safe_int(summary.get('confirmed_reactions'))), "$0.40-$0.80 underlying reaction", "good")}
           {stat_card("No-Chase", str(safe_int(summary.get('extended_no_chase'))), "> $0.80 reaction is not upgraded", "warn")}
+          {stat_card("Gap Path", str(gap.get('fill_bucket') or 'unavailable'), "realized path, never a fill prediction", "")}
+          {stat_card("Breadth", str(breadth.get('regime') or 'unavailable'), "frozen challenger, not a gate", "")}
+          {stat_card("QQQ-SPY", qqq_text, str(intermarket.get('qqq_spy_regime') or 'unavailable'), "")}
         </div>
         <p><strong>Mapped levels:</strong> {map_text}</p>
+        <p><strong>Sector leaders vs SPY:</strong> {leader_text}</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Level</th><th>Price</th><th>Direction</th><th>State</th><th>Reaction</th><th>Completed bar</th></tr></thead>
           <tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar level reaction is active. Wait at mapped support/resistance; do not chase a move already extended.</td></tr>'}</tbody>
         </table></div>
         """,
         "Shadow context only · underlying SPY move is not an options-premium prediction · no order authority",
+    )
+
+
+def render_spy_level_outcomes(model: dict[str, Any]) -> str:
+    """Render frozen gap/breadth/intermarket slices without promoting them."""
+    data = model.get("spy_level_outcomes") if isinstance(model.get("spy_level_outcomes"), dict) else {}
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    slices = summary.get("gap_time_to_fill_slices") if isinstance(summary.get("gap_time_to_fill_slices"), list) else []
+    rows: list[str] = []
+    for item in slices:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            "<tr>"
+            f"<td>{esc(item.get('bucket'))}</td>"
+            f"<td>{safe_int(item.get('sample_count'))}</td>"
+            f"<td>{safe_float(item.get('win_rate')) * 100:.1f}%</td>"
+            f"<td>{safe_float(item.get('mean_terminal_outcome_points')):+.2f}</td>"
+            f"<td>{safe_float(item.get('mean_mfe_points')):+.2f}</td>"
+            f"<td>{safe_float(item.get('mean_mae_points')):+.2f}</td>"
+            "</tr>"
+        )
+    blockers = ", ".join(str(item).replace("_", " ") for item in summary.get("promotion_blockers") or []) or "collecting forward observations"
+    return section(
+        "SPY Context Outcome Research",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Resolved", str(safe_int(summary.get('resolved_count'))), "60-minute underlying proxy", "")}
+          {stat_card("Minimum / Bucket", str(data.get('minimum_bucket_sample') or 30), "separate dates and regimes required", "warn")}
+          {stat_card("Promotion", "BLOCKED", "no execution authority", "bad")}
+        </div>
+        <p><strong>Gap time-to-fill slices:</strong> frozen at observation time. They describe outcomes; they never forecast that a gap will fill.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Gap bucket</th><th>N</th><th>Win rate</th><th>Mean terminal pts</th><th>Mean MFE</th><th>Mean MAE</th></tr></thead>
+          <tbody>{''.join(rows) or '<tr><td colspan="6">No resolved 60-minute observations yet. The ledger is collecting completed-bar reactions first.</td></tr>'}</tbody>
+        </table></div>
+        <p><strong>Promotion blockers:</strong> {esc(blockers)}</p>
+        """,
+        "Shadow-only outcome slices · breadth and QQQ/SPY-sector context remain challengers · not option P&L or a live signal",
     )
 
 
@@ -2203,6 +2258,8 @@ def render_html(model: dict[str, Any]) -> str:
     {render_bplus_spotlight(model)}
 
     {render_spy_level_reaction(model)}
+
+    {render_spy_level_outcomes(model)}
 
     <div id="overview" class="section">
       <div class="section-label"><h2>Overview</h2><p>Account, audit, market force, and daily verdict</p></div>

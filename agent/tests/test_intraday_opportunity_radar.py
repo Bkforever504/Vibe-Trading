@@ -15,6 +15,7 @@ from scripts.intraday_opportunity_radar import (
     discovery_map,
     evaluate_candidate,
     fetch_intraday_bars,
+    market_context_snapshot,
     nominate_symbols,
     rank_candidates_by_lane,
     select_symbols_for_intraday_bars,
@@ -192,6 +193,17 @@ def test_missing_market_context_is_visible_but_never_penalizes_or_blocks() -> No
     assert enriched[0]["market_context"]["status"] == "unavailable"
     assert enriched[0]["market_context"]["ranking_adjustment"] == 0.0
     assert enriched[0]["hard_gates"] == {"existing": True}
+
+
+def test_market_context_snapshot_publishes_qqq_spy_and_sector_leaders_without_authority() -> None:
+    context = market_context_snapshot({
+        "SPY": {"gap_return": 0.010}, "QQQ": {"gap_return": 0.022},
+        "XLK": {"gap_return": 0.025}, "XLF": {"gap_return": 0.004}, "XLE": {"gap_return": -0.003},
+    })
+
+    assert context["qqq_spy_regime"] == "qqq_leading_spy"
+    assert context["sector_leaders"][0]["etf"] == "XLK"
+    assert context["authority"] == "context_only_no_gate_or_sizing_effect"
 
 
 def test_intraday_bar_fetch_batches_without_silent_symbol_truncation(monkeypatch) -> None:

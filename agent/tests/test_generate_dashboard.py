@@ -68,6 +68,12 @@ def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
             "operational_health": "ok",
             "level_map": {"levels": [{"name": "previous_day_high", "price": 101.0}]},
             "summary": {"confirmed_reactions": 1, "extended_no_chase": 0},
+            "gap_context": {"fill_bucket": "filled_within_30m"},
+            "breadth_context": {"regime": "mixed"},
+            "intermarket_context": {
+                "qqq_vs_spy_pct": 0.24, "qqq_spy_regime": "qqq_leading_spy",
+                "sector_leaders": [{"etf": "XLK", "vs_spy_pct": 0.31}],
+            },
             "reactions": [{
                 "level_name": "previous_day_high", "level": 101.0, "direction": "bearish",
                 "status": "CONFIRMED_REACTION", "reaction_points": 0.52,
@@ -80,6 +86,29 @@ def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
     assert "previous_day_high" in html
     assert "CONFIRMED_REACTION" in html
     assert "options-premium prediction" in html
+    assert "filled_within_30m" in html
+    assert "qqq_leading_spy" in html
+
+
+def test_dashboard_renders_frozen_gap_outcome_slices_as_blocked_research() -> None:
+    html = dashboard.render_spy_level_outcomes({
+        "spy_level_outcomes": {
+            "minimum_bucket_sample": 30,
+            "summary": {
+                "resolved_count": 2,
+                "promotion_blockers": ["frozen_forward_sample_below_minimum"],
+                "gap_time_to_fill_slices": [{
+                    "bucket": "filled_within_30m", "sample_count": 2, "win_rate": 0.5,
+                    "mean_terminal_outcome_points": 0.12, "mean_mfe_points": 0.44, "mean_mae_points": -0.32,
+                }],
+            },
+        }
+    })
+
+    assert "SPY Context Outcome Research" in html
+    assert "filled_within_30m" in html
+    assert "BLOCKED" in html
+    assert "not option P&amp;L" in html
 
 
 def test_flip_trade_stats_split_all_time_and_post_fix() -> None:
