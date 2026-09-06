@@ -16,6 +16,7 @@ EXCLUDE_PARTS = (
 
 CLASSIFICATIONS = {
     "banks_821_control_shadow.py": ("volume_native_forward_only", "The preregistered control-level retest requires completed-bar volume expansion; forward outcomes remain mandatory."),
+    "cisd_retest_shadow.py": ("volume_overlay_not_preregistered", "The frozen CISD confirmed-retest trial is price-structure based; adding a volume filter after preregistration would define a separate hypothesis family."),
     "donchian_expansion_forward_shadow.py": ("volume_native_forward_only", "This resolves the volume-gated Donchian candidate with a frozen forward cost model; it does not create a new volume hypothesis."),
     "donchian_expansion_shadow.py": ("volume_native_forward_only", "The frozen Donchian candidate requires relative-volume and true-range expansion on completed bars."),
     "ftfc_continuity_shadow.py": ("context_volume_native_forward_only", "The context lane explicitly records daily volume versus SMA9 and a liquidity floor; it is not an entry signal."),

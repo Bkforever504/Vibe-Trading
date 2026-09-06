@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "shadow_only": true,
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "symbols": ["SPY", "QQQ", "IWM"],
+  "timeframes": ["1m", "5m"],
+  "atr_period": 14,
+  "atr_multiplier": 0.5,
+  "pending_timeout_bars": 10,
+  "retest_tolerance_atr": 0.1,
+  "discord_delivery_enabled": false,
+  "minimum_reconciled_outcomes": 30,
+  "requires_human_review": true
+}

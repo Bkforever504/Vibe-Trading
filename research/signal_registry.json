@@ -3816,6 +3816,34 @@
         "family_key": "catalyst",
         "requires_human_review": true
       }
+    },
+    {
+      "id": "cisd_retest_shadow",
+      "name": "CISD Confirmed-Retest Shadow",
+      "script": "scripts/cisd_retest_shadow.py",
+      "status": "shadow",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "can_read_order_history": false,
+      "broker_or_venue": "none",
+      "feeds": [
+        "alpaca_iex_or_sip_completed_1m_bars",
+        "explicit_completed_ohlc_bars",
+        "resolved_forward_outcomes"
+      ],
+      "evidence_gate": "At least 30 reconciled outcomes per timeframe; paired latency, chase-distance, MAE and MFE comparison; purged-CV and block-bootstrap gates; explicit human review",
+      "preregistration": "research/CISD_RETEST_SHADOW_PREREGISTRATION_2026-09-06.md",
+      "notes": "MPL-2.0 attributed CISD lifecycle detector. Pending levels never alert. Confirmed retest is a shadow candidate only and has no notifier, broker, sizing, or order authority.",
+      "family_key": "momentum",
+      "family_assignment_review_required": false,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     }
   ],
   "statistical_gate_schema_version": 1,
