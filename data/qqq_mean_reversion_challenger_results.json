@@ -1,0 +1,4725 @@
+{
+  "schema_version": 1,
+  "experiment": "QQQ-MEAN-REVERSION-CHALLENGER-2026-08-19",
+  "specification": "research/QQQ_MEAN_REVERSION_CHALLENGER_SPEC_2026-08-19.md",
+  "mode": "development_only_research",
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "development_end": "2023-01-26",
+  "sealed_holdouts": {
+    "selection": {
+      "start": "2023-01-27",
+      "opened": false
+    },
+    "final": {
+      "start": "2024-10-21",
+      "opened": false
+    }
+  },
+  "trial_count": 12,
+  "prior_effective_attempts": 909,
+  "effective_attempt_count": 921,
+  "bonferroni_alpha": 5.428881650380022e-05,
+  "survivors": [],
+  "ranked": [
+    {
+      "variant": "double7_sma200_rising20",
+      "rules": {
+        "name": "double7_sma200_rising20",
+        "family": "double7",
+        "rising_sma200": true,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 67,
+        "total_pnl": 5013.99,
+        "expectancy": 74.8356,
+        "win_rate": 0.7313,
+        "profit_factor": 1.8358,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02078615,
+        "top_one_pct_removed_expectancy": 67.704,
+        "average_holding_sessions": 8.552,
+        "average_mae_pct": -2.799,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.323,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            10.9698,
+            139.549
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 67,
+        "total_pnl": 4745.99,
+        "expectancy": 70.8356,
+        "win_rate": 0.7313,
+        "profit_factor": 1.7817,
+        "max_drawdown": 1059.34,
+        "p_value": 0.02687436,
+        "top_one_pct_removed_expectancy": 63.704,
+        "average_holding_sessions": 8.552,
+        "average_mae_pct": -2.799,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.323,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.9698,
+            135.549
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1676.72,
+          "expectancy": 76.2144,
+          "win_rate": 0.7727,
+          "profit_factor": 2.4129,
+          "max_drawdown": 1020.67,
+          "p_value": 0.05604614,
+          "top_one_pct_removed_expectancy": 56.9968,
+          "average_holding_sessions": 8.636,
+          "average_mae_pct": -1.823,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.862,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -25.9396,
+              149.0208
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 578.29,
+          "expectancy": 26.2858,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2722,
+          "max_drawdown": 1035.34,
+          "p_value": 0.32532347,
+          "top_one_pct_removed_expectancy": 6.8343,
+          "average_holding_sessions": 8.273,
+          "average_mae_pct": -2.979,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.973,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -63.0901,
+              112.8659
+            ]
+          }
+        },
+        {
+          "trades": 23,
+          "total_pnl": 2758.98,
+          "expectancy": 119.9557,
+          "win_rate": 0.7391,
+          "profit_factor": 2.0265,
+          "max_drawdown": 771.85,
+          "p_value": 0.06709296,
+          "top_one_pct_removed_expectancy": 100.6119,
+          "average_holding_sessions": 8.739,
+          "average_mae_pct": -3.56,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.099,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              8.3911,
+              236.0784
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 96.6527
+          },
+          "high": {
+            "trades": 22,
+            "expectancy": 80.2358
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 95.491
+          },
+          "medium": {
+            "trades": 24,
+            "expectancy": 189.8596
+          },
+          "shallow": {
+            "trades": 40,
+            "expectancy": 4.2721
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 20,
+            "expectancy": 106.5179
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 7,
+            "expectancy": 64.6625
+          },
+          "Wednesday": {
+            "trades": 12,
+            "expectancy": 20.9101
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 43,
+            "expectancy": 101.0489
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_baseline",
+      "rules": {
+        "name": "double7_baseline",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 4864.94,
+        "expectancy": 71.5432,
+        "win_rate": 0.7353,
+        "profit_factor": 1.8109,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02344643,
+        "top_one_pct_removed_expectancy": 64.4689,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.643,
+            136.3523
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 4592.94,
+        "expectancy": 67.5432,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7565,
+        "max_drawdown": 1059.34,
+        "p_value": 0.0303168,
+        "top_one_pct_removed_expectancy": 60.4689,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.643,
+            132.3523
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1405.24,
+          "expectancy": 63.8744,
+          "win_rate": 0.7727,
+          "profit_factor": 2.1841,
+          "max_drawdown": 817.64,
+          "p_value": 0.08488178,
+          "top_one_pct_removed_expectancy": 44.0692,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -29.2326,
+              132.2352
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 509.11,
+          "expectancy": 23.1412,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2396,
+          "max_drawdown": 1035.34,
+          "p_value": 0.34419103,
+          "top_one_pct_removed_expectancy": 3.5399,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -64.0749,
+              103.9878
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2950.59,
+          "expectancy": 122.9414,
+          "win_rate": 0.75,
+          "profit_factor": 2.0978,
+          "max_drawdown": 771.85,
+          "p_value": 0.05456434,
+          "top_one_pct_removed_expectancy": 104.5684,
+          "average_holding_sessions": 8.708,
+          "average_mae_pct": -3.424,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.082,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              5.7908,
+              234.4952
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 99.4451
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 67.5959
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 95.491
+          },
+          "medium": {
+            "trades": 23,
+            "expectancy": 182.5976
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 9.0171
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 93.3408
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 81.9584
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 19.6713
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 95.3648
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_gap_guard_1atr",
+      "rules": {
+        "name": "double7_gap_guard_1atr",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": 1.0,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 4797.46,
+        "expectancy": 70.551,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7908,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02569024,
+        "top_one_pct_removed_expectancy": 63.4619,
+        "average_holding_sessions": 8.5,
+        "average_mae_pct": -2.826,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.261,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.1789,
+            134.1239
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 4525.46,
+        "expectancy": 66.551,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7372,
+        "max_drawdown": 1059.34,
+        "p_value": 0.03304395,
+        "top_one_pct_removed_expectancy": 59.4619,
+        "average_holding_sessions": 8.5,
+        "average_mae_pct": -2.826,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.261,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.1789,
+            130.1239
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1405.24,
+          "expectancy": 63.8744,
+          "win_rate": 0.7727,
+          "profit_factor": 2.1841,
+          "max_drawdown": 817.64,
+          "p_value": 0.08488178,
+          "top_one_pct_removed_expectancy": 44.0692,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -29.2326,
+              132.2352
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 509.11,
+          "expectancy": 23.1412,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2396,
+          "max_drawdown": 1035.34,
+          "p_value": 0.34419103,
+          "top_one_pct_removed_expectancy": 3.5399,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -64.0749,
+              103.9878
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2883.12,
+          "expectancy": 120.1301,
+          "win_rate": 0.75,
+          "profit_factor": 2.0464,
+          "max_drawdown": 771.85,
+          "p_value": 0.06087764,
+          "top_one_pct_removed_expectancy": 101.6348,
+          "average_holding_sessions": 8.667,
+          "average_mae_pct": -3.451,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.048,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              3.1944,
+              229.5493
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 99.4451
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 64.6623
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 4,
+            "expectancy": -47.635
+          },
+          "medium": {
+            "trades": 22,
+            "expectancy": 209.513
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 9.0171
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 18,
+            "expectancy": 121.2786
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 9,
+            "expectancy": 19.8505
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 19.6713
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 93.8314
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_baseline",
+      "rules": {
+        "name": "rsi2_baseline",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 6503.85,
+        "expectancy": 61.357,
+        "win_rate": 0.717,
+        "profit_factor": 1.8015,
+        "max_drawdown": 1691.94,
+        "p_value": 0.02741514,
+        "top_one_pct_removed_expectancy": 47.0809,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.1608,
+            117.3374
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 6079.85,
+        "expectancy": 57.357,
+        "win_rate": 0.717,
+        "profit_factor": 1.7383,
+        "max_drawdown": 1695.94,
+        "p_value": 0.03632402,
+        "top_one_pct_removed_expectancy": 43.0809,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.1608,
+            113.3374
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 989.3,
+          "expectancy": 28.2656,
+          "win_rate": 0.6857,
+          "profit_factor": 1.3955,
+          "max_drawdown": 1566.61,
+          "p_value": 0.26046811,
+          "top_one_pct_removed_expectancy": 16.3084,
+          "average_holding_sessions": 7.829,
+          "average_mae_pct": -1.741,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.552,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -77.5,
+              109.1292
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1596.76,
+          "expectancy": 45.6216,
+          "win_rate": 0.7429,
+          "profit_factor": 1.9349,
+          "max_drawdown": 498.28,
+          "p_value": 0.05414196,
+          "top_one_pct_removed_expectancy": 37.3973,
+          "average_holding_sessions": 7.114,
+          "average_mae_pct": -2.086,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.673,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -6.9892,
+              94.7924
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 3917.8,
+          "expectancy": 108.8277,
+          "win_rate": 0.7222,
+          "profit_factor": 2.0031,
+          "max_drawdown": 1691.94,
+          "p_value": 0.08557421,
+          "top_one_pct_removed_expectancy": 87.6766,
+          "average_holding_sessions": 9.611,
+          "average_mae_pct": -2.755,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.212,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -21.0031,
+              233.5037
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 63.449
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 96.0336
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": 24.5287
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 205.3424
+          },
+          "medium": {
+            "trades": 18,
+            "expectancy": 96.0464
+          },
+          "shallow": {
+            "trades": 81,
+            "expectancy": 41.2051
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 22,
+            "expectancy": 74.7429
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 23.6963
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": -6.7519
+          },
+          "Tuesday": {
+            "trades": 19,
+            "expectancy": 194.9242
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 34.7874
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 83.1586
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 10.941
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_sma200_rising20",
+      "rules": {
+        "name": "rsi2_sma200_rising20",
+        "family": "rsi2",
+        "rising_sma200": true,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 103,
+        "total_pnl": 6300.32,
+        "expectancy": 61.1681,
+        "win_rate": 0.7184,
+        "profit_factor": 1.7746,
+        "max_drawdown": 1857.91,
+        "p_value": 0.03174292,
+        "top_one_pct_removed_expectancy": 46.4641,
+        "average_holding_sessions": 8.223,
+        "average_mae_pct": -2.208,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.179,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            0.6497,
+            119.7751
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 103,
+        "total_pnl": 5888.32,
+        "expectancy": 57.1681,
+        "win_rate": 0.7184,
+        "profit_factor": 1.7138,
+        "max_drawdown": 1877.91,
+        "p_value": 0.04142198,
+        "top_one_pct_removed_expectancy": 42.4641,
+        "average_holding_sessions": 8.223,
+        "average_mae_pct": -2.208,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.179,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -3.3503,
+            115.7751
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 34,
+          "total_pnl": 874.07,
+          "expectancy": 25.7078,
+          "win_rate": 0.7059,
+          "profit_factor": 1.3469,
+          "max_drawdown": 1857.91,
+          "p_value": 0.28689771,
+          "top_one_pct_removed_expectancy": 13.3108,
+          "average_holding_sessions": 7.824,
+          "average_mae_pct": -1.756,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.543,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -105.5322,
+              116.9035
+            ]
+          }
+        },
+        {
+          "trades": 34,
+          "total_pnl": 1564.97,
+          "expectancy": 46.0284,
+          "win_rate": 0.7353,
+          "profit_factor": 1.9162,
+          "max_drawdown": 498.28,
+          "p_value": 0.05873664,
+          "top_one_pct_removed_expectancy": 37.5673,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.04,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.692,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -6.1482,
+              95.4825
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 3861.28,
+          "expectancy": 110.3224,
+          "win_rate": 0.7143,
+          "profit_factor": 1.9886,
+          "max_drawdown": 1691.94,
+          "p_value": 0.08875354,
+          "top_one_pct_removed_expectancy": 88.5932,
+          "average_holding_sessions": 9.8,
+          "average_mae_pct": -2.81,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.269,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -23.8589,
+              239.3521
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 35,
+            "expectancy": 74.2515
+          },
+          "middle": {
+            "trades": 34,
+            "expectancy": 85.0009
+          },
+          "high": {
+            "trades": 34,
+            "expectancy": 23.8672
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 205.3424
+          },
+          "medium": {
+            "trades": 19,
+            "expectancy": 108.4316
+          },
+          "shallow": {
+            "trades": 77,
+            "expectancy": 36.3989
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 21,
+            "expectancy": 82.9846
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 7.606
+          },
+          "Thursday": {
+            "trades": 20,
+            "expectancy": -26.1558
+          },
+          "Tuesday": {
+            "trades": 18,
+            "expectancy": 200.7165
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 56.8754
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 72,
+            "expectancy": 76.447
+          },
+          "True": {
+            "trades": 31,
+            "expectancy": 25.6817
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_gap_guard_1atr",
+      "rules": {
+        "name": "rsi2_gap_guard_1atr",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": 1.0,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 6353.48,
+        "expectancy": 59.9385,
+        "win_rate": 0.717,
+        "profit_factor": 1.7728,
+        "max_drawdown": 1750.39,
+        "p_value": 0.03239152,
+        "top_one_pct_removed_expectancy": 45.635,
+        "average_holding_sessions": 8.142,
+        "average_mae_pct": -2.204,
+        "worst_mae_pct": -25.966,
+        "average_mfe_pct": 2.139,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            4.5638,
+            115.4881
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 5929.48,
+        "expectancy": 55.9385,
+        "win_rate": 0.717,
+        "profit_factor": 1.7109,
+        "max_drawdown": 1754.39,
+        "p_value": 0.04239825,
+        "top_one_pct_removed_expectancy": 41.635,
+        "average_holding_sessions": 8.142,
+        "average_mae_pct": -2.204,
+        "worst_mae_pct": -25.966,
+        "average_mfe_pct": 2.139,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            0.5638,
+            111.4881
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 1174.37,
+          "expectancy": 33.5534,
+          "win_rate": 0.6857,
+          "profit_factor": 1.4607,
+          "max_drawdown": 1614.44,
+          "p_value": 0.2329469,
+          "top_one_pct_removed_expectancy": 21.7518,
+          "average_holding_sessions": 7.771,
+          "average_mae_pct": -1.69,
+          "worst_mae_pct": -13.813,
+          "average_mfe_pct": 1.604,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -75.2453,
+              114.8353
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1450.27,
+          "expectancy": 41.4363,
+          "win_rate": 0.7429,
+          "profit_factor": 1.8491,
+          "max_drawdown": 498.28,
+          "p_value": 0.06999251,
+          "top_one_pct_removed_expectancy": 33.0889,
+          "average_holding_sessions": 7.086,
+          "average_mae_pct": -2.1,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.632,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -8.7296,
+              87.6036
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 3728.84,
+          "expectancy": 103.5788,
+          "win_rate": 0.7222,
+          "profit_factor": 1.9407,
+          "max_drawdown": 1750.39,
+          "p_value": 0.09905317,
+          "top_one_pct_removed_expectancy": 82.2777,
+          "average_holding_sessions": 9.528,
+          "average_mae_pct": -2.805,
+          "worst_mae_pct": -25.966,
+          "average_mfe_pct": 3.153,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -25.2825,
+              227.0189
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 69.1238
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 92.5709
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": 17.8583
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 8,
+            "expectancy": -55.0217
+          },
+          "medium": {
+            "trades": 19,
+            "expectancy": 206.1822
+          },
+          "shallow": {
+            "trades": 79,
+            "expectancy": 36.4075
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 21,
+            "expectancy": 71.7969
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 182.304
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": -6.7519
+          },
+          "Tuesday": {
+            "trades": 20,
+            "expectancy": 27.9163
+          },
+          "Wednesday": {
+            "trades": 25,
+            "expectancy": 38.6172
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 81.7729
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 9.4463
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_vol_scaled",
+      "rules": {
+        "name": "double7_vol_scaled",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": true,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 3791.23,
+        "expectancy": 55.7534,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7391,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02942832,
+        "top_one_pct_removed_expectancy": 49.4245,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            1.6524,
+            107.1409
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 3548.14,
+        "expectancy": 52.1786,
+        "win_rate": 0.7353,
+        "profit_factor": 1.6831,
+        "max_drawdown": 1059.34,
+        "p_value": 0.03853876,
+        "top_one_pct_removed_expectancy": 45.8561,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -1.9554,
+            103.7775
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1571.79,
+          "expectancy": 71.4448,
+          "win_rate": 0.7727,
+          "profit_factor": 2.5466,
+          "max_drawdown": 647.33,
+          "p_value": 0.0435514,
+          "top_one_pct_removed_expectancy": 52.0,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -7.4734,
+              132.1324
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": -10.75,
+          "expectancy": -0.4885,
+          "win_rate": 0.6818,
+          "profit_factor": 0.9948,
+          "max_drawdown": 1035.34,
+          "p_value": 0.50388261,
+          "top_one_pct_removed_expectancy": -10.6803,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -79.0509,
+              73.0853
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2230.19,
+          "expectancy": 92.9246,
+          "win_rate": 0.75,
+          "profit_factor": 2.0797,
+          "max_drawdown": 641.77,
+          "p_value": 0.05614108,
+          "top_one_pct_removed_expectancy": 76.2152,
+          "average_holding_sessions": 8.708,
+          "average_mae_pct": -3.424,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.082,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              4.6205,
+              175.3199
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 98.9183
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 21.4168
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 57.9529
+          },
+          "medium": {
+            "trades": 23,
+            "expectancy": 124.9318
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 17.7128
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 0.1855
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 70.3261
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 105.5602
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 93.9999
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 25.2285
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 71.4049
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.0589
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": false,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_exit_sma5",
+      "rules": {
+        "name": "double7_exit_sma5",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": "sma5",
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 86,
+        "total_pnl": 4529.17,
+        "expectancy": 52.6648,
+        "win_rate": 0.6977,
+        "profit_factor": 1.9986,
+        "max_drawdown": 750.18,
+        "p_value": 0.00552004,
+        "top_one_pct_removed_expectancy": 46.4948,
+        "average_holding_sessions": 4.628,
+        "average_mae_pct": -2.119,
+        "worst_mae_pct": -10.91,
+        "average_mfe_pct": 1.721,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            19.3612,
+            84.699
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 86,
+        "total_pnl": 4185.17,
+        "expectancy": 48.6648,
+        "win_rate": 0.686,
+        "profit_factor": 1.902,
+        "max_drawdown": 758.18,
+        "p_value": 0.0094271,
+        "top_one_pct_removed_expectancy": 42.4948,
+        "average_holding_sessions": 4.628,
+        "average_mae_pct": -2.119,
+        "worst_mae_pct": -10.91,
+        "average_mfe_pct": 1.721,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            15.3612,
+            80.699
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 28,
+          "total_pnl": 1340.34,
+          "expectancy": 47.8692,
+          "win_rate": 0.75,
+          "profit_factor": 2.3789,
+          "max_drawdown": 495.89,
+          "p_value": 0.03634865,
+          "top_one_pct_removed_expectancy": 40.5597,
+          "average_holding_sessions": 4.893,
+          "average_mae_pct": -1.339,
+          "worst_mae_pct": -7.543,
+          "average_mfe_pct": 1.362,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -4.1238,
+              95.9298
+            ]
+          }
+        },
+        {
+          "trades": 28,
+          "total_pnl": 743.84,
+          "expectancy": 26.5658,
+          "win_rate": 0.5714,
+          "profit_factor": 1.3615,
+          "max_drawdown": 642.49,
+          "p_value": 0.25417504,
+          "top_one_pct_removed_expectancy": 13.6809,
+          "average_holding_sessions": 4.607,
+          "average_mae_pct": -2.737,
+          "worst_mae_pct": -10.605,
+          "average_mfe_pct": 1.619,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -31.256,
+              88.4518
+            ]
+          }
+        },
+        {
+          "trades": 30,
+          "total_pnl": 2444.99,
+          "expectancy": 81.4997,
+          "win_rate": 0.7667,
+          "profit_factor": 2.6235,
+          "max_drawdown": 750.18,
+          "p_value": 0.01880866,
+          "top_one_pct_removed_expectancy": 64.4094,
+          "average_holding_sessions": 4.4,
+          "average_mae_pct": -2.271,
+          "worst_mae_pct": -10.91,
+          "average_mfe_pct": 2.152,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              32.3749,
+              127.9852
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 29,
+            "expectancy": 20.4145
+          },
+          "middle": {
+            "trades": 28,
+            "expectancy": 67.1708
+          },
+          "high": {
+            "trades": 29,
+            "expectancy": 70.9093
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 11,
+            "expectancy": 61.3675
+          },
+          "medium": {
+            "trades": 30,
+            "expectancy": 115.3626
+          },
+          "shallow": {
+            "trades": 45,
+            "expectancy": 8.739
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 18,
+            "expectancy": -31.809
+          },
+          "Monday": {
+            "trades": 22,
+            "expectancy": 56.8731
+          },
+          "Thursday": {
+            "trades": 18,
+            "expectancy": 121.2137
+          },
+          "Tuesday": {
+            "trades": 13,
+            "expectancy": 53.1859
+          },
+          "Wednesday": {
+            "trades": 15,
+            "expectancy": 65.1509
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 54,
+            "expectancy": 55.2209
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 48.3514
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_vol_scaled",
+      "rules": {
+        "name": "rsi2_vol_scaled",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": true,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 5515.78,
+        "expectancy": 52.0357,
+        "win_rate": 0.717,
+        "profit_factor": 1.8431,
+        "max_drawdown": 1361.52,
+        "p_value": 0.01814665,
+        "top_one_pct_removed_expectancy": 39.8251,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            9.9845,
+            94.4303
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 5140.29,
+        "expectancy": 48.4933,
+        "win_rate": 0.717,
+        "profit_factor": 1.7733,
+        "max_drawdown": 1364.74,
+        "p_value": 0.02550294,
+        "top_one_pct_removed_expectancy": 36.2915,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.5151,
+            90.7167
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 1175.36,
+          "expectancy": 33.5819,
+          "win_rate": 0.6857,
+          "profit_factor": 1.5365,
+          "max_drawdown": 1275.64,
+          "p_value": 0.18405569,
+          "top_one_pct_removed_expectancy": 22.7914,
+          "average_holding_sessions": 7.829,
+          "average_mae_pct": -1.741,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.552,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -54.9722,
+              104.4728
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1533.92,
+          "expectancy": 43.8264,
+          "win_rate": 0.7429,
+          "profit_factor": 2.0792,
+          "max_drawdown": 435.33,
+          "p_value": 0.03891353,
+          "top_one_pct_removed_expectancy": 35.5493,
+          "average_holding_sessions": 7.114,
+          "average_mae_pct": -2.086,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.673,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -3.5293,
+              89.294
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 2806.5,
+          "expectancy": 77.9582,
+          "win_rate": 0.7222,
+          "profit_factor": 1.9577,
+          "max_drawdown": 1361.52,
+          "p_value": 0.0946745,
+          "top_one_pct_removed_expectancy": 58.5192,
+          "average_holding_sessions": 9.611,
+          "average_mae_pct": -2.755,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.212,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -10.6385,
+              164.5519
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 63.449
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 95.2962
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": -2.9642
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 128.7396
+          },
+          "medium": {
+            "trades": 18,
+            "expectancy": 69.1236
+          },
+          "shallow": {
+            "trades": 81,
+            "expectancy": 41.6096
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 22,
+            "expectancy": 70.8059
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 11.9508
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": 0.7729
+          },
+          "Tuesday": {
+            "trades": 19,
+            "expectancy": 168.4141
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 21.3473
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 73.4511
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 2.5127
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_exit_prior_high",
+      "rules": {
+        "name": "rsi2_exit_prior_high",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": "prior_high",
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 136,
+        "total_pnl": 7058.65,
+        "expectancy": 51.9018,
+        "win_rate": 0.7794,
+        "profit_factor": 2.1421,
+        "max_drawdown": 1182.11,
+        "p_value": 0.00035373,
+        "top_one_pct_removed_expectancy": 46.5573,
+        "average_holding_sessions": 4.324,
+        "average_mae_pct": -1.766,
+        "worst_mae_pct": -11.506,
+        "average_mfe_pct": 1.551,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            22.2307,
+            83.2778
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 136,
+        "total_pnl": 6514.65,
+        "expectancy": 47.9018,
+        "win_rate": 0.7574,
+        "profit_factor": 2.0335,
+        "max_drawdown": 1234.11,
+        "p_value": 0.000887,
+        "top_one_pct_removed_expectancy": 42.5573,
+        "average_holding_sessions": 4.324,
+        "average_mae_pct": -1.766,
+        "worst_mae_pct": -11.506,
+        "average_mfe_pct": 1.551,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            18.2307,
+            79.2778
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 45,
+          "total_pnl": 1558.96,
+          "expectancy": 34.6436,
+          "win_rate": 0.7778,
+          "profit_factor": 2.0198,
+          "max_drawdown": 545.52,
+          "p_value": 0.03862733,
+          "top_one_pct_removed_expectancy": 26.7644,
+          "average_holding_sessions": 4.333,
+          "average_mae_pct": -1.347,
+          "worst_mae_pct": -7.044,
+          "average_mfe_pct": 1.141,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              7.3433,
+              60.5739
+            ]
+          }
+        },
+        {
+          "trades": 45,
+          "total_pnl": 575.28,
+          "expectancy": 12.784,
+          "win_rate": 0.7111,
+          "profit_factor": 1.1898,
+          "max_drawdown": 1182.11,
+          "p_value": 0.33630389,
+          "top_one_pct_removed_expectancy": 5.9164,
+          "average_holding_sessions": 4.356,
+          "average_mae_pct": -2.059,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.386,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -40.6661,
+              66.9514
+            ]
+          }
+        },
+        {
+          "trades": 46,
+          "total_pnl": 4924.41,
+          "expectancy": 107.0523,
+          "win_rate": 0.8478,
+          "profit_factor": 4.0371,
+          "max_drawdown": 452.63,
+          "p_value": 3.826e-05,
+          "top_one_pct_removed_expectancy": 99.8567,
+          "average_holding_sessions": 4.283,
+          "average_mae_pct": -1.889,
+          "worst_mae_pct": -10.605,
+          "average_mfe_pct": 2.115,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              60.6673,
+              158.1063
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 46,
+            "expectancy": 19.5189
+          },
+          "middle": {
+            "trades": 45,
+            "expectancy": 36.3157
+          },
+          "high": {
+            "trades": 45,
+            "expectancy": 100.5905
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 15,
+            "expectancy": 81.1952
+          },
+          "medium": {
+            "trades": 26,
+            "expectancy": 136.3682
+          },
+          "shallow": {
+            "trades": 95,
+            "expectancy": 24.1594
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 28,
+            "expectancy": 18.1566
+          },
+          "Monday": {
+            "trades": 26,
+            "expectancy": 52.8301
+          },
+          "Thursday": {
+            "trades": 29,
+            "expectancy": 35.1108
+          },
+          "Tuesday": {
+            "trades": 26,
+            "expectancy": 109.9151
+          },
+          "Wednesday": {
+            "trades": 27,
+            "expectancy": 48.1731
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 95,
+            "expectancy": 58.4977
+          },
+          "True": {
+            "trades": 41,
+            "expectancy": 36.6186
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_turn_of_month",
+      "rules": {
+        "name": "double7_turn_of_month",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": true,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 36,
+        "total_pnl": 1758.67,
+        "expectancy": 48.852,
+        "win_rate": 0.6667,
+        "profit_factor": 1.6023,
+        "max_drawdown": 799.65,
+        "p_value": 0.14977584,
+        "top_one_pct_removed_expectancy": 28.8759,
+        "average_holding_sessions": 8.139,
+        "average_mae_pct": -3.244,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.134,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -45.15,
+            139.1376
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 36,
+        "total_pnl": 1614.67,
+        "expectancy": 44.852,
+        "win_rate": 0.6667,
+        "profit_factor": 1.544,
+        "max_drawdown": 823.65,
+        "p_value": 0.17043356,
+        "top_one_pct_removed_expectancy": 24.8759,
+        "average_holding_sessions": 8.139,
+        "average_mae_pct": -3.244,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.134,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -49.15,
+            135.1376
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 192.14,
+          "expectancy": 16.0113,
+          "win_rate": 0.6667,
+          "profit_factor": 1.2487,
+          "max_drawdown": 685.88,
+          "p_value": 0.39679477,
+          "top_one_pct_removed_expectancy": -0.925,
+          "average_holding_sessions": 8.583,
+          "average_mae_pct": -2.338,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.484,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -86.9775,
+              108.387
+            ]
+          }
+        },
+        {
+          "trades": 12,
+          "total_pnl": 953.26,
+          "expectancy": 79.4385,
+          "win_rate": 0.75,
+          "profit_factor": 2.5517,
+          "max_drawdown": 321.09,
+          "p_value": 0.08808305,
+          "top_one_pct_removed_expectancy": 47.1358,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.724,
+          "worst_mae_pct": -10.263,
+          "average_mfe_pct": 2.297,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              1.7778,
+              151.1907
+            ]
+          }
+        },
+        {
+          "trades": 12,
+          "total_pnl": 613.27,
+          "expectancy": 51.1061,
+          "win_rate": 0.5833,
+          "profit_factor": 1.4,
+          "max_drawdown": 799.65,
+          "p_value": 0.33171104,
+          "top_one_pct_removed_expectancy": -12.2493,
+          "average_holding_sessions": 8.833,
+          "average_mae_pct": -4.67,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 2.622,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -135.9748,
+              241.3461
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 12,
+            "expectancy": 14.0511
+          },
+          "middle": {
+            "trades": 12,
+            "expectancy": 102.0486
+          },
+          "high": {
+            "trades": 12,
+            "expectancy": 30.4563
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 6,
+            "expectancy": 80.3965
+          },
+          "medium": {
+            "trades": 11,
+            "expectancy": 127.8851
+          },
+          "shallow": {
+            "trades": 19,
+            "expectancy": -6.8655
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 7,
+            "expectancy": 50.2877
+          },
+          "Monday": {
+            "trades": 6,
+            "expectancy": 189.227
+          },
+          "Thursday": {
+            "trades": 10,
+            "expectancy": 130.6625
+          },
+          "Tuesday": {
+            "trades": 3,
+            "expectancy": -160.6811
+          },
+          "Wednesday": {
+            "trades": 10,
+            "expectancy": -55.3287
+          }
+        },
+        "turn_of_month": {
+          "True": {
+            "trades": 36,
+            "expectancy": 48.852
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": false,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": false,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_rsi2_hybrid",
+      "rules": {
+        "name": "double7_rsi2_hybrid",
+        "family": "hybrid",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": true
+      },
+      "development": {
+        "trades": 62,
+        "total_pnl": 2218.89,
+        "expectancy": 35.7886,
+        "win_rate": 0.6613,
+        "profit_factor": 1.4342,
+        "max_drawdown": 1123.75,
+        "p_value": 0.13851764,
+        "top_one_pct_removed_expectancy": 28.373,
+        "average_holding_sessions": 6.758,
+        "average_mae_pct": -2.492,
+        "worst_mae_pct": -12.622,
+        "average_mfe_pct": 1.974,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -20.4563,
+            90.1828
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 62,
+        "total_pnl": 1970.89,
+        "expectancy": 31.7886,
+        "win_rate": 0.6613,
+        "profit_factor": 1.3794,
+        "max_drawdown": 1167.75,
+        "p_value": 0.16714423,
+        "top_one_pct_removed_expectancy": 24.373,
+        "average_holding_sessions": 6.758,
+        "average_mae_pct": -2.492,
+        "worst_mae_pct": -12.622,
+        "average_mfe_pct": 1.974,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -24.4563,
+            86.1828
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 20,
+          "total_pnl": 345.46,
+          "expectancy": 17.2731,
+          "win_rate": 0.7,
+          "profit_factor": 1.2673,
+          "max_drawdown": 963.06,
+          "p_value": 0.35781977,
+          "top_one_pct_removed_expectancy": -1.2659,
+          "average_holding_sessions": 6.95,
+          "average_mae_pct": -1.896,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.473,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -75.8347,
+              96.0737
+            ]
+          }
+        },
+        {
+          "trades": 20,
+          "total_pnl": 180.5,
+          "expectancy": 9.0252,
+          "win_rate": 0.6,
+          "profit_factor": 1.1057,
+          "max_drawdown": 1123.75,
+          "p_value": 0.43077966,
+          "top_one_pct_removed_expectancy": -13.3824,
+          "average_holding_sessions": 6.3,
+          "average_mae_pct": -2.629,
+          "worst_mae_pct": -8.813,
+          "average_mfe_pct": 1.707,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -96.0541,
+              99.421
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 1692.93,
+          "expectancy": 76.9513,
+          "win_rate": 0.6818,
+          "profit_factor": 1.802,
+          "max_drawdown": 768.08,
+          "p_value": 0.13070987,
+          "top_one_pct_removed_expectancy": 57.371,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.909,
+          "worst_mae_pct": -12.622,
+          "average_mfe_pct": 2.672,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -11.052,
+              159.6117
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 21,
+            "expectancy": 64.5411
+          },
+          "middle": {
+            "trades": 20,
+            "expectancy": 6.8251
+          },
+          "high": {
+            "trades": 21,
+            "expectancy": 34.6205
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 5,
+            "expectancy": 166.3675
+          },
+          "medium": {
+            "trades": 24,
+            "expectancy": 61.763
+          },
+          "shallow": {
+            "trades": 33,
+            "expectancy": -2.8866
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 14,
+            "expectancy": 66.7941
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 41.4704
+          },
+          "Thursday": {
+            "trades": 9,
+            "expectancy": -51.1969
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 49.8004
+          },
+          "Wednesday": {
+            "trades": 12,
+            "expectancy": 46.5173
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 41,
+            "expectancy": 49.7314
+          },
+          "True": {
+            "trades": 21,
+            "expectancy": 8.5669
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": false,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    }
+  ],
+  "results": [
+    {
+      "variant": "double7_baseline",
+      "rules": {
+        "name": "double7_baseline",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 4864.94,
+        "expectancy": 71.5432,
+        "win_rate": 0.7353,
+        "profit_factor": 1.8109,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02344643,
+        "top_one_pct_removed_expectancy": 64.4689,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.643,
+            136.3523
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 4592.94,
+        "expectancy": 67.5432,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7565,
+        "max_drawdown": 1059.34,
+        "p_value": 0.0303168,
+        "top_one_pct_removed_expectancy": 60.4689,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.643,
+            132.3523
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1405.24,
+          "expectancy": 63.8744,
+          "win_rate": 0.7727,
+          "profit_factor": 2.1841,
+          "max_drawdown": 817.64,
+          "p_value": 0.08488178,
+          "top_one_pct_removed_expectancy": 44.0692,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -29.2326,
+              132.2352
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 509.11,
+          "expectancy": 23.1412,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2396,
+          "max_drawdown": 1035.34,
+          "p_value": 0.34419103,
+          "top_one_pct_removed_expectancy": 3.5399,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -64.0749,
+              103.9878
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2950.59,
+          "expectancy": 122.9414,
+          "win_rate": 0.75,
+          "profit_factor": 2.0978,
+          "max_drawdown": 771.85,
+          "p_value": 0.05456434,
+          "top_one_pct_removed_expectancy": 104.5684,
+          "average_holding_sessions": 8.708,
+          "average_mae_pct": -3.424,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.082,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              5.7908,
+              234.4952
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 99.4451
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 67.5959
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 95.491
+          },
+          "medium": {
+            "trades": 23,
+            "expectancy": 182.5976
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 9.0171
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 93.3408
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 81.9584
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 19.6713
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 95.3648
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_sma200_rising20",
+      "rules": {
+        "name": "double7_sma200_rising20",
+        "family": "double7",
+        "rising_sma200": true,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 67,
+        "total_pnl": 5013.99,
+        "expectancy": 74.8356,
+        "win_rate": 0.7313,
+        "profit_factor": 1.8358,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02078615,
+        "top_one_pct_removed_expectancy": 67.704,
+        "average_holding_sessions": 8.552,
+        "average_mae_pct": -2.799,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.323,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            10.9698,
+            139.549
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 67,
+        "total_pnl": 4745.99,
+        "expectancy": 70.8356,
+        "win_rate": 0.7313,
+        "profit_factor": 1.7817,
+        "max_drawdown": 1059.34,
+        "p_value": 0.02687436,
+        "top_one_pct_removed_expectancy": 63.704,
+        "average_holding_sessions": 8.552,
+        "average_mae_pct": -2.799,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.323,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.9698,
+            135.549
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1676.72,
+          "expectancy": 76.2144,
+          "win_rate": 0.7727,
+          "profit_factor": 2.4129,
+          "max_drawdown": 1020.67,
+          "p_value": 0.05604614,
+          "top_one_pct_removed_expectancy": 56.9968,
+          "average_holding_sessions": 8.636,
+          "average_mae_pct": -1.823,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.862,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -25.9396,
+              149.0208
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 578.29,
+          "expectancy": 26.2858,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2722,
+          "max_drawdown": 1035.34,
+          "p_value": 0.32532347,
+          "top_one_pct_removed_expectancy": 6.8343,
+          "average_holding_sessions": 8.273,
+          "average_mae_pct": -2.979,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.973,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -63.0901,
+              112.8659
+            ]
+          }
+        },
+        {
+          "trades": 23,
+          "total_pnl": 2758.98,
+          "expectancy": 119.9557,
+          "win_rate": 0.7391,
+          "profit_factor": 2.0265,
+          "max_drawdown": 771.85,
+          "p_value": 0.06709296,
+          "top_one_pct_removed_expectancy": 100.6119,
+          "average_holding_sessions": 8.739,
+          "average_mae_pct": -3.56,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.099,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              8.3911,
+              236.0784
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 96.6527
+          },
+          "high": {
+            "trades": 22,
+            "expectancy": 80.2358
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 95.491
+          },
+          "medium": {
+            "trades": 24,
+            "expectancy": 189.8596
+          },
+          "shallow": {
+            "trades": 40,
+            "expectancy": 4.2721
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 20,
+            "expectancy": 106.5179
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 7,
+            "expectancy": 64.6625
+          },
+          "Wednesday": {
+            "trades": 12,
+            "expectancy": 20.9101
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 43,
+            "expectancy": 101.0489
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_gap_guard_1atr",
+      "rules": {
+        "name": "double7_gap_guard_1atr",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": 1.0,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 4797.46,
+        "expectancy": 70.551,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7908,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02569024,
+        "top_one_pct_removed_expectancy": 63.4619,
+        "average_holding_sessions": 8.5,
+        "average_mae_pct": -2.826,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.261,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.1789,
+            134.1239
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 4525.46,
+        "expectancy": 66.551,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7372,
+        "max_drawdown": 1059.34,
+        "p_value": 0.03304395,
+        "top_one_pct_removed_expectancy": 59.4619,
+        "average_holding_sessions": 8.5,
+        "average_mae_pct": -2.826,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.261,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.1789,
+            130.1239
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1405.24,
+          "expectancy": 63.8744,
+          "win_rate": 0.7727,
+          "profit_factor": 2.1841,
+          "max_drawdown": 817.64,
+          "p_value": 0.08488178,
+          "top_one_pct_removed_expectancy": 44.0692,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -29.2326,
+              132.2352
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 509.11,
+          "expectancy": 23.1412,
+          "win_rate": 0.6818,
+          "profit_factor": 1.2396,
+          "max_drawdown": 1035.34,
+          "p_value": 0.34419103,
+          "top_one_pct_removed_expectancy": 3.5399,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -64.0749,
+              103.9878
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2883.12,
+          "expectancy": 120.1301,
+          "win_rate": 0.75,
+          "profit_factor": 2.0464,
+          "max_drawdown": 771.85,
+          "p_value": 0.06087764,
+          "top_one_pct_removed_expectancy": 101.6348,
+          "average_holding_sessions": 8.667,
+          "average_mae_pct": -3.451,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.048,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              3.1944,
+              229.5493
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 99.4451
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 64.6623
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 4,
+            "expectancy": -47.635
+          },
+          "medium": {
+            "trades": 22,
+            "expectancy": 209.513
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 9.0171
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 47.0272
+          },
+          "Monday": {
+            "trades": 18,
+            "expectancy": 121.2786
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 113.4354
+          },
+          "Tuesday": {
+            "trades": 9,
+            "expectancy": 19.8505
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 19.6713
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 93.8314
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.8702
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_vol_scaled",
+      "rules": {
+        "name": "double7_vol_scaled",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": true,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 68,
+        "total_pnl": 3791.23,
+        "expectancy": 55.7534,
+        "win_rate": 0.7353,
+        "profit_factor": 1.7391,
+        "max_drawdown": 1035.34,
+        "p_value": 0.02942832,
+        "top_one_pct_removed_expectancy": 49.4245,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            1.6524,
+            107.1409
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 68,
+        "total_pnl": 3548.14,
+        "expectancy": 52.1786,
+        "win_rate": 0.7353,
+        "profit_factor": 1.6831,
+        "max_drawdown": 1059.34,
+        "p_value": 0.03853876,
+        "top_one_pct_removed_expectancy": 45.8561,
+        "average_holding_sessions": 8.515,
+        "average_mae_pct": -2.817,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.273,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -1.9554,
+            103.7775
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 22,
+          "total_pnl": 1571.79,
+          "expectancy": 71.4448,
+          "win_rate": 0.7727,
+          "profit_factor": 2.5466,
+          "max_drawdown": 647.33,
+          "p_value": 0.0435514,
+          "top_one_pct_removed_expectancy": 52.0,
+          "average_holding_sessions": 8.773,
+          "average_mae_pct": -1.979,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.745,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -7.4734,
+              132.1324
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": -10.75,
+          "expectancy": -0.4885,
+          "win_rate": 0.6818,
+          "profit_factor": 0.9948,
+          "max_drawdown": 1035.34,
+          "p_value": 0.50388261,
+          "top_one_pct_removed_expectancy": -10.6803,
+          "average_holding_sessions": 8.045,
+          "average_mae_pct": -2.992,
+          "worst_mae_pct": -12.212,
+          "average_mfe_pct": 1.917,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -79.0509,
+              73.0853
+            ]
+          }
+        },
+        {
+          "trades": 24,
+          "total_pnl": 2230.19,
+          "expectancy": 92.9246,
+          "win_rate": 0.75,
+          "profit_factor": 2.0797,
+          "max_drawdown": 641.77,
+          "p_value": 0.05614108,
+          "top_one_pct_removed_expectancy": 76.2152,
+          "average_holding_sessions": 8.708,
+          "average_mae_pct": -3.424,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 3.082,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              4.6205,
+              175.3199
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 23,
+            "expectancy": 48.8017
+          },
+          "middle": {
+            "trades": 22,
+            "expectancy": 98.9183
+          },
+          "high": {
+            "trades": 23,
+            "expectancy": 21.4168
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 3,
+            "expectancy": 57.9529
+          },
+          "medium": {
+            "trades": 23,
+            "expectancy": 124.9318
+          },
+          "shallow": {
+            "trades": 42,
+            "expectancy": 17.7128
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 15,
+            "expectancy": 0.1855
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 70.3261
+          },
+          "Thursday": {
+            "trades": 13,
+            "expectancy": 105.5602
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 93.9999
+          },
+          "Wednesday": {
+            "trades": 13,
+            "expectancy": 25.2285
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 44,
+            "expectancy": 71.4049
+          },
+          "True": {
+            "trades": 24,
+            "expectancy": 27.0589
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": false,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_exit_sma5",
+      "rules": {
+        "name": "double7_exit_sma5",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": "sma5",
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 86,
+        "total_pnl": 4529.17,
+        "expectancy": 52.6648,
+        "win_rate": 0.6977,
+        "profit_factor": 1.9986,
+        "max_drawdown": 750.18,
+        "p_value": 0.00552004,
+        "top_one_pct_removed_expectancy": 46.4948,
+        "average_holding_sessions": 4.628,
+        "average_mae_pct": -2.119,
+        "worst_mae_pct": -10.91,
+        "average_mfe_pct": 1.721,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            19.3612,
+            84.699
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 86,
+        "total_pnl": 4185.17,
+        "expectancy": 48.6648,
+        "win_rate": 0.686,
+        "profit_factor": 1.902,
+        "max_drawdown": 758.18,
+        "p_value": 0.0094271,
+        "top_one_pct_removed_expectancy": 42.4948,
+        "average_holding_sessions": 4.628,
+        "average_mae_pct": -2.119,
+        "worst_mae_pct": -10.91,
+        "average_mfe_pct": 1.721,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            15.3612,
+            80.699
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 28,
+          "total_pnl": 1340.34,
+          "expectancy": 47.8692,
+          "win_rate": 0.75,
+          "profit_factor": 2.3789,
+          "max_drawdown": 495.89,
+          "p_value": 0.03634865,
+          "top_one_pct_removed_expectancy": 40.5597,
+          "average_holding_sessions": 4.893,
+          "average_mae_pct": -1.339,
+          "worst_mae_pct": -7.543,
+          "average_mfe_pct": 1.362,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -4.1238,
+              95.9298
+            ]
+          }
+        },
+        {
+          "trades": 28,
+          "total_pnl": 743.84,
+          "expectancy": 26.5658,
+          "win_rate": 0.5714,
+          "profit_factor": 1.3615,
+          "max_drawdown": 642.49,
+          "p_value": 0.25417504,
+          "top_one_pct_removed_expectancy": 13.6809,
+          "average_holding_sessions": 4.607,
+          "average_mae_pct": -2.737,
+          "worst_mae_pct": -10.605,
+          "average_mfe_pct": 1.619,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -31.256,
+              88.4518
+            ]
+          }
+        },
+        {
+          "trades": 30,
+          "total_pnl": 2444.99,
+          "expectancy": 81.4997,
+          "win_rate": 0.7667,
+          "profit_factor": 2.6235,
+          "max_drawdown": 750.18,
+          "p_value": 0.01880866,
+          "top_one_pct_removed_expectancy": 64.4094,
+          "average_holding_sessions": 4.4,
+          "average_mae_pct": -2.271,
+          "worst_mae_pct": -10.91,
+          "average_mfe_pct": 2.152,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              32.3749,
+              127.9852
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 29,
+            "expectancy": 20.4145
+          },
+          "middle": {
+            "trades": 28,
+            "expectancy": 67.1708
+          },
+          "high": {
+            "trades": 29,
+            "expectancy": 70.9093
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 11,
+            "expectancy": 61.3675
+          },
+          "medium": {
+            "trades": 30,
+            "expectancy": 115.3626
+          },
+          "shallow": {
+            "trades": 45,
+            "expectancy": 8.739
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 18,
+            "expectancy": -31.809
+          },
+          "Monday": {
+            "trades": 22,
+            "expectancy": 56.8731
+          },
+          "Thursday": {
+            "trades": 18,
+            "expectancy": 121.2137
+          },
+          "Tuesday": {
+            "trades": 13,
+            "expectancy": 53.1859
+          },
+          "Wednesday": {
+            "trades": 15,
+            "expectancy": 65.1509
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 54,
+            "expectancy": 55.2209
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 48.3514
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_turn_of_month",
+      "rules": {
+        "name": "double7_turn_of_month",
+        "family": "double7",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": true,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 36,
+        "total_pnl": 1758.67,
+        "expectancy": 48.852,
+        "win_rate": 0.6667,
+        "profit_factor": 1.6023,
+        "max_drawdown": 799.65,
+        "p_value": 0.14977584,
+        "top_one_pct_removed_expectancy": 28.8759,
+        "average_holding_sessions": 8.139,
+        "average_mae_pct": -3.244,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.134,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -45.15,
+            139.1376
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 36,
+        "total_pnl": 1614.67,
+        "expectancy": 44.852,
+        "win_rate": 0.6667,
+        "profit_factor": 1.544,
+        "max_drawdown": 823.65,
+        "p_value": 0.17043356,
+        "top_one_pct_removed_expectancy": 24.8759,
+        "average_holding_sessions": 8.139,
+        "average_mae_pct": -3.244,
+        "worst_mae_pct": -15.349,
+        "average_mfe_pct": 2.134,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -49.15,
+            135.1376
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 12,
+          "total_pnl": 192.14,
+          "expectancy": 16.0113,
+          "win_rate": 0.6667,
+          "profit_factor": 1.2487,
+          "max_drawdown": 685.88,
+          "p_value": 0.39679477,
+          "top_one_pct_removed_expectancy": -0.925,
+          "average_holding_sessions": 8.583,
+          "average_mae_pct": -2.338,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.484,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -86.9775,
+              108.387
+            ]
+          }
+        },
+        {
+          "trades": 12,
+          "total_pnl": 953.26,
+          "expectancy": 79.4385,
+          "win_rate": 0.75,
+          "profit_factor": 2.5517,
+          "max_drawdown": 321.09,
+          "p_value": 0.08808305,
+          "top_one_pct_removed_expectancy": 47.1358,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.724,
+          "worst_mae_pct": -10.263,
+          "average_mfe_pct": 2.297,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              1.7778,
+              151.1907
+            ]
+          }
+        },
+        {
+          "trades": 12,
+          "total_pnl": 613.27,
+          "expectancy": 51.1061,
+          "win_rate": 0.5833,
+          "profit_factor": 1.4,
+          "max_drawdown": 799.65,
+          "p_value": 0.33171104,
+          "top_one_pct_removed_expectancy": -12.2493,
+          "average_holding_sessions": 8.833,
+          "average_mae_pct": -4.67,
+          "worst_mae_pct": -15.349,
+          "average_mfe_pct": 2.622,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -135.9748,
+              241.3461
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 12,
+            "expectancy": 14.0511
+          },
+          "middle": {
+            "trades": 12,
+            "expectancy": 102.0486
+          },
+          "high": {
+            "trades": 12,
+            "expectancy": 30.4563
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 6,
+            "expectancy": 80.3965
+          },
+          "medium": {
+            "trades": 11,
+            "expectancy": 127.8851
+          },
+          "shallow": {
+            "trades": 19,
+            "expectancy": -6.8655
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 7,
+            "expectancy": 50.2877
+          },
+          "Monday": {
+            "trades": 6,
+            "expectancy": 189.227
+          },
+          "Thursday": {
+            "trades": 10,
+            "expectancy": 130.6625
+          },
+          "Tuesday": {
+            "trades": 3,
+            "expectancy": -160.6811
+          },
+          "Wednesday": {
+            "trades": 10,
+            "expectancy": -55.3287
+          }
+        },
+        "turn_of_month": {
+          "True": {
+            "trades": 36,
+            "expectancy": 48.852
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": false,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": false,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_baseline",
+      "rules": {
+        "name": "rsi2_baseline",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 6503.85,
+        "expectancy": 61.357,
+        "win_rate": 0.717,
+        "profit_factor": 1.8015,
+        "max_drawdown": 1691.94,
+        "p_value": 0.02741514,
+        "top_one_pct_removed_expectancy": 47.0809,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.1608,
+            117.3374
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 6079.85,
+        "expectancy": 57.357,
+        "win_rate": 0.717,
+        "profit_factor": 1.7383,
+        "max_drawdown": 1695.94,
+        "p_value": 0.03632402,
+        "top_one_pct_removed_expectancy": 43.0809,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            2.1608,
+            113.3374
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 989.3,
+          "expectancy": 28.2656,
+          "win_rate": 0.6857,
+          "profit_factor": 1.3955,
+          "max_drawdown": 1566.61,
+          "p_value": 0.26046811,
+          "top_one_pct_removed_expectancy": 16.3084,
+          "average_holding_sessions": 7.829,
+          "average_mae_pct": -1.741,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.552,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -77.5,
+              109.1292
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1596.76,
+          "expectancy": 45.6216,
+          "win_rate": 0.7429,
+          "profit_factor": 1.9349,
+          "max_drawdown": 498.28,
+          "p_value": 0.05414196,
+          "top_one_pct_removed_expectancy": 37.3973,
+          "average_holding_sessions": 7.114,
+          "average_mae_pct": -2.086,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.673,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -6.9892,
+              94.7924
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 3917.8,
+          "expectancy": 108.8277,
+          "win_rate": 0.7222,
+          "profit_factor": 2.0031,
+          "max_drawdown": 1691.94,
+          "p_value": 0.08557421,
+          "top_one_pct_removed_expectancy": 87.6766,
+          "average_holding_sessions": 9.611,
+          "average_mae_pct": -2.755,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.212,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -21.0031,
+              233.5037
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 63.449
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 96.0336
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": 24.5287
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 205.3424
+          },
+          "medium": {
+            "trades": 18,
+            "expectancy": 96.0464
+          },
+          "shallow": {
+            "trades": 81,
+            "expectancy": 41.2051
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 22,
+            "expectancy": 74.7429
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 23.6963
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": -6.7519
+          },
+          "Tuesday": {
+            "trades": 19,
+            "expectancy": 194.9242
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 34.7874
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 83.1586
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 10.941
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_sma200_rising20",
+      "rules": {
+        "name": "rsi2_sma200_rising20",
+        "family": "rsi2",
+        "rising_sma200": true,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 103,
+        "total_pnl": 6300.32,
+        "expectancy": 61.1681,
+        "win_rate": 0.7184,
+        "profit_factor": 1.7746,
+        "max_drawdown": 1857.91,
+        "p_value": 0.03174292,
+        "top_one_pct_removed_expectancy": 46.4641,
+        "average_holding_sessions": 8.223,
+        "average_mae_pct": -2.208,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.179,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            0.6497,
+            119.7751
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 103,
+        "total_pnl": 5888.32,
+        "expectancy": 57.1681,
+        "win_rate": 0.7184,
+        "profit_factor": 1.7138,
+        "max_drawdown": 1877.91,
+        "p_value": 0.04142198,
+        "top_one_pct_removed_expectancy": 42.4641,
+        "average_holding_sessions": 8.223,
+        "average_mae_pct": -2.208,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.179,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -3.3503,
+            115.7751
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 34,
+          "total_pnl": 874.07,
+          "expectancy": 25.7078,
+          "win_rate": 0.7059,
+          "profit_factor": 1.3469,
+          "max_drawdown": 1857.91,
+          "p_value": 0.28689771,
+          "top_one_pct_removed_expectancy": 13.3108,
+          "average_holding_sessions": 7.824,
+          "average_mae_pct": -1.756,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.543,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -105.5322,
+              116.9035
+            ]
+          }
+        },
+        {
+          "trades": 34,
+          "total_pnl": 1564.97,
+          "expectancy": 46.0284,
+          "win_rate": 0.7353,
+          "profit_factor": 1.9162,
+          "max_drawdown": 498.28,
+          "p_value": 0.05873664,
+          "top_one_pct_removed_expectancy": 37.5673,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.04,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.692,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -6.1482,
+              95.4825
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 3861.28,
+          "expectancy": 110.3224,
+          "win_rate": 0.7143,
+          "profit_factor": 1.9886,
+          "max_drawdown": 1691.94,
+          "p_value": 0.08875354,
+          "top_one_pct_removed_expectancy": 88.5932,
+          "average_holding_sessions": 9.8,
+          "average_mae_pct": -2.81,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.269,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -23.8589,
+              239.3521
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 35,
+            "expectancy": 74.2515
+          },
+          "middle": {
+            "trades": 34,
+            "expectancy": 85.0009
+          },
+          "high": {
+            "trades": 34,
+            "expectancy": 23.8672
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 205.3424
+          },
+          "medium": {
+            "trades": 19,
+            "expectancy": 108.4316
+          },
+          "shallow": {
+            "trades": 77,
+            "expectancy": 36.3989
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 21,
+            "expectancy": 82.9846
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 7.606
+          },
+          "Thursday": {
+            "trades": 20,
+            "expectancy": -26.1558
+          },
+          "Tuesday": {
+            "trades": 18,
+            "expectancy": 200.7165
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 56.8754
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 72,
+            "expectancy": 76.447
+          },
+          "True": {
+            "trades": 31,
+            "expectancy": 25.6817
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_gap_guard_1atr",
+      "rules": {
+        "name": "rsi2_gap_guard_1atr",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": 1.0,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 6353.48,
+        "expectancy": 59.9385,
+        "win_rate": 0.717,
+        "profit_factor": 1.7728,
+        "max_drawdown": 1750.39,
+        "p_value": 0.03239152,
+        "top_one_pct_removed_expectancy": 45.635,
+        "average_holding_sessions": 8.142,
+        "average_mae_pct": -2.204,
+        "worst_mae_pct": -25.966,
+        "average_mfe_pct": 2.139,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            4.5638,
+            115.4881
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 5929.48,
+        "expectancy": 55.9385,
+        "win_rate": 0.717,
+        "profit_factor": 1.7109,
+        "max_drawdown": 1754.39,
+        "p_value": 0.04239825,
+        "top_one_pct_removed_expectancy": 41.635,
+        "average_holding_sessions": 8.142,
+        "average_mae_pct": -2.204,
+        "worst_mae_pct": -25.966,
+        "average_mfe_pct": 2.139,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            0.5638,
+            111.4881
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 1174.37,
+          "expectancy": 33.5534,
+          "win_rate": 0.6857,
+          "profit_factor": 1.4607,
+          "max_drawdown": 1614.44,
+          "p_value": 0.2329469,
+          "top_one_pct_removed_expectancy": 21.7518,
+          "average_holding_sessions": 7.771,
+          "average_mae_pct": -1.69,
+          "worst_mae_pct": -13.813,
+          "average_mfe_pct": 1.604,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -75.2453,
+              114.8353
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1450.27,
+          "expectancy": 41.4363,
+          "win_rate": 0.7429,
+          "profit_factor": 1.8491,
+          "max_drawdown": 498.28,
+          "p_value": 0.06999251,
+          "top_one_pct_removed_expectancy": 33.0889,
+          "average_holding_sessions": 7.086,
+          "average_mae_pct": -2.1,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.632,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -8.7296,
+              87.6036
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 3728.84,
+          "expectancy": 103.5788,
+          "win_rate": 0.7222,
+          "profit_factor": 1.9407,
+          "max_drawdown": 1750.39,
+          "p_value": 0.09905317,
+          "top_one_pct_removed_expectancy": 82.2777,
+          "average_holding_sessions": 9.528,
+          "average_mae_pct": -2.805,
+          "worst_mae_pct": -25.966,
+          "average_mfe_pct": 3.153,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -25.2825,
+              227.0189
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 69.1238
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 92.5709
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": 17.8583
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 8,
+            "expectancy": -55.0217
+          },
+          "medium": {
+            "trades": 19,
+            "expectancy": 206.1822
+          },
+          "shallow": {
+            "trades": 79,
+            "expectancy": 36.4075
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 21,
+            "expectancy": 71.7969
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 182.304
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": -6.7519
+          },
+          "Tuesday": {
+            "trades": 20,
+            "expectancy": 27.9163
+          },
+          "Wednesday": {
+            "trades": 25,
+            "expectancy": 38.6172
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 81.7729
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 9.4463
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_vol_scaled",
+      "rules": {
+        "name": "rsi2_vol_scaled",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": true,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 106,
+        "total_pnl": 5515.78,
+        "expectancy": 52.0357,
+        "win_rate": 0.717,
+        "profit_factor": 1.8431,
+        "max_drawdown": 1361.52,
+        "p_value": 0.01814665,
+        "top_one_pct_removed_expectancy": 39.8251,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            9.9845,
+            94.4303
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 106,
+        "total_pnl": 5140.29,
+        "expectancy": 48.4933,
+        "win_rate": 0.717,
+        "profit_factor": 1.7733,
+        "max_drawdown": 1364.74,
+        "p_value": 0.02550294,
+        "top_one_pct_removed_expectancy": 36.2915,
+        "average_holding_sessions": 8.198,
+        "average_mae_pct": -2.199,
+        "worst_mae_pct": -25.441,
+        "average_mfe_pct": 2.156,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            6.5151,
+            90.7167
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 35,
+          "total_pnl": 1175.36,
+          "expectancy": 33.5819,
+          "win_rate": 0.6857,
+          "profit_factor": 1.5365,
+          "max_drawdown": 1275.64,
+          "p_value": 0.18405569,
+          "top_one_pct_removed_expectancy": 22.7914,
+          "average_holding_sessions": 7.829,
+          "average_mae_pct": -1.741,
+          "worst_mae_pct": -13.349,
+          "average_mfe_pct": 1.552,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -54.9722,
+              104.4728
+            ]
+          }
+        },
+        {
+          "trades": 35,
+          "total_pnl": 1533.92,
+          "expectancy": 43.8264,
+          "win_rate": 0.7429,
+          "profit_factor": 2.0792,
+          "max_drawdown": 435.33,
+          "p_value": 0.03891353,
+          "top_one_pct_removed_expectancy": 35.5493,
+          "average_holding_sessions": 7.114,
+          "average_mae_pct": -2.086,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.673,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -3.5293,
+              89.294
+            ]
+          }
+        },
+        {
+          "trades": 36,
+          "total_pnl": 2806.5,
+          "expectancy": 77.9582,
+          "win_rate": 0.7222,
+          "profit_factor": 1.9577,
+          "max_drawdown": 1361.52,
+          "p_value": 0.0946745,
+          "top_one_pct_removed_expectancy": 58.5192,
+          "average_holding_sessions": 9.611,
+          "average_mae_pct": -2.755,
+          "worst_mae_pct": -25.441,
+          "average_mfe_pct": 3.212,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -10.6385,
+              164.5519
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 36,
+            "expectancy": 63.449
+          },
+          "middle": {
+            "trades": 35,
+            "expectancy": 95.2962
+          },
+          "high": {
+            "trades": 35,
+            "expectancy": -2.9642
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 7,
+            "expectancy": 128.7396
+          },
+          "medium": {
+            "trades": 18,
+            "expectancy": 69.1236
+          },
+          "shallow": {
+            "trades": 81,
+            "expectancy": 41.6096
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 22,
+            "expectancy": 70.8059
+          },
+          "Monday": {
+            "trades": 21,
+            "expectancy": 11.9508
+          },
+          "Thursday": {
+            "trades": 21,
+            "expectancy": 0.7729
+          },
+          "Tuesday": {
+            "trades": 19,
+            "expectancy": 168.4141
+          },
+          "Wednesday": {
+            "trades": 23,
+            "expectancy": 21.3473
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 74,
+            "expectancy": 73.4511
+          },
+          "True": {
+            "trades": 32,
+            "expectancy": 2.5127
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "rsi2_exit_prior_high",
+      "rules": {
+        "name": "rsi2_exit_prior_high",
+        "family": "rsi2",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": "prior_high",
+        "turn_of_month_only": false,
+        "hybrid": false
+      },
+      "development": {
+        "trades": 136,
+        "total_pnl": 7058.65,
+        "expectancy": 51.9018,
+        "win_rate": 0.7794,
+        "profit_factor": 2.1421,
+        "max_drawdown": 1182.11,
+        "p_value": 0.00035373,
+        "top_one_pct_removed_expectancy": 46.5573,
+        "average_holding_sessions": 4.324,
+        "average_mae_pct": -1.766,
+        "worst_mae_pct": -11.506,
+        "average_mfe_pct": 1.551,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            22.2307,
+            83.2778
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 136,
+        "total_pnl": 6514.65,
+        "expectancy": 47.9018,
+        "win_rate": 0.7574,
+        "profit_factor": 2.0335,
+        "max_drawdown": 1234.11,
+        "p_value": 0.000887,
+        "top_one_pct_removed_expectancy": 42.5573,
+        "average_holding_sessions": 4.324,
+        "average_mae_pct": -1.766,
+        "worst_mae_pct": -11.506,
+        "average_mfe_pct": 1.551,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            18.2307,
+            79.2778
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 45,
+          "total_pnl": 1558.96,
+          "expectancy": 34.6436,
+          "win_rate": 0.7778,
+          "profit_factor": 2.0198,
+          "max_drawdown": 545.52,
+          "p_value": 0.03862733,
+          "top_one_pct_removed_expectancy": 26.7644,
+          "average_holding_sessions": 4.333,
+          "average_mae_pct": -1.347,
+          "worst_mae_pct": -7.044,
+          "average_mfe_pct": 1.141,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              7.3433,
+              60.5739
+            ]
+          }
+        },
+        {
+          "trades": 45,
+          "total_pnl": 575.28,
+          "expectancy": 12.784,
+          "win_rate": 0.7111,
+          "profit_factor": 1.1898,
+          "max_drawdown": 1182.11,
+          "p_value": 0.33630389,
+          "top_one_pct_removed_expectancy": 5.9164,
+          "average_holding_sessions": 4.356,
+          "average_mae_pct": -2.059,
+          "worst_mae_pct": -11.506,
+          "average_mfe_pct": 1.386,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -40.6661,
+              66.9514
+            ]
+          }
+        },
+        {
+          "trades": 46,
+          "total_pnl": 4924.41,
+          "expectancy": 107.0523,
+          "win_rate": 0.8478,
+          "profit_factor": 4.0371,
+          "max_drawdown": 452.63,
+          "p_value": 3.826e-05,
+          "top_one_pct_removed_expectancy": 99.8567,
+          "average_holding_sessions": 4.283,
+          "average_mae_pct": -1.889,
+          "worst_mae_pct": -10.605,
+          "average_mfe_pct": 2.115,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              60.6673,
+              158.1063
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 46,
+            "expectancy": 19.5189
+          },
+          "middle": {
+            "trades": 45,
+            "expectancy": 36.3157
+          },
+          "high": {
+            "trades": 45,
+            "expectancy": 100.5905
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 15,
+            "expectancy": 81.1952
+          },
+          "medium": {
+            "trades": 26,
+            "expectancy": 136.3682
+          },
+          "shallow": {
+            "trades": 95,
+            "expectancy": 24.1594
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 28,
+            "expectancy": 18.1566
+          },
+          "Monday": {
+            "trades": 26,
+            "expectancy": 52.8301
+          },
+          "Thursday": {
+            "trades": 29,
+            "expectancy": 35.1108
+          },
+          "Tuesday": {
+            "trades": 26,
+            "expectancy": 109.9151
+          },
+          "Wednesday": {
+            "trades": 27,
+            "expectancy": 48.1731
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 95,
+            "expectancy": 58.4977
+          },
+          "True": {
+            "trades": 41,
+            "expectancy": 36.6186
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": true,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    },
+    {
+      "variant": "double7_rsi2_hybrid",
+      "rules": {
+        "name": "double7_rsi2_hybrid",
+        "family": "hybrid",
+        "rising_sma200": false,
+        "gap_guard_atr": null,
+        "volatility_scaled": false,
+        "exit_mode": null,
+        "turn_of_month_only": false,
+        "hybrid": true
+      },
+      "development": {
+        "trades": 62,
+        "total_pnl": 2218.89,
+        "expectancy": 35.7886,
+        "win_rate": 0.6613,
+        "profit_factor": 1.4342,
+        "max_drawdown": 1123.75,
+        "p_value": 0.13851764,
+        "top_one_pct_removed_expectancy": 28.373,
+        "average_holding_sessions": 6.758,
+        "average_mae_pct": -2.492,
+        "worst_mae_pct": -12.622,
+        "average_mfe_pct": 1.974,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -20.4563,
+            90.1828
+          ]
+        }
+      },
+      "development_2x_friction": {
+        "trades": 62,
+        "total_pnl": 1970.89,
+        "expectancy": 31.7886,
+        "win_rate": 0.6613,
+        "profit_factor": 1.3794,
+        "max_drawdown": 1167.75,
+        "p_value": 0.16714423,
+        "top_one_pct_removed_expectancy": 24.373,
+        "average_holding_sessions": 6.758,
+        "average_mae_pct": -2.492,
+        "worst_mae_pct": -12.622,
+        "average_mfe_pct": 1.974,
+        "bootstrap": {
+          "samples": 4000,
+          "block": 5,
+          "ci95": [
+            -24.4563,
+            86.1828
+          ]
+        }
+      },
+      "development_regimes": [
+        {
+          "trades": 20,
+          "total_pnl": 345.46,
+          "expectancy": 17.2731,
+          "win_rate": 0.7,
+          "profit_factor": 1.2673,
+          "max_drawdown": 963.06,
+          "p_value": 0.35781977,
+          "top_one_pct_removed_expectancy": -1.2659,
+          "average_holding_sessions": 6.95,
+          "average_mae_pct": -1.896,
+          "worst_mae_pct": -11.623,
+          "average_mfe_pct": 1.473,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -75.8347,
+              96.0737
+            ]
+          }
+        },
+        {
+          "trades": 20,
+          "total_pnl": 180.5,
+          "expectancy": 9.0252,
+          "win_rate": 0.6,
+          "profit_factor": 1.1057,
+          "max_drawdown": 1123.75,
+          "p_value": 0.43077966,
+          "top_one_pct_removed_expectancy": -13.3824,
+          "average_holding_sessions": 6.3,
+          "average_mae_pct": -2.629,
+          "worst_mae_pct": -8.813,
+          "average_mfe_pct": 1.707,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -96.0541,
+              99.421
+            ]
+          }
+        },
+        {
+          "trades": 22,
+          "total_pnl": 1692.93,
+          "expectancy": 76.9513,
+          "win_rate": 0.6818,
+          "profit_factor": 1.802,
+          "max_drawdown": 768.08,
+          "p_value": 0.13070987,
+          "top_one_pct_removed_expectancy": 57.371,
+          "average_holding_sessions": 7.0,
+          "average_mae_pct": -2.909,
+          "worst_mae_pct": -12.622,
+          "average_mfe_pct": 2.672,
+          "bootstrap": {
+            "samples": 4000,
+            "block": 5,
+            "ci95": [
+              -11.052,
+              159.6117
+            ]
+          }
+        }
+      ],
+      "diagnostic_attribution": {
+        "vol_bucket": {
+          "low": {
+            "trades": 21,
+            "expectancy": 64.5411
+          },
+          "middle": {
+            "trades": 20,
+            "expectancy": 6.8251
+          },
+          "high": {
+            "trades": 21,
+            "expectancy": 34.6205
+          }
+        },
+        "drawdown_bucket": {
+          "deep": {
+            "trades": 5,
+            "expectancy": 166.3675
+          },
+          "medium": {
+            "trades": 24,
+            "expectancy": 61.763
+          },
+          "shallow": {
+            "trades": 33,
+            "expectancy": -2.8866
+          }
+        },
+        "weekday": {
+          "Friday": {
+            "trades": 14,
+            "expectancy": 66.7941
+          },
+          "Monday": {
+            "trades": 19,
+            "expectancy": 41.4704
+          },
+          "Thursday": {
+            "trades": 9,
+            "expectancy": -51.1969
+          },
+          "Tuesday": {
+            "trades": 8,
+            "expectancy": 49.8004
+          },
+          "Wednesday": {
+            "trades": 12,
+            "expectancy": 46.5173
+          }
+        },
+        "turn_of_month": {
+          "False": {
+            "trades": 41,
+            "expectancy": 49.7314
+          },
+          "True": {
+            "trades": 21,
+            "expectancy": 8.5669
+          }
+        }
+      },
+      "gates": {
+        "twenty_trades_each_regime": true,
+        "positive_each_regime": true,
+        "positive_at_2x_friction": true,
+        "positive_without_best_one_pct": true,
+        "bootstrap_lower_bound_positive": false,
+        "multiple_test_corrected": false,
+        "all_pass": false
+      }
+    }
+  ],
+  "warning": "Exploratory attribution cannot promote a rule. Forward shadow evidence and explicit approval remain mandatory."
+}
