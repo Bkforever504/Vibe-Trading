@@ -2623,9 +2623,10 @@ def render_execution_readiness(model: dict[str, Any]) -> str:
         f"<tr><td><strong>{esc(row.get('name'))}</strong></td><td class='{('good' if row.get('status') == 'PASS' else 'warn' if row.get('status') == 'PENDING' else 'bad')}'>{esc(row.get('status'))}</td><td>{safe_int(row.get('observed')) if row.get('observed') is not None else '—'} / {safe_int(row.get('required')) if row.get('required') is not None else '—'}</td><td>{safe_int(row.get('days_remaining'))}</td></tr>"
         for row in criteria if isinstance(row, dict)
     )
+    rows_html = rows or '<tr><td colspan="4">No readiness report yet.</td></tr>'
     return section(
         "Live-Execution Readiness · Draft",
-        f"<div class='stat-grid compact'>{stat_card('Overall', str(data.get('status') or 'PENDING'), 'human promotion only', 'good' if data.get('status') == 'PASS' else 'bad')}{stat_card('Automatic promotion', 'OFF', 'scorecard cannot change configuration', 'good')}{stat_card('Order authority', 'NONE', 'shadow reports only', 'good')}</div><div class='table-wrap'><table><thead><tr><th>Criterion</th><th>Status</th><th>Observed / Required</th><th>Remaining</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No readiness report yet.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Overall', str(data.get('status') or 'PENDING'), 'human promotion only', 'good' if data.get('status') == 'PASS' else 'bad')}{stat_card('Automatic promotion', 'OFF', 'scorecard cannot change configuration', 'good')}{stat_card('Order authority', 'NONE', 'shadow reports only', 'good')}</div><div class='table-wrap'><table><thead><tr><th>Criterion</th><th>Status</th><th>Observed / Required</th><th>Remaining</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Passing evidence still requires explicit human review and a strategy-specific configuration change; this panel cannot enable execution.",
     )
 
