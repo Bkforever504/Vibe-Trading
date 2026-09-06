@@ -269,6 +269,7 @@ def test_intraday_bar_fetch_batches_without_silent_symbol_truncation(monkeypatch
         return Response(symbols)
 
     monkeypatch.setattr("scripts.intraday_opportunity_radar.requests.get", fake_get)
+    monkeypatch.setattr("scripts.intraday_opportunity_radar._credentials", lambda: {})
     symbols = [f"S{index}" for index in range(205)]
 
     bars, errors = fetch_intraday_bars(symbols, NOW_ET)
@@ -294,6 +295,7 @@ def test_intraday_bar_fetch_excludes_currently_forming_five_minute_bar(monkeypat
         return Response()
 
     monkeypatch.setattr("scripts.intraday_opportunity_radar.requests.get", fake_get)
+    monkeypatch.setattr("scripts.intraday_opportunity_radar._credentials", lambda: {})
 
     fetch_intraday_bars(["QQQ"], datetime(2026, 8, 20, 11, 3, tzinfo=ZoneInfo("America/New_York")))
 

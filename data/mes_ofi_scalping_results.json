@@ -1,0 +1,184 @@
+{
+  "can_submit_orders": false,
+  "configuration_count": 2,
+  "execution_enabled": false,
+  "mode": "research_only",
+  "protocol": "MES_OFI_SCALPING_PREREGISTRATION_2026-08-13",
+  "results": [
+    {
+      "final_stress_half_pnl": [
+        -1896.07,
+        -1794.7
+      ],
+      "gates": {
+        "all_pass": false,
+        "both_final_halves_positive": false,
+        "final_base_positive": false,
+        "final_profit_factor_above_one": false,
+        "final_stress_positive": false,
+        "final_trimmed_positive": false,
+        "minimum_100_trades": true,
+        "selection_base_positive": false,
+        "selection_profit_factor_above_one": false,
+        "selection_stress_positive": false,
+        "selection_trimmed_positive": false
+      },
+      "shadow_candidate": false,
+      "stages": {
+        "development": {
+          "base": {
+            "expectancy": -3.8116,
+            "max_drawdown": 4382.04,
+            "profit_factor": 0.2762,
+            "top_one_pct_removed_expectancy": -4.1731,
+            "total_pnl": -4379.52,
+            "trades": 1149,
+            "win_rate": 0.2846
+          },
+          "stress": {
+            "expectancy": -8.7916,
+            "max_drawdown": 10101.54,
+            "profit_factor": 0.0655,
+            "top_one_pct_removed_expectancy": -9.1531,
+            "total_pnl": -10101.54,
+            "trades": 1149,
+            "win_rate": 0.1131
+          }
+        },
+        "final": {
+          "base": {
+            "expectancy": -4.5569,
+            "max_drawdown": 1778.69,
+            "profit_factor": 0.2942,
+            "top_one_pct_removed_expectancy": -4.8788,
+            "total_pnl": -1763.51,
+            "trades": 387,
+            "win_rate": 0.323
+          },
+          "stress": {
+            "expectancy": -9.5369,
+            "max_drawdown": 3690.77,
+            "profit_factor": 0.0795,
+            "top_one_pct_removed_expectancy": -9.8588,
+            "total_pnl": -3690.77,
+            "trades": 387,
+            "win_rate": 0.155
+          }
+        },
+        "selection": {
+          "base": {
+            "expectancy": -4.2541,
+            "max_drawdown": 1633.59,
+            "profit_factor": 0.2124,
+            "top_one_pct_removed_expectancy": -4.4734,
+            "total_pnl": -1633.57,
+            "trades": 384,
+            "win_rate": 0.2474
+          },
+          "stress": {
+            "expectancy": -9.2341,
+            "max_drawdown": 3545.89,
+            "profit_factor": 0.0445,
+            "top_one_pct_removed_expectancy": -9.4534,
+            "total_pnl": -3545.89,
+            "trades": 384,
+            "win_rate": 0.099
+          }
+        }
+      },
+      "trade_count": 1920,
+      "variant": "ofi_momentum_scalp"
+    },
+    {
+      "final_stress_half_pnl": [
+        -1448.57,
+        -1602.2
+      ],
+      "gates": {
+        "all_pass": false,
+        "both_final_halves_positive": false,
+        "final_base_positive": false,
+        "final_profit_factor_above_one": false,
+        "final_stress_positive": false,
+        "final_trimmed_positive": false,
+        "minimum_100_trades": true,
+        "selection_base_positive": false,
+        "selection_profit_factor_above_one": false,
+        "selection_stress_positive": false,
+        "selection_trimmed_positive": false
+      },
+      "shadow_candidate": false,
+      "stages": {
+        "development": {
+          "base": {
+            "expectancy": -3.6484,
+            "max_drawdown": 4192.08,
+            "profit_factor": 0.2721,
+            "top_one_pct_removed_expectancy": -3.9257,
+            "total_pnl": -4192.02,
+            "trades": 1149,
+            "win_rate": 0.3072
+          },
+          "stress": {
+            "expectancy": -8.6284,
+            "max_drawdown": 9914.04,
+            "profit_factor": 0.0558,
+            "top_one_pct_removed_expectancy": -8.9057,
+            "total_pnl": -9914.04,
+            "trades": 1149,
+            "win_rate": 0.1053
+          }
+        },
+        "final": {
+          "base": {
+            "expectancy": -2.9031,
+            "max_drawdown": 1144.84,
+            "profit_factor": 0.4685,
+            "top_one_pct_removed_expectancy": -3.2927,
+            "total_pnl": -1123.51,
+            "trades": 387,
+            "win_rate": 0.3618
+          },
+          "stress": {
+            "expectancy": -7.8831,
+            "max_drawdown": 3059.6,
+            "profit_factor": 0.1415,
+            "top_one_pct_removed_expectancy": -8.2727,
+            "total_pnl": -3050.77,
+            "trades": 387,
+            "win_rate": 0.1964
+          }
+        },
+        "selection": {
+          "base": {
+            "expectancy": -3.2059,
+            "max_drawdown": 1239.88,
+            "profit_factor": 0.3122,
+            "top_one_pct_removed_expectancy": -3.4339,
+            "total_pnl": -1231.07,
+            "trades": 384,
+            "win_rate": 0.3255
+          },
+          "stress": {
+            "expectancy": -8.1859,
+            "max_drawdown": 3143.39,
+            "profit_factor": 0.0554,
+            "top_one_pct_removed_expectancy": -8.4139,
+            "total_pnl": -3143.39,
+            "trades": 384,
+            "win_rate": 0.1276
+          }
+        }
+      },
+      "trade_count": 1920,
+      "variant": "ofi_reversal_scalp"
+    }
+  ],
+  "schema_version": 1,
+  "session_counts": {
+    "development": 384,
+    "final": 129,
+    "selection": 128
+  },
+  "source": "C:\\Users\\kenne\\Desktop\\MAILK-Repos\\Vibe-Trading\\data\\databento\\mes_bbo_ofi_30s_2024_2026.parquet"
+}
