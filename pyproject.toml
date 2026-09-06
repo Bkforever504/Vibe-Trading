@@ -101,6 +101,8 @@ ibkr = [
     "ib_async>=2.0",
 ]
 dev = [
+    "alpaca-py>=0.43.0",
+    "pyarrow>=15.0.0",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-socket>=0.7.0",

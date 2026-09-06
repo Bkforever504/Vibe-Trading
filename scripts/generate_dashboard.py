@@ -1164,9 +1164,13 @@ def render_donchian_expansion_shadow(model: dict[str, Any]) -> str:
         f"<td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
         for row in hits[:8] if isinstance(row, dict)
     )
+    rows_html = rows or (
+        '<tr><td colspan="6">No strict completed-bar expansion. This is candidate coverage '
+        'only—not an entry or an alert.</td></tr>'
+    )
     return section(
         "Donchian Expansion · Shadow",
-        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed RTH 5m bars only', '')}{stat_card('Strict expansions', str(safe_int(coverage.get('strict_hits'))), '20-bar break + RVOL + close + range', 'warn')}{stat_card('Resolved forward', str(safe_int(forward_summary.get('resolved'))), 'next-bar-open, stop-first, 2R / 60m', '')}{stat_card('Mean net R', esc(str(forward_summary.get('mean_net_r_after_costs') if forward_summary.get('mean_net_r_after_costs') is not None else 'pending')), 'fixed slippage stress; not fill evidence', 'warn')}{stat_card('Promotion', 'BLOCKED', 'walk-forward and shadow evaluation required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>RVOL</th><th>Close location</th><th>TR / ATR</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="6">No strict completed-bar expansion. This is candidate coverage only—not an entry or an alert.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed RTH 5m bars only', '')}{stat_card('Strict expansions', str(safe_int(coverage.get('strict_hits'))), '20-bar break + RVOL + close + range', 'warn')}{stat_card('Resolved forward', str(safe_int(forward_summary.get('resolved'))), 'next-bar-open, stop-first, 2R / 60m', '')}{stat_card('Mean net R', esc(str(forward_summary.get('mean_net_r_after_costs') if forward_summary.get('mean_net_r_after_costs') is not None else 'pending')), 'fixed slippage stress; not fill evidence', 'warn')}{stat_card('Promotion', 'BLOCKED', 'walk-forward and shadow evaluation required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>RVOL</th><th>Close location</th><th>TR / ATR</th><th>Completed bar</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Prior-20-bar Donchian break + 1.25x prior completed-bar volume + strong close + 1.20x prior ATR range · forward audit uses next-bar open, signal-bar stop, 2R / 60m and 5 bp/side stress · no execution authority",
     )
 
