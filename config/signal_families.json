@@ -1,8 +1,8 @@
 {
   "schema_version": "2",
-  "reviewed_by_human": false,
-  "reviewed_at": null,
-  "review_status": "pending_human_review",
+  "reviewed_by_human": true,
+  "reviewed_at": "2026-09-06T19:52:27Z",
+  "review_status": "approved_by_human",
   "default_family": "unassigned",
   "families": {
     "momentum": {
