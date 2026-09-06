@@ -1,7 +1,7 @@
 # Claude Code Handoff - Loop Closure Report
 
-Date: 2026-08-29
-Generated: 2026-08-30T00:59:02.881860Z
+Date: 2026-09-05
+Generated: 2026-09-06T01:40:13.932306Z
 
 ## Objective
 
@@ -13,11 +13,11 @@ Tighten the Vibe-Trading learning loop so every day has a durable scanner -> dec
 - No-trade explanations: 0
 - Promotion rows: 20
 - Closed trade P/L represented: 0
-- Next-day promotion allowed: True
+- Next-day promotion allowed: False
 
 ## Next-Day Gate Blockers
 
-- None.
+- unresolved_high_severity_lessons
 
 ## Claude Task
 

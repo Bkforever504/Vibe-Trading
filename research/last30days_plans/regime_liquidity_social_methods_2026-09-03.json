@@ -1,0 +1,35 @@
+{
+  "intent": "concept",
+  "freshness_mode": "evergreen_ok",
+  "cluster_mode": "workflow",
+  "subqueries": [
+    {
+      "label": "primary",
+      "search_query": "regime aware trading liquidity sweep IFVG",
+      "ranking_query": "What reproducible rules, data, and evidence are traders publishing for regime-aware and liquidity-sweep trading systems?",
+      "sources": ["reddit", "x", "youtube", "tiktok", "instagram", "hackernews", "polymarket"],
+      "weight": 1.0
+    },
+    {
+      "label": "tempo",
+      "search_query": "TempoICT IFVG liquidity sweep",
+      "ranking_query": "What exact entry, stop, target, sample construction, and backtest evidence has TempoICT published for the IFVG setup?",
+      "sources": ["x", "youtube", "reddit"],
+      "weight": 0.9
+    },
+    {
+      "label": "regime",
+      "search_query": "hidden Markov regime trading walk forward",
+      "ranking_query": "How are practitioners validating hidden-Markov or Markov-switching regime filters without lookahead or overfitting?",
+      "sources": ["reddit", "youtube", "x", "hackernews"],
+      "weight": 0.8
+    },
+    {
+      "label": "claims",
+      "search_query": "Aristotle Investments Boa Signals trading results",
+      "ranking_query": "Are the posted win-rate and target-odds claims supported by timestamped entries, stops, complete ledgers, and independently checkable outcomes?",
+      "sources": ["x", "youtube", "reddit"],
+      "weight": 0.7
+    }
+  ]
+}

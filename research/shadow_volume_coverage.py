@@ -15,6 +15,12 @@ EXCLUDE_PARTS = (
 )
 
 CLASSIFICATIONS = {
+    "banks_821_control_shadow.py": ("volume_native_forward_only", "The preregistered control-level retest requires completed-bar volume expansion; forward outcomes remain mandatory."),
+    "donchian_expansion_forward_shadow.py": ("volume_native_forward_only", "This resolves the volume-gated Donchian candidate with a frozen forward cost model; it does not create a new volume hypothesis."),
+    "donchian_expansion_shadow.py": ("volume_native_forward_only", "The frozen Donchian candidate requires relative-volume and true-range expansion on completed bars."),
+    "ftfc_continuity_shadow.py": ("context_volume_native_forward_only", "The context lane explicitly records daily volume versus SMA9 and a liquidity floor; it is not an entry signal."),
+    "macro_release_30m_orb_shadow.py": ("volume_native_forward_only", "The preregistered macro-release ORB requires release-window volume versus prior release sessions."),
+    "spy_level_reaction_shadow.py": ("context_volume_native_forward_only", "Mapped-level reactions retain completed-bar VWAP and volume context for frozen outcome slices without creating a trigger."),
     "adaptive_options_shadow_playbook.py": ("historical_options_data_missing", "Options decisions require point-in-time chains, quotes, IV and spread costs; stock volume is not a valid substitute."),
     "czt_order_flow_shadow.py": ("volume_native_forward_only", "Already gates on RVOL and uses VWAP plus a bar-derived volume-profile proxy; true bid/ask delta is unavailable in IEX OHLCV."),
     "event_gap_continuation_shadow.py": ("volume_native_forward_only", "The frozen event-gap sequence requires completed-bar breakout volume and relative direction; executable forward outcomes remain the promotion evidence."),
@@ -53,6 +59,15 @@ CLASSIFICATIONS = {
     "wavetrend_shadow_logger.py": ("historical_volume_matrix_complete", "Daily SPY and QQQ event replayed across 19 volume filters; fixed-horizon outcome because the logger has no executable exit."),
     "williams_r_shadow_logger.py": ("historical_volume_matrix_complete", "Daily SPY and QQQ replayed across 19 volume filters with chronological holdout and cost stress."),
 }
+
+NON_STRATEGY_PROGRAMS = frozenset({
+    "daily_level_map_shadow.py", "footprint_evidence_shadow.py",
+    "governed_shadow_alert.py", "governed_shadow_decision.py",
+    "governed_shadow_lifecycle.py", "governed_shadow_outcome.py",
+    "governed_shadow_rule_update.py", "institutional_confluence_shadow.py",
+    "intraday_trade_lifecycle_shadow.py", "premarket_thesis_shadow.py",
+    "wolves_bbr_shadow.py",
+})
 
 LOGS = {
     "adaptive_options_shadow_playbook.py": "adaptive_options_shadow_playbook_log.jsonl",
@@ -97,6 +112,8 @@ LOGS = {
 def discover() -> list[str]:
     names = []
     for path in (ROOT / "scripts").glob("*shadow*.py"):
+        if path.name in NON_STRATEGY_PROGRAMS:
+            continue
         if any(part in path.stem for part in EXCLUDE_PARTS):
             continue
         names.append(path.name)

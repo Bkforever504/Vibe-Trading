@@ -1,0 +1,19 @@
+{
+  "as_of": "2026-08-30",
+  "purpose": "Identify intraday families lacking controlled multi-timeframe evidence.",
+  "execution_enabled": false,
+  "rank_effect": "none",
+  "families": [
+    {"family": "trader_barbie_strat_smc_ict", "tested_timeframes_minutes": [3, 5, 10, 15, 30, 60, 90, 120, 240], "multi_timeframe_complete": true, "evidence": ["data/trader_barbie_timeframe_tournament.json", "data/trader_barbie_3m_ce_results.json"], "note": "The 3m lane uses genuine SPY 1m data, fixed 15m context, second-CE-recross variants, and a 30-minute maximum hold; it is not reconstructable from the 5m SPY/QQQ source."},
+    {"family": "opening_range_breakout_retest", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "prior_day_break_retest", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "liquidity_sweep_mss_fvg", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "first_touch_rsi_fade", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "gap_continuation", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "ema_8_21_break_retest", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "opening_drive_vwap_pullback", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"},
+    {"family": "multi_indicator_reversal", "tested_timeframes_minutes": [5], "multi_timeframe_complete": false, "evidence": "data/global_social_sequence_tournament_results.json"}
+  ],
+  "uncovered_family_count": 8,
+  "next_experiment": "MULTI-TIMEFRAME-EDGE-2026-08-30"
+}

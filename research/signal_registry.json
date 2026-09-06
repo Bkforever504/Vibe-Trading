@@ -30,7 +30,17 @@
         "manual_review"
       ],
       "evidence_gate": "Read-only order history only.",
-      "notes": "Reads Alpaca closed orders. Must not submit orders."
+      "notes": "Reads Alpaca closed orders. Must not submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "trading_dashboard",
@@ -48,7 +58,17 @@
         "manual_review"
       ],
       "evidence_gate": "Dashboard only.",
-      "notes": "Reads orders/reports and renders dashboard. Must not submit orders."
+      "notes": "Reads orders/reports and renders dashboard. Must not submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "execution_gate_audit",
@@ -65,7 +85,17 @@
         "governance"
       ],
       "evidence_gate": "Governance only.",
-      "notes": "Scans source code for order patterns. Contains pattern strings by design."
+      "notes": "Scans source code for order patterns. Contains pattern strings by design.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_bot",
@@ -93,7 +123,17 @@
       ],
       "evidence_gate": "Already order-capable in guarded paper mode. Live requires FLIP_LIVE_EXECUTION_ENABLED, explicit Kenny approval, execution_gate_audit, strategy_leak_audit, and postmortem evidence. Stop conditions include shared execution_guard, kill switch/manual reset, 2pct MAX_RISK_PCT, MAX_CONTRACTS=5, -50pct stop loss, +75pct target, and profit-protect ratchet.",
       "notes": "Known execution bot. Non-goals: no autonomous live promotion, no self-approval, no bypass of guardrails. Forbidden actions: no broker wiring or risk-threshold changes without explicit approval. Separate verifier: execution_gate_audit plus closed_trade_postmortem.",
-      "config_change_note": "MAX_RISK_PCT reduced from 0.25 to 0.02 (2%). MAX_CONTRACTS capped at 5. Prior to this date, one 69-contract blowup caused -$11,557 loss dominating total PnL. Post-fix sample window: 2026-06-26 onward. Evidence grades and total PnL before this date reflect misconfiguration, not strategy quality. Post-fix win rate: 7/7 wins, every trade 2026-06-29 onward hit profit target or profit protect."
+      "config_change_note": "MAX_RISK_PCT reduced from 0.25 to 0.02 (2%). MAX_CONTRACTS capped at 5. Prior to this date, one 69-contract blowup caused -$11,557 loss dominating total PnL. Post-fix sample window: 2026-06-26 onward. Evidence grades and total PnL before this date reflect misconfiguration, not strategy quality. Post-fix win rate: 7/7 wins, every trade 2026-06-29 onward hit profit target or profit protect.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "iwm_options_bot",
@@ -115,7 +155,17 @@
         "closed_trade_postmortem"
       ],
       "evidence_gate": "Already order-capable in guarded paper mode. Live requires OPTIONS_LIVE_EXECUTION_ENABLED, ALPACA_PAPER=false, explicit Kenny approval, execution_gate_audit, strategy_leak_audit, and postmortem evidence. Stop conditions include shared execution_guard, kill switch/manual reset, MAX_CONTRACTS_PER_ORDER=5, MAX_DAILY_LOSS_PCT kill switch, spread stop loss, max trades per day, and grouped state recovery.",
-      "notes": "Known execution bot. Non-goals: no autonomous live promotion, no self-approval, no bypass of guardrails. Forbidden actions: no broker wiring or risk-threshold changes without explicit approval. Separate verifier: execution_gate_audit plus closed_trade_postmortem."
+      "notes": "Known execution bot. Non-goals: no autonomous live promotion, no self-approval, no bypass of guardrails. Forbidden actions: no broker wiring or risk-threshold changes without explicit approval. Separate verifier: execution_gate_audit plus closed_trade_postmortem.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "portfolio_monitor",
@@ -134,7 +184,17 @@
         "portfolio_kill_switch"
       ],
       "evidence_gate": "Risk control only.",
-      "notes": "Can write kill-switch block files but must not submit orders."
+      "notes": "Can write kill-switch block files but must not submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "mnq_shadow_scanner",
@@ -153,7 +213,17 @@
         "mnq_forward_test"
       ],
       "evidence_gate": "30+ shadow signals and prop-rule review before any execution path.",
-      "notes": "No orders. MNQ validation only."
+      "notes": "No orders. MNQ validation only.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "rsi2_shadow",
@@ -173,7 +243,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 days and 10 entry signals before promotion review.",
-      "notes": "Mean-reversion shadow candidate."
+      "notes": "Mean-reversion shadow candidate.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "kama_shadow",
@@ -193,7 +273,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 days and 10 entry signals before promotion review.",
-      "notes": "Trend-following shadow candidate."
+      "notes": "Trend-following shadow candidate.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "williams_r_shadow",
@@ -213,7 +303,17 @@
         "overlap_reports"
       ],
       "evidence_gate": "30 days and 10 entry signals before promotion review.",
-      "notes": "Orthogonal to RSI-2 based on initial overlap report."
+      "notes": "Orthogonal to RSI-2 based on initial overlap report.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "momentum_rotation",
@@ -233,7 +333,17 @@
         "overlap_reports"
       ],
       "evidence_gate": "30 days and 10 signals before promotion review.",
-      "notes": "Validated paper candidate, still shadow-only."
+      "notes": "Validated paper candidate, still shadow-only.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "qqq_gld_rotation",
@@ -253,7 +363,17 @@
         "overlap_reports"
       ],
       "evidence_gate": "30 days and 10 signals before promotion review.",
-      "notes": "Rotation candidate, no orders."
+      "notes": "Rotation candidate, no orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "ttm_squeeze",
@@ -273,7 +393,17 @@
         "flip_bot_context"
       ],
       "evidence_gate": "30 days before any gate. Currently context only.",
-      "notes": "Flip Bot logs squeeze state but does not gate on it."
+      "notes": "Flip Bot logs squeeze state but does not gate on it.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "wavetrend",
@@ -292,7 +422,17 @@
         "market_force_score"
       ],
       "evidence_gate": "30 days before any gate. Currently context only.",
-      "notes": "Market Cipher style momentum context."
+      "notes": "Market Cipher style momentum context.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "smc",
@@ -311,7 +451,17 @@
         "market_force_score"
       ],
       "evidence_gate": "30 days before any gate. Currently context only.",
-      "notes": "Fallback SMC approximation unless external package works."
+      "notes": "Fallback SMC approximation unless external package works.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "gex_scanner",
@@ -331,7 +481,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Only provenance-qualified 0DTE rows with at least 60% open-interest coverage may feed the read-only market-force report. Thirty forward days plus OOS proof and explicit approval are required before any execution discussion.",
-      "notes": "Call-minus-put gamma/open-interest proxy only. Dealer inventory and trade direction are not observed. Displayed quote size is never substituted for open interest, and all-expiration fallback is forbidden."
+      "notes": "Call-minus-put gamma/open-interest proxy only. Dealer inventory and trade direction are not observed. Displayed quote size is never substituted for open interest, and all-expiration fallback is forbidden.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "ivr_scanner",
@@ -351,7 +511,17 @@
         "iwm_options_context"
       ],
       "evidence_gate": "30 days before tightening IVR gates.",
-      "notes": "IWM bot may read IVR context, but this scanner does not submit orders."
+      "notes": "IWM bot may read IVR context, but this scanner does not submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "ivr_quality_report",
@@ -372,7 +542,17 @@
         "signal_stack_health_report"
       ],
       "evidence_gate": "Review only. IVR gate changes still require 30 days of usable readings.",
-      "notes": "Grades whether Alpaca ATM IV readings are present and mature enough for true IVR."
+      "notes": "Grades whether Alpaca ATM IV readings are present and mature enough for true IVR.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "rv_iv_regime",
@@ -392,7 +572,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 days before any strategy-family gate.",
-      "notes": "Compares realized volatility to ATM implied volatility to label momentum vs premium/mean-reversion context."
+      "notes": "Compares realized volatility to ATM implied volatility to label momentum vs premium/mean-reversion context.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "hurst_regime",
@@ -412,7 +602,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 days before any strategy-family gate.",
-      "notes": "Estimates Hurst exponent to label trend persistence vs mean-reversion context. It is not bullish/bearish direction."
+      "notes": "Estimates Hurst exponent to label trend persistence vs mean-reversion context. It is not bullish/bearish direction.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "opening_range_breadth",
@@ -431,7 +631,17 @@
         "market_force_score"
       ],
       "evidence_gate": "30 days before any gate.",
-      "notes": "Trend breadth context."
+      "notes": "Trend breadth context.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "relative_volume",
@@ -451,7 +661,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 days before any gate.",
-      "notes": "Volume participation context."
+      "notes": "Volume participation context.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "sec_insider_buying",
@@ -470,7 +690,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Research context only.",
-      "notes": "No broker calls."
+      "notes": "No broker calls.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "distribution_day",
@@ -490,7 +720,17 @@
         "regime_memory"
       ],
       "evidence_gate": "30 days before any posture gate.",
-      "notes": "Institutional selling context."
+      "notes": "Institutional selling context.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "market_breadth",
@@ -510,7 +750,17 @@
         "regime_memory"
       ],
       "evidence_gate": "30 days before any posture gate.",
-      "notes": "Breadth/uptrend context."
+      "notes": "Breadth/uptrend context.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "sector_rotation",
@@ -530,7 +780,17 @@
         "regime_memory"
       ],
       "evidence_gate": "30 days before any posture gate.",
-      "notes": "Daily sector leadership context."
+      "notes": "Daily sector leadership context.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "social_trending",
@@ -550,7 +810,17 @@
         "social_persistence"
       ],
       "evidence_gate": "2+ weeks of persistence/outcome review before any scoring change.",
-      "notes": "Social context only."
+      "notes": "Social context only.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "public_social_intake",
@@ -572,7 +842,17 @@
         "signal_stack_health_report"
       ],
       "evidence_gate": "2+ weeks of public-source persistence review before any scoring change. No symbol promotion without 30 trading days and 10 completed shadow samples.",
-      "notes": "Autonomously collects public Reddit RSS cashtag observations into ~/.vibe-trading/social-arb-observations.json. No logged-in scraping and no orders."
+      "notes": "Autonomously collects public Reddit RSS cashtag observations into ~/.vibe-trading/social-arb-observations.json. No logged-in scraping and no orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "deep_liquid_universe_scanner",
@@ -594,7 +874,17 @@
         "shadow_universe_review"
       ],
       "evidence_gate": "30 trading days and 10 completed shadow samples before adding any symbol to an execution universe.",
-      "notes": "Ranks a broad liquid stocks/ETF universe by dollar volume, relative volume, momentum, and social persistence. Designed to discover AAPL-style misses without trading thin names."
+      "notes": "Ranks a broad liquid stocks/ETF universe by dollar volume, relative volume, momentum, and social persistence. Designed to discover AAPL-style misses without trading thin names.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "social_persistence",
@@ -613,7 +903,17 @@
         "daily_review"
       ],
       "evidence_gate": "2+ weeks before conclusions.",
-      "notes": "Analyzes persistence, no orders."
+      "notes": "Analyzes persistence, no orders.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "preopen_sentiment",
@@ -632,7 +932,17 @@
         "market_force_score"
       ],
       "evidence_gate": "30 days before any gate.",
-      "notes": "SPY/QQQ pre-open sentiment context."
+      "notes": "SPY/QQQ pre-open sentiment context.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "limitless_market",
@@ -651,7 +961,17 @@
         "prediction_market_context"
       ],
       "evidence_gate": "Read-only venue scan until strategy evidence exists.",
-      "notes": "No keys, no wallet."
+      "notes": "No keys, no wallet.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "moondev_liquidation_context",
@@ -672,7 +992,17 @@
         "market_force_review"
       ],
       "evidence_gate": "30 days before using crypto liquidation context as any equity/options gate.",
-      "notes": "Optional MOONDEV_API_KEY. Logs multi-exchange liquidations, HLP sentiment, near-liquidation snapshots, and Polymarket whale context. No orders."
+      "notes": "Optional MOONDEV_API_KEY. Logs multi-exchange liquidations, HLP sentiment, near-liquidation snapshots, and Polymarket whale context. No orders.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "pmxt_probe",
@@ -689,7 +1019,17 @@
         "prediction_market_context"
       ],
       "evidence_gate": "Manual read-only only. Not scheduled.",
-      "notes": "PMXT is not ready as free backbone; keep isolated."
+      "notes": "PMXT is not ready as free backbone; keep isolated.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "polymarket_wallet_tracker",
@@ -706,7 +1046,17 @@
         "copy_trader_watchlist"
       ],
       "evidence_gate": "Wallet must pass copy-trader scoring before paper_watch.",
-      "notes": "Endpoint provenance and survivorship warnings are logged."
+      "notes": "Endpoint provenance and survivorship warnings are logged.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "polymarket_fed_whale_watch",
@@ -723,7 +1073,17 @@
         "prediction_market_context"
       ],
       "evidence_gate": "Observation only.",
-      "notes": "No signatures or orders."
+      "notes": "No signatures or orders.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "polymarket_weather_bot",
@@ -744,7 +1104,17 @@
         "open_meteo_ensemble"
       ],
       "evidence_gate": "No live wallet or order capability. Any future promotion requires at least 200 promotion-grade completed paper positions across 30 calendar days, positive bid/ask-and-fee-adjusted expectancy, station and resolution audits, drawdown limits, execution audit, and explicit human approval.",
-      "notes": "Discovers daily-high events, verifies resolution station and units, converts ensemble member highs to bucket probabilities, and maintains capped paper positions. Unknown or stale metadata fails closed."
+      "notes": "Discovers daily-high events, verifies resolution station and units, converts ensemble member highs to bucket probabilities, and maintains capped paper positions. Unknown or stale metadata fails closed.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "kalshi_prediction_bot",
@@ -761,7 +1131,17 @@
         "prediction_market_context"
       ],
       "evidence_gate": "No live order submission is implemented here.",
-      "notes": "Report-only prediction market bot."
+      "notes": "Report-only prediction market bot.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "kalshi_history_fetcher",
@@ -778,7 +1158,17 @@
         "copy_trader_watchlist"
       ],
       "evidence_gate": "Read-only history import only.",
-      "notes": "No Kalshi orders."
+      "notes": "No Kalshi orders.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "market_force_score",
@@ -798,7 +1188,17 @@
         "exposure_coach"
       ],
       "evidence_gate": "30 days before any gate; currently observability only.",
-      "notes": "8-signal aggregate."
+      "notes": "8-signal aggregate.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "exposure_coach",
@@ -818,7 +1218,17 @@
         "bot_status_snapshot"
       ],
       "evidence_gate": "Advisory only until proven.",
-      "notes": "Does not modify settings."
+      "notes": "Does not modify settings.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "portfolio_concentration",
@@ -838,7 +1248,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Risk visibility only.",
-      "notes": "Uses TradingClient read-only; no orders."
+      "notes": "Uses TradingClient read-only; no orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "bot_status_snapshot",
@@ -857,7 +1277,17 @@
         "daily_review"
       ],
       "evidence_gate": "Status only.",
-      "notes": "Reads local reports only."
+      "notes": "Reads local reports only.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "closed_trade_postmortem",
@@ -877,7 +1307,17 @@
         "regime_memory"
       ],
       "evidence_gate": "Review only.",
-      "notes": "No orders."
+      "notes": "No orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "daily_outcome_reviewer",
@@ -897,7 +1337,17 @@
         "bot_status_snapshot"
       ],
       "evidence_gate": "Review only.",
-      "notes": "Compares posture vs outcomes."
+      "notes": "Compares posture vs outcomes.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "regime_memory",
@@ -916,7 +1366,17 @@
         "governance"
       ],
       "evidence_gate": "30+ days before any conclusions.",
-      "notes": "Currently log-building."
+      "notes": "Currently log-building.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "rejected_trade_intelligence",
@@ -936,7 +1396,17 @@
         "needs_review_queue"
       ],
       "evidence_gate": "Review only. Possibly-too-strict is not permission to loosen gates.",
-      "notes": "Classifies guard blocks."
+      "notes": "Classifies guard blocks.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "needs_review_queue",
@@ -957,7 +1427,17 @@
         "signal_stack_leaderboard"
       ],
       "evidence_gate": "Review only. Queued items are not permission to loosen guards.",
-      "notes": "Turns rejected-trade intelligence into a small manual-review queue."
+      "notes": "Turns rejected-trade intelligence into a small manual-review queue.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "signal_stack_grades",
@@ -977,7 +1457,17 @@
         "manual_review"
       ],
       "evidence_gate": "Review only. Grades are not execution approval.",
-      "notes": "Daily A-F/0-100 report card for bots, shadow loggers, and read-only scanners."
+      "notes": "Daily A-F/0-100 report card for bots, shadow loggers, and read-only scanners.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "daily_eod_summary",
@@ -997,7 +1487,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Review only. EOD summary is not execution approval.",
-      "notes": "Plain-English daily verdict combining health, grades, audit, activity, and review queue."
+      "notes": "Plain-English daily verdict combining health, grades, audit, activity, and review queue.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "nightly_research_loop",
@@ -1017,7 +1517,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Read-only handoff only. Max one active task. No live/risk/gate changes.",
-      "notes": "Writes STATUS.md and a capped nightly queue after EOD summary. It is not an autonomous executor."
+      "notes": "Writes STATUS.md and a capped nightly queue after EOD summary. It is not an autonomous executor.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "nightly_alpha_factory",
@@ -1039,7 +1549,17 @@
         "nightly_research_loop"
       ],
       "evidence_gate": "Read-only morning alpha factory. Separates idea builder, validator, regime reviewer, and governance chair. No promotion without signal_promotion_rules.md and explicit approval.",
-      "notes": "Builds the six-stage agent-swarm style research report and Claude Code handoff. It cannot approve its own ideas, submit orders, or change execution settings."
+      "notes": "Builds the six-stage agent-swarm style research report and Claude Code handoff. It cannot approve its own ideas, submit orders, or change execution settings.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "loop_readiness_audit",
@@ -1058,7 +1578,17 @@
         "execution_gate_audit"
       ],
       "evidence_gate": "Read-only loop-engineering governance. Scores L0/L1/L2/L3 readiness and requires maker/checker split plus explicit approval before any assisted or execution-impacting loop.",
-      "notes": "Writes LOOP.md, loop-readiness-audit.json, and Claude Code handoff. It cannot approve its own findings, submit orders, schedule tasks, or change execution settings."
+      "notes": "Writes LOOP.md, loop-readiness-audit.json, and Claude Code handoff. It cannot approve its own findings, submit orders, schedule tasks, or change execution settings.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "mahoraga_repo_intake_audit",
@@ -1077,7 +1607,17 @@
         "loop_readiness_audit"
       ],
       "evidence_gate": "Read-only architecture intake. MAHORAGA ideas may become local reports only after tests, execution audit, and explicit approval. No external code import, Worker deploy, broker endpoint copy, or social-to-order routing.",
-      "notes": "Mines ygwyg/MAHORAGA for staleness exits, pluggable strategy contracts, social gatherer schema, policy-wrapper design, and dashboard observability. Explicitly rejects Alpaca execution worker and 25pct cash sizing."
+      "notes": "Mines ygwyg/MAHORAGA for staleness exits, pluggable strategy contracts, social gatherer schema, policy-wrapper design, and dashboard observability. Explicitly rejects Alpaca execution worker and 25pct cash sizing.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "openalice_repo_intake_audit",
@@ -1096,7 +1636,17 @@
         "loop_readiness_audit"
       ],
       "evidence_gate": "Read-only architecture intake. OpenAlice ideas may become local reports/docs only after tests, execution audit, and explicit approval. No AGPL code import, broker connection, Trading-as-Git execution copy, or autonomous agent CLI scheduler.",
-      "notes": "Mines TraderAlice/OpenAlice for markdown issue board, tracked entity memory graph, inbox delivery, workspace automation metadata, market tool index, and approval-gated trade proposal patterns. Explicitly rejects unified trading account and unattended agent schedulers."
+      "notes": "Mines TraderAlice/OpenAlice for markdown issue board, tracked entity memory graph, inbox delivery, workspace automation metadata, market tool index, and approval-gated trade proposal patterns. Explicitly rejects unified trading account and unattended agent schedulers.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "market_schedule_alignment",
@@ -1116,7 +1666,17 @@
         "daily_eod_summary"
       ],
       "evidence_gate": "Ops only. Schedule alignment is not execution approval.",
-      "notes": "Checks Windows Task Scheduler against intended Central-time market open, close, and EOD sequence."
+      "notes": "Checks Windows Task Scheduler against intended Central-time market open, close, and EOD sequence.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "signal_stack_health",
@@ -1135,7 +1695,17 @@
         "bot_status_snapshot"
       ],
       "evidence_gate": "Ops only.",
-      "notes": "Checks tasks/log freshness."
+      "notes": "Checks tasks/log freshness.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "signal_stack_leaderboard",
@@ -1154,7 +1724,17 @@
         "daily_review"
       ],
       "evidence_gate": "Leaderboard only.",
-      "notes": "Observability layer."
+      "notes": "Observability layer.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "daily_activity_csv",
@@ -1173,7 +1753,17 @@
         "daily_review"
       ],
       "evidence_gate": "Ledger only.",
-      "notes": "CSV export."
+      "notes": "CSV export.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "worldquant_alpha_lab",
@@ -1190,7 +1780,17 @@
         "strategy_research"
       ],
       "evidence_gate": "Research report only. Any alpha must become a shadow logger and pass 30 days / 10 samples before promotion review.",
-      "notes": "Cross-sectional ETF factor lab inspired by WorldQuant Alpha101. Current initial run rejected all tested factors."
+      "notes": "Cross-sectional ETF factor lab inspired by WorldQuant Alpha101. Current initial run rejected all tested factors.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "daily_activity_viewer",
@@ -1207,7 +1807,17 @@
         "manual_review"
       ],
       "evidence_gate": "Viewer only.",
-      "notes": "Optional local browser viewer for daily CSV inspection. Requires dtale installed in the one-off uv run environment."
+      "notes": "Optional local browser viewer for daily CSV inspection. Requires dtale installed in the one-off uv run environment.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "premarket_ema_retest_shadow",
@@ -1228,7 +1838,17 @@
         "market_force_review"
       ],
       "evidence_gate": "30 trading days, 10 actionable signals, forward outcome improvement, dual review before any gate.",
-      "notes": "Account-flip style premarket high/low + 13/48/200 EMA retest scanner. Shadow-only."
+      "notes": "Account-flip style premarket high/low + 13/48/200 EMA retest scanner. Shadow-only.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "prediction_market_microstructure",
@@ -1249,7 +1869,17 @@
         "prediction_market_watchlist"
       ],
       "evidence_gate": "Read-only for 30 days minimum. No prediction-market execution is wired.",
-      "notes": "Short-horizon Up/Down market flow, spread, and imbalance context inspired by microstructure bot claims."
+      "notes": "Short-horizon Up/Down market flow, spread, and imbalance context inspired by microstructure bot claims.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_shadow_candidates",
@@ -1271,7 +1901,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 trading days before review. QQQ and IWM require 10 confirmed setup matches with SPY before any promotion discussion. NVDA/TSLA/AAPL/META require independent validation.",
-      "notes": "QQQ/IWM/NVDA/TSLA/AAPL/META 0DTE candidates logged from Flip Bot scan path. Shadow-only; entries do not flow into broker submission."
+      "notes": "QQQ/IWM/NVDA/TSLA/AAPL/META 0DTE candidates logged from Flip Bot scan path. Shadow-only; entries do not flow into broker submission.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_shadow_pnl_evaluator",
@@ -1293,7 +1933,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 trading days and at least 10 completed samples per symbol before any promotion discussion. Uses logged estimates only.",
-      "notes": "Scores hypothetical returns for QQQ/IWM/NVDA/TSLA shadow 0DTE candidates so viral account-flip setups can be reviewed with evidence instead of screenshots."
+      "notes": "Scores hypothetical returns for QQQ/IWM/NVDA/TSLA shadow 0DTE candidates so viral account-flip setups can be reviewed with evidence instead of screenshots.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "cheap_asymmetry_scanner",
@@ -1312,7 +1962,17 @@
         "dashboard"
       ],
       "evidence_gate": "Read-only ranking only. Requires repeated samples, liquidity review, and signal governance before any execution wiring.",
-      "notes": "Ranks small-premium option candidates that match the account-flip target profile: roughly $10-$50 cost, 3x+ upside, tight spread, and 5x+ captured return for true goal matches."
+      "notes": "Ranks small-premium option candidates that match the account-flip target profile: roughly $10-$50 cost, 3x+ upside, tight spread, and 5x+ captured return for true goal matches.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "creator_watchlist_runner_scanner",
@@ -1333,7 +1993,17 @@
         "small_account_bot_learning"
       ],
       "evidence_gate": "Read-only creator/watchlist validation. No ticker can influence execution without 30 trading days, 10 completed shadow samples, liquidity proof, dual review, and explicit user approval.",
-      "notes": "Scores X/manual creator watchlist tickers like HIMS/RDDT/AAPL/SPX against independent Flip shadow PnL and cheap-asymmetry evidence. Screenshots are discovery prompts only, not trade signals."
+      "notes": "Scores X/manual creator watchlist tickers like HIMS/RDDT/AAPL/SPX against independent Flip shadow PnL and cheap-asymmetry evidence. Screenshots are discovery prompts only, not trade signals.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "crowded_positioning_scanner",
@@ -1353,7 +2023,17 @@
         "flip_bot_learning_report"
       ],
       "evidence_gate": "Read-only crowded-positioning context. Requires 30 trading days of outcome review before any use as an entry or exit gate.",
-      "notes": "Aggregates liquidation pressure, HLP sentiment, position snapshot distance, prediction-market flow, and crypto proxy watchlist context into cautious/normal Flip Bot posture hints. No orders and no settings changes."
+      "notes": "Aggregates liquidation pressure, HLP sentiment, position snapshot distance, prediction-market flow, and crypto proxy watchlist context into cautious/normal Flip Bot posture hints. No orders and no settings changes.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "candlestick_context_scanner",
@@ -1374,7 +2054,17 @@
         "flip_bot_learning_report"
       ],
       "evidence_gate": "Read-only candlestick context. No pattern can route to execution without 30 trading days, 10 relevant samples, liquidity proof, dual review, and explicit user approval.",
-      "notes": "Detects bullish/bearish engulfing, VWAP reclaim/failure, liquidity grabs, and indecision context for SPY/QQQ/IWM and high-attention names. It only advises playbook selection and review."
+      "notes": "Detects bullish/bearish engulfing, VWAP reclaim/failure, liquidity grabs, and indecision context for SPY/QQQ/IWM and high-attention names. It only advises playbook selection and review.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "higher_timeframe_market_map",
@@ -1395,7 +2085,17 @@
         "generate_dashboard"
       ],
       "evidence_gate": "Read-only higher-timeframe map. Blocks mixed-timeframe confidence from being treated as execution evidence until forward-tested.",
-      "notes": "Maps weekly, daily, and intraday trend alignment into bullish/bearish/mixed context. Helps avoid forcing calls into downtrends or premium-selling into catalyst trend days."
+      "notes": "Maps weekly, daily, and intraday trend alignment into bullish/bearish/mixed context. Helps avoid forcing calls into downtrends or premium-selling into catalyst trend days.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "market_catalyst_calendar",
@@ -1416,7 +2116,17 @@
         "generate_dashboard"
       ],
       "evidence_gate": "Read-only catalyst veto context. High-impact news can only reduce risk, force review, or block short-premium ideas; it cannot approve trades.",
-      "notes": "Tracks CPI, PPI, FOMC, jobs, GDP/PCE, Fed minutes, and Treasury auction windows so the bots avoid rookie mistakes around known volatility catalysts."
+      "notes": "Tracks CPI, PPI, FOMC, jobs, GDP/PCE, Fed minutes, and Treasury auction windows so the bots avoid rookie mistakes around known volatility catalysts.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "daily_edge_orchestrator",
@@ -1440,7 +2150,17 @@
         "flip_bot_learning_report"
       ],
       "evidence_gate": "Read-only daily operating view. Can recommend watchlists, vetoes, review reasons, and scanner leadership only. No execution wiring without forward evidence and explicit Kenny approval.",
-      "notes": "Combines morning targets, intraday runner detection, no-trade explanations, exit accountability, and scanner leadership so the bots learn from missed runners without chasing screenshots."
+      "notes": "Combines morning targets, intraday runner detection, no-trade explanations, exit accountability, and scanner leadership so the bots learn from missed runners without chasing screenshots.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "weekly_hot_instruments",
@@ -1462,7 +2182,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "Read-only rolling 7-day social/liquidity review. No symbol promotion without 30 trading days and at least 10 completed shadow samples.",
-      "notes": "Ranks hot tickers from social persistence, manual X/social observations, and Flip shadow P&L. Designed to catch weekly attention names while keeping high-noise squeeze tickers research-only."
+      "notes": "Ranks hot tickers from social persistence, manual X/social observations, and Flip shadow P&L. Designed to catch weekly attention names while keeping high-noise squeeze tickers research-only.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "challenge_account_simulator",
@@ -1483,7 +2213,17 @@
         "daily_eod_summary"
       ],
       "evidence_gate": "Read-only account-size simulation. Cannot approve leverage or live trading without forward-tested drawdown review.",
-      "notes": "Replays closed Flip Bot trade returns on a configurable small account using fixed fractional risk."
+      "notes": "Replays closed Flip Bot trade returns on a configurable small account using fixed fractional risk.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "position_sizing_sanity_report",
@@ -1502,7 +2242,17 @@
         "daily_eod_summary"
       ],
       "evidence_gate": "Read-only sizing and tail-risk sanity check. Cannot loosen risk limits or approve live trading.",
-      "notes": "Checks Flip Bot 2pct risk and 5-contract caps, separates pre-fix contract artifact from post-risk-fix samples, and reports Markov/Chebyshev/Chernoff-style tail-loss bounds."
+      "notes": "Checks Flip Bot 2pct risk and 5-contract caps, separates pre-fix contract artifact from post-risk-fix samples, and reports Markov/Chebyshev/Chernoff-style tail-loss bounds.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "mfi_shadow",
@@ -1523,7 +2273,17 @@
         "daily_activity_csv"
       ],
       "evidence_gate": "30 trading days and 10 actionable signals before any gate review. MFI oversold+rising must correlate with positive Flip Bot outcomes.",
-      "notes": "Money Flow Index period=14 on SPY+QQQ daily. MoonDev sma_variations showed MFI filter raised Sharpe 1.51->2.37 on same SMA crossover pattern Flip Bot uses."
+      "notes": "Money Flow Index period=14 on SPY+QQQ daily. MoonDev sma_variations showed MFI filter raised Sharpe 1.51->2.37 on same SMA crossover pattern Flip Bot uses.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "options_liquidity_gate",
@@ -1542,8 +2302,18 @@
         "weekly_hot_instrument_log",
         "deep_liquid_universe_scan_log"
       ],
-      "evidence_gate": "Gate only \u2014 scores 0-5 per symbol. Score >= 4 required before adding any symbol to SHADOW_CANDIDATES in flip_bot.py.",
-      "notes": "Criteria: 0DTE available, weekly available, ATM OI >= 500, bid-ask spread <= 15pct of mid, ATM price <= $5/share ($500/contract). Read-only. No yfinance live data in tests \u2014 fully mocked. IMPORTANT: gate failure does NOT mean remove from SHADOW_CANDIDATES. Shadow logging is evidence gathering \u2014 it runs regardless of gate status. Gate only blocks promotion to live execution. META/TSLA fail price criterion (options > $500/contract) \u2014 too expensive for small-account challenge sizing. They remain in SHADOW_CANDIDATES for evidence accumulation on the main $90k account."
+      "evidence_gate": "Gate only — scores 0-5 per symbol. Score >= 4 required before adding any symbol to SHADOW_CANDIDATES in flip_bot.py.",
+      "notes": "Criteria: 0DTE available, weekly available, ATM OI >= 500, bid-ask spread <= 15pct of mid, ATM price <= $5/share ($500/contract). Read-only. No yfinance live data in tests — fully mocked. IMPORTANT: gate failure does NOT mean remove from SHADOW_CANDIDATES. Shadow logging is evidence gathering — it runs regardless of gate status. Gate only blocks promotion to live execution. META/TSLA fail price criterion (options > $500/contract) — too expensive for small-account challenge sizing. They remain in SHADOW_CANDIDATES for evidence accumulation on the main $90k account.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "strategy_leak_audit",
@@ -1561,7 +2331,17 @@
         "pine_strategy_lab_report"
       ],
       "evidence_gate": "Required before any new external strategy can become paper_candidate. Critical findings reject until fixed.",
-      "notes": "Scans for future shift, Pine lookahead, centered rolling, global min/max normalization, same-bar high/low assumptions, and unshifted signals."
+      "notes": "Scans for future shift, Pine lookahead, centered rolling, global min/max normalization, same-bar high/low assumptions, and unshifted signals.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "hmm_regime_scanner",
@@ -1579,7 +2359,17 @@
         "agent_trade_debate_report"
       ],
       "evidence_gate": "30 trading days of forward regime labels before this can route or gate strategy families.",
-      "notes": "Deterministic Gaussian-state approximation classifies trend/chop/panic from return and volatility features. Context only."
+      "notes": "Deterministic Gaussian-state approximation classifies trend/chop/panic from return and volatility features. Context only.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "pca_market_forces",
@@ -1597,7 +2387,17 @@
         "agent_trade_debate_report"
       ],
       "evidence_gate": "30 trading days before any use as a symbol-selection filter.",
-      "notes": "Compresses liquid equity universe into principal forces and idiosyncratic residual scores. Prevents confusing beta echoes with ticker-specific edge."
+      "notes": "Compresses liquid equity universe into principal forces and idiosyncratic residual scores. Prevents confusing beta echoes with ticker-specific edge.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "prediction_market_slow_news_watch",
@@ -1615,7 +2415,17 @@
         "limitless_market_scanner"
       ],
       "evidence_gate": "Only observe event-resolution windows. No wallet, key, order, or live trade discussion without separate approval.",
-      "notes": "Finds macro/CPI/FOMC/jobs/earnings-style public markets where slow-news mispricing might be measurable."
+      "notes": "Finds macro/CPI/FOMC/jobs/earnings-style public markets where slow-news mispricing might be measurable.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "agent_trade_debate_report",
@@ -1633,7 +2443,17 @@
         "market_force_score"
       ],
       "evidence_gate": "Report only. Risk-manager veto remains informational here; actual blocking stays in guards.",
-      "notes": "Deterministic bull vs bear vs risk-manager debate. Final verdict is always observe_only."
+      "notes": "Deterministic bull vs bear vs risk-manager debate. Final verdict is always observe_only.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "trading_skills_intake_audit",
@@ -1652,7 +2472,17 @@
         "strategy_intake_report"
       ],
       "evidence_gate": "Ideas only. No adoption without local implementation, tests, execution audit, and forward evidence where applicable.",
-      "notes": "Read-only intake of selected agiprolabs claude-trading-skills ideas: walk-forward-validation, position-sizing, options-pricing, and trade-journal. Risk-management intentionally excluded for this pass."
+      "notes": "Read-only intake of selected agiprolabs claude-trading-skills ideas: walk-forward-validation, position-sizing, options-pricing, and trade-journal. Risk-management intentionally excluded for this pass.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "missed_banger_review",
@@ -1671,7 +2501,17 @@
         "flip_shadow_candidates_log"
       ],
       "evidence_gate": "Read-only review tool. No promotion gate. Surfaces universe gaps and setup misses for human review.",
-      "notes": "Cross-references social observations against deep scan universe, liquidity gate, and flip shadow log. Verdicts: universe_gap / liquidity_gate_blocked / setup_not_triggered / bot_covered / not_a_banger."
+      "notes": "Cross-references social observations against deep scan universe, liquidity gate, and flip shadow log. Verdicts: universe_gap / liquidity_gate_blocked / setup_not_triggered / bot_covered / not_a_banger.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "adaptive_options_shadow_playbook",
@@ -1693,7 +2533,17 @@
         "premarket_ema_retest_shadow_logger"
       ],
       "evidence_gate": "Shadow-only until 30 trading days, 10+ relevant directional samples per playbook, and postmortem evidence shows improvement without overtrading.",
-      "notes": "Selects the market-appropriate options playbook: long put, long call, put credit spread, call credit spread, iron condor, or stand aside. It logs adaptation reasoning only and cannot place orders."
+      "notes": "Selects the market-appropriate options playbook: long put, long call, put credit spread, call credit spread, iron condor, or stand aside. It logs adaptation reasoning only and cannot place orders.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "agent_incentive_safety_audit",
@@ -1712,7 +2562,17 @@
         "loop_readiness_audit"
       ],
       "evidence_gate": "Governance only. Blocks promotion review when autonomous loops lack objective, non-goal, forbidden-action, stop-condition, evidence, or independent-verifier metadata.",
-      "notes": "Read-only audit inspired by Agents of Chaos. It checks incentive design, self-approval risk, and unbounded autonomy language. Must not change execution flags, risk thresholds, or broker wiring."
+      "notes": "Read-only audit inspired by Agents of Chaos. It checks incentive design, self-approval risk, and unbounded autonomy language. Must not change execution flags, risk thresholds, or broker wiring.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "loop_closure_report",
@@ -1733,7 +2593,17 @@
         "signal_stack_grades"
       ],
       "evidence_gate": "Read-only loop closure only. No promotion or rule change without tests, execution audit, dual review, and explicit Kenny approval.",
-      "notes": "Normalizes scanner -> decision -> trade/no-trade -> exit quality -> P/L explanation -> lesson -> next-day gate. Does not call brokers or change bot settings."
+      "notes": "Normalizes scanner -> decision -> trade/no-trade -> exit quality -> P/L explanation -> lesson -> next-day gate. Does not call brokers or change bot settings.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "options_surface_intelligence",
@@ -1754,7 +2624,17 @@
         "daily_options_universe_ranker"
       ],
       "evidence_gate": "Public option-chain snapshots are unsigned context only. No smart-money classification or behavior change without classified OPRA evidence, forward outcomes, OOS validation, and explicit approval.",
-      "notes": "Computes IV level, skew, term structure, implied move, spreads, open interest, unsigned volume/OI anomalies, and cheap-option lottery-risk flags. It cannot submit orders or select execution symbols."
+      "notes": "Computes IV level, skew, term structure, implied move, spreads, open interest, unsigned volume/OI anomalies, and cheap-option lottery-risk flags. It cannot submit orders or select execution symbols.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_feature_ablation_report",
@@ -1775,7 +2655,17 @@
         "edge_trial_ledger"
       ],
       "evidence_gate": "Review eligibility requires 30 known telemetry trades, 10 per comparison group, positive lift, and Bonferroni significance. Any behavior change still requires a separately recorded OOS trial and explicit approval.",
-      "notes": "Read-only descriptive feature/outcome comparisons. It does not claim causality, impute legacy telemetry, promote features, change thresholds, or submit orders."
+      "notes": "Read-only descriptive feature/outcome comparisons. It does not claim causality, impute legacy telemetry, promote features, change thresholds, or submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "edge_trial_ledger",
@@ -1796,7 +2686,17 @@
         "self_improving_strategy_verifier"
       ],
       "evidence_gate": "Every attempted variant, including failures, must be recorded. Promotion review requires OOS or forward stage, Bonferroni significance, 30 OOS trades, positive expectancy, profit factor above one, and drawdown coverage.",
-      "notes": "Append-only experiment accounting with deterministic IDs and family-wide multiple-testing correction. It can flag candidates for review but cannot promote signals or submit orders."
+      "notes": "Append-only experiment accounting with deterministic IDs and family-wide multiple-testing correction. It can flag candidates for review but cannot promote signals or submit orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_equity_curve_report",
@@ -1817,7 +2717,17 @@
         "elite_bot_readiness_scorecard"
       ],
       "evidence_gate": "Realized-PnL analytics only. Profitability cannot score 10 without at least 200 post-hardening trades, 120 calendar days, and durable drawdown evidence.",
-      "notes": "Deduplicated post-hardening realized-PnL curve and peak-to-trough drawdown. Percentage drawdown is relative to peak cumulative realized profit, not total account equity."
+      "notes": "Deduplicated post-hardening realized-PnL curve and peak-to-trough drawdown. Percentage drawdown is relative to peak cumulative realized profit, not total account equity.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "point_in_time_option_quotes",
@@ -1836,7 +2746,17 @@
         "flip_feature_ablation_report"
       ],
       "evidence_gate": "Free Alpaca indicative quotes are provenance telemetry only, not OPRA NBBO or classified flow. Missing fields remain null; no signal or behavior change is allowed from this source without OOS validation and explicit approval.",
-      "notes": "Event-driven signal/fill/monitor/exit capture keyed by trade, order, contract, and leg role. Uses free indicative options data and IEX underlying trades on nonblocking durable worker threads."
+      "notes": "Event-driven signal/fill/monitor/exit capture keyed by trade, order, contract, and leg role. Uses free indicative options data and IEX underlying trades on nonblocking durable worker threads.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "zero_dte_expected_move_context",
@@ -1856,7 +2776,17 @@
         "edge_trial_ledger"
       ],
       "evidence_gate": "Context-only until expected-move bins have forward outcomes across at least 30 trading days and 30 OOS trades, pass multiple-testing controls, and receive explicit approval for any behavior change.",
-      "notes": "Normalizes ORB width, midpoint displacement, and breakout overshoot by spot times ATM IV divided by sqrt(252). It labels shadow observations only and cannot select trades, size positions, change gates, or submit orders."
+      "notes": "Normalizes ORB width, midpoint displacement, and breakout overshoot by spot times ATM IV divided by sqrt(252). It labels shadow observations only and cannot select trades, size positions, change gates, or submit orders.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "zero_dte_entry_feature_edge_report",
@@ -1875,7 +2805,17 @@
         "zero_dte_expected_move_context"
       ],
       "evidence_gate": "No bucket can influence execution before at least 30 completed forward lifecycles across 10 trading days, chronological holdout and multiple-testing review, and explicit approval.",
-      "notes": "Read-only preregistered comparison of entry time, breakout ATR, ORB/expected-move fraction, expected-move consumption, and recorded regime labels. Missing point-in-time fields remain unavailable and are never reconstructed."
+      "notes": "Read-only preregistered comparison of entry time, breakout ATR, ORB/expected-move fraction, expected-move consumption, and recorded regime labels. Missing point-in-time fields remain unavailable and are never reconstructed.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "kronos_market_forecaster",
@@ -1897,7 +2837,17 @@
         "daily_edge_orchestrator"
       ],
       "evidence_gate": "Shadow-only until Kronos forecast rows have 30 trading days of forward outcomes, conflict/confirm rates are measured by symbol and regime, and Kenny explicitly approves any promotion.",
-      "notes": "Optional adapter for shiyu-coder/Kronos foundation K-line forecasts. Uses KRONOS_REPO_PATH/model config when installed; otherwise reports setup_required. It can add forecast context or conflict blockers, but cannot approve trades or submit orders."
+      "notes": "Optional adapter for shiyu-coder/Kronos foundation K-line forecasts. Uses KRONOS_REPO_PATH/model config when installed; otherwise reports setup_required. It can add forecast context or conflict blockers, but cannot approve trades or submit orders.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "polymarket_weather_near_miss_cohort",
@@ -1917,7 +2867,17 @@
         "polymarket_weather_performance_report"
       ],
       "evidence_gate": "The preregistered fee-adjusted edge band is 5.0% inclusive to 10.0% exclusive, with all three model families at 5%+ edge and no more than 20 points disagreement. Threshold review requires at least 30 resolved observations across 14 calendar days; no automatic threshold change is permitted.",
-      "notes": "One forward observation per market is tracked through explicit settlement using a hypothetical $1 executable-ask entry. The cohort is research-only and cannot create paper or live positions."
+      "notes": "One forward observation per market is tracked through explicit settlement using a hypothetical $1 executable-ask entry. The cohort is research-only and cannot create paper or live positions.",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_15m_orb_retest_shadow_challenger",
@@ -1937,7 +2897,17 @@
         "flip_shadow_time_bucket_report"
       ],
       "evidence_gate": "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
-      "notes": "Independent 15-minute opening range, completed-candle breakout, bounded retest, hold, and prior-day-high/low alignment. Isolated from primary symbol promotion and live selector rankings."
+      "notes": "Independent 15-minute opening range, completed-candle breakout, bounded retest, hold, and prior-day-high/low alignment. Isolated from primary symbol promotion and live selector rankings.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_level_sweep_reversal_shadow_challenger",
@@ -1957,7 +2927,17 @@
         "flip_shadow_time_bucket_report"
       ],
       "evidence_gate": "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
-      "notes": "First-90-minute failed break of prior-day or prior-week levels with close-back-inside and next-bar confirmation. The social-media 70% reversal claim is explicitly unverified and grants no execution authority."
+      "notes": "First-90-minute failed break of prior-day or prior-week levels with close-back-inside and next-bar confirmation. The social-media 70% reversal claim is explicitly unverified and grants no execution authority.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_orb_extension_reversal_shadow_challenger",
@@ -1977,7 +2957,17 @@
         "flip_shadow_time_bucket_report"
       ],
       "evidence_gate": "Human review requires 50 completed option lifecycles across 10 trading days, 15 chronological holdout observations, positive full and holdout expectancy, complete entry-ask/exit-bid coverage, and explicit approval. No automatic promotion.",
-      "notes": "After price extends at least one full 5-minute opening-range width, records the first confirmed lower-high/lower-low PUT reversal or higher-low/higher-high CALL reversal. Research-only counterfactual for learning reversal timing; it cannot submit orders."
+      "notes": "After price extends at least one full 5-minute opening-range width, records the first confirmed lower-high/lower-low PUT reversal or higher-low/higher-high CALL reversal. Research-only counterfactual for learning reversal timing; it cannot submit orders.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "flip_decision_missed_banger_review",
@@ -1997,7 +2987,17 @@
         "shadow_consensus_blocker_audit"
       ],
       "evidence_gate": "The preregistered proxy is a 0.50% directionally favorable SPY underlying move within 60 minutes. Review requires at least 20 trading days and 50 directionally scoreable decisions; underlying moves are not option fills and cannot change a gate without explicit approval and option-level validation.",
-      "notes": "Read-only reason and blocker attribution. Repeated intraday decisions are labeled correlated, and historical rows with unavailable direction remain unscored."
+      "notes": "Read-only reason and blocker attribution. Repeated intraday decisions are labeled correlated, and historical rows with unavailable direction remain unscored.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "trend_participation_shadow",
@@ -2023,7 +3023,17 @@
         "liquid_options_edge_shadow"
       ],
       "evidence_gate": "Promotion requires 60 dev outcomes + 30 chronological holdout outcomes, all under doubled fees. Evidence collection begins 2026-08-05. Aug 4 permanently excluded as design day. Promotion decision requires explicit human approval.",
-      "notes": "Forward-only call debit spread lane for SPY/QQQ/NVDA. Entry gates: HTF bullish+aligned, above opening range, market force bullish/bullish-lean, no risk veto, no high-impact catalyst. Max debit 50. 50% profit target, 50% stop. 7-day/2-DTE hard exits. Discord alerts on candidate entry and close."
+      "notes": "Forward-only call debit spread lane for SPY/QQQ/NVDA. Entry gates: HTF bullish+aligned, above opening range, market force bullish/bullish-lean, no risk veto, no high-impact catalyst. Max debit 50. 50% profit target, 50% stop. 7-day/2-DTE hard exits. Discord alerts on candidate entry and close.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "nearterm_trend_shadow",
@@ -2055,7 +3065,17 @@
         "liquid_options_edge_shadow"
       ],
       "evidence_gate": "Promotion requires 60 dev outcomes + 30 chronological holdout outcomes, all under doubled fees. Evidence collection begins 2026-08-05. Conviction score tracked per outcome for win-rate vs score analysis. Promotion requires explicit human approval.",
-      "notes": "2-5 DTE call debit spreads on SPY/QQQ/NVDA. Same base gates as trend_participation_shadow but 3x faster evidence collection. Adds conviction scorer (0-6 points) from 6 idle context signals: distribution_day, market_breadth, HMM regime, Hurst regime, sector_rotation, GEX. MIN_CONVICTION=2 required to enter. Max debit 50. 75% profit target, 40% stop. Generates training data for future ML gate."
+      "notes": "2-5 DTE call debit spreads on SPY/QQQ/NVDA. Same base gates as trend_participation_shadow but 3x faster evidence collection. Adds conviction scorer (0-6 points) from 6 idle context signals: distribution_day, market_breadth, HMM regime, Hurst regime, sector_rotation, GEX. MIN_CONVICTION=2 required to enter. Max debit 50. 75% profit target, 40% stop. Generates training data for future ML gate.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "0dte_time_window_gate",
@@ -2072,14 +3092,24 @@
       "feeds": [
         "context_only"
       ],
-      "evidence_gate": "Trivial filter \u00e2\u20ac\u201d log 30 days of entry times vs outcomes before gating.",
+      "evidence_gate": "Trivial filter â€” log 30 days of entry times vs outcomes before gating.",
       "verdict": "REAL EDGE",
       "edge_clarity": 4,
       "implementation_complexity": 1,
       "data_availability": 5,
       "stack_fit": 5,
-      "source": "SSRN 5223127 (Bozovic 2025) \u00e2\u20ac\u201d intraday jump intensity clusters at open/close; practitioner backtest 11:09am SPX condor = 132% R/R",
-      "notes": "Restrict all 0DTE entries to 10:00-11:30 ET. Jump risk premium peaks at open (too dangerous for sellers) and decays by 10am. Lunch doldrums 11:30-13:30 have worst fills. Gamma acceleration after 13:30 is dangerous for new short-gamma entries. No paid data needed."
+      "source": "SSRN 5223127 (Bozovic 2025) â€” intraday jump intensity clusters at open/close; practitioner backtest 11:09am SPX condor = 132% R/R",
+      "notes": "Restrict all 0DTE entries to 10:00-11:30 ET. Jump risk premium peaks at open (too dangerous for sellers) and decays by 10am. Lunch doldrums 11:30-13:30 have worst fills. Gamma acceleration after 13:30 is dangerous for new short-gamma entries. No paid data needed.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "vwap_deviation_filter",
@@ -2103,7 +3133,17 @@
       "data_availability": 5,
       "stack_fit": 5,
       "source": "EdgeForAlpha Q1-2025 SPY backtest: Sharpe 2.8, +8.6% vs SPY -5.0%, max DD -3.4%, 63 days. Institutional basis: VWAP is actual execution benchmark (Almgren & Chriss 2000).",
-      "notes": "Use VWAP deviation as entry filter for 0DTE PM spread and iron condor \u00e2\u20ac\u201d prefer entries when SPY is within +-0.75 sigma of VWAP (near fair value). Avoid entries when price is already at +-2 sigma (overextended, mean-reversion risk). Computable with yfinance 1-min download + pandas volume-weighted calc. Anchored VWAP from last FOMC date also valuable for FOMC IV crush strategy."
+      "notes": "Use VWAP deviation as entry filter for 0DTE PM spread and iron condor â€” prefer entries when SPY is within +-0.75 sigma of VWAP (near fair value). Avoid entries when price is already at +-2 sigma (overextended, mean-reversion risk). Computable with yfinance 1-min download + pandas volume-weighted calc. Anchored VWAP from last FOMC date also valuable for FOMC IV crush strategy.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "iv_term_structure_slope",
@@ -2126,8 +3166,18 @@
       "implementation_complexity": 2,
       "data_availability": 5,
       "stack_fit": 5,
-      "source": "Bandi, Fusari, Reno SSRN 4503344 (2024) \u00e2\u20ac\u201d 0DTE variance risk premium exists but conditional timing required. yfinance options chain provides multiple expiry IVs for free.",
-      "notes": "When 0DTE median IV > 5-day median IV (inverted term structure), 0DTE premium is overpriced vs realized vol \u00e2\u20ac\u201d better edge for sellers. When term structure is flat/normal, skip or reduce size. Use yfinance Ticker.options to get nearest two expiries, compare median call IV. Positive slope (0DTE > next expiry) = green light for theta harvest."
+      "source": "Bandi, Fusari, Reno SSRN 4503344 (2024) â€” 0DTE variance risk premium exists but conditional timing required. yfinance options chain provides multiple expiry IVs for free.",
+      "notes": "When 0DTE median IV > 5-day median IV (inverted term structure), 0DTE premium is overpriced vs realized vol â€” better edge for sellers. When term structure is flat/normal, skip or reduce size. Use yfinance Ticker.options to get nearest two expiries, compare median call IV. Positive slope (0DTE > next expiry) = green light for theta harvest.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "vix_contango_gate",
@@ -2151,7 +3201,17 @@
       "data_availability": 4,
       "stack_fit": 4,
       "source": "Standard volatility risk premium literature. VXX contango/backwardation is observable from yfinance (^VIX vs VXX price trend as proxy).",
-      "notes": "When VIX spot < VIX front-month futures (contango) = vol risk premium is positive = better edge for premium selling. When VIX spot > front-month (backwardation) = skip or reduce premium selling. Proxy: use yfinance ^VIX and compare to VXX rolling change as contango proxy. CBOE publishes exact VX settlement for free."
+      "notes": "When VIX spot < VIX front-month futures (contango) = vol risk premium is positive = better edge for premium selling. When VIX spot > front-month (backwardation) = skip or reduce premium selling. Proxy: use yfinance ^VIX and compare to VXX rolling change as contango proxy. CBOE publishes exact VX settlement for free.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "camarilla_pivot_context",
@@ -2168,14 +3228,24 @@
       "feeds": [
         "context_only"
       ],
-      "evidence_gate": "Context and confluence use only \u00e2\u20ac\u201d not a standalone signal. 30 days observation.",
+      "evidence_gate": "Context and confluence use only â€” not a standalone signal. 30 days observation.",
       "verdict": "TIMING TOOL ONLY",
       "edge_clarity": 2,
       "implementation_complexity": 1,
       "data_availability": 5,
       "stack_fit": 3,
       "source": "Nick Stott (bond trader). No peer-reviewed SPY/ES edge quantification found as of 2026-08-11. Practitioner use is widespread.",
-      "notes": "Use H3/L3 as mean-reversion zones for condor wing placement guidance (avoid placing short strikes near H3/L3 \u00e2\u20ac\u201d higher probability of test). H4/L4 as hard stop context for 0DTE spreads. CPR width as daily regime flag: narrow CPR = trending day, wide CPR = ranging day. Computed purely from previous day OHLC via yfinance \u00e2\u20ac\u201d zero cost. No standalone edge evidence."
+      "notes": "Use H3/L3 as mean-reversion zones for condor wing placement guidance (avoid placing short strikes near H3/L3 â€” higher probability of test). H4/L4 as hard stop context for 0DTE spreads. CPR width as daily regime flag: narrow CPR = trending day, wide CPR = ranging day. Computed purely from previous day OHLC via yfinance â€” zero cost. No standalone edge evidence.",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
     },
     {
       "id": "ict_killzones",
@@ -2190,14 +3260,24 @@
       "can_submit_orders": false,
       "broker_or_venue": "none",
       "feeds": [],
-      "evidence_gate": "Rejected \u00e2\u20ac\u201d no build.",
+      "evidence_gate": "Rejected â€” no build.",
       "verdict": "TIMING TOOL ONLY (patterns rejected)",
       "edge_clarity": 1,
       "implementation_complexity": 4,
       "data_availability": 5,
       "stack_fit": 1,
-      "source": "offbeatforex.com backtest: 24,908 candles, 125 trades, win rate 29.6%, profit factor 0.81, result -45% on $10k. EURUSD only \u00e2\u20ac\u201d no SPY/ES data.",
-      "notes": "Mechanical ICT pattern trading has negative expectancy (PF 0.81). The session windows themselves (NY open, PM session) correspond to real volume clusters and are worth using as time filters, but the ICT entry patterns within them (displacement candles, FVGs, etc.) have no documented mechanical edge. The AI-assisted version (PF 1.99) required rejecting 92% of setups \u00e2\u20ac\u201d edge is in discretionary filtering, not the pattern. Rejected for automation."
+      "source": "offbeatforex.com backtest: 24,908 candles, 125 trades, win rate 29.6%, profit factor 0.81, result -45% on $10k. EURUSD only â€” no SPY/ES data.",
+      "notes": "Mechanical ICT pattern trading has negative expectancy (PF 0.81). The session windows themselves (NY open, PM session) correspond to real volume clusters and are worth using as time filters, but the ICT entry patterns within them (displacement candles, FVGs, etc.) have no documented mechanical edge. The AI-assisted version (PF 1.99) required rejecting 92% of setups â€” edge is in discretionary filtering, not the pattern. Rejected for automation.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "smc_order_blocks_fvg",
@@ -2212,14 +3292,24 @@
       "can_submit_orders": false,
       "broker_or_venue": "none",
       "feeds": [],
-      "evidence_gate": "Rejected \u00e2\u20ac\u201d no build.",
+      "evidence_gate": "Rejected â€” no build.",
       "verdict": "NO EVIDENCE",
       "edge_clarity": 1,
       "implementation_complexity": 5,
       "data_availability": 5,
       "stack_fit": 1,
-      "source": "Medium/@space.garaa 2,600-trade backtest (Jan 2024-Mar 2026): 61.2% WR, PF 2.17 \u00e2\u20ac\u201d but no individual concept isolation, no SPY/ES data, no methodology audit. Zero peer-reviewed papers on SMC/order blocks/FVG as of 2026-08-11.",
-      "notes": "SMC is useful as a conceptual framework for reading market structure but fails automation requirements: patterns require subjective identification, no falsifiable mechanical rules, no peer-reviewed evidence. The '70% FVG fill rate' claim circulates without any published methodology. Rejected. Exception: liquidity sweeps (stop hunts above/below swing highs) are a real phenomenon worth a separate shadow scanner."
+      "source": "Medium/@space.garaa 2,600-trade backtest (Jan 2024-Mar 2026): 61.2% WR, PF 2.17 â€” but no individual concept isolation, no SPY/ES data, no methodology audit. Zero peer-reviewed papers on SMC/order blocks/FVG as of 2026-08-11.",
+      "notes": "SMC is useful as a conceptual framework for reading market structure but fails automation requirements: patterns require subjective identification, no falsifiable mechanical rules, no peer-reviewed evidence. The '70% FVG fill rate' claim circulates without any published methodology. Rejected. Exception: liquidity sweeps (stop hunts above/below swing highs) are a real phenomenon worth a separate shadow scanner.",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
     },
     {
       "id": "liquidity_sweep_scanner",
@@ -2237,8 +3327,8 @@
         "yfinance_1min",
         "yfinance_daily"
       ],
-      "evidence_gate": "30-day shadow observation, minimum 10 qualifying sweep events. Decision gate: if observed win rate (price reaches VWAP within 2h) > 70% AND false breakdown rate < 20%, promote to debit-spread consideration. Credit spread entry requires ~88% WR \u00e2\u20ac\u201d do not promote for credit spreads unless that threshold is confirmed.",
-      "verdict": "TIMING TOOL \u00e2\u20ac\u201d insufficient evidence for options entry, sufficient for negative filter use",
+      "evidence_gate": "30-day shadow observation, minimum 10 qualifying sweep events. Decision gate: if observed win rate (price reaches VWAP within 2h) > 70% AND false breakdown rate < 20%, promote to debit-spread consideration. Credit spread entry requires ~88% WR â€” do not promote for credit spreads unless that threshold is confirmed.",
+      "verdict": "TIMING TOOL â€” insufficient evidence for options entry, sufficient for negative filter use",
       "edge_clarity": 2,
       "implementation_complexity": 3,
       "data_availability": 5,
@@ -2246,20 +3336,20 @@
       "research_eval": "research/repo_eval_liquidity_sweeps_0dte_2026-08-11.md",
       "last_reviewed": "2026-08-11",
       "academic_refs": [
-        "Vlasiuk & Smirnov (2025) arXiv 2511.06177 \u00e2\u20ac\u201d push-response anomalies in SPY NBBO data, 1,500 trading days. Large directional pushes yield non-random responses. Supports reversal hypothesis at microstructure level.",
-        "Zarattini, Aziz & Barbon (2024) SSRN 4824172 \u00e2\u20ac\u201d intraday momentum on SPY 2007-2024, Sharpe 1.33, 19.6% annualized. Abnormal supply/demand imbalance signal conceptually adjacent to sweep detection.",
+        "Vlasiuk & Smirnov (2025) arXiv 2511.06177 â€” push-response anomalies in SPY NBBO data, 1,500 trading days. Large directional pushes yield non-random responses. Supports reversal hypothesis at microstructure level.",
+        "Zarattini, Aziz & Barbon (2024) SSRN 4824172 â€” intraday momentum on SPY 2007-2024, Sharpe 1.33, 19.6% annualized. Abnormal supply/demand imbalance signal conceptually adjacent to sweep detection.",
         "No peer-reviewed paper directly backtests PDH/PDL sweep reversal on SPY with clean entry/exit rules. This is the central evidence gap."
       ],
       "practitioner_stats": {
         "spy_opens_inside_range_tags_pdh_or_pdl": "86% of days (TradeThatSwing.com)",
         "spy_opens_below_pdl_returns_above_pdl": "71% (TradeThatSwing.com)",
         "sfp_plus_volume_confirm_win_rate": "55-68% (QuantVPS, 2022-2025, multi-asset)",
-        "orb_failure_spy_win_rate": "~50% (TOS Indicators 30-day backtest \u00e2\u20ac\u201d near coin-flip)",
-        "orb_credit_spread_in_direction_win_rate": "88.8% (Quantish.io, SPX 0DTE, Sept 2025 \u00e2\u20ac\u201d MOMENTUM direction, NOT reversal)"
+        "orb_failure_spy_win_rate": "~50% (TOS Indicators 30-day backtest â€” near coin-flip)",
+        "orb_credit_spread_in_direction_win_rate": "88.8% (Quantish.io, SPX 0DTE, Sept 2025 â€” MOMENTUM direction, NOT reversal)"
       },
       "options_math": {
         "credit_spread_break_even_win_rate": "~88% required at 1:7.3 reward-to-risk (typical 0DTE $5-wide spread at $0.60 credit)",
-        "debit_spread_ev_at_60pct_win": "+$0.80 per spread (positive EV \u00e2\u20ac\u201d preferred approach if signal validates)",
+        "debit_spread_ev_at_60pct_win": "+$0.80 per spread (positive EV â€” preferred approach if signal validates)",
         "catastrophic_risk": "Max loss on 0DTE credit spread if sweep continues: all three Greeks (delta, vega, gamma) move against position simultaneously"
       },
       "mechanical_definition": {
@@ -2309,19 +3399,29 @@
         ]
       },
       "recommended_integration": {
-        "immediate": "Negative filter only \u00e2\u20ac\u201d if bearish sweep of PDH occurred within 2h, skip condor entry for current session. No new code path, add as veto check in existing entry filters.",
+        "immediate": "Negative filter only â€” if bearish sweep of PDH occurred within 2h, skip condor entry for current session. No new code path, add as veto check in existing entry filters.",
         "after_30day_shadow_if_wr_gt_70pct": "0DTE debit spread (long call spread on bullish sweep, long put spread on bearish sweep). NOT credit spread.",
-        "do_not_do": "Do not use as 0DTE put credit spread entry signal \u00e2\u20ac\u201d credit spread payoff structure requires ~88% WR which is unvalidated."
+        "do_not_do": "Do not use as 0DTE put credit spread entry signal â€” credit spread payoff structure requires ~88% WR which is unvalidated."
       },
       "risk_flags": [
         "0DTE gamma amplification: 0.3% adverse move can cause near-max-loss on credit spread",
         "IV expansion during sweep hurts short vega before confirmation",
         "Double-tap pattern (sweep, false reclaim, second sweep) causes immediate max loss on fresh position",
         "VIX > 25: sweeps more likely to be genuine breakouts, not false. Tighten VIX gate for sweep entries vs. current bot gate of VIX < 40",
-        "Bid-ask spreads on 0DTE options widen during sweep \u00e2\u20ac\u201d slippage at worst possible moment"
+        "Bid-ask spreads on 0DTE options widen during sweep â€” slippage at worst possible moment"
       ],
       "source": "Deep research 2026-08-11. Phenomenon supported by microstructure theory and practitioner data. No peer-reviewed SPY-specific quantification of PDH/PDL sweep reversal edge. Upgraded from deferred to intake_shadow.",
-      "notes": "Build shadow scanner using yfinance 1-min data. Log daily: sweep_type, time, level, vol_ratio, sweep_excess_pct, vwap_reached_within_2h. After 30 days minimum 10 events: if WR > 70% consider debit spread integration, if WR < 65% reject for automation. Use immediately as negative veto filter on existing condor/spread entries with zero code risk."
+      "notes": "Build shadow scanner using yfinance 1-min data. Log daily: sweep_type, time, level, vol_ratio, sweep_excess_pct, vwap_reached_within_2h. After 30 days minimum 10 events: if WR > 70% consider debit spread integration, if WR < 65% reject for automation. Use immediately as negative veto filter on existing condor/spread entries with zero code risk.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "mes_reopen_vix_shadow",
@@ -2358,7 +3458,17 @@
           "win_rate": 0.591
         }
       },
-      "notes": "Long MES from the 5 PM CT reopen to the next 9:30 AM ET open when final same-day VIX<=18 and the 4 PM ET MES close-to-close move>=-1%. Corrects the non-causal 3:55 PM ET proposal and stays inside one Topstep session. The independent test block-bootstrap CI crosses zero (90%: -$2.05 to $26.11; 95%: -$5.00 to $29.02), so this is supportive shadow evidence only, not a statistically confirmed edge. No practice or live authority."
+      "notes": "Long MES from the 5 PM CT reopen to the next 9:30 AM ET open when final same-day VIX<=18 and the 4 PM ET MES close-to-close move>=-1%. Corrects the non-causal 3:55 PM ET proposal and stays inside one Topstep session. The independent test block-bootstrap CI crosses zero (90%: -$2.05 to $26.11; 95%: -$5.00 to $29.02), so this is supportive shadow evidence only, not a statistically confirmed edge. No practice or live authority.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
     },
     {
       "id": "qqq_mean_reversion_shadow",
@@ -2380,7 +3490,17 @@
       ],
       "evidence_gate": "At least 30 newly logged trading days and 10 completed forward trades per reviewed variant, positive expectancy after costs, PF > 1, controlled drawdown, and explicit human approval. Development results cannot promote.",
       "preregistration": "research/QQQ_MEAN_REVERSION_CHALLENGER_SPEC_2026-08-19.md",
-      "notes": "Tracks exact QQQ Double 7 and RSI2 baselines plus SMA5 and prior-high exit challengers. Development tests improved drawdown and holding time but failed experiment-wide multiple-test correction. Read-only shadow evidence; no order authority."
+      "notes": "Tracks exact QQQ Double 7 and RSI2 baselines plus SMA5 and prior-high exit challengers. Development tests improved drawdown and holding time but failed experiment-wide multiple-test correction. Read-only shadow evidence; no order authority.",
+      "family_key": "mean_reversion",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "mean_reversion",
+        "requires_human_review": true
+      }
     },
     {
       "id": "opportunity_intelligence_pipeline",
@@ -2407,7 +3527,297 @@
       ],
       "evidence_gate": "No execution promotion. Each underlying strategy retains its own forward evidence and explicit-approval contract.",
       "preregistration": "research/OPPORTUNITY_INTELLIGENCE_PROTOCOL_2026-08-19.md",
-      "notes": "Writes every considered and rejected lane plus explicit cash. Produces uncertainty-adjusted research weights only; it cannot alter production gates, sizes, or orders."
+      "notes": "Writes every considered and rejected lane plus explicit cash. Produces uncertainty-adjusted research weights only; it cannot alter production gates, sizes, or orders.",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "spy_0dte_iron_condor_shadow_challenger",
+      "name": "SPY 0DTE Iron Condor Shadow Challenger",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "blocked_source_not_reproducible",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P3",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "0dte",
+      "target_symbol": "SPY",
+      "rule_summary": "9:35 ET, VIX>14, 0.10-delta call+put spreads $3 wide, 25-35pct width credit, 2x credit stop, 2pm force-close",
+      "external_baseline_sources": [
+        "tradealgo.com 0DTE guide",
+        "daystoexpiry.com reversal scalping"
+      ],
+      "evidence_gate": "Requires 30 shadow sessions + spy_move_ledger recall proof before execution consideration",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "spy_3pm_gex_pin_butterfly_shadow",
+      "name": "SPY 3pm GEX-Pin Butterfly Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "blocked_source_not_reproducible",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P3",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "0dte_gamma",
+      "target_symbol": "SPY",
+      "rule_summary": "At 15:00 ET, GEX-based pin predictor outputs price; construct $1-wide 0DTE SPY butterfly centered on that level; log pin-error vs 16:00 close",
+      "external_baseline_sources": [
+        "Kane Shieh TradingPub vendor self-reported alert summary; proprietary pin formula unavailable"
+      ],
+      "evidence_gate": "Blocked until a public, point-in-time pin formula and independently auditable alert/fill ledger exist; no implementation from a marketing statistic",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "spy_post_catalyst_iv_crush_shadow",
+      "name": "SPY Post-Catalyst IV Crush Harvest Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P1",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "catalyst",
+      "target_symbol": "SPY",
+      "rule_summary": "After 14:30 ET FOMC press-conf end OR after 08:30 CPI/NFP resolves, enter defined-risk short-vega iron condor at pm expected move; log IV-crush pct captured",
+      "external_baseline_sources": [
+        "Trader Central FOMC IV crush",
+        "Pure Power Picks FOMC 3-phase",
+        "Days to Expiry post-catalyst straddle sell"
+      ],
+      "evidence_gate": "Requires 15+ FOMC/CPI/NFP events shadow with IV-crush capture pct >= published baseline",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "spy_5min_0dte_orb_shadow",
+      "name": "SPY 5-min 0DTE ORB Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P1",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "orb",
+      "target_symbol": "SPY",
+      "rule_summary": "5-min OR 09:30-09:35; first breakout only; ATM 0DTE call above high, put below low; stop -50pct premium, target +100pct, time stop 15:30 ET; Mon/Wed/Fri only",
+      "external_baseline_sources": [
+        "options.cafe 303-trade Massive/Polygon backtest 55.2pct return 7.6pct DD"
+      ],
+      "evidence_gate": "Requires 30 shadow sessions matching options.cafe published equity curve",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "orb_symbol_asymmetry_shadow",
+      "name": "ORB Per-Symbol Asymmetry Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P2",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "orb",
+      "target_symbol": "SPY,QQQ,IWM,NVDA,TSLA",
+      "rule_summary": "09:30-09:45 ORB per symbol with historical follow-through gate (NVDA 72.7pct, QQQ 63.6pct, SPY 54.5pct, IWM 40pct); pre-bell RV+relative-volume ranker; asymmetric long vs short sizing",
+      "external_baseline_sources": [
+        "Vortex Capital 60-day multi-symbol study"
+      ],
+      "evidence_gate": "Requires per-symbol shadow log validating published follow-through rates within +/-10pct",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "orb_short_regime_flag_shadow",
+      "name": "ORB Short-Regime Flag Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P2",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "orb_regime",
+      "target_symbol": "SPY,QQQ + high-beta names",
+      "rule_summary": "Compute rolling 20-day short-ORB and long-ORB base rates; emit flag when short > long (regime inversion); feed into other ORB scanners as sizing multiplier",
+      "external_baseline_sources": [
+        "Vortex Capital 20-day inversion study (short 46.7pct vs long 30.6pct)"
+      ],
+      "evidence_gate": "Requires 60 days shadow demonstrating regime-flag agrees with realized ORB base rates",
+      "family_key": "momentum",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "momentum",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "spy_gex_flow_adjusted_shadow",
+      "name": "SPY Flow-Adjusted GEX Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P1",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "gamma_flow",
+      "target_symbol": "SPY,SPX",
+      "rule_summary": "After 11:00 ET, compute flow-adjusted OI (settled + side-classified intraday volume simulator); emit settled + flow-adjusted flip and walls; alert when divergence > $2",
+      "external_baseline_sources": [
+        "FlashAlpha GEX playbook",
+        "FlashAlpha 0DTE-1sigma study"
+      ],
+      "evidence_gate": "Requires 30-day shadow showing flow-GEX flip vs settled-GEX flip and their price-action accuracy differential",
+      "family_key": "orderflow",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "orderflow",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "zero_gamma_flip_crossing_shadow",
+      "name": "Zero-Gamma Flip Crossing Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P2",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "gamma",
+      "target_symbol": "SPY",
+      "rule_summary": "Two-sided setup at gamma flip: breakout holding 5min past level on rising volume = trend entry; return inside within 10min = failed-flip fade",
+      "external_baseline_sources": [
+        "SpotGamma playbook",
+        "FlashAlpha",
+        "GEXBoard 30s live flip"
+      ],
+      "evidence_gate": "Requires 20 flip-crossing events with published breakout / fade WR",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "premarket_gapper_universe_scanner_shadow",
+      "name": "Pre-Market Gapper Universe Scanner Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P3",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "orb_gapper",
+      "target_symbol": "small-cap gappers",
+      "rule_summary": "Pre-market universe filter: gap >= 4pct, RV >= 100k pre-mkt, small float; feed 1-min ORB shadow with 2:1-3:1 RR; VWAP + 9/20 EMA + volume",
+      "external_baseline_sources": [
+        "Ross Cameron / Warrior Trading public methodology"
+      ],
+      "evidence_gate": "Requires 30 sessions shadow with real fills modeled",
+      "family_key": "governance",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "governance",
+        "requires_human_review": true
+      }
+    },
+    {
+      "id": "catalyst_tier_ivr_em_composite_gate_shadow",
+      "name": "Catalyst Tier + IVR + EM Composite Gate Shadow",
+      "script": "NOT_YET_IMPLEMENTED",
+      "status": "research_backlog",
+      "execution_enabled": false,
+      "can_submit_orders": false,
+      "priority": "P1",
+      "provenance": "research/social_trader_signal_gap_match_2026-09-01.json",
+      "edge_type": "catalyst_composite",
+      "target_symbol": "SPY,QQQ,TLT",
+      "rule_summary": "Composite gate: (Tier1 catalyst next 3d) AND (IVR<30 -> long premium ; IVR>60 -> short premium) AND (historical_move/implied_move >= 1.2 for long premium) -> route to sub-strategy selector",
+      "external_baseline_sources": [
+        "Oyamori catalyst tier table",
+        "Trader Central FOMC",
+        "Longbridge macro-events guide"
+      ],
+      "evidence_gate": "Requires 20 tier-1 events shadow with composite-gate WR vs unconditional entry",
+      "family_key": "catalyst",
+      "family_assignment_review_required": true,
+      "promotion_gate": {
+        "min_outcomes": 30,
+        "min_deflated_sharpe": null,
+        "min_psr": 0.95,
+        "max_pbo": 0.5,
+        "family_key": "catalyst",
+        "requires_human_review": true
+      }
     }
-  ]
+  ],
+  "statistical_gate_schema_version": 1,
+  "family_assignment_review_status": "pending_human_review"
 }

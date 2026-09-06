@@ -1,0 +1,353 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-01T19:00:00Z",
+  "generator": "claude_multisource_trader_research",
+  "sources": [
+    "agent_reach_trading_research collector (yt/x/web/social snapshots)",
+    "exa web_search 4-pass across 0DTE, ORB, GEX, catalyst edge types",
+    "lunarcrush attempted, paywalled — deferred until subscription"
+  ],
+  "governance": {
+    "execution_enabled": false,
+    "can_submit_orders": false,
+    "automatic_promotion": false,
+    "purpose": "research_intake_and_shadow_scanner_backlog_only",
+    "verification_tier": "external_public_content_requires_own_replay_before_promotion"
+  },
+  "extracted_signals": [
+    {
+      "id": "spy_0dte_iron_condor_tradealgo",
+      "edge_type": "0dte",
+      "source": "tradealgo.com/trading-guides/options/0dte-spy-options-strategy",
+      "author": "TradeAlgo (educational, unverified P/L)",
+      "verification": "unverified",
+      "rule_summary": "9:35 ET open, VIX>14 filter, sell 0.10-delta call spread + put spread ($3 wide), collect 25-35% width credit, stop at 2x credit, exit by 2-3pm",
+      "target_symbol": "SPY",
+      "timeframe": "0DTE",
+      "registry_match": "iwm_options_bot",
+      "match_status": "partial",
+      "gap": "bot runs 0.16-delta IC on IWM 30-45 DTE, not 0.10-delta 0DTE SPY; VIX gate not identical"
+    },
+    {
+      "id": "spy_0dte_gex_pin_butterfly_kane_shieh",
+      "edge_type": "0dte_gamma",
+      "source": "thetradingpub.com/kane-shieh/my-0dte-spy-pin-strategy-using-a-gamma-exposure-algorithm",
+      "author": "Kane Shieh, TradingPub",
+      "verification": "vendor_self_reported_live_alert_summary_no_independent_ledger",
+      "verification_note": "The vendor reports live alerts from 08/23/24-3/28/26 and a 54-14 record, but does not publish an independently auditable alert/fill ledger or the proprietary pin formula.",
+      "rule_summary": "At 3pm ET, GEX algo outputs pin price, construct $1-wide 0DTE SPY butterfly centered on that level",
+      "target_symbol": "SPY",
+      "timeframe": "0DTE last-hour",
+      "registry_match": "gex_scanner,zero_dte_expected_move_context",
+      "match_status": "missing",
+      "gap": "proprietary pin formula and independent alert/fill ledger are unavailable; not reproducible enough to implement as a strategy family"
+    },
+    {
+      "id": "spy_0dte_reversal_scalping_daystoexpiry",
+      "edge_type": "0dte",
+      "source": "daystoexpiry.com/blog/0dte-strategy-radar-high-probability-intraday-playbook",
+      "author": "Days to Expiry",
+      "verification": "backtested_100plus_sessions_no_broker_verification",
+      "rule_summary": "3 mechanical setups: (a) 9:35 iron condor +/-0.75%, 50%TP or 2x stop, close by 2pm; (b) post-catalyst ATM straddle sell, 2x credit stop, 1-4h hold; (c) failed-move S/R reversal vertical, volume-confirmed rejection wick + 2 consec closes above level",
+      "target_symbol": "SPY",
+      "timeframe": "0DTE",
+      "registry_match": "iwm_options_bot,camarilla_pivot_context,market_catalyst_calendar",
+      "match_status": "partial",
+      "gap": "no 3-setup 0DTE playbook scanner; individual pieces scattered"
+    },
+    {
+      "id": "spy_0dte_opening_candle_kafka",
+      "edge_type": "0dte",
+      "source": "linkedin.com/posts/brendan-kafka_optionstrading-0dte-spy-activity-7463689761648570369",
+      "author": "Brendan Kafka",
+      "verification": "single_trade_screenshot_no_track_record",
+      "rule_summary": "0DTE SPY call/put on 5m chart: first 1-3 candles establish bias; entry above opening wick low (support); stop 20% option risk below S/R; target = prior-session wick high; indicators VWAP + 9EMA + volume + ATR + RSI",
+      "target_symbol": "SPY",
+      "timeframe": "5m 0DTE",
+      "registry_match": "flip_bot,opening_range_breadth,vwap_deviation_filter",
+      "match_status": "partial",
+      "gap": "flip_bot trades equities/futures, not 0DTE options; combined VWAP+9EMA+opening-wick-support gate not explicit"
+    },
+    {
+      "id": "spy_0dte_kalman_momentum_herrmann",
+      "edge_type": "0dte",
+      "source": "mitchell-herrmann.com/projects/tradebot",
+      "author": "Mitchell Herrmann",
+      "verification": "public_demo_dashboard_no_audited_pnl",
+      "rule_summary": "Tick-by-tick Schwab WebSocket; Kalman-filter momentum vs calibrated threshold; RSI + regime + concurrent-position gate; Bayesian lookup table for parameter adaptation",
+      "target_symbol": "SPY",
+      "timeframe": "tick 0DTE",
+      "registry_match": "flip_bot,hmm_regime_scanner,kronos_market_forecaster",
+      "match_status": "partial",
+      "gap": "no Kalman-filter momentum shadow; existing regime models are HMM/PCA not Kalman"
+    },
+    {
+      "id": "spy_0dte_vrp_flashalpha_study",
+      "edge_type": "0dte_vol",
+      "source": "flashalpha.com/articles/are-0dte-straddles-overpriced-193-spy-sessions-data-study",
+      "author": "FlashAlpha (Tomasz Dobrowolski)",
+      "verification": "reproducible_dataset_193_sessions",
+      "rule_summary": "10:00 ET ATM straddle snapshot; realized median move / implied = 0.589 vs 0.674 fair; 71% closes inside implied band vs 68.3% fair; sell defined-risk (iron fly/condor), never naked",
+      "target_symbol": "SPY",
+      "timeframe": "0DTE 10am-close",
+      "registry_match": "zero_dte_expected_move_context,zero_dte_entry_feature_edge_report",
+      "match_status": "already_have",
+      "gap": "verify 10am snapshot cadence + defined-risk enforcement gate present"
+    },
+    {
+      "id": "spy_5min_orb_0dte_optionscafe",
+      "edge_type": "orb",
+      "source": "options.cafe/blog/0dte-opening-range-breakout-strategy-spy-backtested-results",
+      "author": "Options.cafe",
+      "verification": "303_trade_backtest_real_option_prices_massive_polygon",
+      "verification_note": "55.2% return over 2yr, 7.6% max DD, 39% WR at +100%/-50% RR, Mon/Wed/Fri only",
+      "rule_summary": "5-min opening range 9:30-9:35; first breakout only; ATM 0DTE call above high / put below low; stop -50% premium, target +100%, time stop 3:30 ET",
+      "target_symbol": "SPY",
+      "timeframe": "5m 0DTE",
+      "registry_match": "flip_15m_orb_retest_shadow_challenger,flip_orb_extension_reversal_shadow_challenger,opening_range_breadth",
+      "match_status": "partial",
+      "gap": "15m ORB variant exists; 5m 0DTE with fixed +100/-50 targets + M/W/F day filter missing"
+    },
+    {
+      "id": "orb_concretum_filters",
+      "edge_type": "orb",
+      "source": "concretumgroup.substack.com/p/improving-the-opening-range-breakout",
+      "author": "Concretum Research",
+      "verification": "18_year_backtest_2008_2025_academic_grade",
+      "verification_note": "Vanilla ORB 1.0% CAGR; with filters + trade mgmt + dynamic sizing = 12.1% CAGR, Sharpe 0.14->0.84, alpha 1.75%->12.80%",
+      "rule_summary": "5-min ORB on SPY + trade-selection filters + improved trade management + dynamic position sizing (specific filters gated)",
+      "target_symbol": "SPY",
+      "timeframe": "5m",
+      "registry_match": "flip_15m_orb_retest_shadow_challenger",
+      "match_status": "partial",
+      "gap": "no ORB variant with academic-grade net-of-fee filters + dynamic sizing; paywalled paper needs replication"
+    },
+    {
+      "id": "orb_vortex_persymbol_asymmetry",
+      "edge_type": "orb_symbol_selection",
+      "source": "vortexcapitalgroup.com/insights/the-09-30-09-45-auction-opening-range-breaks-that-actually-pay",
+      "author": "Vortex Capital Group",
+      "verification": "60_trading_day_study_yfinance_multi_symbol",
+      "verification_note": "NVDA upside 72.7%, QQQ 63.6%, SPY 54.5%, IWM 40%, TSLA 45.5% follow-through; SPY downside 11% only (regime-conditional)",
+      "rule_summary": "09:30-09:45 ORB; symbol-selection ranker (RV + relative volume) before bell; order-flow confirmation (CVD + VWAP slope + resting size); DMA routing; asymmetric sizing long vs short",
+      "target_symbol": "SPY,QQQ,IWM,NVDA,TSLA",
+      "timeframe": "15m",
+      "registry_match": "opening_range_breadth,relative_volume",
+      "match_status": "partial",
+      "gap": "no per-symbol ORB conditional gate; no CVD/order-flow confirmation layer"
+    },
+    {
+      "id": "orb_vortex_short_side_inversion",
+      "edge_type": "orb_regime",
+      "source": "vortexcapitalgroup.com/insights/opening-range-breakout-a-statistical-framework-for-active-equity-day-traders",
+      "author": "Vortex Capital Group",
+      "verification": "20_day_desk_study_9_high_beta_names",
+      "verification_note": "Long ORB 30.6% base / 31.0% w/full confirmation; SHORT ORB 46.7% base / 50.0% w/full confirmation — regime inversion vs historical",
+      "rule_summary": "Short-side ORB is currently the higher-probability trade in 2025-26 regime; borrow-confirmed, VWAP-below on retest, QQQ/sector confirmation, flow shows sellers filled",
+      "target_symbol": "high-beta momentum universe",
+      "timeframe": "15m to 10:15 ET evaluation",
+      "registry_match": "flip_orb_extension_reversal_shadow_challenger,hmm_regime_scanner",
+      "match_status": "partial",
+      "gap": "no short-side-favored ORB regime flag; asymmetric long/short thresholds not implemented"
+    },
+    {
+      "id": "orb_ross_cameron_gapper",
+      "edge_type": "orb_gapper",
+      "source": "eathealthy365.com/the-warrior-trading-strategy-of-ross-cameron",
+      "author": "Ross Cameron (Warrior Trading)",
+      "verification": "public_educational_no_indep_verification",
+      "rule_summary": "Pre-market gapper universe (>4-5% gap, high RV, small float); 1-min ORB (first 9:30-9:31 candle); entry above first candle high; stop below first candle low; 2:1 to 3:1 R:R; VWAP + 9/20 EMA + volume; exit by first 60-90 min",
+      "target_symbol": "small-cap gappers",
+      "timeframe": "1m",
+      "registry_match": "premarket_ema_retest_shadow,relative_volume,social_trending",
+      "match_status": "partial",
+      "gap": "no pre-market gapper universe scanner with float + gap-percent + RV filter"
+    },
+    {
+      "id": "orb_retest_entry_tradeology",
+      "edge_type": "orb_retest",
+      "source": "tradeology.app/academy/day-trading/opening-range-breakout",
+      "author": "TradeOlogy Academy",
+      "verification": "educational_only",
+      "rule_summary": "15-min ORB with retest-only entry variant: wait for pullback to broken level, enter on rejection candle close, stop just beyond level; lower trade frequency, WR raises to 60%+",
+      "target_symbol": "SPY/QQQ",
+      "timeframe": "15m",
+      "registry_match": "flip_15m_orb_retest_shadow_challenger",
+      "match_status": "already_have",
+      "gap": "verify retest-rejection candle close logic + volume confirmation present"
+    },
+    {
+      "id": "spy_gex_3_levels_flashalpha",
+      "edge_type": "gamma",
+      "source": "flashalpha.com/articles/spy-gex-guide-live-gamma-levels-dealer-hedging",
+      "author": "FlashAlpha",
+      "verification": "reproducible_api_formula",
+      "rule_summary": "3 SPY GEX levels: call wall (peak positive call gamma = resistance), put wall (peak put gamma = support), gamma flip (net GEX crosses zero); positive-GEX regime = fade extremes; negative-GEX = trend continuation; wall break = do not fade",
+      "target_symbol": "SPY",
+      "timeframe": "intraday",
+      "registry_match": "gex_scanner",
+      "match_status": "partial",
+      "gap": "verify gex_scanner emits all 3 levels + regime tag; walls + flip distance not confirmed"
+    },
+    {
+      "id": "gex_spotgamma_playbook",
+      "edge_type": "gamma_playbook",
+      "source": "spotgamma.com/gex",
+      "author": "SpotGamma",
+      "verification": "commercial_playbook_no_public_pnl",
+      "rule_summary": "5-min morning routine: (1) tag regime pos/neg gamma; (2) mark flip; (3) call wall + put wall; (4) check expiration weighting incl 0DTE share; (5) write 1-sentence thesis. 3 setups: call-wall fade, put-wall breakdown, zero-gamma-flip crossing (2-sided, 5-min hold past level on volume)",
+      "target_symbol": "SPY,SPX,TSLA,NVDA,AAPL,AMD,META",
+      "timeframe": "intraday",
+      "registry_match": "gex_scanner,hmm_regime_scanner",
+      "match_status": "partial",
+      "gap": "no zero-gamma-flip crossing shadow scanner; no 0DTE-specific GEX overlay"
+    },
+    {
+      "id": "gex_live_flip_gexboard",
+      "edge_type": "gamma_realtime",
+      "source": "gexboard.com/learn/zero-gamma-gamma-flip",
+      "author": "GEXBoard",
+      "verification": "commercial_dashboard",
+      "rule_summary": "30-second refresh live gamma flip via price-level simulation (60 hypothetical levels, BS gamma recalc); proximity band alert; failed-reclaim short setup",
+      "target_symbol": "SPY",
+      "timeframe": "30s intraday",
+      "registry_match": "gex_scanner",
+      "match_status": "missing",
+      "gap": "no sub-minute flip refresh; no proximity-band alerting; no failed-reclaim shadow trade"
+    },
+    {
+      "id": "gex_flow_vs_settled_flashalpha",
+      "edge_type": "gamma_flow",
+      "source": "flashalpha.com/articles/gex-trading-system-playbook-negative-gamma-flip-rules,flashalpha.com/articles/complete-guide-trading-gamma-exposure-gex",
+      "author": "FlashAlpha",
+      "verification": "reproducible_api_methodology",
+      "rule_summary": "Settled GEX (morning OI snapshot) reliable first 90 min; flow-GEX (settled + intraday flow simulator, side-classified buy/sell) required after 11am ET; 15-25% of near-term OI turns over intraday; walls can drift $2-5 by midday",
+      "target_symbol": "SPY,SPX",
+      "timeframe": "intraday",
+      "registry_match": "gex_scanner",
+      "match_status": "missing",
+      "gap": "gex_scanner uses static/settled OI; no flow-adjusted GEX after 11am"
+    },
+    {
+      "id": "fomc_iv_crush_timing_tradercentral",
+      "edge_type": "catalyst",
+      "source": "traderc.com/options-trading-fomc",
+      "author": "Trader Central",
+      "verification": "educational_multi_cycle_reference",
+      "rule_summary": "IV rises 10-20% above baseline 2-3 days pre-FOMC; do not add short-vega in final 48h; enter post-crush short-vega positions 3:15-3:30pm ET (AFTER Fed Chair press conf ends), not at 2pm; expected move SPX 0.5-1.5%",
+      "target_symbol": "SPY,SPX",
+      "timeframe": "event day",
+      "registry_match": "market_catalyst_calendar,ivr_scanner",
+      "match_status": "partial",
+      "gap": "no time-gated post-2:30pm short-vega entry rule; no 48h pre-event no-add gate"
+    },
+    {
+      "id": "catalyst_tier_playbook_oyamori",
+      "edge_type": "catalyst",
+      "source": "oyamori.com/learning/momentum-catalysts-options-trading",
+      "author": "Oyamori",
+      "verification": "educational_with_historical_ivr_tables",
+      "rule_summary": "Tier 1 = CPI/NFP/FOMC/PCE; check IVR gate: IVR<30 = buy premium (long straddle or directional), IVR>60 = sell premium (iron condor or credit spread); compare historical move vs implied — if historical exceeds implied by >=20% and IVR<30, straddle is underpriced",
+      "target_symbol": "SPY,QQQ,TLT",
+      "timeframe": "event day",
+      "registry_match": "market_catalyst_calendar,ivr_scanner,zero_dte_expected_move_context",
+      "match_status": "partial",
+      "gap": "no composite tier + IVR + EM-ratio gate; no pre-event straddle/condor auto-selector"
+    },
+    {
+      "id": "fomc_3phase_purepower",
+      "edge_type": "catalyst",
+      "source": "purepowerpicks.com/how-to-trade-options-around-fomc-meetings",
+      "author": "Pure Power Picks",
+      "verification": "educational_only",
+      "rule_summary": "3-phase FOMC framework: (1) before = sell premium or buy early+small; (2) during (2:00-2:30) = avoid new long premium, expect whipsaw; (3) after (post-2:30 press conf) = trade clean directional trend with defined-risk debit spread",
+      "target_symbol": "SPY",
+      "timeframe": "event day",
+      "registry_match": "market_catalyst_calendar",
+      "match_status": "partial",
+      "gap": "no phase-conditional strategy switcher"
+    }
+  ],
+  "backlog_new_registry_entries": [
+    {
+      "id": "spy_0dte_iron_condor_shadow_challenger",
+      "purpose": "Shadow-replay 0.10-delta SPY 0DTE IC with $3 wings, VIX>14 gate, 25-35% credit floor, 2x credit stop, 2pm force-close",
+      "priority": "P1",
+      "sources": ["spy_0dte_iron_condor_tradealgo","spy_0dte_reversal_scalping_daystoexpiry"],
+      "shadow_only": true
+    },
+    {
+      "id": "spy_3pm_gex_pin_butterfly_shadow",
+      "purpose": "3pm ET GEX-derived pin price predictor + $1-wide 0DTE SPY butterfly at level; log delta between predicted pin and 4pm close",
+      "priority": "P3",
+      "sources": ["spy_0dte_gex_pin_butterfly_kane_shieh"],
+      "shadow_only": true,
+      "blocked_reason": "vendor_self_reported_performance_and_proprietary_pin_formula_are_not_a_reproducible_baseline"
+    },
+    {
+      "id": "spy_post_catalyst_iv_crush_shadow",
+      "purpose": "After 2:30pm FOMC press conf ends OR after 8:30am CPI/NFP resolves, enter defined-risk short-vega on SPY (iron condor at ±expected move); log IV-crush capture pct",
+      "priority": "P1",
+      "sources": ["fomc_iv_crush_timing_tradercentral","fomc_3phase_purepower","spy_0dte_reversal_scalping_daystoexpiry"],
+      "shadow_only": true
+    },
+    {
+      "id": "spy_5min_0dte_orb_shadow",
+      "purpose": "5-min opening range 9:30-9:35 ET; first breakout only; ATM 0DTE call/put; -50%/+100% exit; 3:30 time stop; Mon/Wed/Fri filter",
+      "priority": "P1",
+      "sources": ["spy_5min_orb_0dte_optionscafe"],
+      "shadow_only": true,
+      "verified_baseline": "options_cafe_303_trade_massive_polygon_backtest"
+    },
+    {
+      "id": "orb_symbol_asymmetry_shadow",
+      "purpose": "Per-symbol ORB with historical follow-through gate (NVDA/QQQ/SPY differentiated); pre-bell RV+relative-volume ranker",
+      "priority": "P2",
+      "sources": ["orb_vortex_persymbol_asymmetry","orb_vortex_short_side_inversion"],
+      "shadow_only": true
+    },
+    {
+      "id": "orb_short_regime_flag",
+      "purpose": "Signal flag when short-ORB base rate > long-ORB base rate over rolling N days (regime inversion detector)",
+      "priority": "P2",
+      "sources": ["orb_vortex_short_side_inversion"],
+      "shadow_only": true
+    },
+    {
+      "id": "spy_gex_flow_adjusted_shadow",
+      "purpose": "Extend gex_scanner: after 11am ET, apply flow-adjusted OI (settled + side-classified intraday volume simulator); emit both settled and flow-adjusted flip + walls; alert when divergence > $2",
+      "priority": "P1",
+      "sources": ["gex_flow_vs_settled_flashalpha","gex_live_flip_gexboard"],
+      "shadow_only": true
+    },
+    {
+      "id": "zero_gamma_flip_crossing_shadow",
+      "purpose": "Two-sided setup at zero-gamma level: breakout that holds 5min past level on volume = trend entry; return inside within 10min = fade entry",
+      "priority": "P2",
+      "sources": ["gex_spotgamma_playbook","gex_live_flip_gexboard"],
+      "shadow_only": true
+    },
+    {
+      "id": "premarket_gapper_universe_scanner",
+      "purpose": "Pre-market universe filter: gap >= 4%, RV >= 100k pre-mkt, small float; feeds 1-min ORB shadow for gappers",
+      "priority": "P3",
+      "sources": ["orb_ross_cameron_gapper"],
+      "shadow_only": true
+    },
+    {
+      "id": "catalyst_tier_ivr_em_composite_gate",
+      "purpose": "Composite gate: Tier1_catalyst_next_3d AND (IVR<30 for buy_premium OR IVR>60 for sell_premium) AND historical_move/implied_move >= 1.2 for buy",
+      "priority": "P1",
+      "sources": ["catalyst_tier_playbook_oyamori","fomc_iv_crush_timing_tradercentral"],
+      "shadow_only": true
+    }
+  ],
+  "summary": {
+    "extracted_count": 19,
+    "already_have": 2,
+    "partial": 13,
+    "missing": 4,
+    "new_backlog_shadow_entries": 10,
+    "recommendation": "Prioritize P1 entries: gex-pin-butterfly, flow-adjusted GEX, post-catalyst IV-crush, catalyst-composite-gate, SPY 0DTE IC challenger. All shadow-only; require 5+ session recall proof before promotion consideration."
+  }
+}

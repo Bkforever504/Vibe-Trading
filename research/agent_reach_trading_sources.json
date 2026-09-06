@@ -4,11 +4,17 @@
   "youtube_queries": [
     "systematic SPY options gap continuation exact entry exit rules",
     "SPY 0DTE options full trade recap entry stop exit",
+    "SPY QQQ opening range breakout exact entry stop target",
+    "SPY gamma exposure GEX dealer positioning intraday exact levels",
+    "FOMC CPI SPY catalyst straddle exact entry stop timeframe",
     "MES futures systematic strategy exact rules transaction costs",
     "options selling implied volatility realized volatility exact rules"
   ],
   "x_queries": [
-    "SPY options exact entry stop exit",
+    "SPY 0DTE entry stop target exact",
+    "SPY opening range breakout ORB entry stop",
+    "SPY QQQ gamma flip level dealer positioning",
+    "FOMC CPI SPY straddle entry stop timeframe",
     "MES futures exact entry stop target",
     "options strategy full trade recap loss"
   ],

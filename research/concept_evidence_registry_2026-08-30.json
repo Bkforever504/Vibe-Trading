@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-08-30",
+  "policy": "Implementation is not evidence. A proxy is not the named concept. Missing exact evidence fails closed to untested.",
+  "execution_enabled": false,
+  "rank_effect": "none",
+  "patterns": {
+    "orb_5m": {"evidence_status": "isolated_tested", "data_readiness": "ready", "evidence": ["research/PROFITABILITY_DISCOVERY_100_PREREGISTRATION_2026-08-04.md", "data/global_social_sequence_tournament_results.json"]},
+    "avwap_trend_hold": {"evidence_status": "partial_proxy_only", "data_readiness": "partial", "evidence": ["research/PROFITABILITY_DISCOVERY_100_PREREGISTRATION_2026-08-04.md"], "gap": "Session VWAP is not a declared anchored VWAP."},
+    "bull_bear_flag": {"evidence_status": "implementation_only", "data_readiness": "ready", "evidence": [], "gap": "No isolated family tournament found."},
+    "poc_rejection": {"evidence_status": "untested", "data_readiness": "partial", "evidence": [], "gap": "Requires causal prior-session price-by-volume profile."},
+    "inverse_head_shoulders": {"evidence_status": "implementation_only", "data_readiness": "ready", "evidence": [], "gap": "No isolated family tournament found."},
+    "ascending_triangle": {"evidence_status": "untested", "data_readiness": "ready", "evidence": [], "gap": "No causal apex/touch-regression tournament found."},
+    "double_bottom": {"evidence_status": "implementation_only", "data_readiness": "ready", "evidence": [], "gap": "No isolated neckline-confirmation tournament found."},
+    "engulfing_context_gated": {"evidence_status": "isolated_tested", "data_readiness": "ready", "evidence": ["data/uncovered_concept_tournament.json"], "result": "No cross-market corrected survivor under the preregistered standalone rule."},
+    "fvg_retest": {"evidence_status": "partial_proxy_only", "data_readiness": "ready", "evidence": ["research/BREAKAWAY_FVG_STRUCTURE_RESULTS_2026-08-04.md", "data/global_social_sequence_tournament_results.json", "data/uncovered_concept_tournament.json"], "gap": "The new isolated test used execution-timeframe EMA direction and is explicitly fvg_retest_trend_proxy, not true HTF direction."},
+    "liquidity_sweep_choch_retest": {"evidence_status": "isolated_tested", "data_readiness": "ready", "evidence": ["research/liquidity_sweep_mss_retest_lab.py", "data/global_social_sequence_tournament_results.json"]},
+    "wyckoff_spring_sos": {"evidence_status": "untested", "data_readiness": "partial", "evidence": [], "gap": "Needs a causal Phase-A/range state machine."},
+    "ote_htf_confluence": {"evidence_status": "untested", "data_readiness": "partial", "evidence": [], "gap": "Needs frozen BOS-leg origin and independent HTF POI."},
+    "delta_divergence_proxy": {"evidence_status": "data_blocked", "data_readiness": "blocked", "evidence": [], "gap": "True aggressor-side delta unavailable; OHLCV proxy must be separately named."},
+    "gex_flip": {"evidence_status": "data_blocked", "data_readiness": "blocked", "evidence": [], "gap": "Requires timestamped provenance-gated options surface."},
+    "equal_highs_lows_sweep": {"evidence_status": "partial_proxy_only", "data_readiness": "ready", "evidence": ["research/liquidity_sweep_mss_retest_lab.py"], "gap": "Generic rolling extrema are not confirmed equal-extreme pools."},
+    "strat_completed_bar_ftfc_context": {"evidence_status": "implementation_only", "data_readiness": "partial", "evidence": ["data/trader_barbie_timeframe_tournament.json"], "gap": "Barbie tests do not isolate strict four-timeframe FTFC as a context filter."},
+    "ny_0800_0900_range_cisd": {"evidence_status": "implementation_only", "data_readiness": "partial", "evidence": [], "gap": "Needs consistently complete extended-hours history."},
+    "ict_cisd_universal_model": {"evidence_status": "implementation_only", "data_readiness": "ready", "evidence": [], "gap": "Manual/shadow detection exists, but no isolated historical tournament is registered."},
+    "cbc_strong_flip": {"evidence_status": "isolated_tested", "data_readiness": "ready", "evidence": ["data/uncovered_concept_tournament.json"], "result": "No cross-market corrected survivor as a standalone trigger."},
+    "session_liquidity_sweep_reclaim": {"evidence_status": "isolated_tested", "data_readiness": "ready", "evidence": ["data/uncovered_concept_tournament.json"], "result": "No cross-market corrected survivor as a standalone trigger."}
+  },
+  "external_concept_queue": [
+    {"id": "ce_failed_first_second_recross", "evidence_status": "spy_only_tested", "data_readiness": "partial", "evidence": ["data/trader_barbie_3m_ce_results.json"], "gap": "QQQ 1m and forward data missing."},
+    {"id": "strat_2_1_2_reversal", "evidence_status": "untested", "data_readiness": "ready", "gap": "Needs frozen magnitude and entry definition."},
+    {"id": "strat_3_1_2_reversal", "evidence_status": "untested", "data_readiness": "ready", "gap": "Needs frozen outside-bar direction and magnitude definition."},
+    {"id": "strat_failed_2", "evidence_status": "underspecified", "data_readiness": "partial", "gap": "Public screenshot does not fully define failed-2 state transition."},
+    {"id": "wolves_bbr_ema_level_confluence", "evidence_status": "partial_proxy_only", "data_readiness": "ready", "evidence": ["research/WOLVES_OF_WEALTH_STRATEGY_REVIEW_2026-08-31.md", "research/WOLVES_OF_WEALTH_BBR_PREREGISTRATION_2026-08-31.md", "data/wolves_bbr_tournament.json"], "result": "Completed SPY/QQQ 5m/15m level-break and EMA-confluence proxies were negative after costs; no promotion.", "gap": "The public material remains underspecified on retest, stop, and EMA-ladder exit. The tested proxy is not the exact named strategy."},
+    {"id": "daily_4h_50pct_hold_or_failed2", "evidence_status": "untested", "data_readiness": "partial", "evidence": ["research/TRADE_INTELLIGENCE_INTAKE_2026-08-31.md"], "gap": "Needs a causal daily/4H swing-leg definition, 50% level calculation, and explicit hold-versus-sweep/failed-2 confirmation rule."},
+    {"id": "mnq_orb_15m_breakout_1m_execution", "evidence_status": "untested", "data_readiness": "partial", "evidence": ["research/TRADE_INTELLIGENCE_INTAKE_2026-08-31.md"], "gap": "Requires continuous MNQ 1m/tick data with roll handling, a frozen 15m breakout/retest rule, and realistic commissions/slippage."}
+  ]
+}
