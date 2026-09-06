@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "review_status": "pending_human_review",
+  "default_family": "governance",
+  "families": {
+    "momentum": ["momentum", "breakout", "trend", "orb", "donchian", "continuation", "expansion"],
+    "mean_reversion": ["mean", "reversal", "rsi", "fade", "retest", "vwap", "gap_fill"],
+    "orderflow": ["gex", "option", "nbbo", "tape", "liquidity", "flow", "footprint", "dealer", "microstructure"],
+    "catalyst": ["news", "sec", "edgar", "catalyst", "earnings", "macro", "weather", "kalshi", "polymarket"]
+  },
+  "notes": [
+    "Keyword-derived legacy family assignments require human review before any promotion decision.",
+    "Family changes affect the lifetime trial denominator and therefore require a new gate evaluation."
+  ]
+}
+
