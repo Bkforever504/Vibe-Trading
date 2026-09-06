@@ -1137,9 +1137,13 @@ def render_banks_821_shadow(model: dict[str, Any]) -> str:
         f"<tr><td>{esc(row.get('symbol'))}</td><td>{esc(row.get('direction'))}</td><td>{safe_float((row.get('ema') or {}).get('ema8')):.4f} / {safe_float((row.get('ema') or {}).get('ema21')):.4f}</td><td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
         for row in hits[:8] if isinstance(row, dict)
     )
+    rows_html = rows or (
+        '<tr><td colspan="4">No mechanical proxy hit. Ranging 8/21, weak momentum, '
+        'chop, or no retest are explicit no-trades.</td></tr>'
+    )
     return section(
         "Banks 8/21 Control · Shadow",
-        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed 5m history', '')}{stat_card('Proxy hits', str(safe_int(coverage.get('hits'))), 'not validated', 'warn')}{stat_card('Promotion', 'BLOCKED', 'separate tournament required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>EMA 8 / 21</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No mechanical proxy hit. Ranging 8/21, weak momentum, chop, or no retest are explicit no-trades.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed 5m history', '')}{stat_card('Proxy hits', str(safe_int(coverage.get('hits'))), 'not validated', 'warn')}{stat_card('Promotion', 'BLOCKED', 'separate tournament required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>EMA 8 / 21</th><th>Completed bar</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Public checklist translated into declared assumptions · no rank, alert, sizing, or execution authority",
     )
 
