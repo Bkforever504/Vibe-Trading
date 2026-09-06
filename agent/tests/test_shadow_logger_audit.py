@@ -26,9 +26,17 @@ def test_audit_distinguishes_resolved_context_and_derived_streams(tmp_path: Path
     assert report["summary"]["log_count"] == 3
     assert by_name["alpha_shadow_log.jsonl"]["resolved_count"] == 1
     assert by_name["alpha_shadow_log.jsonl"]["evidence_status"] == "collecting_resolved_outcomes"
+    assert by_name["alpha_shadow_log.jsonl"]["performance_eligible"] is True
+    assert by_name["alpha_shadow_log.jsonl"]["performance_eligibility_reason"] == "independently_resolved_outcomes_present"
     assert by_name["beta_shadow_log.jsonl"]["evidence_status"] == "context_only_no_resolved_outcomes"
+    assert by_name["beta_shadow_log.jsonl"]["performance_eligible"] is False
+    assert by_name["beta_shadow_log.jsonl"]["performance_eligibility_reason"] == "no_independently_resolved_outcomes"
     assert "forward_outcome_contract_missing_or_external" in by_name["beta_shadow_log.jsonl"]["issues"]
+    assert "quarantined_from_performance_and_promotion_claims" in by_name["beta_shadow_log.jsonl"]["issues"]
     assert by_name["flip_shadow_pnl_evaluation_log.jsonl"]["role"] == "derived_report_stream"
+    assert by_name["flip_shadow_pnl_evaluation_log.jsonl"]["performance_eligible"] is False
+    assert report["summary"]["performance_eligible_count"] == 1
+    assert report["summary"]["performance_quarantined_count"] == 2
 
 
 def test_audit_marks_old_daily_logger_stale(tmp_path: Path) -> None:

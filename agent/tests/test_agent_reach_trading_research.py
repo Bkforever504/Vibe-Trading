@@ -119,6 +119,40 @@ def test_verified_rule_still_requires_external_replay() -> None:
     assert row["execution_enabled"] is False
 
 
+def test_explicit_callout_without_capture_provenance_is_not_replay_ready() -> None:
+    row = research.normalize_source({
+        "platform": "reddit",
+        "external_id": "callout",
+        "url": "https://www.reddit.com/r/Daytrading/comments/callout",
+        "published_at": "2026-09-01T14:05:00Z",
+        "text": (
+            "$SPY direction: short. Entry zone: 775.00-776.50. Stop: 778.00. "
+            "TP1: 767.00. Mandatory trigger on 5m close."
+        ),
+    })
+
+    callout = row["trade_callout"]
+    assert callout["status"] == "incomplete_callout"
+    assert callout["entry_zone"] == [775.0, 776.5]
+    assert callout["targets"] == [767.0]
+    assert "capture_provenance" in callout["missing_fields"]
+    assert callout["eligible_for_shadow_replay"] is False
+    assert callout["execution_enabled"] is False
+
+
+def test_untimestamped_or_ambiguous_post_cannot_become_replay_ready() -> None:
+    row = research.normalize_source({
+        "platform": "x",
+        "external_id": "vague",
+        "url": "https://x.com/trader/status/vague",
+        "text": "$SPY looks bearish. I may buy puts at 775 with a stop near 778.",
+    })
+
+    assert row["trade_callout"]["status"] == "incomplete_callout"
+    assert "source_timestamp" in row["trade_callout"]["missing_fields"]
+    assert row["trade_callout"]["eligible_for_shadow_replay"] is False
+
+
 def test_youtube_collection_uses_agent_reach_ytdlp_and_transcript(tmp_path: Path) -> None:
     ytdlp = tmp_path / "yt-dlp.exe"
     ytdlp.write_text("placeholder", encoding="utf-8")
@@ -216,11 +250,72 @@ def test_build_report_includes_reviewed_social_snapshots() -> None:
     report, rows = research.build_report(config, include_transcripts=False)
 
     assert report["by_platform"] == {"threads": 1, "x": 1}
-    assert report["channel_status"]["x"] == "collected_reviewed_snapshot"
-    assert report["channel_status"]["threads"] == "collected_reviewed_snapshot"
+    assert report["channel_status"]["x"] == "reviewed_snapshots_only"
+    assert report["channel_status"]["threads"] == "reviewed_snapshots_only"
     assert report["preregistration_candidates"] == []
     assert len(report["rejected_marketing_claims"]) == 1
     assert all(row["can_submit_orders"] is False for row in rows)
+
+
+def test_replay_queue_only_accepts_eligible_callouts(tmp_path: Path) -> None:
+    queue = tmp_path / "social_replay_queue.jsonl"
+    eligible = research.normalize_source({
+        "platform": "reddit",
+        "external_id": "eligible-callout",
+        "url": "https://www.reddit.com/r/Daytrading/comments/callout",
+        "published_at": "2026-09-01T14:05:00Z",
+        "captured_at": "2026-09-01T14:05:03Z",
+        "capture_provenance": "official_api",
+        "text": (
+            "$SPY direction: short. Entry zone: 775.00-776.50. Stop: 778.00. "
+            "TP1: 767.00. Mandatory trigger on 5m close."
+        ),
+    })
+    ineligible = research.normalize_source({
+        "platform": "x",
+        "external_id": "vague-post",
+        "url": "https://x.com/trader/status/vague",
+        "text": "$SPY looks bearish. I may buy puts at 775 with a stop near 778.",
+    })
+
+    added = research._append_replay_queue(queue, [eligible, ineligible])
+
+    assert added == 1
+    lines = queue.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["symbol"] == "SPY"
+    assert record["direction"] == "short"
+    assert record["entry_zone_low"] == 775.0
+    assert record["entry_zone_high"] == 776.5
+    assert record["stop"] == 778.0
+    assert record["targets"] == [767.0]
+    assert record["timeframe"] == "5m"
+    assert record["source_timestamp"] == "2026-09-01T14:05:00Z"
+    assert record["capture_provenance"] == "official_api"
+    assert record["execution_enabled"] is False
+    assert record["can_submit_orders"] is False
+    assert record["status"] == "queued_shadow_replay"
+
+
+def test_replay_queue_is_idempotent(tmp_path: Path) -> None:
+    queue = tmp_path / "social_replay_queue.jsonl"
+    row = research.normalize_source({
+        "platform": "reddit",
+        "external_id": "dup-callout",
+        "url": "https://www.reddit.com/r/Daytrading/comments/dup",
+        "published_at": "2026-09-01T15:00:00Z",
+        "captured_at": "2026-09-01T15:00:03Z",
+        "capture_provenance": "official_api",
+        "text": (
+            "$QQQ direction: long. Entry zone: 500.00-501.00. Stop: 498.00. "
+            "TP: 505.00. 5m chart."
+        ),
+    })
+
+    assert research._append_replay_queue(queue, [row]) == 1
+    assert research._append_replay_queue(queue, [row]) == 0
+    assert len(queue.read_text(encoding="utf-8").splitlines()) == 1
 
 
 def test_nightly_research_integration_cannot_block_existing_loop() -> None:

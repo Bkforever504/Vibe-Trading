@@ -2,13 +2,27 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import date
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import needs_review_queue as queue
+
+
+@pytest.fixture(autouse=True)
+def _freeze_queue_reference_date(monkeypatch):
+    """Historical queue fixtures are evaluated relative to their frozen session."""
+    class FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 6, 30)
+
+    monkeypatch.setattr(queue, "date", FrozenDate)
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

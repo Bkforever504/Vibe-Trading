@@ -64,7 +64,35 @@ def _sources(*, closed: int = 10, complete_exits: int = 0, promotion_count: int 
             "can_submit_orders": False,
             "summary": {"max_drawdown_dollars": -385.0, "account_equity_drawdown_available": False},
         },
+        "shadow_audit": {
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "summary": {"performance_eligible_count": 2, "performance_quarantined_count": 0},
+        },
+        "operational_gate": {
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "operational_prerequisite_passed": True,
+        },
     }
+
+
+def test_shadow_streams_without_resolved_outcomes_are_quarantined_from_readiness_claims() -> None:
+    sources = _sources(closed=250, complete_exits=60, promotion_count=1)
+    sources["learning"]["rolling_actual"]["window_start"] = "2025-01-01"
+    sources["trial_ledger"].update({
+        "trial_count": 35,
+        "trials": [{"stage": "forward"} for _ in range(10)],
+    })
+    sources["ablation"]["feature_telemetry_trade_count"] = 35
+    sources["shadow_audit"]["summary"]["performance_quarantined_count"] = 24
+
+    report = scorecard.build_report(sources, today=date(2026, 7, 13))
+    research = next(row for row in report["categories"] if row["name"] == "Research validity")
+
+    assert research["evidence_cap"] <= 8
+    assert "shadow_streams_quarantined=24" in research["evidence"]
+    assert any("24 shadow streams" in blocker for blocker in research["blockers_to_10"])
 
 
 def test_small_sample_cannot_receive_unproven_tens() -> None:
@@ -81,6 +109,15 @@ def test_small_sample_cannot_receive_unproven_tens() -> None:
     assert report["all_categories_verified_10"] is False
     assert report["execution_enabled"] is False
     assert report["can_submit_orders"] is False
+
+
+def test_operational_integrity_requires_five_clean_sessions() -> None:
+    sources = _sources()
+    sources["operational_gate"]["operational_prerequisite_passed"] = False
+    report = scorecard.build_report(sources, today=date(2026, 7, 13))
+    operational = next(row for row in report["categories"] if row["name"] == "Operational integrity")
+    assert operational["score"] <= 8
+    assert any("five distinct market sessions" in blocker for blocker in operational["blockers_to_10"])
 
 
 def test_missing_automation_cannot_score_autonomous_safety_ten() -> None:

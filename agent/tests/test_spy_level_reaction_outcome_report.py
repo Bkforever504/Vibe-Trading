@@ -22,6 +22,17 @@ def _candidate() -> dict:
         "gap_context": {"fill_bucket": "filled_within_30m"},
         "breadth_context": {"regime": "mixed"},
         "intermarket_context": {"qqq_spy_regime": "qqq_leading_spy", "sector_leaders": [{"etf": "XLK"}]},
+        "spy0dte_candidate_features": {
+            "mapped_level_kind": "whole_dollar",
+            "touch_count": 1,
+            "touch_sequence": "first",
+            "rsi_14_completed_5m": 29.4,
+            "rsi_14_status": "available",
+            "raw_approach_return_30m_points": -0.72,
+            "atr_14_completed_5m_points": 0.28,
+            "atr_normalized_approach_speed": -2.57,
+            "early_session_eligible": True,
+        },
     }
 
 
@@ -52,6 +63,16 @@ def test_resolver_requires_full_post_availability_horizon_and_records_context() 
     assert outcome["mfe_points"] > 0
     assert outcome["cost_adjusted"] is False
     assert outcome["can_submit_orders"] is False
+    assert outcome["spy0dte_candidate_features"]["rsi_14_completed_5m"] == 29.4
+    assert outcome["contract_feasibility"] == {
+        "status": "unavailable",
+        "reason": "quote_required",
+        "required_data": "timestamped_selected_contract_bid_ask_nbbo_and_quote_freshness",
+        "option_return_inferred": False,
+    }
+    assert outcome["fixed_premium_proxy_plan"]["target_pct"] == 20.0
+    assert outcome["fixed_premium_proxy_plan"]["stop_pct"] == -12.5
+    assert outcome["fixed_premium_proxy_plan"]["result"] == "not_inferred"
 
 
 def test_outcome_slice_requires_minimum_sample_and_stays_blocked() -> None:
@@ -64,6 +85,23 @@ def test_outcome_slice_requires_minimum_sample_and_stays_blocked() -> None:
     assert row["sample_count"] == 1
     assert row["meets_minimum_sample"] is False
     assert report["summary"]["promotion_eligible"] is False
+    assert report["summary"]["contract_feasibility"]["status"] == "unavailable"
+    assert report["summary"]["contract_feasibility"]["option_return_inferred"] is False
+    assert report["summary"]["spy0dte_candidate_feature_slices"]["rsi_14_completed_5m"][0]["bucket"] == "29.4"
+    assert "non-executable" in report["warnings"][-1]
+
+
+def test_absent_spy0dte_features_remain_backward_compatible_and_never_infer_option_returns() -> None:
+    candidate = _candidate()
+    candidate.pop("spy0dte_candidate_features")
+    outcome = resolver.resolve_candidate(candidate, _bars(), now_et=AVAILABLE + timedelta(minutes=60))
+
+    assert outcome is not None
+    assert outcome["spy0dte_candidate_features"] == {}
+    assert outcome["fixed_premium_proxy_plan"]["status"] == "non_executable_unvalidated"
+    assert outcome["contract_feasibility"]["status"] == "unavailable"
+    assert outcome["contract_feasibility"]["option_return_inferred"] is False
+    assert "option_return_pct" not in outcome
 
 
 def test_outcome_ledger_is_durable_and_deduped(tmp_path: Path) -> None:

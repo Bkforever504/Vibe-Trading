@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.sec_catalyst_feed import build_disabled_report, classify_filing
+from scripts.sec_catalyst_feed import build_disabled_report, classify_filing, partition_sec_eligible_symbols
 
 
 def test_sec_adapter_fails_closed_without_required_identity() -> None:
@@ -31,3 +31,11 @@ def test_sec_filing_classifier_preserves_source_and_event_time() -> None:
     assert row["execution_enabled"] is False
     assert row["can_submit_orders"] is False
 
+
+def test_non_issuer_radar_symbols_are_skipped_not_reported_as_sec_errors() -> None:
+    eligible, skipped = partition_sec_eligible_symbols(
+        ["NVDA", "SPY", "NVDW"], {"NVDA": "0001045810"}
+    )
+
+    assert eligible == ["NVDA"]
+    assert skipped == ["SPY", "NVDW"]

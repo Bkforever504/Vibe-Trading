@@ -42,6 +42,23 @@ def test_hmm_aggregate_prefers_panic_when_probability_elevated() -> None:
     assert report["action_context"] == "risk_down_context"
 
 
+def test_legacy_hmm_report_discloses_heuristic_probability_semantics(monkeypatch) -> None:
+    monkeypatch.setattr(hmm, "scan_symbol", lambda symbol, day: {
+        "symbol": symbol,
+        "date": day,
+        "status": "ok",
+        "state": "trend",
+        "probabilities": {"trend": 1.0, "chop": 0.0, "panic": 0.0},
+    })
+
+    report = hmm.build_report(day="2026-09-03", symbols=["SPY"])
+
+    assert report["model_type"] == "deterministic_observable_state_classifier"
+    assert "not_hidden_state_posterior" in report["probability_semantics"]
+    assert report["calibrated_probability"] is False
+    assert any("not a fitted HMM" in warning for warning in report["warnings"])
+
+
 def test_pca_power_iteration_extracts_dominant_component() -> None:
     from scripts import pca_market_forces as pca
 

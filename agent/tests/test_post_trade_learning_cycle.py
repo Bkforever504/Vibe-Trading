@@ -75,3 +75,25 @@ def test_cycle_bootstrap_does_not_reprocess_old_history(tmp_path: Path) -> None:
     assert code == 0
     assert result["new_trade_ids"] == ["today"]
     assert set(json.loads(state.read_text(encoding="utf-8"))["processed_trade_ids"]) == {"old", "today"}
+
+
+def test_cycle_can_explicitly_reconcile_previously_processed_history(tmp_path: Path) -> None:
+    trades = tmp_path / "trades.json"
+    state = tmp_path / "state.json"
+    report = tmp_path / "report.json"
+    _write(trades, [{"id": "old", "status": "closed", "exit_date": "2026-08-15"}])
+    _write(state, {"processed_trade_ids": ["old"]})
+    calls: list[list[str]] = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    result, code = run_cycle(
+        trades, state, report, runner, current_day=date(2026, 8, 18), reconcile_history=True
+    )
+
+    assert code == 0
+    assert result["reconciled_history"] is True
+    assert result["new_trade_ids"] == ["old"]
+    assert len(calls) == len(DATED_STEPS) + len(GLOBAL_STEPS)

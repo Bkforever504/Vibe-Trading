@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from strategies.strat_30m_continuation import classify_bar, evaluate_strat_30m
+from strategies.strat_30m_continuation import classify_bar, evaluate_intraday_212_reversal, evaluate_strat_30m
 
 
 def _daily(previous_type="3"):
@@ -57,3 +57,35 @@ def test_waits_until_30m_range_is_complete():
     result = evaluate_strat_30m("GOOGL", _daily(), frame)
     assert result["status"] == "waiting_for_completed_30m_range"
     assert result["execution_enabled"] is False
+
+
+def test_completed_30m_2_1_2_reversal_has_causal_entry_stop_and_target():
+    start = pd.Timestamp("2026-09-02 09:30", tz="America/New_York")
+    aggregate = [
+        (95.0, 100.0, 90.0, 98.0),
+        (98.0, 105.0, 92.0, 104.0),
+        (104.0, 104.5, 93.0, 100.0),
+        (100.0, 103.0, 92.5, 93.0),
+    ]
+    rows = []
+    index = []
+    for bucket, (open_, high, low, close) in enumerate(aggregate):
+        for part in range(6):
+            rows.append({
+                "open": open_ if part == 0 else close,
+                "high": high if part == 1 else max(open_, close),
+                "low": low if part == 2 else min(open_, close),
+                "close": close,
+                "volume": 1000,
+            })
+            index.append(start + pd.Timedelta(minutes=bucket * 30 + part * 5))
+    result = evaluate_intraday_212_reversal(pd.DataFrame(rows, index=index))
+
+    assert result["sequence"] == ["2U", "1", "2D"]
+    assert result["shadow_signal"] is True
+    assert result["shadow_direction"] == "put"
+    assert result["counterfactual"]["entry_underlying"] == 93.0
+    assert result["counterfactual"]["stop_underlying"] == 104.5
+    assert result["counterfactual"]["first_level_target"] == 92.0
+    assert result["trigger_at"].endswith("11:15:00-04:00")
+    assert result["bar_basis"] == "completed_directional_and_inside_30m_bars_then_first_completed_source_bar_cross"

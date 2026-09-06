@@ -1,0 +1,4 @@
+Signal Stack Health | expected_session=2026-09-04
+OK=65 STALE=0 MISSING=0 ERROR=0 DISABLED=1
+Pattern Grader health=ok task=Ready latest=2026-09-04
+StartWhenAvailable=true; task rerun result=0; weekend guard produced no fabricated rows

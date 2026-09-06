@@ -284,6 +284,16 @@ def test_append_log_writes_jsonl(tmp_path: Path) -> None:
     assert json.loads(path.read_text(encoding="utf-8").strip()) == report
 
 
+def test_historical_confidence_labels_small_samples() -> None:
+    result = post.historical_confidence([
+        {"pnl": 10, "current_strategy_eligible": True},
+        {"pnl": -5, "current_strategy_eligible": True},
+    ])
+    assert result["metrics"]["expectancy"]["reason"] == "insufficient_data"
+    assert "n=2" in result["metrics"]["expectancy"]["display"]
+    assert result["execution_enabled"] is False
+
+
 def test_collect_closed_options_dedupes_shared_order_id(monkeypatch, tmp_path: Path) -> None:
     (tmp_path / "flip-trades.json").write_text("[]", encoding="utf-8")
     (tmp_path / "options-trades.json").write_text(json.dumps({"trades": [

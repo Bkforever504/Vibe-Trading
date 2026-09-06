@@ -3,9 +3,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_contract_limit_from_host_environment(monkeypatch):
+    """These tests exercise other gates; pin the documented five-contract fixture."""
+    from strategies import flip_bot
+
+    monkeypatch.setattr(flip_bot, "MAX_TOTAL_OPEN_CONTRACTS", 5)
 
 
 def _without_client_order_ids(submissions):
@@ -203,7 +213,8 @@ def test_flip_bot_entry_blocks_when_shadow_consensus_says_stand_aside(monkeypatc
 
     assert submitted_spreads == []
     assert alerts
-    assert "SHADOW CONSENSUS BLOCKED" in alerts[-1]
+    assert "SIMULATION BLOCKED" in alerts[-1]
+    assert "reason=market_force_unclear" in alerts[-1]
 
 
 def test_flip_scanner_uses_same_risk_and_contract_cap_as_bot(monkeypatch) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -68,6 +68,7 @@ def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
             "operational_health": "ok",
             "level_map": {"levels": [{"name": "previous_day_high", "price": 101.0}]},
             "summary": {"confirmed_reactions": 1, "extended_no_chase": 0},
+            "spy0dte_feature_contract": {"early_session_cutoff_et": "11:15"},
             "gap_context": {"fill_bucket": "filled_within_30m"},
             "breadth_context": {"regime": "mixed"},
             "intermarket_context": {
@@ -78,6 +79,16 @@ def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
                 "level_name": "previous_day_high", "level": 101.0, "direction": "bearish",
                 "status": "CONFIRMED_REACTION", "reaction_points": 0.52,
                 "observed_at": "2026-08-28T09:45:00-04:00",
+                "spy0dte_features": {
+                    "touch_sequence": "first", "touch_count": 1,
+                    "rsi_14_completed_5m": 27.4, "atr_normalized_approach_speed": -1.2,
+                    "early_session_eligible": True,
+                },
+            }],
+            "level_lifecycles": [{
+                "level_name": "previous_day_high", "level": 101.0,
+                "state": "FAILED_RETEST_FROM_BELOW", "touch_count": 2,
+                "current_side": "below", "state_observed_at": "2026-08-28T09:45:00-04:00",
             }],
         }
     })
@@ -88,6 +99,92 @@ def test_dashboard_renders_spy_mapped_level_reaction_as_context_only() -> None:
     assert "options-premium prediction" in html
     assert "filled_within_30m" in html
     assert "qqq_leading_spy" in html
+    assert "SPY0DTE Features" in html
+    assert "RSI(14)" in html
+    assert "Independent completed-bar level lifecycle" in html
+    assert "Level Lifecycle Context" in html
+    assert "FAILED_RETEST_FROM_BELOW" in html
+
+
+def test_dashboard_renders_orb_as_shadow_replay_not_alert() -> None:
+    html = dashboard.render_spy_5m_0dte_orb({
+        "spy_5m_0dte_orb": {
+            "signal_count": 1,
+            "resolved_option_quote_paths": 0,
+            "promotion_blockers": ["licensed_opra_nbbo_or_equivalent_executable_quote_coverage_required"],
+            "outcomes": [{
+                "date": "2026-09-14", "direction": "call", "signal_bar_completed_at": "2026-09-14T09:36:00-04:00",
+                "option_outcome": {"reason": "timestamped_option_bid_ask_required"},
+            }],
+        }
+    })
+    assert "SHADOW" in html
+    assert "timestamped_option_bid_ask_required" in html
+    assert "no rank, alert, sizing, or execution authority" in html
+
+
+def test_dashboard_renders_confirmed_signal_as_simulated_paper_alert() -> None:
+    html = dashboard.render_simulated_alert_feed({
+        "simple_price_action_alerts": {
+            "counts": {"CONFIRMED": 1, "WAIT": 1, "INVALID": 0},
+            "signals": [{
+                "state": "CONFIRMED", "symbol": "SPY", "direction": "LONG", "grade": "A-", "score": 82,
+                "trigger": 650.0, "stop": 648.0, "target": 654.0,
+                "bar_completed_at": "2026-09-02T10:05:00-04:00", "decisive_reason": "breakout_retest_hold",
+            }],
+        }
+    })
+    assert "Simulated real-time alert feed" in html
+    assert "SHADOW ENTRY" in html
+    assert "SPY" in html
+    assert "no broker order is sent" in html
+
+
+def test_governed_dashboard_scores_alerts_from_first_full_minute_after_discord() -> None:
+    html = dashboard.render_governed_shadow_decision({
+        "governed_alert": {"alerts_sent": 2, "dashboard_only": 5},
+        "discord_chart_review": {
+            "summary": {
+                "delivered_trade_alerts": 12,
+                "unique_trade_candidates": 8,
+                "duplicate_trade_alerts": 4,
+                "evaluated": 7,
+                "positive_pct": 42.86,
+                "median_r": -0.18,
+                "status_counts": {"invalidated_before_entry": 3},
+            }
+        }
+    })
+
+    assert "Post-Discord 1m Chart Review" in html
+    assert "5 dashboard-only" in html
+    assert "first full minute after delivery" in html
+    assert "Invalid before entry" in html
+    assert "not option-contract P&amp;L" in html
+
+
+def test_dashboard_renders_execution_readiness_without_promotion_authority() -> None:
+    html = dashboard.render_execution_readiness({"execution_readiness": {"status": "NOT_READY", "criteria": [{"name": "SESSIONS", "status": "PENDING", "observed": 12, "required": 30, "days_remaining": 18}]}})
+    assert "Live-Execution Readiness" in html
+    assert "SESSIONS" in html
+    assert "Automatic promotion" in html
+    assert "cannot enable execution" in html
+
+
+def test_dashboard_pins_named_liquid_focus_without_bypassing_gates() -> None:
+    html = dashboard.render_session_focus({
+        "intraday_radar": {
+            "ranked_candidates": [{
+                "symbol": "NVDA", "direction": "bullish", "grade": "B+", "score": 78.0, "price": 200.0,
+                "confirmation_stage": "awaiting_completed_5m_confirmation",
+                "hard_gates": {"completed_5m_structure": False, "underlying_spread": True},
+                "trade_levels": {"confirmation_trigger": 201.0, "invalidation": 198.0, "target_2r": 207.0},
+            }]
+        }
+    })
+    assert "NVDA" in html and "GOOGL" in html and "AAPL" in html and "META" in html
+    assert "completed 5m structure" in html
+    assert "never bypasses" in html
 
 
 def test_dashboard_renders_frozen_gap_outcome_slices_as_blocked_research() -> None:
@@ -97,6 +194,9 @@ def test_dashboard_renders_frozen_gap_outcome_slices_as_blocked_research() -> No
             "summary": {
                 "resolved_count": 2,
                 "promotion_blockers": ["frozen_forward_sample_below_minimum"],
+                "contract_feasibility": {"status": "unavailable", "reason": "quote_required"},
+                "fixed_premium_proxy_plan": {"status": "non_executable_unvalidated"},
+                "spy0dte_candidate_feature_slices": {"touch_sequence": [{"sample_count": 2}]},
                 "gap_time_to_fill_slices": [{
                     "bucket": "filled_within_30m", "sample_count": 2, "win_rate": 0.5,
                     "mean_terminal_outcome_points": 0.12, "mean_mfe_points": 0.44, "mean_mae_points": -0.32,
@@ -109,6 +209,8 @@ def test_dashboard_renders_frozen_gap_outcome_slices_as_blocked_research() -> No
     assert "filled_within_30m" in html
     assert "BLOCKED" in html
     assert "not option P&amp;L" in html
+    assert "Contract Quotes" in html
+    assert "non executable unvalidated" in html
 
 
 def test_dashboard_overfit_guard_surfaces_a_failed_adversarial_audit() -> None:
@@ -372,6 +474,38 @@ def test_render_kronos_forecast_shows_shadow_context() -> None:
     assert "shadow_context" in html
 
 
+def test_shadow_health_displays_fail_closed_evidence_quarantine() -> None:
+    html = dashboard.render_shadow_and_health({
+        "health": {"summary": {"ok": 3, "stale": 0, "error": 0, "missing": 0}, "items": []},
+        "shadow_audit": {
+            "summary": {"performance_eligible_count": 2, "performance_quarantined_count": 24},
+        },
+    })
+
+    assert "Performance Eligible" in html
+    assert "Evidence Quarantined" in html
+    assert ">24<" in html
+    assert "cannot support performance or promotion claims" in html
+
+
+def test_operational_gate_is_visibly_fail_closed() -> None:
+    html = dashboard.render_operational_gate({
+        "operational_gate": {
+            "status": "observing",
+            "operational_prerequisite_passed": False,
+            "required_passing_sessions": 5,
+            "passing_sessions_in_window": 2,
+            "observed_sessions_in_window": 2,
+            "current_session": {"session_date": "2026-08-31", "radar_coverage_clean": True, "signal_stack_clean": True},
+            "blockers": ["Need 5 distinct passing sessions; observed=2."],
+        }
+    })
+    assert "Operational Readiness Gate" in html
+    assert "BLOCKED" in html
+    assert "2/5" in html
+    assert "no live authority" in html
+
+
 def test_dashboard_html_renders_bot_trades_and_static_contract() -> None:
     model = {
         "generated_at": "2026-07-04 15:00:00 CDT",
@@ -502,3 +636,347 @@ def test_dashboard_html_renders_bot_trades_and_static_contract() -> None:
     assert "lightweight-charts@5.2.0" in html
     assert 'id="chart-data"' in html
     assert "chart-account-equity" in html
+    assert 'href="#daily-map"' in html
+    assert 'id="daily-map"' in html
+    assert "SHADOW SIMULATION ONLY · NO ORDERS" in html
+
+
+def test_operational_run_evidence_requires_explicit_success_and_closed_breaker() -> None:
+    current = datetime.now().astimezone().isoformat()
+    rendered = dashboard.render_operational_runs({
+        "operational_runs": {
+            "schema_version": "run-envelope-v1",
+            "status": "healthy",
+            "summary": {"status": "healthy"},
+            "components": [
+                {
+                    "run_id": "run-1",
+                    "component": "intraday-radar",
+                    "schema_version": "run-envelope-v1",
+                    "status": "success",
+                    "breaker_state": "CLOSED",
+                    "finished_at": current,
+                    "exit_code": 0,
+                    "failure_class": None,
+                    "last_success_at": current,
+                    "data_as_of": current,
+                    "freshness_seconds": 3,
+                    "freshness_sla_seconds": 900,
+                    "duration_ms": 1250,
+                    "input_count": 40,
+                    "output_count": 6,
+                    "alerts_attempted": 2,
+                    "alerts_delivered": 2,
+                }
+            ],
+        }
+    })
+    assert "HEALTHY" in rendered
+    assert "intraday-radar" in rendered
+    assert "2/2" in rendered
+
+    unknown = dashboard.render_operational_runs({"operational_runs": {}})
+    assert "ATTENTION" in unknown
+    assert "therefore not green" in unknown
+
+
+def test_operational_run_evidence_escapes_failure_and_open_breaker_is_red() -> None:
+    rendered = dashboard.render_operational_runs({
+        "operational_runs": {
+            "schema_version": "run-envelope-v1",
+            "status": "healthy",
+            "components": [{
+                "component": "alert-delivery",
+                "status": "timeout",
+                "breaker": {"state": "OPEN"},
+                "failure_class": "timeout",
+                "error": "<script>alert('x')</script>",
+                "next_action": "hold downstream alerts",
+            }],
+        }
+    })
+    assert "ATTENTION" in rendered
+    assert "OPEN" in rendered
+    assert "&lt;script&gt;" in rendered
+    assert "<script>alert('x')</script>" not in rendered
+
+
+def test_operational_run_evidence_requires_top_level_schema_and_consistent_status() -> None:
+    current = datetime.now().astimezone().isoformat()
+    component = {
+        "schema_version": "run-envelope-v1", "component": "scanner", "status": "success",
+        "breaker_state": "CLOSED", "finished_at": current, "data_as_of": current,
+        "exit_code": 0, "failure_class": None, "freshness_sla_seconds": 900,
+    }
+    missing_schema = dashboard.render_operational_runs({
+        "operational_runs": {"status": "healthy", "summary": {"status": "healthy"}, "components": [component]},
+    })
+    contradictory = dashboard.render_operational_runs({
+        "operational_runs": {
+            "schema_version": "run-envelope-v1", "status": "healthy",
+            "summary": {"status": "attention"}, "components": [component],
+        },
+    })
+    assert "ATTENTION" in missing_schema
+    assert "ATTENTION" in contradictory
+
+
+def test_daily_level_map_renders_fresh_shadow_confluence_without_proprietary_claims() -> None:
+    current = datetime.now().astimezone().isoformat()
+    rendered = dashboard.render_daily_level_map_shadow({
+        "daily_level_map_shadow": {
+            "schema_version": "daily-level-map-shadow-v1",
+            "generated_at": current,
+            "status": "healthy",
+            "session_date": "2026-09-04",
+            "freshness_sla_seconds": 900,
+            "shadow_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "session_state": "rth",
+            "coverage": {"requested": 2, "available": 2, "completed_3m_expected_now": True},
+            "symbols": [
+                {
+                    "symbol": "SPY",
+                    "daily_bias": "bullish",
+                    "nearest_level": {
+                        "price": 651.25,
+                        "type": "prior_day_high",
+                        "source": "market_data",
+                        "provenance": "previous_completed_session",
+                        "distance_points": 0.34,
+                    },
+                    "confirmation_3m": {
+                        "state": "CONFIRMED",
+                        "trigger": "3m close above 651.25 then hold",
+                        "invalidation": 650.80,
+                        "next_target": 652.50,
+                        "bar_completed_at": current,
+                    },
+                },
+                {
+                    "symbol": "QQQ",
+                    "daily_context": {"bias": "neutral"},
+                    "nearest_level": {
+                        "price": 584.10,
+                        "type": "overnight_high",
+                        "source": "market_data",
+                        "provenance": "regularized_public_proxy",
+                        "distance": 0.12,
+                    },
+                    "confirmation_3m": {
+                        "state": "ARMED",
+                        "trigger_price": 584.15,
+                        "invalidation_rule": "3m close below 583.70",
+                        "target_price": 585.00,
+                        "observed_at": current,
+                    },
+                },
+            ],
+        }
+    })
+    assert "READY" in rendered
+    assert "Daily Map &amp; 3m Confluence" in rendered
+    assert "SPY" in rendered and "QQQ" in rendered
+    assert "prior_day_high" in rendered
+    assert "previous_completed_session" in rendered
+    assert "CONFIRMED" in rendered and "ARMED" in rendered
+    assert "3m close above 651.25 then hold" in rendered
+    assert "SHADOW SIMULATION ONLY · NO ORDERS" in rendered
+    assert "does not infer or reproduce proprietary formulas" in rendered
+
+
+def test_daily_level_map_missing_malformed_or_stale_is_attention() -> None:
+    missing = dashboard.render_daily_level_map_shadow({})
+    assert "ATTENTION" in missing
+    assert "unknown and therefore ATTENTION—not green" in missing
+
+    stale = dashboard.render_daily_level_map_shadow({
+        "daily_level_map_shadow": {
+            "schema_version": "daily-level-map-shadow-v1",
+            "generated_at": "2020-01-01T00:00:00+00:00",
+            "status": "healthy",
+            "freshness_sla_seconds": 900,
+            "shadow_only": True,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "symbols": [{
+                "symbol": "IWM",
+                "daily_bias": "bearish",
+                "nearest_level": {
+                    "price": 231.5,
+                    "type": "prior_day_low",
+                    "source": "market_data",
+                    "provenance": "previous_completed_session",
+                },
+                "confirmation_3m": {
+                    "state": "WATCH",
+                    "trigger": 231.4,
+                    "invalidation": 232.0,
+                    "next_target": 230.5,
+                    "bar_completed_at": "2020-01-01T00:00:00+00:00",
+                },
+            }],
+        }
+    })
+    malformed = dashboard.render_daily_level_map_shadow({
+        "daily_level_map_shadow": {
+            "schema_version": "daily-level-map-shadow-v1",
+            "generated_at": datetime.now().astimezone().isoformat(),
+            "status": "healthy",
+            "symbols": [{"symbol": "SPY", "confirmation_3m": {"state": "CONFIRMED"}}],
+        }
+    })
+    assert "ATTENTION" in stale and "STALE / UNKNOWN" in stale
+    assert "ATTENTION" in malformed
+
+
+def test_daily_level_map_premarket_is_ready_while_3m_is_explicitly_waiting() -> None:
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    rendered = dashboard.render_daily_level_map_shadow({
+        "daily_level_map_shadow": {
+            "schema_version": "daily-level-map-shadow-v1", "status": "ok", "generated_at": now,
+            "freshness_sla_seconds": 900, "shadow_only": True, "execution_enabled": False,
+            "can_submit_orders": False,
+            "session_state": "premarket",
+            "coverage": {"requested": 1, "available": 1, "completed_3m_expected_now": False},
+            "symbols": [{
+                "symbol": "SPY", "daily_bias": "BULLISH",
+                "nearest_level": {"price": 650, "type": "premarket_high", "source": "completed_current_premarket_1m", "provenance": "reproducible_public_completed_bar", "distance_points": -0.2},
+                "confirmation_3m": {"state": "PREMARKET", "trigger": 650, "bar_completed_at": now},
+            }],
+        }
+    })
+    assert "PREMARKET READY / 3M WAITING" in rendered
+    assert "ATTENTION" not in rendered
+
+
+def test_priority_universe_recall_separates_observation_from_execution_and_surfaces_debt() -> None:
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    rendered = dashboard.render_priority_universe_recall({
+        "daily_move_coverage_review": {
+            "schema_version": 5,
+            "generated_at": now,
+            "freshness_sla_seconds": 900,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "priority_universe_coverage": {
+                "universe": ["SPY", "QQQ", "DELL"],
+                "observation_coverage_pct": 66.67,
+                "recall_pct": None,
+                "recall_not_computable_reason": "provider_top_movers_do_not_supply_outcomes_for_omitted_priority_symbols",
+                "symbols": [
+                    {"symbol": "SPY", "evaluated": True, "outcome_status": "available_in_provider_top_movers", "coverage_debt": None},
+                    {"symbol": "QQQ", "evaluated": True, "outcome_status": "unknown_not_in_provider_top_movers", "coverage_debt": None},
+                    {"symbol": "DELL", "evaluated": False, "outcome_status": "unknown_not_in_provider_top_movers", "coverage_debt": "not_discovered"},
+                ],
+            },
+            "moves": [{"symbol": "SPY", "stages": {"execution_qualified": False}, "risk_gate_status": "disqualified"}],
+        }
+    })
+
+    assert "Priority-Universe Recall" in rendered
+    assert "Observed / evaluated" in rendered
+    assert "Execution-eligible" in rendered
+    assert "DELL" in rendered and "not_discovered" in rendered
+    assert "ATTENTION" in rendered
+    assert "recall not computable" in rendered.lower()
+    assert "No P/L or profitability is inferred" in rendered
+
+
+def test_priority_universe_recall_missing_or_stale_is_attention() -> None:
+    assert "ATTENTION" in dashboard.render_priority_universe_recall({})
+    rendered = dashboard.render_priority_universe_recall({
+        "daily_move_coverage_review": {
+            "schema_version": 5,
+            "generated_at": "2020-01-01T00:00:00Z",
+            "freshness_sla_seconds": 60,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+            "priority_universe_coverage": {"universe": ["SPY"], "symbols": [{"symbol": "SPY", "evaluated": True}]},
+        }
+    })
+    assert "ATTENTION" in rendered and "STALE" in rendered
+
+
+def test_priority_alert_visibility_does_not_relabel_disqualified_observation() -> None:
+    rendered = dashboard.render_simulated_alert_feed({
+        "simple_price_action_alerts": {
+            "counts": {"CONFIRMED": 0, "WAIT": 0, "INVALID": 1},
+            "signals": [{
+                "symbol": "DELL", "state": "INVALID", "direction": "LONG",
+                "lane": "PRIORITY_FOCUS_SHADOW", "always_visible": True,
+                "observation_visible": True, "execution_review_eligible": False,
+                "execution_review_outcome": "do_not_take", "decisive_reason": "underlying_spread",
+                "execution_enabled": False, "can_submit_orders": False,
+            }],
+        }
+    })
+    assert "DELL" in rendered
+    assert "OBSERVE / DISQUALIFIED" in rendered
+    assert "Observed" in rendered and "Execution-eligible" in rendered
+    assert "NO" in rendered
+    assert "no broker order is sent" in rendered
+
+
+def test_persistent_swing_lifecycle_shows_state_age_transition_and_strict_eligibility() -> None:
+    now = datetime.now(timezone.utc)
+    changed = (now.replace(microsecond=0)).isoformat().replace("+00:00", "Z")
+    rendered = dashboard.render_priority_swing_observation({
+        "priority_swing_observation": {
+            "schema_version": "priority-swing-observation-v1",
+            "provider": "priority_swing_observation",
+            "mode": "persistent_shadow_observation",
+            "generated_at": changed,
+            "freshness_sla_seconds": 900,
+            "universe_source": "priority_swing_observation_v1_config",
+            "priority_symbols": ["NVDA", "DELL"],
+            "summary": {"symbols_requested": 2, "symbols_observed": 2, "errors": 0},
+            "observations": [
+                {
+                    "symbol": "NVDA", "state": "ARMED", "previous_state": "WATCH",
+                    "signal_date": "2026-09-04", "continuing_setup": True,
+                    "validation_status": "unvalidated", "strict_execution_eligible": False,
+                    "setup_family": "daily_trend_pullback", "trigger": 201.0, "invalidation": 194.0,
+                    "completed_daily_evidence": {"status": "available", "latest_completed_date": "2026-09-04"},
+                    "blockers": ["forward_sample_required"], "source_labels": ["daily_completed_bar"],
+                    "execution_enabled": False, "can_submit_orders": False,
+                },
+                {
+                    "symbol": "DELL", "state": "WATCH", "previous_state": "WATCH",
+                    "signal_date": "2026-09-03", "continuing_setup": True,
+                    "validation_status": "unvalidated", "strict_execution_eligible": False,
+                    "setup_family": "daily_trend_pullback", "trigger": 140.0, "invalidation": 132.0,
+                    "completed_daily_evidence": {"status": "available", "latest_completed_date": "2026-09-04"},
+                    "blockers": ["confirmation_required"], "source_labels": ["daily_completed_bar"],
+                    "execution_enabled": False, "can_submit_orders": False,
+                },
+            ],
+            "transition_events": [],
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        },
+        "priority_swing_events": [{
+                "symbol": "NVDA", "previous_state": "WATCH", "state": "ARMED",
+                "observed_at": changed,
+        }],
+    })
+    assert "Persistent Swing Lifecycle" in rendered
+    assert "NVDA" in rendered and "WATCH → ARMED" in rendered
+    assert "State age" in rendered and "Last transition" in rendered
+    assert "Execution-eligible" in rendered and "NO" in rendered
+    assert "No P/L or profitability is inferred" in rendered
+    assert "ATTENTION" not in rendered
+
+
+def test_persistent_swing_lifecycle_missing_stale_or_bad_authority_is_attention() -> None:
+    assert "ATTENTION" in dashboard.render_priority_swing_observation({})
+    rendered = dashboard.render_priority_swing_observation({
+        "priority_swing_observation": {
+            "schema_version": "priority-swing-observation-v1", "provider": "priority_swing_observation",
+            "generated_at": "2020-01-01T00:00:00Z", "freshness_sla_seconds": 60,
+            "priority_symbols": ["SPY"], "observations": [], "transition_events": [],
+            "execution_enabled": True, "can_submit_orders": False,
+        }
+    })
+    assert "ATTENTION" in rendered and "STALE" in rendered

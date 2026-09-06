@@ -7,6 +7,9 @@ from zoneinfo import ZoneInfo
 
 from scripts.daily_move_coverage_review import build_review
 from scripts.intraday_opportunity_radar import (
+    aplus_evidence_record,
+    attach_time_matched_rvol,
+    attach_primary_catalysts,
     apply_cross_sectional_factor_consensus,
     apply_market_context,
     bar_features,
@@ -15,8 +18,10 @@ from scripts.intraday_opportunity_radar import (
     discovery_map,
     evaluate_candidate,
     fetch_intraday_bars,
+    liquid_review_escalations,
     market_context_snapshot,
     nominate_symbols,
+    preconfirmation_heads_up,
     rank_candidates_by_lane,
     select_symbols_for_intraday_bars,
     symbols_from_report_payload,
@@ -82,6 +87,27 @@ def test_coverage_trace_explains_where_a_symbol_stopped() -> None:
     }
 
 
+def test_coverage_trace_exposes_a_corroborated_liquid_leader_debt() -> None:
+    discovered = {
+        "MU": {
+            "symbol": "MU",
+            "sources": ["known_liquid_leader", "fresh_market_news", "most_active_volume"],
+            "source_ranks": {},
+            "screener_values": {},
+        }
+    }
+
+    trace = coverage_trace(discovered, {"MU": {}}, [], {})
+    debts = [
+        row for row in trace
+        if "known_liquid_leader" in row["nomination_sources"]
+        and len(row["nomination_sources"]) >= 3
+        and row["stop_stage"] != "evaluated"
+    ]
+
+    assert debts == [trace[0]]
+
+
 def test_bar_selection_reserves_capacity_for_liquid_thematic_names() -> None:
     discovered = {
         f"X{index}": {"symbol": f"X{index}", "sources": ["fresh_market_news"]}
@@ -134,6 +160,24 @@ def test_bar_selection_reserves_liquid_mega_caps_before_ranked_quotas() -> None:
     selected = select_symbols_for_intraday_bars(discovered, metrics, limit=12)
 
     assert set(("SPY", "QQQ", "IWM", "META", "AMZN", "GOOGL", "AMD")) <= set(selected)
+
+
+def test_bar_selection_reserves_corroborated_liquid_leader_before_quotas() -> None:
+    discovered = {
+        f"X{index}": {"symbol": f"X{index}", "sources": ["movers_gainers"], "source_ranks": {"movers_gainers": index}}
+        for index in range(20)
+    }
+    metrics = {symbol: {"gap_return": 0.50, "snapshot_volume": 1_000_000} for symbol in discovered}
+    discovered["MU"] = {
+        "symbol": "MU",
+        "sources": ["known_liquid_leader", "fresh_market_news", "most_active_trades", "most_active_volume"],
+        "source_ranks": {},
+    }
+    metrics["MU"] = {"gap_return": 0.001, "snapshot_volume": 10_000}
+
+    selected = select_symbols_for_intraday_bars(discovered, metrics, limit=6)
+
+    assert "MU" in selected
 
 
 def test_bar_selection_reserves_official_movers_before_general_activity() -> None:
@@ -366,7 +410,8 @@ def test_report_exposes_benchmark_lane_schema(monkeypatch) -> None:
     context = report["coverage"]["market_context"]
     assert context["status"] == "partial"
     assert context["error_count"] == 0
-    assert report["operational_health"] == "ok"
+    assert report["operational_health"] == "degraded"
+    assert report["coverage"]["core_liquid_coverage_debt_count"] >= 1
     assert any(warning.startswith("Market context incomplete:") for warning in report["warnings"])
 
 
@@ -411,6 +456,21 @@ def test_liquid_confirmed_move_has_levels_but_no_order_authority() -> None:
     assert row["invalidation"] == row["trade_levels"]["invalidation"]
 
 
+def test_reserved_core_coverage_debt_degrades_report(monkeypatch) -> None:
+    import scripts.intraday_opportunity_radar as radar
+
+    monkeypatch.setattr(radar, "fetch_market_screeners", lambda: ({name: [] for name in ("movers_gainers", "movers_losers", "most_active_volume", "most_active_trades")}, []))
+    monkeypatch.setattr(radar, "fetch_news", lambda *args, **kwargs: ([], []))
+    monkeypatch.setattr(radar, "fetch_snapshots", lambda symbols: ({symbol: {} for symbol in symbols if symbol != "MRNA"}, []))
+    monkeypatch.setattr(radar, "fetch_intraday_bars", lambda *args: ({}, []))
+    monkeypatch.setattr(radar, "fetch_daily_liquidity", lambda *args: ({}, []))
+
+    report = radar.build_report(NOW_ET)
+
+    assert report["coverage"]["core_liquid_coverage_debt_count"] >= 1
+    assert report["operational_health"] == "degraded"
+
+
 def test_unconfirmed_setup_still_flags_revalidation_blocker() -> None:
     unconfirmed_bars = bar_features(_bars())
     unconfirmed_bars["price_action_state"] = "waiting"
@@ -425,12 +485,28 @@ def test_unconfirmed_setup_still_flags_revalidation_blocker() -> None:
     assert "strategy_confirmation_and_revalidation_required" in row["blockers"]
 
 
-def test_intraday_radar_runner_updates_spy_level_monitor_before_alerting() -> None:
+def test_intraday_radar_runner_defers_spy_research_until_after_delivery() -> None:
     root = Path(__file__).resolve().parents[2]
     runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")
 
     assert "spy_level_reaction_shadow.py" in runner
-    assert runner.index("spy_level_reaction_shadow.py") < runner.index("simple_price_action_alerts.py")
+    assert runner.index("spy_level_reaction_shadow.py") > runner.index("governed_shadow_alert.py")
+
+
+def test_intraday_radar_records_governed_shadow_decision_after_alert_scan() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")
+
+    assert "governed_shadow_decision.py" in runner
+    assert runner.index("simple_price_action_alerts.py") < runner.index("governed_shadow_decision.py")
+
+
+def test_intraday_radar_runner_defers_donchian_research_until_after_delivery() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")
+
+    assert "donchian_expansion_shadow.py" in runner
+    assert runner.index("donchian_expansion_shadow.py") > runner.index("governed_shadow_alert.py")
 
 
 def test_already_extended_move_is_no_chase_and_cannot_enter_actionable_ranking() -> None:
@@ -464,6 +540,116 @@ def test_unconfirmed_watch_cannot_enter_actionable_ranking() -> None:
 
     assert row["confirmation_stage"] == "awaiting_completed_5m_confirmation"
     assert row["actionable_for_ranking"] is False
+
+
+def test_intraday_bar_fetch_drops_provider_bar_that_has_not_completed(monkeypatch) -> None:
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "bars": {
+                    "SPY": [
+                        {"t": "2026-09-04T13:40:00Z", "o": 770, "h": 771, "l": 769, "c": 770.5, "v": 100},
+                        {"t": "2026-09-04T13:45:00Z", "o": 770.5, "h": 772, "l": 770, "c": 771.5, "v": 90},
+                    ]
+                },
+                "next_page_token": None,
+            }
+
+    monkeypatch.setattr("scripts.intraday_opportunity_radar.requests.get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr("scripts.intraday_opportunity_radar._credentials", lambda: {})
+
+    bars, errors = fetch_intraday_bars(
+        ["SPY"], datetime(2026, 9, 4, 9, 46, tzinfo=ZoneInfo("America/New_York"))
+    )
+
+    assert errors == []
+    assert [row["t"] for row in bars["SPY"]] == ["2026-09-04T13:40:00Z"]
+
+
+def test_preconfirmation_heads_up_is_visible_but_has_no_execution_authority() -> None:
+    rows = preconfirmation_heads_up([
+        {
+            "symbol": "TSLA", "state": "watch", "score": 70.0, "ranking_score": 75.0,
+            "confirmation_stage": "awaiting_completed_5m_confirmation",
+            "blockers": ["strategy_confirmation_and_revalidation_required"],
+        },
+        {
+            "symbol": "NOPE", "state": "watch", "score": 90.0,
+            "confirmation_stage": "awaiting_completed_5m_confirmation", "blockers": ["underlying_spread"],
+        },
+    ])
+
+    assert [row["symbol"] for row in rows] == ["TSLA"]
+    assert rows[0]["heads_up_only"] is True
+    assert rows[0]["can_submit_orders"] is False
+
+
+def test_liquid_quote_gate_failure_is_visible_for_review_but_not_actionable() -> None:
+    rows = liquid_review_escalations([{
+        "symbol": "MRNA", "score": 56.0, "ranking_score": 61.0,
+        "confirmation_stage": "completed_5m_confirmed",
+        "avg_dollar_volume_20d": 500_000_000,
+        "blockers": ["underlying_spread"],
+        "actionable_for_ranking": False,
+    }])
+
+    assert [row["symbol"] for row in rows] == ["MRNA"]
+    assert rows[0]["liquid_review_escalation"] is True
+    assert rows[0]["actionable_for_ranking"] is False
+    assert rows[0]["can_submit_orders"] is False
+
+
+def test_aplus_evidence_fails_closed_when_scanner_only_has_headlines_and_proxy_volume() -> None:
+    record = aplus_evidence_record(
+        {
+            "symbol": "TSLA",
+            "catalyst_headlines": [{"headline": "Publisher headline", "created_at": "2026-08-20T14:00:00Z"}],
+            "market_context": {"status": "available"},
+            "data_freshness": {"latest_quote_at": "2026-08-20T15:00:00Z"},
+            "structure": {"opening_range_high": 101.0, "opening_range_low": 99.0, "vwap_proxy": 100.0},
+            "volume_pace_rvol_proxy": 2.1,
+            "price_action_confirmation": {"state": "bullish_confirmed"},
+            "trade_levels": {"confirmation_trigger": 101.0, "invalidation": 100.0, "target_2r": 103.0},
+        },
+        NOW_ET,
+    )
+
+    assert record["classification"] == "evidence_incomplete"
+    assert record["eligible_for_a_plus_label"] is False
+    assert record["catalyst"]["status"] == "publisher_headline_unverified"
+    assert record["opening_and_participation"]["time_matched_rvol_status"] == "unavailable_no_same_time_baseline"
+    assert {"primary_catalyst_provenance", "fresh_nbbo_quote", "family_oos_validation"} <= set(record["missing_required_fields"])
+    assert record["can_submit_orders"] is False
+
+
+def test_time_matched_rvol_uses_same_clock_cumulative_baseline_not_session_proxy() -> None:
+    candidates = attach_time_matched_rvol(
+        [{"symbol": "TSLA", "structure": {"last_completed_bar_at": "2026-08-20T14:00:00Z", "session_volume_5m": 300.0}}],
+        {"as_of_et": "2026-08-20T08:20:00-04:00", "profiles": {"TSLA": {
+            "status": "ok", "sessions_used": 20, "cumulative_volume_baseline_by_clock_et": {"10:00": 100.0},
+        }}},
+    )
+
+    assert candidates[0]["time_matched_rvol"]["value"] == 3.0
+    assert candidates[0]["time_matched_rvol"]["status"] == "available_iex_relative"
+
+
+def test_primary_sec_catalyst_requires_timestamp_and_cannot_create_execution_authority() -> None:
+    candidates = attach_primary_catalysts(
+        [{"symbol": "TSLA"}],
+        {"status": "ok", "generated_at": "2026-08-20T15:00:00Z", "catalysts": [{
+            "symbol": "TSLA", "form": "8-K", "accepted_at": "2026-08-20T14:30:00Z", "source": "sec_edgar_submissions",
+        }]},
+        NOW_ET,
+    )
+
+    primary = candidates[0]["primary_catalyst"]
+    assert primary["status"] == "verified_primary_sec"
+    assert primary["filings"][0]["form"] == "8-K"
+    assert primary["authority"] == "provenance_only_no_rank_or_execution_effect"
 
 
 def test_inverted_directional_levels_are_suppressed() -> None:

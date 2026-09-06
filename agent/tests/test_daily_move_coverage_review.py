@@ -56,7 +56,9 @@ def test_move_review_separates_risk_gate_denominator_and_counts_blockers() -> No
     assert blockers["underlying_spread_too_wide"] == 1
     assert rows["LIQUID"]["first_actionable_rank"] == 1
     assert rows["THIN"]["risk_gate_status"] == "disqualified"
+    assert rows["THIN"]["first_failing_gate"] == "dollar_liquidity_below_minimum"
     assert rows["UNKNOWN"]["risk_gate_status"] == "unassessed"
+    assert rows["UNKNOWN"]["first_failing_gate"] == "not_selected_for_intraday_bar_budget"
     assert summary["stage_counts"] == {
         "market_moves": 4,
         "discovered": 4,

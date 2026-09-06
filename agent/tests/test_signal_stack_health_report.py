@@ -28,6 +28,19 @@ def test_latest_jsonl_ignores_bad_lines_and_returns_latest(tmp_path: Path) -> No
     assert warning == "invalid_json_lines=1"
 
 
+def test_latest_jsonl_prefers_expected_session_over_weekend_maintenance_row(tmp_path: Path) -> None:
+    path = tmp_path / "sample.jsonl"
+    path.write_text(
+        '{"date":"2026-08-28","status":"market"}\n'
+        '{"date":"2026-08-30","status":"market_closed"}\n',
+        encoding="utf-8",
+    )
+    latest, count, warning = report._latest_jsonl(path, preferred_date="2026-08-28")
+    assert latest == {"date": "2026-08-28", "status": "market"}
+    assert count == 2
+    assert warning is None
+
+
 def test_build_report_flags_missing_stale_error_and_ok(monkeypatch, tmp_path: Path) -> None:
     ok_log = tmp_path / "ok.jsonl"
     ok_log.write_text('{"date":"2026-06-30","primary":{"action":"flat"}}\n', encoding="utf-8")
@@ -249,6 +262,100 @@ def test_stale_activity_marks_signal_stale_even_if_task_scheduled_today(monkeypa
 
     assert built["items"][0]["health"] == "stale"
     assert any("no_new_rows_in" in warning for warning in built["items"][0]["warnings"])
+
+
+def test_weekend_manual_run_without_rows_does_not_create_false_error(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "grader.jsonl"
+    log.write_text('{"resolved_at":"2026-08-28T15:00:00-05:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(report, "SIGNALS", [{
+        "name": "Grader", "task": r"\grader", "log": log, "kind": "intraday",
+        "require_activity_after_last_run": True, "max_hours_since_last_row": 6,
+    }])
+    monkeypatch.setattr(report, "_task_status", lambda _task: {
+        "available": True, "status": "Ready", "last_run_time": "8/30/2026 9:00:00 AM",
+        "last_result": "0", "next_run_time": "8/31/2026 8:30:00 AM",
+    })
+
+    built = report.build_report(today=date(2026, 8, 30), now=datetime(2026, 8, 30, 10, 0))
+
+    assert built["items"][0]["health"] == "ok"
+    assert not any("empty_after_last_run" in warning for warning in built["items"][0]["warnings"])
+    assert not any("no_new_rows_in" in warning for warning in built["items"][0]["warnings"])
+
+
+def test_holiday_manual_run_without_rows_does_not_create_false_error(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "outcomes.jsonl"
+    log.write_text('{"resolved_at":"2026-07-02T15:00:00-05:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(report, "SIGNALS", [{
+        "name": "Resolver", "task": r"\resolver", "log": log, "kind": "close",
+        "require_activity_after_last_run": True, "max_hours_since_last_row": 6,
+    }])
+    monkeypatch.setattr(report, "_task_status", lambda _task: {
+        "available": True, "status": "Ready", "last_run_time": "7/3/2026 3:10:00 PM",
+        "last_result": "0", "next_run_time": "7/6/2026 3:10:00 PM",
+    })
+
+    built = report.build_report(today=date(2026, 7, 3), now=datetime(2026, 7, 3, 16, 0))
+
+    assert report.is_expected_market_session(date(2026, 7, 3)) is False
+    assert built["date"] == "2026-07-02"
+    assert built["items"][0]["health"] == "ok"
+
+
+def test_out_of_window_manual_run_does_not_create_false_empty_after_run(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "grader.jsonl"
+    log.write_text('{"resolved_at":"2026-08-31T15:00:00-05:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(report, "SIGNALS", [{
+        "name": "Grader", "task": r"\grader", "log": log, "kind": "intraday",
+        "require_activity_after_last_run": True, "max_hours_since_last_row": 6,
+    }])
+    monkeypatch.setattr(report, "_task_status", lambda _task: {
+        "available": True, "status": "Ready", "last_run_time": "8/31/2026 8:00:00 PM",
+        "last_result": "0", "next_run_time": "9/1/2026 8:30:00 AM",
+    })
+
+    built = report.build_report(today=date(2026, 8, 31), now=datetime(2026, 8, 31, 20, 15))
+
+    assert built["items"][0]["health"] == "ok"
+    assert not any("empty_after_last_run" in warning for warning in built["items"][0]["warnings"])
+
+
+def test_missing_friday_rows_remain_stale_on_weekend(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "grader.jsonl"
+    log.write_text('{"resolved_at":"2026-08-27T15:00:00-05:00"}\n', encoding="utf-8")
+    monkeypatch.setattr(report, "SIGNALS", [{
+        "name": "Grader", "task": r"\grader", "log": log, "kind": "intraday",
+        "max_hours_since_last_row": 6,
+    }])
+    monkeypatch.setattr(report, "_task_status", lambda _task: {
+        "available": True, "status": "Ready", "last_run_time": "8/28/2026 3:00:00 PM",
+        "last_result": "0", "next_run_time": "8/31/2026 8:30:00 AM",
+    })
+
+    built = report.build_report(today=date(2026, 8, 30), now=datetime(2026, 8, 30, 10, 0))
+
+    assert built["date"] == "2026-08-28"
+    assert built["items"][0]["health"] == "stale"
+    assert any("latest_date=2026-08-27" in warning for warning in built["items"][0]["warnings"])
+
+
+def test_weekend_market_closed_row_cannot_hide_missing_friday_data(monkeypatch, tmp_path: Path) -> None:
+    log = tmp_path / "scanner.jsonl"
+    log.write_text(
+        '{"date":"2026-08-27","status":"ok"}\n'
+        '{"date":"2026-08-30","status":"market_closed"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(report, "SIGNALS", [{
+        "name": "Scanner", "task": r"\scanner", "log": log, "kind": "morning",
+    }])
+    monkeypatch.setattr(report, "_task_status", lambda _task: {
+        "available": True, "status": "Ready", "last_run_time": "8/30/2026 9:00:00 AM",
+        "last_result": "0", "next_run_time": "8/31/2026 8:35:00 AM",
+    })
+    built = report.build_report(today=date(2026, 8, 30), now=datetime(2026, 8, 30, 10, 0))
+    assert built["items"][0]["health"] == "stale"
+    assert any("expected_session=2026-08-28" in warning for warning in built["items"][0]["warnings"])
 
 
 def test_strategy_staleness_alerts_after_threshold(tmp_path: Path) -> None:

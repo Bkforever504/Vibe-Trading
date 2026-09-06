@@ -1,0 +1,4 @@
+Signal Stack Health | expected_session=2026-09-04
+OK=64 STALE=0 MISSING=0 ERROR=1 DISABLED=1
+Pattern Grader health=error task=Ready latest=2026-09-04
+warning=task_last_result=-2147020576 (0x800710E0)

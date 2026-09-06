@@ -60,7 +60,9 @@ def test_notifier_uses_env_first_redacts_and_disables_mentions(tmp_path: Path) -
         webhook_url="https://discord.com/api/webhooks/fixture/token",
         transport=lambda url, payload, timeout: sent.append((url, payload, timeout)),
     )
-    assert result == {"status": "sent", "sent": True, "chunks": 1}
+    assert result == {"status": "sent", "sent": True, "chunks": 1,
+                      "receipts": [{"discord_message_id": None, "discord_delivered_ts": None}]}
+    assert sent[0][0].endswith("?wait=true")
     assert sent[0][1]["allowed_mentions"] == {"parse": []}
     assert "db-secret-value" not in sent[0][1]["content"]
 

@@ -79,3 +79,10 @@ def test_append_log_writes_jsonl(tmp_path: Path) -> None:
     reviewer.append_log(report, path)
 
     assert json.loads(path.read_text(encoding="utf-8").strip()) == report
+
+
+def test_small_sample_expectancy_is_flagged_for_review() -> None:
+    result = reviewer.expectancy_confidence([1.0, -0.5, 0.25])
+    assert result["reason"] == "insufficient_data"
+    assert result["review_action"] == "needs_review"
+    assert result["execution_enabled"] is False

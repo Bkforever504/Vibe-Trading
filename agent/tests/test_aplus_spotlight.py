@@ -150,3 +150,8 @@ def test_scheduler_contract_is_wake_capable_and_staggered_after_radar() -> None:
     assert "-MultipleInstances IgnoreNew" in registration
     assert "aplus_spotlight.py" in runner
     assert "generate_dashboard.py" in runner
+
+
+def test_bplus_is_dashboard_only_by_default() -> None:
+    assert spotlight.TIERS["bplus"]["discord_enabled"] is False
+    assert spotlight.TIERS["aplus"]["discord_enabled"] is False
