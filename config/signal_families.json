@@ -1,16 +1,63 @@
 {
-  "schema_version": 1,
-  "review_status": "pending_human_review",
-  "default_family": "governance",
+  "schema_version": "2",
+  "reviewed_by_human": true,
+  "reviewed_at": "2026-09-06T19:52:27Z",
+  "review_status": "approved_by_human",
+  "default_family": "unassigned",
   "families": {
-    "momentum": ["momentum", "breakout", "trend", "orb", "donchian", "continuation", "expansion"],
-    "mean_reversion": ["mean", "reversal", "rsi", "fade", "retest", "vwap", "gap_fill"],
-    "orderflow": ["gex", "option", "nbbo", "tape", "liquidity", "flow", "footprint", "dealer", "microstructure"],
-    "catalyst": ["news", "sec", "edgar", "catalyst", "earnings", "macro", "weather", "kalshi", "polymarket"]
+    "momentum": {
+      "description": "Trend-following entries (ORB, breakout, MA cross, HMM trend regime)",
+      "keywords": ["orb", "breakout", "ma_cross"],
+      "example_signals": ["orb_long", "vwap_breakout", "ma_cross"]
+    },
+    "mean_reversion": {
+      "description": "Fade entries against extended moves (VWAP fade, RSI2, BB reversion)",
+      "example_signals": ["vwap_fade", "rsi2_reversion"]
+    },
+    "volatility_premium": {
+      "description": "Short-vol structures: credit spreads, iron condors, cash-secured puts",
+      "example_signals": ["iwm_credit_spread", "iwm_iron_condor"]
+    },
+    "volatility_expansion": {
+      "description": "Long-vol / long-premium: straddles, strangles, directional long calls or puts around expected move breaches",
+      "example_signals": ["iwm_directional_long_premium"]
+    },
+    "catalyst_reactive": {
+      "description": "One-shot signals triggered by a discrete, timestamped disclosure or announcement that already occurred (EDGAR 8-K, earnings beat, or a same-event Form 4 cluster); excludes rolling or longitudinal positioning aggregates",
+      "example_signals": ["edgar_8k_watchlist", "edgar_form4_cluster"]
+    },
+    "catalyst_scheduled": {
+      "description": "Signals gating around known future events (FOMC, earnings, ex-dividend and rebalance blackouts)",
+      "example_signals": ["fomc_blackout_pass", "earnings_blackout_pass"]
+    },
+    "orderflow_microstructure": {
+      "description": "Signals derived from bid/ask book, NBBO, OFI/VPIN, or dark-pool prints",
+      "example_signals": ["nbbo_confluence_veto", "ofi_directional_bias"]
+    },
+    "positioning_dealer": {
+      "description": "Dealer-positioning inference: GEX, max pain, 0DTE pin and gamma regime",
+      "example_signals": ["dealer_gex_regime", "zero_dte_pin_risk"]
+    },
+    "alt_data_smart_money": {
+      "description": "Rolling or longitudinal non-price aggregates implying informed positioning (Congress-trade accumulation, 13F changes, and provider-derived positioning); excludes signals triggered directly by an individual EDGAR/SEC filing or same-event Form 4 cluster",
+      "example_signals": ["quiver_congress", "quiver_darkpool_short_vol"]
+    },
+    "sentiment_retail": {
+      "description": "Retail-sentiment velocity from WSB, StockTwits, and volume-weighted X/Twitter observations",
+      "example_signals": ["quiver_wsb_velocity"]
+    },
+    "regime_macro": {
+      "description": "Cross-asset regime state: HMM regime, PCA breadth, RV/IV, VIX term structure, and market force",
+      "example_signals": ["hmm_regime_gate", "market_force_score"]
+    },
+    "nlp_catalyst": {
+      "description": "NLP-derived catalyst confidence from filing sentiment and earnings-transcript scoring",
+      "example_signals": ["edgar_sentiment_weighted", "earnings_transcript_sentiment"]
+    }
   },
   "notes": [
-    "Keyword-derived legacy family assignments require human review before any promotion decision.",
-    "Family changes affect the lifetime trial denominator and therefore require a new gate evaluation."
+    "Taxonomy determines the family-level trial denominator used by Deflated Sharpe.",
+    "No family may be used for registration or re-evaluation until reviewed_by_human is true.",
+    "Changing a registered signal family creates a new hypothesis and a new append-only trial-ledger row."
   ]
 }
-

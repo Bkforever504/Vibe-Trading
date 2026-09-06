@@ -23,3 +23,20 @@ def test_family_assignment_reads_reviewable_config(tmp_path):
     config.write_text(json.dumps({"default_family": "other", "families": {"momentum": ["breakout"]}}))
     assert family_for("opening_breakout", families_path=config) == "momentum"
 
+
+def test_family_assignment_supports_v2_object_schema(tmp_path):
+    config = tmp_path / "families.json"
+    config.write_text(json.dumps({
+        "default_family": "unassigned",
+        "families": {
+            "momentum": {
+                "description": "Trend-following entries",
+                "keywords": ["breakout"],
+                "example_signals": ["orb_long"],
+            }
+        },
+    }))
+
+    assert family_for("opening_breakout", families_path=config) == "momentum"
+    assert family_for("orb_long", families_path=config) == "momentum"
+    assert family_for("unknown_signal", families_path=config) == "unassigned"

@@ -31,6 +31,8 @@ jobs:
           python -m py_compile src/agent/loop.py
           python -m py_compile src/tools/__init__.py
           python -m py_compile backtest/runner.py
+          cd ..
+          python -m py_compile scripts/generate_dashboard.py
 
       - name: Run tests
         # test_e2e_harness_v2.py is gated by VIBE_TRADING_RUN_LIVE_E2E

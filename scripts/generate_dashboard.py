@@ -1137,9 +1137,13 @@ def render_banks_821_shadow(model: dict[str, Any]) -> str:
         f"<tr><td>{esc(row.get('symbol'))}</td><td>{esc(row.get('direction'))}</td><td>{safe_float((row.get('ema') or {}).get('ema8')):.4f} / {safe_float((row.get('ema') or {}).get('ema21')):.4f}</td><td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
         for row in hits[:8] if isinstance(row, dict)
     )
+    rows_html = rows or (
+        '<tr><td colspan="4">No mechanical proxy hit. Ranging 8/21, weak momentum, '
+        'chop, or no retest are explicit no-trades.</td></tr>'
+    )
     return section(
         "Banks 8/21 Control · Shadow",
-        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed 5m history', '')}{stat_card('Proxy hits', str(safe_int(coverage.get('hits'))), 'not validated', 'warn')}{stat_card('Promotion', 'BLOCKED', 'separate tournament required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>EMA 8 / 21</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No mechanical proxy hit. Ranging 8/21, weak momentum, chop, or no retest are explicit no-trades.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed 5m history', '')}{stat_card('Proxy hits', str(safe_int(coverage.get('hits'))), 'not validated', 'warn')}{stat_card('Promotion', 'BLOCKED', 'separate tournament required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>EMA 8 / 21</th><th>Completed bar</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Public checklist translated into declared assumptions · no rank, alert, sizing, or execution authority",
     )
 
@@ -1160,9 +1164,13 @@ def render_donchian_expansion_shadow(model: dict[str, Any]) -> str:
         f"<td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
         for row in hits[:8] if isinstance(row, dict)
     )
+    rows_html = rows or (
+        '<tr><td colspan="6">No strict completed-bar expansion. This is candidate coverage '
+        'only—not an entry or an alert.</td></tr>'
+    )
     return section(
         "Donchian Expansion · Shadow",
-        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed RTH 5m bars only', '')}{stat_card('Strict expansions', str(safe_int(coverage.get('strict_hits'))), '20-bar break + RVOL + close + range', 'warn')}{stat_card('Resolved forward', str(safe_int(forward_summary.get('resolved'))), 'next-bar-open, stop-first, 2R / 60m', '')}{stat_card('Mean net R', esc(str(forward_summary.get('mean_net_r_after_costs') if forward_summary.get('mean_net_r_after_costs') is not None else 'pending')), 'fixed slippage stress; not fill evidence', 'warn')}{stat_card('Promotion', 'BLOCKED', 'walk-forward and shadow evaluation required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>RVOL</th><th>Close location</th><th>TR / ATR</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="6">No strict completed-bar expansion. This is candidate coverage only—not an entry or an alert.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed RTH 5m bars only', '')}{stat_card('Strict expansions', str(safe_int(coverage.get('strict_hits'))), '20-bar break + RVOL + close + range', 'warn')}{stat_card('Resolved forward', str(safe_int(forward_summary.get('resolved'))), 'next-bar-open, stop-first, 2R / 60m', '')}{stat_card('Mean net R', esc(str(forward_summary.get('mean_net_r_after_costs') if forward_summary.get('mean_net_r_after_costs') is not None else 'pending')), 'fixed slippage stress; not fill evidence', 'warn')}{stat_card('Promotion', 'BLOCKED', 'walk-forward and shadow evaluation required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>RVOL</th><th>Close location</th><th>TR / ATR</th><th>Completed bar</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Prior-20-bar Donchian break + 1.25x prior completed-bar volume + strong close + 1.20x prior ATR range · forward audit uses next-bar open, signal-bar stop, 2R / 60m and 5 bp/side stress · no execution authority",
     )
 
@@ -2615,9 +2623,10 @@ def render_execution_readiness(model: dict[str, Any]) -> str:
         f"<tr><td><strong>{esc(row.get('name'))}</strong></td><td class='{('good' if row.get('status') == 'PASS' else 'warn' if row.get('status') == 'PENDING' else 'bad')}'>{esc(row.get('status'))}</td><td>{safe_int(row.get('observed')) if row.get('observed') is not None else '—'} / {safe_int(row.get('required')) if row.get('required') is not None else '—'}</td><td>{safe_int(row.get('days_remaining'))}</td></tr>"
         for row in criteria if isinstance(row, dict)
     )
+    rows_html = rows or '<tr><td colspan="4">No readiness report yet.</td></tr>'
     return section(
         "Live-Execution Readiness · Draft",
-        f"<div class='stat-grid compact'>{stat_card('Overall', str(data.get('status') or 'PENDING'), 'human promotion only', 'good' if data.get('status') == 'PASS' else 'bad')}{stat_card('Automatic promotion', 'OFF', 'scorecard cannot change configuration', 'good')}{stat_card('Order authority', 'NONE', 'shadow reports only', 'good')}</div><div class='table-wrap'><table><thead><tr><th>Criterion</th><th>Status</th><th>Observed / Required</th><th>Remaining</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No readiness report yet.</td></tr>'}</tbody></table></div>",
+        f"<div class='stat-grid compact'>{stat_card('Overall', str(data.get('status') or 'PENDING'), 'human promotion only', 'good' if data.get('status') == 'PASS' else 'bad')}{stat_card('Automatic promotion', 'OFF', 'scorecard cannot change configuration', 'good')}{stat_card('Order authority', 'NONE', 'shadow reports only', 'good')}</div><div class='table-wrap'><table><thead><tr><th>Criterion</th><th>Status</th><th>Observed / Required</th><th>Remaining</th></tr></thead><tbody>{rows_html}</tbody></table></div>",
         "Passing evidence still requires explicit human review and a strategy-specific configuration change; this panel cannot enable execution.",
     )
 

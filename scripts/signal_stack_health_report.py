@@ -15,6 +15,7 @@ import json
 import subprocess
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -549,7 +550,10 @@ def _latest_row_timestamp(row: dict | None) -> datetime | None:
         except ValueError:
             continue
         if parsed.tzinfo is not None:
-            parsed = parsed.astimezone().replace(tzinfo=None)
+            # Health windows are defined in the deployment's Chicago wall clock.
+            # Converting through the host timezone made identical evidence stale
+            # on Windows but fresh on Linux CI.
+            parsed = parsed.astimezone(ZoneInfo("America/Chicago")).replace(tzinfo=None)
         return parsed
     return None
 

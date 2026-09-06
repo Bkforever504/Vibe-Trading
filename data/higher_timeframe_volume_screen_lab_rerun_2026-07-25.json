@@ -1,0 +1,617 @@
+{
+  "can_submit_orders": false,
+  "configuration_count": 6,
+  "data_window": {
+    "development_end": "2022-12-31",
+    "end": "2026-07-21",
+    "selection_end": "2023-12-31",
+    "start": "2015-01-01"
+  },
+  "errors": [],
+  "execution_enabled": false,
+  "mode": "research_only_preregistered_family",
+  "rows": [
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 19,
+          "ci95_bps": [
+            -5.056,
+            45.807
+          ],
+          "probability_positive": 0.939
+        },
+        "expectancy_bps": 18.513,
+        "max_drawdown_pct": -32.759,
+        "periods": 389,
+        "profit_factor": 1.187,
+        "top_one_pct_removed_expectancy_bps": 9.617,
+        "underlying_signals": 1772,
+        "win_rate": 0.5296
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 11,
+          "ci95_bps": [
+            -14.196,
+            92.195
+          ],
+          "probability_positive": 0.9267
+        },
+        "expectancy_bps": 39.019,
+        "max_drawdown_pct": -20.85,
+        "periods": 132,
+        "profit_factor": 1.415,
+        "top_one_pct_removed_expectancy_bps": 25.238,
+        "underlying_signals": 635,
+        "win_rate": 0.6061
+      },
+      "final_uplift_vs_price_only_bps": 0.0,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": false,
+        "positive_all_windows": true,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": false,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "weekly",
+        "hold_days": 5,
+        "name": "weekly_price_trend_baseline",
+        "require_dual_trend": false,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "none"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "block_periods": 7,
+          "ci95_bps": [
+            -21.724,
+            126.567
+          ],
+          "probability_positive": 0.904
+        },
+        "expectancy_bps": 67.791,
+        "max_drawdown_pct": -14.277,
+        "periods": 52,
+        "profit_factor": 1.766,
+        "top_one_pct_removed_expectancy_bps": 45.784,
+        "underlying_signals": 239,
+        "win_rate": 0.5577
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 11,
+          "ci95_bps": [
+            -34.196,
+            72.195
+          ],
+          "probability_positive": 0.748
+        },
+        "expectancy_bps": 19.019,
+        "max_drawdown_pct": -26.445,
+        "periods": 132,
+        "profit_factor": 1.186,
+        "top_one_pct_removed_expectancy_bps": 5.238,
+        "underlying_signals": 635,
+        "win_rate": 0.5758
+      },
+      "variant": "weekly_price_trend_baseline"
+    },
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 15,
+          "ci95_bps": [
+            -13.92,
+            95.765
+          ],
+          "probability_positive": 0.923
+        },
+        "expectancy_bps": 31.854,
+        "max_drawdown_pct": -31.148,
+        "periods": 253,
+        "profit_factor": 1.258,
+        "top_one_pct_removed_expectancy_bps": 11.64,
+        "underlying_signals": 611,
+        "win_rate": 0.5257
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 9,
+          "ci95_bps": [
+            -16.97,
+            76.841
+          ],
+          "probability_positive": 0.881
+        },
+        "expectancy_bps": 38.972,
+        "max_drawdown_pct": -17.02,
+        "periods": 93,
+        "profit_factor": 1.414,
+        "top_one_pct_removed_expectancy_bps": 29.56,
+        "underlying_signals": 235,
+        "win_rate": 0.6022
+      },
+      "final_uplift_vs_price_only_bps": -0.047,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": false,
+        "positive_all_windows": true,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": false,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "weekly",
+        "hold_days": 5,
+        "name": "weekly_rvol_125",
+        "require_dual_trend": false,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "rvol_125"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "block_periods": 6,
+          "ci95_bps": [
+            -77.619,
+            218.211
+          ],
+          "probability_positive": 0.7823
+        },
+        "expectancy_bps": 62.667,
+        "max_drawdown_pct": -21.0,
+        "periods": 37,
+        "profit_factor": 1.585,
+        "top_one_pct_removed_expectancy_bps": 5.378,
+        "underlying_signals": 78,
+        "win_rate": 0.4865
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 9,
+          "ci95_bps": [
+            -36.97,
+            56.841
+          ],
+          "probability_positive": 0.622
+        },
+        "expectancy_bps": 18.972,
+        "max_drawdown_pct": -21.762,
+        "periods": 93,
+        "profit_factor": 1.185,
+        "top_one_pct_removed_expectancy_bps": 9.56,
+        "underlying_signals": 235,
+        "win_rate": 0.5591
+      },
+      "variant": "weekly_rvol_125"
+    },
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 17,
+          "ci95_bps": [
+            0.993,
+            54.271
+          ],
+          "probability_positive": 0.9797
+        },
+        "expectancy_bps": 25.217,
+        "max_drawdown_pct": -19.047,
+        "periods": 293,
+        "profit_factor": 1.258,
+        "top_one_pct_removed_expectancy_bps": 14.9,
+        "underlying_signals": 878,
+        "win_rate": 0.5119
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 10,
+          "ci95_bps": [
+            -24.807,
+            103.969
+          ],
+          "probability_positive": 0.9113
+        },
+        "expectancy_bps": 42.718,
+        "max_drawdown_pct": -26.995,
+        "periods": 112,
+        "profit_factor": 1.443,
+        "top_one_pct_removed_expectancy_bps": 27.781,
+        "underlying_signals": 340,
+        "win_rate": 0.6071
+      },
+      "final_uplift_vs_price_only_bps": 3.699,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": true,
+        "positive_all_windows": true,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": false,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "weekly",
+        "hold_days": 5,
+        "name": "weekly_volume_acceleration",
+        "require_dual_trend": false,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "acceleration"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "block_periods": 6,
+          "ci95_bps": [
+            -34.214,
+            153.873
+          ],
+          "probability_positive": 0.8963
+        },
+        "expectancy_bps": 66.989,
+        "max_drawdown_pct": -12.758,
+        "periods": 41,
+        "profit_factor": 1.822,
+        "top_one_pct_removed_expectancy_bps": 32.795,
+        "underlying_signals": 133,
+        "win_rate": 0.5366
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 10,
+          "ci95_bps": [
+            -44.807,
+            83.969
+          ],
+          "probability_positive": 0.7777
+        },
+        "expectancy_bps": 22.718,
+        "max_drawdown_pct": -31.708,
+        "periods": 112,
+        "profit_factor": 1.218,
+        "top_one_pct_removed_expectancy_bps": 7.781,
+        "underlying_signals": 340,
+        "win_rate": 0.5893
+      },
+      "variant": "weekly_volume_acceleration"
+    },
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 14,
+          "ci95_bps": [
+            7.551,
+            141.85
+          ],
+          "probability_positive": 0.9887
+        },
+        "expectancy_bps": 64.163,
+        "max_drawdown_pct": -27.786,
+        "periods": 215,
+        "profit_factor": 1.557,
+        "top_one_pct_removed_expectancy_bps": 38.118,
+        "underlying_signals": 503,
+        "win_rate": 0.5256
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 9,
+          "ci95_bps": [
+            -0.121,
+            89.213
+          ],
+          "probability_positive": 0.9743
+        },
+        "expectancy_bps": 58.879,
+        "max_drawdown_pct": -10.804,
+        "periods": 86,
+        "profit_factor": 1.672,
+        "top_one_pct_removed_expectancy_bps": 48.926,
+        "underlying_signals": 213,
+        "win_rate": 0.6279
+      },
+      "final_uplift_vs_price_only_bps": 19.86,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": true,
+        "positive_all_windows": true,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": false,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "weekly",
+        "hold_days": 5,
+        "name": "weekly_rvol_125_dual_trend",
+        "require_dual_trend": true,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "rvol_125"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "block_periods": 5,
+          "ci95_bps": [
+            -159.584,
+            253.101
+          ],
+          "probability_positive": 0.578
+        },
+        "expectancy_bps": 38.447,
+        "max_drawdown_pct": -23.465,
+        "periods": 27,
+        "profit_factor": 1.266,
+        "top_one_pct_removed_expectancy_bps": -41.808,
+        "underlying_signals": 54,
+        "win_rate": 0.4074
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 9,
+          "ci95_bps": [
+            -20.121,
+            69.213
+          ],
+          "probability_positive": 0.8367
+        },
+        "expectancy_bps": 38.879,
+        "max_drawdown_pct": -14.152,
+        "periods": 86,
+        "profit_factor": 1.407,
+        "top_one_pct_removed_expectancy_bps": 28.926,
+        "underlying_signals": 213,
+        "win_rate": 0.5814
+      },
+      "variant": "weekly_rvol_125_dual_trend"
+    },
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 9,
+          "ci95_bps": [
+            52.652,
+            423.416
+          ],
+          "probability_positive": 0.9967
+        },
+        "expectancy_bps": 225.095,
+        "max_drawdown_pct": -32.584,
+        "periods": 81,
+        "profit_factor": 2.31,
+        "top_one_pct_removed_expectancy_bps": 199.64,
+        "underlying_signals": 381,
+        "win_rate": 0.6667
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 5,
+          "ci95_bps": [
+            0.912,
+            539.787
+          ],
+          "probability_positive": 0.9757
+        },
+        "expectancy_bps": 297.73,
+        "max_drawdown_pct": -20.508,
+        "periods": 30,
+        "profit_factor": 3.505,
+        "top_one_pct_removed_expectancy_bps": 252.033,
+        "underlying_signals": 149,
+        "win_rate": 0.7333
+      },
+      "final_uplift_vs_price_only_bps": 0.0,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": false,
+        "positive_all_windows": true,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": true,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "monthly",
+        "hold_days": 20,
+        "name": "monthly_price_trend_baseline",
+        "require_dual_trend": false,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "none"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "block_periods": 3,
+          "ci95_bps": [
+            -269.27,
+            598.533
+          ],
+          "probability_positive": 0.7857
+        },
+        "expectancy_bps": 263.266,
+        "max_drawdown_pct": -18.543,
+        "periods": 12,
+        "profit_factor": 2.595,
+        "top_one_pct_removed_expectancy_bps": 189.058,
+        "underlying_signals": 60,
+        "win_rate": 0.75
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 5,
+          "ci95_bps": [
+            -19.088,
+            519.787
+          ],
+          "probability_positive": 0.9683
+        },
+        "expectancy_bps": 277.73,
+        "max_drawdown_pct": -21.022,
+        "periods": 30,
+        "profit_factor": 3.226,
+        "top_one_pct_removed_expectancy_bps": 232.033,
+        "underlying_signals": 149,
+        "win_rate": 0.7
+      },
+      "variant": "monthly_price_trend_baseline"
+    },
+    {
+      "development_2015_2022": {
+        "bootstrap": {
+          "block_periods": 7,
+          "ci95_bps": [
+            -204.12,
+            263.869
+          ],
+          "probability_positive": 0.5313
+        },
+        "expectancy_bps": 36.136,
+        "max_drawdown_pct": -53.515,
+        "periods": 56,
+        "profit_factor": 1.101,
+        "top_one_pct_removed_expectancy_bps": -4.186,
+        "underlying_signals": 134,
+        "win_rate": 0.5
+      },
+      "final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 4,
+          "ci95_bps": [
+            -269.802,
+            443.677
+          ],
+          "probability_positive": 0.7427
+        },
+        "expectancy_bps": 109.269,
+        "max_drawdown_pct": -30.966,
+        "periods": 21,
+        "profit_factor": 1.398,
+        "top_one_pct_removed_expectancy_bps": 46.526,
+        "underlying_signals": 53,
+        "win_rate": 0.6667
+      },
+      "final_uplift_vs_price_only_bps": -188.461,
+      "high_confidence_ready": false,
+      "pass_checks": {
+        "beats_final_price_only_baseline": false,
+        "positive_all_windows": false,
+        "positive_at_30bps_cost": true,
+        "positive_bootstrap_lower_bound": false,
+        "positive_without_top_one_pct": true
+      },
+      "rules": {
+        "frequency": "monthly",
+        "hold_days": 20,
+        "name": "monthly_rvol_125",
+        "require_dual_trend": false,
+        "require_positive_period": true,
+        "top_n": 5,
+        "volume_rule": "rvol_125"
+      },
+      "selection_2023": {
+        "bootstrap": {
+          "ci95_bps": [
+            null,
+            null
+          ],
+          "probability_positive": null
+        },
+        "expectancy_bps": -130.419,
+        "max_drawdown_pct": -12.679,
+        "periods": 5,
+        "profit_factor": 0.498,
+        "top_one_pct_removed_expectancy_bps": -237.056,
+        "underlying_signals": 11,
+        "win_rate": 0.6
+      },
+      "triple_cost_final_2024_plus": {
+        "bootstrap": {
+          "block_periods": 4,
+          "ci95_bps": [
+            -289.802,
+            423.677
+          ],
+          "probability_positive": 0.7153
+        },
+        "expectancy_bps": 89.269,
+        "max_drawdown_pct": -31.708,
+        "periods": 21,
+        "profit_factor": 1.317,
+        "top_one_pct_removed_expectancy_bps": 26.526,
+        "underlying_signals": 53,
+        "win_rate": 0.6667
+      },
+      "variant": "monthly_rvol_125"
+    }
+  ],
+  "schema_version": 1,
+  "symbols_loaded": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "BAC",
+    "COST",
+    "CVX",
+    "DIA",
+    "GLD",
+    "GOOGL",
+    "HD",
+    "IWM",
+    "JPM",
+    "META",
+    "MSFT",
+    "NVDA",
+    "QQQ",
+    "SLV",
+    "SMH",
+    "SPY",
+    "TLT",
+    "TSLA",
+    "WMT",
+    "XLE",
+    "XLF",
+    "XLK",
+    "XLP",
+    "XLV",
+    "XLY",
+    "XOM"
+  ],
+  "symbols_requested": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "DIA",
+    "SMH",
+    "XLK",
+    "XLF",
+    "XLE",
+    "XLV",
+    "XLY",
+    "XLP",
+    "TLT",
+    "GLD",
+    "SLV",
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "AMZN",
+    "META",
+    "GOOGL",
+    "TSLA",
+    "AMD",
+    "JPM",
+    "BAC",
+    "XOM",
+    "CVX",
+    "WMT",
+    "COST",
+    "HD"
+  ],
+  "warnings": [
+    "Current large/liquid universe creates survivorship bias; results cannot authorize execution.",
+    "Adjusted Yahoo bars are research data, not executable quote data.",
+    "The 2024+ period is a labeled final test for this preregistered family but has been consumed by other project research.",
+    "Date-level equal-weight portfolios prevent correlated same-day symbols from inflating sample size."
+  ]
+}

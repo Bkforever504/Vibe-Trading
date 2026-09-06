@@ -32,7 +32,17 @@ def family_for(signal_id: str, *, descriptor: str = "", families_path: Path = DE
     if signal_id in explicit:
         return str(explicit[signal_id])
     haystack = f"{signal_id} {descriptor}".lower()
-    for family, keywords in (config.get("families") or {}).items():
+    for family, specification in (config.get("families") or {}).items():
+        if isinstance(specification, Mapping):
+            keywords = [
+                *(specification.get("keywords") or []),
+                *(specification.get("example_signals") or []),
+            ]
+        elif isinstance(specification, (list, tuple, set)):
+            # Backward compatibility with the v1 ``family: [keywords]`` schema.
+            keywords = specification
+        else:
+            keywords = []
         if any(str(keyword).lower() in haystack for keyword in keywords):
             return str(family)
     return str(config.get("default_family") or "unassigned")
@@ -74,4 +84,3 @@ def count_trials(family_key: str, *, path: Path = DEFAULT_LEDGER) -> int:
 def hypothesis_hash(signal: Mapping[str, Any]) -> str:
     selected = {key: signal.get(key) for key in ("id", "script", "evidence_gate", "status", "promotion_gate")}
     return hashlib.sha256(json.dumps(selected, sort_keys=True, default=str).encode()).hexdigest()
-

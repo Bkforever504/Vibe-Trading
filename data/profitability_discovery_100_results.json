@@ -1,0 +1,7051 @@
+{
+  "experiment": "PROFITABILITY-DISCOVERY-100",
+  "registry_sha256": "d0311c50bf5631697c8f41735cb4ddae5293c7e99ea01ce2677c0479dee227db",
+  "mode": "development_only_research",
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "dataset_sessions": 1148,
+  "development_sessions": 803,
+  "sealed_selection_sessions": 172,
+  "sealed_final_sessions": 173,
+  "trial_count": 100,
+  "effective_attempt_count": 515,
+  "bonferroni_alpha": 9.70873786407767e-05,
+  "survivor_count": 0,
+  "survivors": [],
+  "family_best_development_only": [
+    {
+      "trial_id": "DISC100-010",
+      "family": "orb_breakout",
+      "variant": 9,
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 212,
+          "total_pnl": 1056.74,
+          "expectancy": 4.9846,
+          "win_rate": 0.5142,
+          "profit_factor": 1.2114,
+          "max_drawdown": 452.3,
+          "t_stat": 1.1689,
+          "p_value": 0.12122853
+        },
+        {
+          "trades": 222,
+          "total_pnl": -621.81,
+          "expectancy": -2.8009,
+          "win_rate": 0.464,
+          "profit_factor": 0.8416,
+          "max_drawdown": 775.7,
+          "t_stat": -1.0025,
+          "p_value": 0.84193726
+        },
+        {
+          "trades": 230,
+          "total_pnl": -437.9,
+          "expectancy": -1.9039,
+          "win_rate": 0.4696,
+          "profit_factor": 0.9145,
+          "max_drawdown": 924.62,
+          "t_stat": -0.5428,
+          "p_value": 0.70636254
+        }
+      ],
+      "development": {
+        "trades": 664,
+        "total_pnl": -2.97,
+        "expectancy": -0.0045,
+        "win_rate": 0.4819,
+        "profit_factor": 0.9998,
+        "max_drawdown": 1301.95,
+        "t_stat": -0.0022,
+        "p_value": 0.50086991
+      },
+      "development_2x_cost": {
+        "trades": 664,
+        "total_pnl": -3309.69,
+        "expectancy": -4.9845,
+        "win_rate": 0.4367,
+        "profit_factor": 0.7912,
+        "max_drawdown": 3790.61,
+        "t_stat": -2.4299,
+        "p_value": 0.99244916
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-016",
+      "family": "orb_failed_break",
+      "variant": 5,
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 77,
+          "total_pnl": -248.46,
+          "expectancy": -3.2268,
+          "win_rate": 0.3766,
+          "profit_factor": 0.7888,
+          "max_drawdown": 393.96,
+          "t_stat": -1.003,
+          "p_value": 0.84207011
+        },
+        {
+          "trades": 89,
+          "total_pnl": -143.22,
+          "expectancy": -1.6092,
+          "win_rate": 0.3933,
+          "profit_factor": 0.8882,
+          "max_drawdown": 228.56,
+          "t_stat": -0.5375,
+          "p_value": 0.70453846
+        },
+        {
+          "trades": 99,
+          "total_pnl": -658.02,
+          "expectancy": -6.6467,
+          "win_rate": 0.3232,
+          "profit_factor": 0.589,
+          "max_drawdown": 713.12,
+          "t_stat": -2.545,
+          "p_value": 0.99453609
+        }
+      ],
+      "development": {
+        "trades": 265,
+        "total_pnl": -1049.7,
+        "expectancy": -3.9611,
+        "win_rate": 0.3623,
+        "profit_factor": 0.7414,
+        "max_drawdown": 1104.8,
+        "t_stat": -2.3534,
+        "p_value": 0.99069965
+      },
+      "development_2x_cost": {
+        "trades": 265,
+        "total_pnl": -2369.4,
+        "expectancy": -8.9411,
+        "win_rate": 0.3472,
+        "profit_factor": 0.5171,
+        "max_drawdown": 2399.6,
+        "t_stat": -5.3122,
+        "p_value": 0.99999995
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-027",
+      "family": "prior_day_breakout",
+      "variant": 6,
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 173,
+          "total_pnl": -1376.54,
+          "expectancy": -7.9569,
+          "win_rate": 0.341,
+          "profit_factor": 0.6455,
+          "max_drawdown": 1376.54,
+          "t_stat": -2.7514,
+          "p_value": 0.99703315
+        },
+        {
+          "trades": 171,
+          "total_pnl": -452.83,
+          "expectancy": -2.6481,
+          "win_rate": 0.4035,
+          "profit_factor": 0.8495,
+          "max_drawdown": 935.18,
+          "t_stat": -0.961,
+          "p_value": 0.83173605
+        },
+        {
+          "trades": 183,
+          "total_pnl": -1105.09,
+          "expectancy": -6.0387,
+          "win_rate": 0.388,
+          "profit_factor": 0.6866,
+          "max_drawdown": 1409.36,
+          "t_stat": -2.3074,
+          "p_value": 0.98948489
+        }
+      ],
+      "development": {
+        "trades": 527,
+        "total_pnl": -2934.46,
+        "expectancy": -5.5682,
+        "win_rate": 0.3776,
+        "profit_factor": 0.7183,
+        "max_drawdown": 3091.07,
+        "t_stat": -3.5036,
+        "p_value": 0.99977049
+      },
+      "development_2x_cost": {
+        "trades": 527,
+        "total_pnl": -5558.92,
+        "expectancy": -10.5482,
+        "win_rate": 0.3454,
+        "profit_factor": 0.5406,
+        "max_drawdown": 5639.2,
+        "t_stat": -6.6371,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-038",
+      "family": "prior_day_reclaim",
+      "variant": 7,
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 56,
+          "total_pnl": -441.38,
+          "expectancy": -7.8818,
+          "win_rate": 0.3214,
+          "profit_factor": 0.7212,
+          "max_drawdown": 544.2,
+          "t_stat": -1.1409,
+          "p_value": 0.87304558
+        },
+        {
+          "trades": 48,
+          "total_pnl": 447.21,
+          "expectancy": 9.3169,
+          "win_rate": 0.5,
+          "profit_factor": 1.5241,
+          "max_drawdown": 291.05,
+          "t_stat": 1.2666,
+          "p_value": 0.1026412
+        },
+        {
+          "trades": 60,
+          "total_pnl": -463.8,
+          "expectancy": -7.73,
+          "win_rate": 0.3833,
+          "profit_factor": 0.6758,
+          "max_drawdown": 506.5,
+          "t_stat": -1.3418,
+          "p_value": 0.91017758
+        }
+      ],
+      "development": {
+        "trades": 164,
+        "total_pnl": -457.97,
+        "expectancy": -2.7925,
+        "win_rate": 0.3963,
+        "profit_factor": 0.8816,
+        "max_drawdown": 754.85,
+        "t_stat": -0.7251,
+        "p_value": 0.76580416
+      },
+      "development_2x_cost": {
+        "trades": 164,
+        "total_pnl": -1274.69,
+        "expectancy": -7.7725,
+        "win_rate": 0.378,
+        "profit_factor": 0.7085,
+        "max_drawdown": 1317.91,
+        "t_stat": -2.0182,
+        "p_value": 0.97821485
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-049",
+      "family": "vwap_trend_pullback",
+      "variant": 8,
+      "threshold": 0.3,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 61,
+          "total_pnl": -60.03,
+          "expectancy": -0.9841,
+          "win_rate": 0.4098,
+          "profit_factor": 0.9646,
+          "max_drawdown": 577.08,
+          "t_stat": -0.1258,
+          "p_value": 0.55004992
+        },
+        {
+          "trades": 78,
+          "total_pnl": 11.56,
+          "expectancy": 0.1482,
+          "win_rate": 0.4744,
+          "profit_factor": 1.0075,
+          "max_drawdown": 408.09,
+          "t_stat": 0.028,
+          "p_value": 0.48883455
+        },
+        {
+          "trades": 78,
+          "total_pnl": -99.69,
+          "expectancy": -1.2781,
+          "win_rate": 0.5,
+          "profit_factor": 0.9353,
+          "max_drawdown": 433.37,
+          "t_stat": -0.2417,
+          "p_value": 0.59551142
+        }
+      ],
+      "development": {
+        "trades": 217,
+        "total_pnl": -148.16,
+        "expectancy": -0.6828,
+        "win_rate": 0.4654,
+        "profit_factor": 0.969,
+        "max_drawdown": 903.87,
+        "t_stat": -0.1975,
+        "p_value": 0.57826968
+      },
+      "development_2x_cost": {
+        "trades": 217,
+        "total_pnl": -1228.82,
+        "expectancy": -5.6628,
+        "win_rate": 0.4332,
+        "profit_factor": 0.7712,
+        "max_drawdown": 1524.57,
+        "t_stat": -1.6378,
+        "p_value": 0.94926635
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-051",
+      "family": "vwap_deviation_fade",
+      "variant": 0,
+      "threshold": 0.75,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 267,
+          "total_pnl": -1575.91,
+          "expectancy": -5.9023,
+          "win_rate": 0.3858,
+          "profit_factor": 0.613,
+          "max_drawdown": 1701.13,
+          "t_stat": -4.0056,
+          "p_value": 0.99996907
+        },
+        {
+          "trades": 266,
+          "total_pnl": -2037.18,
+          "expectancy": -7.6586,
+          "win_rate": 0.3496,
+          "profit_factor": 0.5078,
+          "max_drawdown": 2062.32,
+          "t_stat": -5.4774,
+          "p_value": 0.99999998
+        },
+        {
+          "trades": 269,
+          "total_pnl": -994.62,
+          "expectancy": -3.6975,
+          "win_rate": 0.4312,
+          "profit_factor": 0.7273,
+          "max_drawdown": 1181.51,
+          "t_stat": -2.5533,
+          "p_value": 0.99466465
+        }
+      ],
+      "development": {
+        "trades": 802,
+        "total_pnl": -4607.71,
+        "expectancy": -5.7453,
+        "win_rate": 0.389,
+        "profit_factor": 0.6114,
+        "max_drawdown": 4898.45,
+        "t_stat": -6.9006,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 802,
+        "total_pnl": -8601.67,
+        "expectancy": -10.7253,
+        "win_rate": 0.3728,
+        "profit_factor": 0.3998,
+        "max_drawdown": 8732.23,
+        "t_stat": -12.882,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-070",
+      "family": "opening_impulse_continuation",
+      "variant": 9,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 208,
+          "total_pnl": 287.91,
+          "expectancy": 1.3842,
+          "win_rate": 0.4856,
+          "profit_factor": 1.0527,
+          "max_drawdown": 513.18,
+          "t_stat": 0.3151,
+          "p_value": 0.37632891
+        },
+        {
+          "trades": 148,
+          "total_pnl": 92.96,
+          "expectancy": 0.6281,
+          "win_rate": 0.5068,
+          "profit_factor": 1.0344,
+          "max_drawdown": 417.06,
+          "t_stat": 0.1641,
+          "p_value": 0.43482338
+        },
+        {
+          "trades": 146,
+          "total_pnl": -1085.83,
+          "expectancy": -7.4372,
+          "win_rate": 0.3973,
+          "profit_factor": 0.716,
+          "max_drawdown": 1368.18,
+          "t_stat": -1.684,
+          "p_value": 0.95390889
+        }
+      ],
+      "development": {
+        "trades": 502,
+        "total_pnl": -704.96,
+        "expectancy": -1.4043,
+        "win_rate": 0.4661,
+        "profit_factor": 0.9412,
+        "max_drawdown": 1502.89,
+        "t_stat": -0.5621,
+        "p_value": 0.71297301
+      },
+      "development_2x_cost": {
+        "trades": 502,
+        "total_pnl": -3204.92,
+        "expectancy": -6.3843,
+        "win_rate": 0.4343,
+        "profit_factor": 0.7605,
+        "max_drawdown": 3654.86,
+        "t_stat": -2.5554,
+        "p_value": 0.99469675
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-075",
+      "family": "opening_impulse_reversal",
+      "variant": 4,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 243,
+          "total_pnl": -2240.14,
+          "expectancy": -9.2187,
+          "win_rate": 0.3827,
+          "profit_factor": 0.6985,
+          "max_drawdown": 2733.24,
+          "t_stat": -2.5036,
+          "p_value": 0.99385355
+        },
+        {
+          "trades": 181,
+          "total_pnl": -877.63,
+          "expectancy": -4.8488,
+          "win_rate": 0.442,
+          "profit_factor": 0.7824,
+          "max_drawdown": 1217.52,
+          "t_stat": -1.4027,
+          "p_value": 0.91964963
+        },
+        {
+          "trades": 169,
+          "total_pnl": -6.62,
+          "expectancy": -0.0392,
+          "win_rate": 0.4852,
+          "profit_factor": 0.9984,
+          "max_drawdown": 518.54,
+          "t_stat": -0.0092,
+          "p_value": 0.50368659
+        }
+      ],
+      "development": {
+        "trades": 593,
+        "total_pnl": -3124.39,
+        "expectancy": -5.2688,
+        "win_rate": 0.43,
+        "profit_factor": 0.7982,
+        "max_drawdown": 4056.31,
+        "t_stat": -2.3906,
+        "p_value": 0.99159031
+      },
+      "development_2x_cost": {
+        "trades": 593,
+        "total_pnl": -6077.53,
+        "expectancy": -10.2488,
+        "win_rate": 0.4047,
+        "profit_factor": 0.6469,
+        "max_drawdown": 6652.8,
+        "t_stat": -4.6502,
+        "p_value": 0.99999834
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-084",
+      "family": "compression_breakout",
+      "variant": 3,
+      "threshold": 1.0,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 2,
+          "total_pnl": 15.04,
+          "expectancy": 7.52,
+          "win_rate": 0.5,
+          "profit_factor": 1.2736,
+          "max_drawdown": 54.98,
+          "t_stat": 0.1203,
+          "p_value": 0.45211483
+        },
+        {
+          "trades": 3,
+          "total_pnl": 177.56,
+          "expectancy": 59.1867,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": 5.4634,
+          "p_value": 2e-08
+        },
+        {
+          "trades": 4,
+          "total_pnl": -59.92,
+          "expectancy": -14.98,
+          "win_rate": 0.5,
+          "profit_factor": 0.3772,
+          "max_drawdown": 96.19,
+          "t_stat": -0.7238,
+          "p_value": 0.7653934
+        }
+      ],
+      "development": {
+        "trades": 9,
+        "total_pnl": 132.68,
+        "expectancy": 14.7422,
+        "win_rate": 0.6667,
+        "profit_factor": 1.8776,
+        "max_drawdown": 96.19,
+        "t_stat": 0.8209,
+        "p_value": 0.20585334
+      },
+      "development_2x_cost": {
+        "trades": 9,
+        "total_pnl": 87.86,
+        "expectancy": 9.7622,
+        "win_rate": 0.5556,
+        "profit_factor": 1.5135,
+        "max_drawdown": 111.13,
+        "t_stat": 0.5436,
+        "p_value": 0.29336125
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-100",
+      "family": "range_expansion_reversal",
+      "variant": 9,
+      "threshold": 2.8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 3,
+          "total_pnl": 20.06,
+          "expectancy": 6.6867,
+          "win_rate": 0.3333,
+          "profit_factor": 1.2112,
+          "max_drawdown": 94.96,
+          "t_stat": 0.1214,
+          "p_value": 0.45170569
+        },
+        {
+          "trades": 10,
+          "total_pnl": -129.8,
+          "expectancy": -12.98,
+          "win_rate": 0.3,
+          "profit_factor": 0.6393,
+          "max_drawdown": 129.96,
+          "t_stat": -0.571,
+          "p_value": 0.71599424
+        },
+        {
+          "trades": 11,
+          "total_pnl": 102.72,
+          "expectancy": 9.3382,
+          "win_rate": 0.7273,
+          "profit_factor": 1.5269,
+          "max_drawdown": 112.44,
+          "t_stat": 0.5485,
+          "p_value": 0.29168067
+        }
+      ],
+      "development": {
+        "trades": 24,
+        "total_pnl": -7.02,
+        "expectancy": -0.2925,
+        "win_rate": 0.5,
+        "profit_factor": 0.9892,
+        "max_drawdown": 289.74,
+        "t_stat": -0.0218,
+        "p_value": 0.50869568
+      },
+      "development_2x_cost": {
+        "trades": 24,
+        "total_pnl": -126.54,
+        "expectancy": -5.2725,
+        "win_rate": 0.4583,
+        "profit_factor": 0.8229,
+        "max_drawdown": 354.48,
+        "t_stat": -0.3929,
+        "p_value": 0.65281553
+      },
+      "discovery_survivor": false
+    }
+  ],
+  "trials": [
+    {
+      "trial_id": "DISC100-001",
+      "family": "orb_breakout",
+      "variant": 0,
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 253,
+          "total_pnl": -1573.69,
+          "expectancy": -6.2201,
+          "win_rate": 0.3715,
+          "profit_factor": 0.5975,
+          "max_drawdown": 1717.74,
+          "t_stat": -4.1159,
+          "p_value": 0.99998072
+        },
+        {
+          "trades": 259,
+          "total_pnl": -1436.07,
+          "expectancy": -5.5447,
+          "win_rate": 0.3861,
+          "profit_factor": 0.6186,
+          "max_drawdown": 1486.11,
+          "t_stat": -3.8123,
+          "p_value": 0.99993116
+        },
+        {
+          "trades": 264,
+          "total_pnl": -1653.47,
+          "expectancy": -6.2631,
+          "win_rate": 0.375,
+          "profit_factor": 0.586,
+          "max_drawdown": 1678.65,
+          "t_stat": -4.32,
+          "p_value": 0.9999922
+        }
+      ],
+      "development": {
+        "trades": 776,
+        "total_pnl": -4663.23,
+        "expectancy": -6.0093,
+        "win_rate": 0.3776,
+        "profit_factor": 0.6004,
+        "max_drawdown": 4738.49,
+        "t_stat": -7.0823,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 776,
+        "total_pnl": -8527.71,
+        "expectancy": -10.9893,
+        "win_rate": 0.3724,
+        "profit_factor": 0.3946,
+        "max_drawdown": 8567.79,
+        "t_stat": -12.9514,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-002",
+      "family": "orb_breakout",
+      "variant": 1,
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 251,
+          "total_pnl": -978.73,
+          "expectancy": -3.8993,
+          "win_rate": 0.4223,
+          "profit_factor": 0.8002,
+          "max_drawdown": 1413.76,
+          "t_stat": -1.7302,
+          "p_value": 0.95819848
+        },
+        {
+          "trades": 259,
+          "total_pnl": -937.32,
+          "expectancy": -3.619,
+          "win_rate": 0.4208,
+          "profit_factor": 0.7879,
+          "max_drawdown": 942.34,
+          "t_stat": -1.7862,
+          "p_value": 0.96297026
+        },
+        {
+          "trades": 264,
+          "total_pnl": -1012.22,
+          "expectancy": -3.8342,
+          "win_rate": 0.4167,
+          "profit_factor": 0.7836,
+          "max_drawdown": 1230.53,
+          "t_stat": -1.87,
+          "p_value": 0.96925986
+        }
+      ],
+      "development": {
+        "trades": 774,
+        "total_pnl": -2928.27,
+        "expectancy": -3.7833,
+        "win_rate": 0.4199,
+        "profit_factor": 0.7908,
+        "max_drawdown": 3146.58,
+        "t_stat": -3.1109,
+        "p_value": 0.99906726
+      },
+      "development_2x_cost": {
+        "trades": 774,
+        "total_pnl": -6782.79,
+        "expectancy": -8.7633,
+        "win_rate": 0.4031,
+        "profit_factor": 0.5831,
+        "max_drawdown": 6782.79,
+        "t_stat": -7.2057,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-003",
+      "family": "orb_breakout",
+      "variant": 2,
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 250,
+          "total_pnl": -732.5,
+          "expectancy": -2.93,
+          "win_rate": 0.436,
+          "profit_factor": 0.8716,
+          "max_drawdown": 1650.03,
+          "t_stat": -1.0287,
+          "p_value": 0.84818019
+        },
+        {
+          "trades": 255,
+          "total_pnl": -777.4,
+          "expectancy": -3.0486,
+          "win_rate": 0.451,
+          "profit_factor": 0.8284,
+          "max_drawdown": 807.5,
+          "t_stat": -1.3108,
+          "p_value": 0.90504558
+        },
+        {
+          "trades": 264,
+          "total_pnl": -849.72,
+          "expectancy": -3.2186,
+          "win_rate": 0.4356,
+          "profit_factor": 0.8378,
+          "max_drawdown": 1018.04,
+          "t_stat": -1.2984,
+          "p_value": 0.90292727
+        }
+      ],
+      "development": {
+        "trades": 769,
+        "total_pnl": -2359.62,
+        "expectancy": -3.0684,
+        "win_rate": 0.4408,
+        "profit_factor": 0.8475,
+        "max_drawdown": 2390.0,
+        "t_stat": -2.0826,
+        "p_value": 0.98135666
+      },
+      "development_2x_cost": {
+        "trades": 769,
+        "total_pnl": -6189.24,
+        "expectancy": -8.0484,
+        "win_rate": 0.4174,
+        "profit_factor": 0.6495,
+        "max_drawdown": 6189.24,
+        "t_stat": -5.4627,
+        "p_value": 0.99999998
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-004",
+      "family": "orb_breakout",
+      "variant": 3,
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 249,
+          "total_pnl": 129.98,
+          "expectancy": 0.522,
+          "win_rate": 0.4859,
+          "profit_factor": 1.0223,
+          "max_drawdown": 1116.63,
+          "t_stat": 0.1577,
+          "p_value": 0.43735649
+        },
+        {
+          "trades": 253,
+          "total_pnl": -629.94,
+          "expectancy": -2.4899,
+          "win_rate": 0.4783,
+          "profit_factor": 0.864,
+          "max_drawdown": 726.36,
+          "t_stat": -0.9684,
+          "p_value": 0.83357865
+        },
+        {
+          "trades": 264,
+          "total_pnl": -1195.97,
+          "expectancy": -4.5302,
+          "win_rate": 0.4356,
+          "profit_factor": 0.7934,
+          "max_drawdown": 1195.97,
+          "t_stat": -1.6345,
+          "p_value": 0.94892537
+        }
+      ],
+      "development": {
+        "trades": 766,
+        "total_pnl": -1695.93,
+        "expectancy": -2.214,
+        "win_rate": 0.4661,
+        "profit_factor": 0.8957,
+        "max_drawdown": 1941.24,
+        "t_stat": -1.3255,
+        "p_value": 0.90749359
+      },
+      "development_2x_cost": {
+        "trades": 766,
+        "total_pnl": -5510.61,
+        "expectancy": -7.194,
+        "win_rate": 0.436,
+        "profit_factor": 0.6997,
+        "max_drawdown": 5510.61,
+        "t_stat": -4.3069,
+        "p_value": 0.99999172
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-005",
+      "family": "orb_breakout",
+      "variant": 4,
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 249,
+          "total_pnl": 314.98,
+          "expectancy": 1.265,
+          "win_rate": 0.502,
+          "profit_factor": 1.0513,
+          "max_drawdown": 938.09,
+          "t_stat": 0.3448,
+          "p_value": 0.36511964
+        },
+        {
+          "trades": 248,
+          "total_pnl": -623.79,
+          "expectancy": -2.5153,
+          "win_rate": 0.4758,
+          "profit_factor": 0.865,
+          "max_drawdown": 667.07,
+          "t_stat": -0.9248,
+          "p_value": 0.82245292
+        },
+        {
+          "trades": 262,
+          "total_pnl": -1158.51,
+          "expectancy": -4.4218,
+          "win_rate": 0.4427,
+          "profit_factor": 0.8118,
+          "max_drawdown": 1315.07,
+          "t_stat": -1.4231,
+          "p_value": 0.92265322
+        }
+      ],
+      "development": {
+        "trades": 759,
+        "total_pnl": -1467.32,
+        "expectancy": -1.9332,
+        "win_rate": 0.473,
+        "profit_factor": 0.9133,
+        "max_drawdown": 1968.84,
+        "t_stat": -1.0504,
+        "p_value": 0.85323911
+      },
+      "development_2x_cost": {
+        "trades": 759,
+        "total_pnl": -5247.14,
+        "expectancy": -6.9132,
+        "win_rate": 0.4387,
+        "profit_factor": 0.7235,
+        "max_drawdown": 5247.14,
+        "t_stat": -3.7563,
+        "p_value": 0.99991379
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-006",
+      "family": "orb_breakout",
+      "variant": 5,
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 216,
+          "total_pnl": -903.18,
+          "expectancy": -4.1814,
+          "win_rate": 0.3472,
+          "profit_factor": 0.7422,
+          "max_drawdown": 1022.98,
+          "t_stat": -2.1574,
+          "p_value": 0.98451215
+        },
+        {
+          "trades": 238,
+          "total_pnl": -822.74,
+          "expectancy": -3.4569,
+          "win_rate": 0.3866,
+          "profit_factor": 0.763,
+          "max_drawdown": 867.8,
+          "t_stat": -1.9956,
+          "p_value": 0.97701256
+        },
+        {
+          "trades": 234,
+          "total_pnl": -1220.32,
+          "expectancy": -5.215,
+          "win_rate": 0.3547,
+          "profit_factor": 0.6678,
+          "max_drawdown": 1468.28,
+          "t_stat": -2.9856,
+          "p_value": 0.99858506
+        }
+      ],
+      "development": {
+        "trades": 688,
+        "total_pnl": -2946.24,
+        "expectancy": -4.2823,
+        "win_rate": 0.3634,
+        "profit_factor": 0.7233,
+        "max_drawdown": 3067.77,
+        "t_stat": -4.1209,
+        "p_value": 0.99998113
+      },
+      "development_2x_cost": {
+        "trades": 688,
+        "total_pnl": -6372.48,
+        "expectancy": -9.2623,
+        "win_rate": 0.3503,
+        "profit_factor": 0.504,
+        "max_drawdown": 6440.26,
+        "t_stat": -8.9131,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-007",
+      "family": "orb_breakout",
+      "variant": 6,
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 215,
+          "total_pnl": -214.45,
+          "expectancy": -0.9974,
+          "win_rate": 0.4186,
+          "profit_factor": 0.9491,
+          "max_drawdown": 714.43,
+          "t_stat": -0.3611,
+          "p_value": 0.64099643
+        },
+        {
+          "trades": 237,
+          "total_pnl": -660.26,
+          "expectancy": -2.7859,
+          "win_rate": 0.4008,
+          "profit_factor": 0.8367,
+          "max_drawdown": 774.17,
+          "t_stat": -1.2174,
+          "p_value": 0.88828107
+        },
+        {
+          "trades": 233,
+          "total_pnl": -735.34,
+          "expectancy": -3.156,
+          "win_rate": 0.4163,
+          "profit_factor": 0.8303,
+          "max_drawdown": 1322.41,
+          "t_stat": -1.2938,
+          "p_value": 0.9021304
+        }
+      ],
+      "development": {
+        "trades": 685,
+        "total_pnl": -1610.05,
+        "expectancy": -2.3504,
+        "win_rate": 0.4117,
+        "profit_factor": 0.8721,
+        "max_drawdown": 1944.32,
+        "t_stat": -1.6368,
+        "p_value": 0.94916697
+      },
+      "development_2x_cost": {
+        "trades": 685,
+        "total_pnl": -5021.35,
+        "expectancy": -7.3304,
+        "win_rate": 0.3839,
+        "profit_factor": 0.6571,
+        "max_drawdown": 5226.14,
+        "t_stat": -5.1049,
+        "p_value": 0.99999983
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-008",
+      "family": "orb_breakout",
+      "variant": 7,
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 214,
+          "total_pnl": -29.47,
+          "expectancy": -0.1377,
+          "win_rate": 0.4486,
+          "profit_factor": 0.9938,
+          "max_drawdown": 623.76,
+          "t_stat": -0.0411,
+          "p_value": 0.51638853
+        },
+        {
+          "trades": 230,
+          "total_pnl": -164.15,
+          "expectancy": -0.7137,
+          "win_rate": 0.4522,
+          "profit_factor": 0.9578,
+          "max_drawdown": 548.63,
+          "t_stat": -0.272,
+          "p_value": 0.60719507
+        },
+        {
+          "trades": 232,
+          "total_pnl": -479.11,
+          "expectancy": -2.0651,
+          "win_rate": 0.4526,
+          "profit_factor": 0.8961,
+          "max_drawdown": 815.96,
+          "t_stat": -0.7213,
+          "p_value": 0.764631
+        }
+      ],
+      "development": {
+        "trades": 676,
+        "total_pnl": -672.73,
+        "expectancy": -0.9952,
+        "win_rate": 0.4512,
+        "profit_factor": 0.9494,
+        "max_drawdown": 1130.58,
+        "t_stat": -0.5864,
+        "p_value": 0.72118751
+      },
+      "development_2x_cost": {
+        "trades": 676,
+        "total_pnl": -4039.21,
+        "expectancy": -5.9752,
+        "win_rate": 0.4142,
+        "profit_factor": 0.7342,
+        "max_drawdown": 4142.71,
+        "t_stat": -3.5207,
+        "p_value": 0.9997848
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-009",
+      "family": "orb_breakout",
+      "variant": 8,
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 212,
+          "total_pnl": 407.99,
+          "expectancy": 1.9245,
+          "win_rate": 0.5,
+          "profit_factor": 1.0826,
+          "max_drawdown": 520.23,
+          "t_stat": 0.503,
+          "p_value": 0.30749436
+        },
+        {
+          "trades": 224,
+          "total_pnl": -476.77,
+          "expectancy": -2.1284,
+          "win_rate": 0.4554,
+          "profit_factor": 0.879,
+          "max_drawdown": 646.5,
+          "t_stat": -0.7699,
+          "p_value": 0.77931381
+        },
+        {
+          "trades": 231,
+          "total_pnl": -630.38,
+          "expectancy": -2.7289,
+          "win_rate": 0.4589,
+          "profit_factor": 0.8741,
+          "max_drawdown": 962.12,
+          "t_stat": -0.8517,
+          "p_value": 0.80280397
+        }
+      ],
+      "development": {
+        "trades": 667,
+        "total_pnl": -699.16,
+        "expectancy": -1.0482,
+        "win_rate": 0.4708,
+        "profit_factor": 0.9497,
+        "max_drawdown": 1301.98,
+        "t_stat": -0.5549,
+        "p_value": 0.7105313
+      },
+      "development_2x_cost": {
+        "trades": 667,
+        "total_pnl": -4020.82,
+        "expectancy": -6.0282,
+        "win_rate": 0.4273,
+        "profit_factor": 0.7445,
+        "max_drawdown": 4050.9,
+        "t_stat": -3.1914,
+        "p_value": 0.99929209
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-010",
+      "family": "orb_breakout",
+      "variant": 9,
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 212,
+          "total_pnl": 1056.74,
+          "expectancy": 4.9846,
+          "win_rate": 0.5142,
+          "profit_factor": 1.2114,
+          "max_drawdown": 452.3,
+          "t_stat": 1.1689,
+          "p_value": 0.12122853
+        },
+        {
+          "trades": 222,
+          "total_pnl": -621.81,
+          "expectancy": -2.8009,
+          "win_rate": 0.464,
+          "profit_factor": 0.8416,
+          "max_drawdown": 775.7,
+          "t_stat": -1.0025,
+          "p_value": 0.84193726
+        },
+        {
+          "trades": 230,
+          "total_pnl": -437.9,
+          "expectancy": -1.9039,
+          "win_rate": 0.4696,
+          "profit_factor": 0.9145,
+          "max_drawdown": 924.62,
+          "t_stat": -0.5428,
+          "p_value": 0.70636254
+        }
+      ],
+      "development": {
+        "trades": 664,
+        "total_pnl": -2.97,
+        "expectancy": -0.0045,
+        "win_rate": 0.4819,
+        "profit_factor": 0.9998,
+        "max_drawdown": 1301.95,
+        "t_stat": -0.0022,
+        "p_value": 0.50086991
+      },
+      "development_2x_cost": {
+        "trades": 664,
+        "total_pnl": -3309.69,
+        "expectancy": -4.9845,
+        "win_rate": 0.4367,
+        "profit_factor": 0.7912,
+        "max_drawdown": 3790.61,
+        "t_stat": -2.4299,
+        "p_value": 0.99244916
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-011",
+      "family": "orb_failed_break",
+      "variant": 0,
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 180,
+          "total_pnl": -745.15,
+          "expectancy": -4.1397,
+          "win_rate": 0.4167,
+          "profit_factor": 0.7134,
+          "max_drawdown": 870.61,
+          "t_stat": -2.2595,
+          "p_value": 0.98807334
+        },
+        {
+          "trades": 174,
+          "total_pnl": -880.27,
+          "expectancy": -5.059,
+          "win_rate": 0.3908,
+          "profit_factor": 0.6462,
+          "max_drawdown": 880.43,
+          "t_stat": -2.8311,
+          "p_value": 0.99768044
+        },
+        {
+          "trades": 169,
+          "total_pnl": -686.62,
+          "expectancy": -4.0628,
+          "win_rate": 0.4083,
+          "profit_factor": 0.7105,
+          "max_drawdown": 811.8,
+          "t_stat": -2.2025,
+          "p_value": 0.98618475
+        }
+      ],
+      "development": {
+        "trades": 523,
+        "total_pnl": -2312.04,
+        "expectancy": -4.4207,
+        "win_rate": 0.4054,
+        "profit_factor": 0.6901,
+        "max_drawdown": 2462.36,
+        "t_stat": -4.2102,
+        "p_value": 0.99998724
+      },
+      "development_2x_cost": {
+        "trades": 523,
+        "total_pnl": -4916.58,
+        "expectancy": -9.4007,
+        "win_rate": 0.4015,
+        "profit_factor": 0.4546,
+        "max_drawdown": 4996.94,
+        "t_stat": -8.953,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-012",
+      "family": "orb_failed_break",
+      "variant": 1,
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 177,
+          "total_pnl": -1206.46,
+          "expectancy": -6.8162,
+          "win_rate": 0.3785,
+          "profit_factor": 0.6782,
+          "max_drawdown": 1216.54,
+          "t_stat": -2.5503,
+          "p_value": 0.99461921
+        },
+        {
+          "trades": 170,
+          "total_pnl": -642.85,
+          "expectancy": -3.7815,
+          "win_rate": 0.4294,
+          "profit_factor": 0.7731,
+          "max_drawdown": 674.7,
+          "t_stat": -1.5485,
+          "p_value": 0.9392514
+        },
+        {
+          "trades": 165,
+          "total_pnl": -879.2,
+          "expectancy": -5.3285,
+          "win_rate": 0.4121,
+          "profit_factor": 0.7051,
+          "max_drawdown": 981.88,
+          "t_stat": -2.1087,
+          "p_value": 0.9825144
+        }
+      ],
+      "development": {
+        "trades": 512,
+        "total_pnl": -2728.51,
+        "expectancy": -5.3291,
+        "win_rate": 0.4062,
+        "profit_factor": 0.7147,
+        "max_drawdown": 2828.71,
+        "t_stat": -3.6186,
+        "p_value": 0.99985192
+      },
+      "development_2x_cost": {
+        "trades": 512,
+        "total_pnl": -5278.27,
+        "expectancy": -10.3091,
+        "win_rate": 0.3848,
+        "profit_factor": 0.5247,
+        "max_drawdown": 5333.59,
+        "t_stat": -7.0002,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-013",
+      "family": "orb_failed_break",
+      "variant": 2,
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 164,
+          "total_pnl": -2154.22,
+          "expectancy": -13.1355,
+          "win_rate": 0.3415,
+          "profit_factor": 0.5326,
+          "max_drawdown": 2164.26,
+          "t_stat": -3.9069,
+          "p_value": 0.99995325
+        },
+        {
+          "trades": 155,
+          "total_pnl": -825.65,
+          "expectancy": -5.3268,
+          "win_rate": 0.4129,
+          "profit_factor": 0.7292,
+          "max_drawdown": 1014.94,
+          "t_stat": -1.744,
+          "p_value": 0.95941638
+        },
+        {
+          "trades": 155,
+          "total_pnl": -533.15,
+          "expectancy": -3.4397,
+          "win_rate": 0.4387,
+          "profit_factor": 0.8266,
+          "max_drawdown": 738.67,
+          "t_stat": -1.0616,
+          "p_value": 0.85579496
+        }
+      ],
+      "development": {
+        "trades": 474,
+        "total_pnl": -3513.02,
+        "expectancy": -7.4114,
+        "win_rate": 0.3966,
+        "profit_factor": 0.6727,
+        "max_drawdown": 3721.06,
+        "t_stat": -3.9635,
+        "p_value": 0.99996307
+      },
+      "development_2x_cost": {
+        "trades": 474,
+        "total_pnl": -5873.54,
+        "expectancy": -12.3914,
+        "win_rate": 0.3713,
+        "profit_factor": 0.518,
+        "max_drawdown": 6025.19,
+        "t_stat": -6.6267,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-014",
+      "family": "orb_failed_break",
+      "variant": 3,
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 156,
+          "total_pnl": -1914.38,
+          "expectancy": -12.2717,
+          "win_rate": 0.3718,
+          "profit_factor": 0.5995,
+          "max_drawdown": 1958.17,
+          "t_stat": -2.9837,
+          "p_value": 0.99857613
+        },
+        {
+          "trades": 138,
+          "total_pnl": -608.49,
+          "expectancy": -4.4093,
+          "win_rate": 0.4203,
+          "profit_factor": 0.7817,
+          "max_drawdown": 836.53,
+          "t_stat": -1.2401,
+          "p_value": 0.8925374
+        },
+        {
+          "trades": 144,
+          "total_pnl": -218.37,
+          "expectancy": -1.5165,
+          "win_rate": 0.4444,
+          "profit_factor": 0.9275,
+          "max_drawdown": 686.35,
+          "t_stat": -0.3924,
+          "p_value": 0.65263195
+        }
+      ],
+      "development": {
+        "trades": 438,
+        "total_pnl": -2741.24,
+        "expectancy": -6.2585,
+        "win_rate": 0.411,
+        "profit_factor": 0.7409,
+        "max_drawdown": 3241.74,
+        "t_stat": -2.7875,
+        "p_value": 0.99734431
+      },
+      "development_2x_cost": {
+        "trades": 438,
+        "total_pnl": -4922.48,
+        "expectancy": -11.2385,
+        "win_rate": 0.3858,
+        "profit_factor": 0.5863,
+        "max_drawdown": 5298.48,
+        "t_stat": -5.0056,
+        "p_value": 0.99999972
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-015",
+      "family": "orb_failed_break",
+      "variant": 4,
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 150,
+          "total_pnl": -2565.75,
+          "expectancy": -17.105,
+          "win_rate": 0.3333,
+          "profit_factor": 0.5092,
+          "max_drawdown": 2639.56,
+          "t_stat": -3.762,
+          "p_value": 0.99991573
+        },
+        {
+          "trades": 112,
+          "total_pnl": -485.26,
+          "expectancy": -4.3327,
+          "win_rate": 0.4286,
+          "profit_factor": 0.808,
+          "max_drawdown": 802.07,
+          "t_stat": -0.972,
+          "p_value": 0.83446627
+        },
+        {
+          "trades": 132,
+          "total_pnl": -472.36,
+          "expectancy": -3.5785,
+          "win_rate": 0.4394,
+          "profit_factor": 0.8484,
+          "max_drawdown": 852.05,
+          "t_stat": -0.8062,
+          "p_value": 0.78994094
+        }
+      ],
+      "development": {
+        "trades": 394,
+        "total_pnl": -3523.37,
+        "expectancy": -8.9426,
+        "win_rate": 0.3959,
+        "profit_factor": 0.6759,
+        "max_drawdown": 3840.1,
+        "t_stat": -3.4083,
+        "p_value": 0.99967321
+      },
+      "development_2x_cost": {
+        "trades": 394,
+        "total_pnl": -5485.49,
+        "expectancy": -13.9226,
+        "win_rate": 0.3782,
+        "profit_factor": 0.5458,
+        "max_drawdown": 5682.7,
+        "t_stat": -5.3064,
+        "p_value": 0.99999994
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-016",
+      "family": "orb_failed_break",
+      "variant": 5,
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 77,
+          "total_pnl": -248.46,
+          "expectancy": -3.2268,
+          "win_rate": 0.3766,
+          "profit_factor": 0.7888,
+          "max_drawdown": 393.96,
+          "t_stat": -1.003,
+          "p_value": 0.84207011
+        },
+        {
+          "trades": 89,
+          "total_pnl": -143.22,
+          "expectancy": -1.6092,
+          "win_rate": 0.3933,
+          "profit_factor": 0.8882,
+          "max_drawdown": 228.56,
+          "t_stat": -0.5375,
+          "p_value": 0.70453846
+        },
+        {
+          "trades": 99,
+          "total_pnl": -658.02,
+          "expectancy": -6.6467,
+          "win_rate": 0.3232,
+          "profit_factor": 0.589,
+          "max_drawdown": 713.12,
+          "t_stat": -2.545,
+          "p_value": 0.99453609
+        }
+      ],
+      "development": {
+        "trades": 265,
+        "total_pnl": -1049.7,
+        "expectancy": -3.9611,
+        "win_rate": 0.3623,
+        "profit_factor": 0.7414,
+        "max_drawdown": 1104.8,
+        "t_stat": -2.3534,
+        "p_value": 0.99069965
+      },
+      "development_2x_cost": {
+        "trades": 265,
+        "total_pnl": -2369.4,
+        "expectancy": -8.9411,
+        "win_rate": 0.3472,
+        "profit_factor": 0.5171,
+        "max_drawdown": 2399.6,
+        "t_stat": -5.3122,
+        "p_value": 0.99999995
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-017",
+      "family": "orb_failed_break",
+      "variant": 6,
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 74,
+          "total_pnl": -608.52,
+          "expectancy": -8.2232,
+          "win_rate": 0.3243,
+          "profit_factor": 0.6418,
+          "max_drawdown": 648.6,
+          "t_stat": -1.8028,
+          "p_value": 0.96428896
+        },
+        {
+          "trades": 87,
+          "total_pnl": -157.01,
+          "expectancy": -1.8047,
+          "win_rate": 0.4138,
+          "profit_factor": 0.8938,
+          "max_drawdown": 396.08,
+          "t_stat": -0.4663,
+          "p_value": 0.67949663
+        },
+        {
+          "trades": 96,
+          "total_pnl": -820.58,
+          "expectancy": -8.5477,
+          "win_rate": 0.3125,
+          "profit_factor": 0.5672,
+          "max_drawdown": 917.03,
+          "t_stat": -2.5027,
+          "p_value": 0.99383745
+        }
+      ],
+      "development": {
+        "trades": 257,
+        "total_pnl": -1586.11,
+        "expectancy": -6.1716,
+        "win_rate": 0.3502,
+        "profit_factor": 0.6874,
+        "max_drawdown": 1701.25,
+        "t_stat": -2.7417,
+        "p_value": 0.99694406
+      },
+      "development_2x_cost": {
+        "trades": 257,
+        "total_pnl": -2865.97,
+        "expectancy": -11.1516,
+        "win_rate": 0.323,
+        "profit_factor": 0.5158,
+        "max_drawdown": 2946.25,
+        "t_stat": -4.9541,
+        "p_value": 0.99999964
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-018",
+      "family": "orb_failed_break",
+      "variant": 7,
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 69,
+          "total_pnl": -286.12,
+          "expectancy": -4.1467,
+          "win_rate": 0.3768,
+          "profit_factor": 0.8394,
+          "max_drawdown": 501.66,
+          "t_stat": -0.6677,
+          "p_value": 0.74783006
+        },
+        {
+          "trades": 77,
+          "total_pnl": -365.96,
+          "expectancy": -4.7527,
+          "win_rate": 0.4156,
+          "profit_factor": 0.7645,
+          "max_drawdown": 714.56,
+          "t_stat": -1.0191,
+          "p_value": 0.84592382
+        },
+        {
+          "trades": 90,
+          "total_pnl": -745.7,
+          "expectancy": -8.2856,
+          "win_rate": 0.3556,
+          "profit_factor": 0.6171,
+          "max_drawdown": 883.38,
+          "t_stat": -1.9677,
+          "p_value": 0.9754462
+        }
+      ],
+      "development": {
+        "trades": 236,
+        "total_pnl": -1397.78,
+        "expectancy": -5.9228,
+        "win_rate": 0.3814,
+        "profit_factor": 0.7354,
+        "max_drawdown": 1637.94,
+        "t_stat": -2.0767,
+        "p_value": 0.98108587
+      },
+      "development_2x_cost": {
+        "trades": 236,
+        "total_pnl": -2573.06,
+        "expectancy": -10.9028,
+        "win_rate": 0.3517,
+        "profit_factor": 0.5729,
+        "max_drawdown": 2773.38,
+        "t_stat": -3.8228,
+        "p_value": 0.99993404
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-019",
+      "family": "orb_failed_break",
+      "variant": 8,
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 60,
+          "total_pnl": -375.05,
+          "expectancy": -6.2508,
+          "win_rate": 0.35,
+          "profit_factor": 0.8004,
+          "max_drawdown": 711.7,
+          "t_stat": -0.777,
+          "p_value": 0.78142457
+        },
+        {
+          "trades": 68,
+          "total_pnl": -436.14,
+          "expectancy": -6.4138,
+          "win_rate": 0.3971,
+          "profit_factor": 0.7294,
+          "max_drawdown": 716.38,
+          "t_stat": -1.1038,
+          "p_value": 0.86516946
+        },
+        {
+          "trades": 76,
+          "total_pnl": -32.23,
+          "expectancy": -0.4241,
+          "win_rate": 0.4605,
+          "profit_factor": 0.9798,
+          "max_drawdown": 502.93,
+          "t_stat": -0.0748,
+          "p_value": 0.52981096
+        }
+      ],
+      "development": {
+        "trades": 204,
+        "total_pnl": -843.42,
+        "expectancy": -4.1344,
+        "win_rate": 0.4069,
+        "profit_factor": 0.8343,
+        "max_drawdown": 1337.76,
+        "t_stat": -1.1165,
+        "p_value": 0.86790167
+      },
+      "development_2x_cost": {
+        "trades": 204,
+        "total_pnl": -1859.34,
+        "expectancy": -9.1144,
+        "win_rate": 0.3922,
+        "profit_factor": 0.6739,
+        "max_drawdown": 2205.87,
+        "t_stat": -2.4614,
+        "p_value": 0.99308041
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-020",
+      "family": "orb_failed_break",
+      "variant": 9,
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 56,
+          "total_pnl": -610.13,
+          "expectancy": -10.8952,
+          "win_rate": 0.3393,
+          "profit_factor": 0.6912,
+          "max_drawdown": 965.79,
+          "t_stat": -1.2079,
+          "p_value": 0.88645011
+        },
+        {
+          "trades": 55,
+          "total_pnl": -416.4,
+          "expectancy": -7.5709,
+          "win_rate": 0.3818,
+          "profit_factor": 0.7102,
+          "max_drawdown": 599.68,
+          "t_stat": -1.0654,
+          "p_value": 0.85664263
+        },
+        {
+          "trades": 68,
+          "total_pnl": -22.39,
+          "expectancy": -0.3293,
+          "win_rate": 0.4706,
+          "profit_factor": 0.9854,
+          "max_drawdown": 545.47,
+          "t_stat": -0.0498,
+          "p_value": 0.51985061
+        }
+      ],
+      "development": {
+        "trades": 179,
+        "total_pnl": -1048.92,
+        "expectancy": -5.8599,
+        "win_rate": 0.4022,
+        "profit_factor": 0.7878,
+        "max_drawdown": 1474.57,
+        "t_stat": -1.3463,
+        "p_value": 0.91090368
+      },
+      "development_2x_cost": {
+        "trades": 179,
+        "total_pnl": -1940.34,
+        "expectancy": -10.8399,
+        "win_rate": 0.3911,
+        "profit_factor": 0.6462,
+        "max_drawdown": 2266.79,
+        "t_stat": -2.4905,
+        "p_value": 0.99362223
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-021",
+      "family": "prior_day_breakout",
+      "variant": 0,
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 207,
+          "total_pnl": -1909.61,
+          "expectancy": -9.2252,
+          "win_rate": 0.314,
+          "profit_factor": 0.4599,
+          "max_drawdown": 1959.77,
+          "t_stat": -5.7115,
+          "p_value": 0.99999999
+        },
+        {
+          "trades": 195,
+          "total_pnl": -1071.1,
+          "expectancy": -5.4928,
+          "win_rate": 0.3897,
+          "profit_factor": 0.6279,
+          "max_drawdown": 1147.63,
+          "t_stat": -3.2196,
+          "p_value": 0.99935808
+        },
+        {
+          "trades": 207,
+          "total_pnl": -1108.36,
+          "expectancy": -5.3544,
+          "win_rate": 0.3816,
+          "profit_factor": 0.6315,
+          "max_drawdown": 1108.58,
+          "t_stat": -3.2574,
+          "p_value": 0.99943779
+        }
+      ],
+      "development": {
+        "trades": 609,
+        "total_pnl": -4089.07,
+        "expectancy": -6.7144,
+        "win_rate": 0.3612,
+        "profit_factor": 0.566,
+        "max_drawdown": 4089.19,
+        "t_stat": -7.0219,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 609,
+        "total_pnl": -7121.89,
+        "expectancy": -11.6944,
+        "win_rate": 0.3547,
+        "profit_factor": 0.3737,
+        "max_drawdown": 7121.89,
+        "t_stat": -12.2299,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-022",
+      "family": "prior_day_breakout",
+      "variant": 1,
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 206,
+          "total_pnl": -1665.88,
+          "expectancy": -8.0868,
+          "win_rate": 0.3641,
+          "profit_factor": 0.6263,
+          "max_drawdown": 1761.04,
+          "t_stat": -3.3195,
+          "p_value": 0.99954914
+        },
+        {
+          "trades": 192,
+          "total_pnl": -661.16,
+          "expectancy": -3.4435,
+          "win_rate": 0.4479,
+          "profit_factor": 0.7966,
+          "max_drawdown": 836.23,
+          "t_stat": -1.4724,
+          "p_value": 0.92954902
+        },
+        {
+          "trades": 207,
+          "total_pnl": -1344.61,
+          "expectancy": -6.4957,
+          "win_rate": 0.3865,
+          "profit_factor": 0.6574,
+          "max_drawdown": 1384.83,
+          "t_stat": -2.8531,
+          "p_value": 0.99783497
+        }
+      ],
+      "development": {
+        "trades": 605,
+        "total_pnl": -3671.65,
+        "expectancy": -6.0688,
+        "win_rate": 0.3983,
+        "profit_factor": 0.6844,
+        "max_drawdown": 3686.77,
+        "t_stat": -4.4672,
+        "p_value": 0.99999604
+      },
+      "development_2x_cost": {
+        "trades": 605,
+        "total_pnl": -6684.55,
+        "expectancy": -11.0488,
+        "win_rate": 0.3785,
+        "profit_factor": 0.5042,
+        "max_drawdown": 6684.55,
+        "t_stat": -8.1329,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-023",
+      "family": "prior_day_breakout",
+      "variant": 2,
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 205,
+          "total_pnl": -2050.9,
+          "expectancy": -10.0044,
+          "win_rate": 0.3756,
+          "profit_factor": 0.6114,
+          "max_drawdown": 2160.94,
+          "t_stat": -3.3345,
+          "p_value": 0.99957278
+        },
+        {
+          "trades": 192,
+          "total_pnl": -811.16,
+          "expectancy": -4.2248,
+          "win_rate": 0.4635,
+          "profit_factor": 0.7736,
+          "max_drawdown": 929.68,
+          "t_stat": -1.5628,
+          "p_value": 0.9409542
+        },
+        {
+          "trades": 206,
+          "total_pnl": -1453.38,
+          "expectancy": -7.0552,
+          "win_rate": 0.4223,
+          "profit_factor": 0.6718,
+          "max_drawdown": 1503.44,
+          "t_stat": -2.5678,
+          "p_value": 0.99488249
+        }
+      ],
+      "development": {
+        "trades": 603,
+        "total_pnl": -4315.44,
+        "expectancy": -7.1566,
+        "win_rate": 0.4196,
+        "profit_factor": 0.6753,
+        "max_drawdown": 4315.44,
+        "t_stat": -4.3858,
+        "p_value": 0.99999422
+      },
+      "development_2x_cost": {
+        "trades": 603,
+        "total_pnl": -7318.38,
+        "expectancy": -12.1366,
+        "win_rate": 0.3814,
+        "profit_factor": 0.5155,
+        "max_drawdown": 7318.38,
+        "t_stat": -7.4378,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-024",
+      "family": "prior_day_breakout",
+      "variant": 3,
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 204,
+          "total_pnl": -1795.92,
+          "expectancy": -8.8035,
+          "win_rate": 0.4118,
+          "profit_factor": 0.6755,
+          "max_drawdown": 1929.73,
+          "t_stat": -2.5421,
+          "p_value": 0.99449131
+        },
+        {
+          "trades": 191,
+          "total_pnl": -451.18,
+          "expectancy": -2.3622,
+          "win_rate": 0.4764,
+          "profit_factor": 0.8682,
+          "max_drawdown": 829.47,
+          "t_stat": -0.8132,
+          "p_value": 0.79194159
+        },
+        {
+          "trades": 201,
+          "total_pnl": -1382.23,
+          "expectancy": -6.8768,
+          "win_rate": 0.4328,
+          "profit_factor": 0.6971,
+          "max_drawdown": 1432.29,
+          "t_stat": -2.1989,
+          "p_value": 0.98605911
+        }
+      ],
+      "development": {
+        "trades": 596,
+        "total_pnl": -3629.33,
+        "expectancy": -6.0895,
+        "win_rate": 0.4396,
+        "profit_factor": 0.7316,
+        "max_drawdown": 3699.35,
+        "t_stat": -3.3099,
+        "p_value": 0.99953337
+      },
+      "development_2x_cost": {
+        "trades": 596,
+        "total_pnl": -6597.41,
+        "expectancy": -11.0695,
+        "win_rate": 0.3977,
+        "profit_factor": 0.5674,
+        "max_drawdown": 6662.45,
+        "t_stat": -6.0168,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-025",
+      "family": "prior_day_breakout",
+      "variant": 4,
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 202,
+          "total_pnl": -1510.96,
+          "expectancy": -7.48,
+          "win_rate": 0.4406,
+          "profit_factor": 0.7334,
+          "max_drawdown": 1683.43,
+          "t_stat": -1.9362,
+          "p_value": 0.97358114
+        },
+        {
+          "trades": 189,
+          "total_pnl": -719.97,
+          "expectancy": -3.8094,
+          "win_rate": 0.4709,
+          "profit_factor": 0.8023,
+          "max_drawdown": 920.46,
+          "t_stat": -1.2396,
+          "p_value": 0.89243028
+        },
+        {
+          "trades": 199,
+          "total_pnl": -1406.02,
+          "expectancy": -7.0654,
+          "win_rate": 0.4422,
+          "profit_factor": 0.706,
+          "max_drawdown": 1456.08,
+          "t_stat": -2.0654,
+          "p_value": 0.9805591
+        }
+      ],
+      "development": {
+        "trades": 590,
+        "total_pnl": -3636.95,
+        "expectancy": -6.1643,
+        "win_rate": 0.4508,
+        "profit_factor": 0.7419,
+        "max_drawdown": 3730.63,
+        "t_stat": -3.0666,
+        "p_value": 0.99891758
+      },
+      "development_2x_cost": {
+        "trades": 590,
+        "total_pnl": -6575.15,
+        "expectancy": -11.1443,
+        "win_rate": 0.4102,
+        "profit_factor": 0.583,
+        "max_drawdown": 6655.19,
+        "t_stat": -5.5441,
+        "p_value": 0.99999999
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-026",
+      "family": "prior_day_breakout",
+      "variant": 5,
+      "threshold": 0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 174,
+          "total_pnl": -1389.02,
+          "expectancy": -7.9829,
+          "win_rate": 0.2816,
+          "profit_factor": 0.5527,
+          "max_drawdown": 1389.02,
+          "t_stat": -3.8951,
+          "p_value": 0.99995092
+        },
+        {
+          "trades": 175,
+          "total_pnl": -936.5,
+          "expectancy": -5.3514,
+          "win_rate": 0.3371,
+          "profit_factor": 0.6576,
+          "max_drawdown": 1026.86,
+          "t_stat": -2.6714,
+          "p_value": 0.99622311
+        },
+        {
+          "trades": 183,
+          "total_pnl": -883.84,
+          "expectancy": -4.8297,
+          "win_rate": 0.3607,
+          "profit_factor": 0.6883,
+          "max_drawdown": 1195.41,
+          "t_stat": -2.4315,
+          "p_value": 0.99248215
+        }
+      ],
+      "development": {
+        "trades": 532,
+        "total_pnl": -3209.36,
+        "expectancy": -6.0326,
+        "win_rate": 0.3271,
+        "profit_factor": 0.6301,
+        "max_drawdown": 3334.5,
+        "t_stat": -5.1942,
+        "p_value": 0.9999999
+      },
+      "development_2x_cost": {
+        "trades": 532,
+        "total_pnl": -5858.72,
+        "expectancy": -11.0126,
+        "win_rate": 0.312,
+        "profit_factor": 0.4408,
+        "max_drawdown": 5949.0,
+        "t_stat": -9.4821,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-027",
+      "family": "prior_day_breakout",
+      "variant": 6,
+      "threshold": 1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 173,
+          "total_pnl": -1376.54,
+          "expectancy": -7.9569,
+          "win_rate": 0.341,
+          "profit_factor": 0.6455,
+          "max_drawdown": 1376.54,
+          "t_stat": -2.7514,
+          "p_value": 0.99703315
+        },
+        {
+          "trades": 171,
+          "total_pnl": -452.83,
+          "expectancy": -2.6481,
+          "win_rate": 0.4035,
+          "profit_factor": 0.8495,
+          "max_drawdown": 935.18,
+          "t_stat": -0.961,
+          "p_value": 0.83173605
+        },
+        {
+          "trades": 183,
+          "total_pnl": -1105.09,
+          "expectancy": -6.0387,
+          "win_rate": 0.388,
+          "profit_factor": 0.6866,
+          "max_drawdown": 1409.36,
+          "t_stat": -2.3074,
+          "p_value": 0.98948489
+        }
+      ],
+      "development": {
+        "trades": 527,
+        "total_pnl": -2934.46,
+        "expectancy": -5.5682,
+        "win_rate": 0.3776,
+        "profit_factor": 0.7183,
+        "max_drawdown": 3091.07,
+        "t_stat": -3.5036,
+        "p_value": 0.99977049
+      },
+      "development_2x_cost": {
+        "trades": 527,
+        "total_pnl": -5558.92,
+        "expectancy": -10.5482,
+        "win_rate": 0.3454,
+        "profit_factor": 0.5406,
+        "max_drawdown": 5639.2,
+        "t_stat": -6.6371,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-028",
+      "family": "prior_day_breakout",
+      "variant": 7,
+      "threshold": 2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 171,
+          "total_pnl": -1455.33,
+          "expectancy": -8.5107,
+          "win_rate": 0.3743,
+          "profit_factor": 0.6668,
+          "max_drawdown": 1634.66,
+          "t_stat": -2.4375,
+          "p_value": 0.99260534
+        },
+        {
+          "trades": 171,
+          "total_pnl": -806.58,
+          "expectancy": -4.7168,
+          "win_rate": 0.4269,
+          "profit_factor": 0.7559,
+          "max_drawdown": 1127.08,
+          "t_stat": -1.5775,
+          "p_value": 0.94266007
+        },
+        {
+          "trades": 183,
+          "total_pnl": -1020.09,
+          "expectancy": -5.5743,
+          "win_rate": 0.4372,
+          "profit_factor": 0.7302,
+          "max_drawdown": 1299.24,
+          "t_stat": -1.8212,
+          "p_value": 0.96570864
+        }
+      ],
+      "development": {
+        "trades": 525,
+        "total_pnl": -3282.0,
+        "expectancy": -6.2514,
+        "win_rate": 0.4133,
+        "profit_factor": 0.7134,
+        "max_drawdown": 3517.72,
+        "t_stat": -3.4043,
+        "p_value": 0.99966829
+      },
+      "development_2x_cost": {
+        "trades": 525,
+        "total_pnl": -5896.5,
+        "expectancy": -11.2314,
+        "win_rate": 0.3695,
+        "profit_factor": 0.5484,
+        "max_drawdown": 6009.28,
+        "t_stat": -6.1162,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-029",
+      "family": "prior_day_breakout",
+      "variant": 8,
+      "threshold": 4,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 169,
+          "total_pnl": -1154.12,
+          "expectancy": -6.8291,
+          "win_rate": 0.4201,
+          "profit_factor": 0.7469,
+          "max_drawdown": 1644.7,
+          "t_stat": -1.6756,
+          "p_value": 0.95309574
+        },
+        {
+          "trades": 169,
+          "total_pnl": -1139.12,
+          "expectancy": -6.7404,
+          "win_rate": 0.432,
+          "profit_factor": 0.6796,
+          "max_drawdown": 1440.85,
+          "t_stat": -2.1042,
+          "p_value": 0.98231786
+        },
+        {
+          "trades": 176,
+          "total_pnl": -1217.73,
+          "expectancy": -6.9189,
+          "win_rate": 0.4432,
+          "profit_factor": 0.6979,
+          "max_drawdown": 1543.03,
+          "t_stat": -1.9786,
+          "p_value": 0.97607171
+        }
+      ],
+      "development": {
+        "trades": 514,
+        "total_pnl": -3510.97,
+        "expectancy": -6.8307,
+        "win_rate": 0.4319,
+        "profit_factor": 0.7109,
+        "max_drawdown": 4111.59,
+        "t_stat": -3.2858,
+        "p_value": 0.9994915
+      },
+      "development_2x_cost": {
+        "trades": 514,
+        "total_pnl": -6070.69,
+        "expectancy": -11.8107,
+        "win_rate": 0.3833,
+        "profit_factor": 0.5563,
+        "max_drawdown": 6516.93,
+        "t_stat": -5.6813,
+        "p_value": 0.99999999
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-030",
+      "family": "prior_day_breakout",
+      "variant": 9,
+      "threshold": 6,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 169,
+          "total_pnl": -1192.87,
+          "expectancy": -7.0584,
+          "win_rate": 0.4497,
+          "profit_factor": 0.7543,
+          "max_drawdown": 1803.43,
+          "t_stat": -1.5724,
+          "p_value": 0.94207092
+        },
+        {
+          "trades": 165,
+          "total_pnl": -845.45,
+          "expectancy": -5.1239,
+          "win_rate": 0.4545,
+          "profit_factor": 0.7436,
+          "max_drawdown": 1227.18,
+          "t_stat": -1.5333,
+          "p_value": 0.93739678
+        },
+        {
+          "trades": 174,
+          "total_pnl": -1156.52,
+          "expectancy": -6.6467,
+          "win_rate": 0.4483,
+          "profit_factor": 0.7205,
+          "max_drawdown": 1511.82,
+          "t_stat": -1.7492,
+          "p_value": 0.9598727
+        }
+      ],
+      "development": {
+        "trades": 508,
+        "total_pnl": -3194.84,
+        "expectancy": -6.2891,
+        "win_rate": 0.4508,
+        "profit_factor": 0.7401,
+        "max_drawdown": 4007.94,
+        "t_stat": -2.7894,
+        "p_value": 0.99735933
+      },
+      "development_2x_cost": {
+        "trades": 508,
+        "total_pnl": -5724.68,
+        "expectancy": -11.2691,
+        "win_rate": 0.4016,
+        "profit_factor": 0.584,
+        "max_drawdown": 6388.38,
+        "t_stat": -4.9981,
+        "p_value": 0.99999971
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-031",
+      "family": "prior_day_reclaim",
+      "variant": 0,
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 125,
+          "total_pnl": -882.5,
+          "expectancy": -7.06,
+          "win_rate": 0.36,
+          "profit_factor": 0.5584,
+          "max_drawdown": 932.86,
+          "t_stat": -3.2881,
+          "p_value": 0.99949562
+        },
+        {
+          "trades": 118,
+          "total_pnl": -437.64,
+          "expectancy": -3.7088,
+          "win_rate": 0.4237,
+          "profit_factor": 0.7345,
+          "max_drawdown": 633.52,
+          "t_stat": -1.6553,
+          "p_value": 0.95106678
+        },
+        {
+          "trades": 119,
+          "total_pnl": -665.12,
+          "expectancy": -5.5892,
+          "win_rate": 0.395,
+          "profit_factor": 0.618,
+          "max_drawdown": 729.31,
+          "t_stat": -2.5796,
+          "p_value": 0.99505441
+        }
+      ],
+      "development": {
+        "trades": 362,
+        "total_pnl": -1985.26,
+        "expectancy": -5.4841,
+        "win_rate": 0.3923,
+        "profit_factor": 0.6315,
+        "max_drawdown": 2010.32,
+        "t_stat": -4.3535,
+        "p_value": 0.9999933
+      },
+      "development_2x_cost": {
+        "trades": 362,
+        "total_pnl": -3788.02,
+        "expectancy": -10.4641,
+        "win_rate": 0.3867,
+        "profit_factor": 0.4167,
+        "max_drawdown": 3798.14,
+        "t_stat": -8.3068,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-032",
+      "family": "prior_day_reclaim",
+      "variant": 1,
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 123,
+          "total_pnl": -850.04,
+          "expectancy": -6.9109,
+          "win_rate": 0.3821,
+          "profit_factor": 0.6758,
+          "max_drawdown": 1090.16,
+          "t_stat": -2.1489,
+          "p_value": 0.98417696
+        },
+        {
+          "trades": 116,
+          "total_pnl": -706.43,
+          "expectancy": -6.0899,
+          "win_rate": 0.3879,
+          "profit_factor": 0.6801,
+          "max_drawdown": 905.94,
+          "t_stat": -1.9757,
+          "p_value": 0.97590441
+        },
+        {
+          "trades": 116,
+          "total_pnl": -492.68,
+          "expectancy": -4.2472,
+          "win_rate": 0.4224,
+          "profit_factor": 0.7659,
+          "max_drawdown": 616.87,
+          "t_stat": -1.3617,
+          "p_value": 0.91335744
+        }
+      ],
+      "development": {
+        "trades": 355,
+        "total_pnl": -2049.15,
+        "expectancy": -5.7723,
+        "win_rate": 0.3972,
+        "profit_factor": 0.7046,
+        "max_drawdown": 2254.29,
+        "t_stat": -3.1873,
+        "p_value": 0.99928191
+      },
+      "development_2x_cost": {
+        "trades": 355,
+        "total_pnl": -3817.05,
+        "expectancy": -10.7523,
+        "win_rate": 0.3887,
+        "profit_factor": 0.5238,
+        "max_drawdown": 3987.33,
+        "t_stat": -5.9371,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-033",
+      "family": "prior_day_reclaim",
+      "variant": 2,
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 119,
+          "total_pnl": -711.37,
+          "expectancy": -5.9779,
+          "win_rate": 0.395,
+          "profit_factor": 0.767,
+          "max_drawdown": 930.44,
+          "t_stat": -1.3983,
+          "p_value": 0.91898904
+        },
+        {
+          "trades": 103,
+          "total_pnl": -432.94,
+          "expectancy": -4.2033,
+          "win_rate": 0.4175,
+          "profit_factor": 0.7989,
+          "max_drawdown": 673.24,
+          "t_stat": -1.0354,
+          "p_value": 0.84975735
+        },
+        {
+          "trades": 108,
+          "total_pnl": 52.16,
+          "expectancy": 0.483,
+          "win_rate": 0.4722,
+          "profit_factor": 1.0253,
+          "max_drawdown": 358.07,
+          "t_stat": 0.1189,
+          "p_value": 0.45269416
+        }
+      ],
+      "development": {
+        "trades": 330,
+        "total_pnl": -1092.15,
+        "expectancy": -3.3095,
+        "win_rate": 0.4273,
+        "profit_factor": 0.8497,
+        "max_drawdown": 1614.82,
+        "t_stat": -1.3815,
+        "p_value": 0.9164396
+      },
+      "development_2x_cost": {
+        "trades": 330,
+        "total_pnl": -2735.55,
+        "expectancy": -8.2895,
+        "win_rate": 0.4152,
+        "profit_factor": 0.6675,
+        "max_drawdown": 3004.45,
+        "t_stat": -3.4603,
+        "p_value": 0.99973025
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-034",
+      "family": "prior_day_reclaim",
+      "variant": 3,
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 114,
+          "total_pnl": -485.22,
+          "expectancy": -4.2563,
+          "win_rate": 0.4298,
+          "profit_factor": 0.8533,
+          "max_drawdown": 625.26,
+          "t_stat": -0.8059,
+          "p_value": 0.78985725
+        },
+        {
+          "trades": 94,
+          "total_pnl": -188.12,
+          "expectancy": -2.0013,
+          "win_rate": 0.4574,
+          "profit_factor": 0.9073,
+          "max_drawdown": 449.77,
+          "t_stat": -0.4127,
+          "p_value": 0.66010143
+        },
+        {
+          "trades": 96,
+          "total_pnl": -294.33,
+          "expectancy": -3.0659,
+          "win_rate": 0.4583,
+          "profit_factor": 0.8633,
+          "max_drawdown": 613.76,
+          "t_stat": -0.6266,
+          "p_value": 0.73453637
+        }
+      ],
+      "development": {
+        "trades": 304,
+        "total_pnl": -967.67,
+        "expectancy": -3.1831,
+        "win_rate": 0.4474,
+        "profit_factor": 0.8708,
+        "max_drawdown": 1268.07,
+        "t_stat": -1.0915,
+        "p_value": 0.86246458
+      },
+      "development_2x_cost": {
+        "trades": 304,
+        "total_pnl": -2481.59,
+        "expectancy": -8.1631,
+        "win_rate": 0.4211,
+        "profit_factor": 0.7031,
+        "max_drawdown": 2746.83,
+        "t_stat": -2.799,
+        "p_value": 0.99743732
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-035",
+      "family": "prior_day_reclaim",
+      "variant": 4,
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 110,
+          "total_pnl": -610.3,
+          "expectancy": -5.5482,
+          "win_rate": 0.4182,
+          "profit_factor": 0.8229,
+          "max_drawdown": 832.91,
+          "t_stat": -0.944,
+          "p_value": 0.82742166
+        },
+        {
+          "trades": 78,
+          "total_pnl": -169.69,
+          "expectancy": -2.1755,
+          "win_rate": 0.4487,
+          "profit_factor": 0.9068,
+          "max_drawdown": 391.8,
+          "t_stat": -0.3677,
+          "p_value": 0.6434531
+        },
+        {
+          "trades": 81,
+          "total_pnl": -105.88,
+          "expectancy": -1.3072,
+          "win_rate": 0.4938,
+          "profit_factor": 0.9446,
+          "max_drawdown": 453.15,
+          "t_stat": -0.2181,
+          "p_value": 0.58632332
+        }
+      ],
+      "development": {
+        "trades": 269,
+        "total_pnl": -885.87,
+        "expectancy": -3.2932,
+        "win_rate": 0.4498,
+        "profit_factor": 0.8766,
+        "max_drawdown": 1256.71,
+        "t_stat": -0.9545,
+        "p_value": 0.83008915
+      },
+      "development_2x_cost": {
+        "trades": 269,
+        "total_pnl": -2225.49,
+        "expectancy": -8.2732,
+        "win_rate": 0.4275,
+        "profit_factor": 0.7195,
+        "max_drawdown": 2514.48,
+        "t_stat": -2.3979,
+        "p_value": 0.99175638
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-036",
+      "family": "prior_day_reclaim",
+      "variant": 5,
+      "threshold": 1,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 61,
+          "total_pnl": -743.78,
+          "expectancy": -12.1931,
+          "win_rate": 0.2131,
+          "profit_factor": 0.3797,
+          "max_drawdown": 743.78,
+          "t_stat": -3.8439,
+          "p_value": 0.99993946
+        },
+        {
+          "trades": 58,
+          "total_pnl": 72.41,
+          "expectancy": 1.2484,
+          "win_rate": 0.4655,
+          "profit_factor": 1.0966,
+          "max_drawdown": 154.86,
+          "t_stat": 0.334,
+          "p_value": 0.36919654
+        },
+        {
+          "trades": 67,
+          "total_pnl": -413.66,
+          "expectancy": -6.174,
+          "win_rate": 0.3284,
+          "profit_factor": 0.6258,
+          "max_drawdown": 458.96,
+          "t_stat": -1.8665,
+          "p_value": 0.96901593
+        }
+      ],
+      "development": {
+        "trades": 186,
+        "total_pnl": -1085.03,
+        "expectancy": -5.8335,
+        "win_rate": 0.3333,
+        "profit_factor": 0.6447,
+        "max_drawdown": 1085.03,
+        "t_stat": -2.9258,
+        "p_value": 0.99828224
+      },
+      "development_2x_cost": {
+        "trades": 186,
+        "total_pnl": -2011.31,
+        "expectancy": -10.8135,
+        "win_rate": 0.328,
+        "profit_factor": 0.4529,
+        "max_drawdown": 2011.31,
+        "t_stat": -5.4236,
+        "p_value": 0.99999997
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-037",
+      "family": "prior_day_reclaim",
+      "variant": 6,
+      "threshold": 2,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 60,
+          "total_pnl": -658.8,
+          "expectancy": -10.98,
+          "win_rate": 0.2667,
+          "profit_factor": 0.572,
+          "max_drawdown": 784.14,
+          "t_stat": -2.1191,
+          "p_value": 0.98295885
+        },
+        {
+          "trades": 56,
+          "total_pnl": 179.87,
+          "expectancy": 3.212,
+          "win_rate": 0.4821,
+          "profit_factor": 1.2025,
+          "max_drawdown": 181.11,
+          "t_stat": 0.6165,
+          "p_value": 0.26878877
+        },
+        {
+          "trades": 65,
+          "total_pnl": -111.2,
+          "expectancy": -1.7108,
+          "win_rate": 0.4154,
+          "profit_factor": 0.9106,
+          "max_drawdown": 284.08,
+          "t_stat": -0.3488,
+          "p_value": 0.63639485
+        }
+      ],
+      "development": {
+        "trades": 181,
+        "total_pnl": -590.13,
+        "expectancy": -3.2604,
+        "win_rate": 0.3867,
+        "profit_factor": 0.8393,
+        "max_drawdown": 821.36,
+        "t_stat": -1.1028,
+        "p_value": 0.8649397
+      },
+      "development_2x_cost": {
+        "trades": 181,
+        "total_pnl": -1491.51,
+        "expectancy": -8.2404,
+        "win_rate": 0.3757,
+        "profit_factor": 0.6477,
+        "max_drawdown": 1551.95,
+        "t_stat": -2.7872,
+        "p_value": 0.99734178
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-038",
+      "family": "prior_day_reclaim",
+      "variant": 7,
+      "threshold": 4,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 56,
+          "total_pnl": -441.38,
+          "expectancy": -7.8818,
+          "win_rate": 0.3214,
+          "profit_factor": 0.7212,
+          "max_drawdown": 544.2,
+          "t_stat": -1.1409,
+          "p_value": 0.87304558
+        },
+        {
+          "trades": 48,
+          "total_pnl": 447.21,
+          "expectancy": 9.3169,
+          "win_rate": 0.5,
+          "profit_factor": 1.5241,
+          "max_drawdown": 291.05,
+          "t_stat": 1.2666,
+          "p_value": 0.1026412
+        },
+        {
+          "trades": 60,
+          "total_pnl": -463.8,
+          "expectancy": -7.73,
+          "win_rate": 0.3833,
+          "profit_factor": 0.6758,
+          "max_drawdown": 506.5,
+          "t_stat": -1.3418,
+          "p_value": 0.91017758
+        }
+      ],
+      "development": {
+        "trades": 164,
+        "total_pnl": -457.97,
+        "expectancy": -2.7925,
+        "win_rate": 0.3963,
+        "profit_factor": 0.8816,
+        "max_drawdown": 754.85,
+        "t_stat": -0.7251,
+        "p_value": 0.76580416
+      },
+      "development_2x_cost": {
+        "trades": 164,
+        "total_pnl": -1274.69,
+        "expectancy": -7.7725,
+        "win_rate": 0.378,
+        "profit_factor": 0.7085,
+        "max_drawdown": 1317.91,
+        "t_stat": -2.0182,
+        "p_value": 0.97821485
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-039",
+      "family": "prior_day_reclaim",
+      "variant": 8,
+      "threshold": 6,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 52,
+          "total_pnl": -223.96,
+          "expectancy": -4.3069,
+          "win_rate": 0.3846,
+          "profit_factor": 0.8594,
+          "max_drawdown": 527.1,
+          "t_stat": -0.4979,
+          "p_value": 0.6907179
+        },
+        {
+          "trades": 44,
+          "total_pnl": 272.13,
+          "expectancy": 6.1848,
+          "win_rate": 0.4773,
+          "profit_factor": 1.3139,
+          "max_drawdown": 303.57,
+          "t_stat": 0.7251,
+          "p_value": 0.23418459
+        },
+        {
+          "trades": 54,
+          "total_pnl": -518.92,
+          "expectancy": -9.6096,
+          "win_rate": 0.4259,
+          "profit_factor": 0.636,
+          "max_drawdown": 600.35,
+          "t_stat": -1.4242,
+          "p_value": 0.92280086
+        }
+      ],
+      "development": {
+        "trades": 150,
+        "total_pnl": -470.75,
+        "expectancy": -3.1383,
+        "win_rate": 0.4267,
+        "profit_factor": 0.8789,
+        "max_drawdown": 854.99,
+        "t_stat": -0.6825,
+        "p_value": 0.75254512
+      },
+      "development_2x_cost": {
+        "trades": 150,
+        "total_pnl": -1217.75,
+        "expectancy": -8.1183,
+        "win_rate": 0.3867,
+        "profit_factor": 0.7189,
+        "max_drawdown": 1434.92,
+        "t_stat": -1.7656,
+        "p_value": 0.96126554
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-040",
+      "family": "prior_day_reclaim",
+      "variant": 9,
+      "threshold": 8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 48,
+          "total_pnl": -1026.54,
+          "expectancy": -21.3863,
+          "win_rate": 0.2917,
+          "profit_factor": 0.4523,
+          "max_drawdown": 1113.03,
+          "t_stat": -2.462,
+          "p_value": 0.99309155
+        },
+        {
+          "trades": 34,
+          "total_pnl": -215.57,
+          "expectancy": -6.3403,
+          "win_rate": 0.3824,
+          "profit_factor": 0.757,
+          "max_drawdown": 357.12,
+          "t_stat": -0.6468,
+          "p_value": 0.74110666
+        },
+        {
+          "trades": 47,
+          "total_pnl": -187.81,
+          "expectancy": -3.996,
+          "win_rate": 0.4894,
+          "profit_factor": 0.8392,
+          "max_drawdown": 370.97,
+          "t_stat": -0.4891,
+          "p_value": 0.68761429
+        }
+      ],
+      "development": {
+        "trades": 129,
+        "total_pnl": -1429.92,
+        "expectancy": -11.0847,
+        "win_rate": 0.3876,
+        "profit_factor": 0.6361,
+        "max_drawdown": 1575.22,
+        "t_stat": -2.1707,
+        "p_value": 0.98502125
+      },
+      "development_2x_cost": {
+        "trades": 129,
+        "total_pnl": -2072.34,
+        "expectancy": -16.0647,
+        "win_rate": 0.3566,
+        "profit_factor": 0.5216,
+        "max_drawdown": 2156.29,
+        "t_stat": -3.1459,
+        "p_value": 0.999172
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-041",
+      "family": "vwap_trend_pullback",
+      "variant": 0,
+      "threshold": 0.0,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 174,
+          "total_pnl": -741.52,
+          "expectancy": -4.2616,
+          "win_rate": 0.4138,
+          "profit_factor": 0.7065,
+          "max_drawdown": 816.9,
+          "t_stat": -2.2904,
+          "p_value": 0.98900068
+        },
+        {
+          "trades": 173,
+          "total_pnl": -752.79,
+          "expectancy": -4.3514,
+          "win_rate": 0.422,
+          "profit_factor": 0.6887,
+          "max_drawdown": 830.73,
+          "t_stat": -2.4026,
+          "p_value": 0.99186104
+        },
+        {
+          "trades": 169,
+          "total_pnl": -851.62,
+          "expectancy": -5.0392,
+          "win_rate": 0.4024,
+          "profit_factor": 0.6482,
+          "max_drawdown": 972.98,
+          "t_stat": -2.7671,
+          "p_value": 0.99717223
+        }
+      ],
+      "development": {
+        "trades": 516,
+        "total_pnl": -2345.93,
+        "expectancy": -4.5464,
+        "win_rate": 0.4128,
+        "profit_factor": 0.6815,
+        "max_drawdown": 2427.03,
+        "t_stat": -4.3075,
+        "p_value": 0.99999174
+      },
+      "development_2x_cost": {
+        "trades": 516,
+        "total_pnl": -4915.61,
+        "expectancy": -9.5264,
+        "win_rate": 0.3953,
+        "profit_factor": 0.4481,
+        "max_drawdown": 4935.65,
+        "t_stat": -9.0258,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-042",
+      "family": "vwap_trend_pullback",
+      "variant": 1,
+      "threshold": 0.1,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 180,
+          "total_pnl": -1290.15,
+          "expectancy": -7.1675,
+          "win_rate": 0.3778,
+          "profit_factor": 0.6596,
+          "max_drawdown": 1290.15,
+          "t_stat": -2.7444,
+          "p_value": 0.99696859
+        },
+        {
+          "trades": 184,
+          "total_pnl": -367.57,
+          "expectancy": -1.9977,
+          "win_rate": 0.4565,
+          "profit_factor": 0.8794,
+          "max_drawdown": 700.48,
+          "t_stat": -0.8135,
+          "p_value": 0.79203516
+        },
+        {
+          "trades": 178,
+          "total_pnl": -366.44,
+          "expectancy": -2.0587,
+          "win_rate": 0.4663,
+          "profit_factor": 0.8731,
+          "max_drawdown": 965.16,
+          "t_stat": -0.839,
+          "p_value": 0.79926846
+        }
+      ],
+      "development": {
+        "trades": 542,
+        "total_pnl": -2024.16,
+        "expectancy": -3.7346,
+        "win_rate": 0.4336,
+        "profit_factor": 0.7919,
+        "max_drawdown": 2594.09,
+        "t_stat": -2.5773,
+        "p_value": 0.9950214
+      },
+      "development_2x_cost": {
+        "trades": 542,
+        "total_pnl": -4723.32,
+        "expectancy": -8.7146,
+        "win_rate": 0.4077,
+        "profit_factor": 0.5821,
+        "max_drawdown": 4999.43,
+        "t_stat": -6.0141,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-043",
+      "family": "vwap_trend_pullback",
+      "variant": 2,
+      "threshold": 0.2,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 190,
+          "total_pnl": -1046.2,
+          "expectancy": -5.5063,
+          "win_rate": 0.4211,
+          "profit_factor": 0.7682,
+          "max_drawdown": 1234.4,
+          "t_stat": -1.7231,
+          "p_value": 0.9575604
+        },
+        {
+          "trades": 192,
+          "total_pnl": -604.91,
+          "expectancy": -3.1506,
+          "win_rate": 0.4583,
+          "profit_factor": 0.8313,
+          "max_drawdown": 914.0,
+          "t_stat": -1.1309,
+          "p_value": 0.87095336
+        },
+        {
+          "trades": 187,
+          "total_pnl": -1397.51,
+          "expectancy": -7.4733,
+          "win_rate": 0.4225,
+          "profit_factor": 0.6452,
+          "max_drawdown": 1408.8,
+          "t_stat": -2.6636,
+          "p_value": 0.99613409
+        }
+      ],
+      "development": {
+        "trades": 569,
+        "total_pnl": -3048.62,
+        "expectancy": -5.3579,
+        "win_rate": 0.4341,
+        "profit_factor": 0.7467,
+        "max_drawdown": 3090.13,
+        "t_stat": -3.1637,
+        "p_value": 0.99922116
+      },
+      "development_2x_cost": {
+        "trades": 569,
+        "total_pnl": -5882.24,
+        "expectancy": -10.3379,
+        "win_rate": 0.3954,
+        "profit_factor": 0.5711,
+        "max_drawdown": 5882.24,
+        "t_stat": -6.1043,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-044",
+      "family": "vwap_trend_pullback",
+      "variant": 3,
+      "threshold": 0.3,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 195,
+          "total_pnl": -762.35,
+          "expectancy": -3.9095,
+          "win_rate": 0.4513,
+          "profit_factor": 0.8432,
+          "max_drawdown": 961.84,
+          "t_stat": -1.0813,
+          "p_value": 0.86021382
+        },
+        {
+          "trades": 198,
+          "total_pnl": -1039.79,
+          "expectancy": -5.2515,
+          "win_rate": 0.4545,
+          "profit_factor": 0.7384,
+          "max_drawdown": 1143.68,
+          "t_stat": -1.8054,
+          "p_value": 0.96449784
+        },
+        {
+          "trades": 200,
+          "total_pnl": -519.75,
+          "expectancy": -2.5988,
+          "win_rate": 0.475,
+          "profit_factor": 0.8696,
+          "max_drawdown": 804.48,
+          "t_stat": -0.8347,
+          "p_value": 0.79805124
+        }
+      ],
+      "development": {
+        "trades": 593,
+        "total_pnl": -2321.89,
+        "expectancy": -3.9155,
+        "win_rate": 0.4604,
+        "profit_factor": 0.819,
+        "max_drawdown": 2466.1,
+        "t_stat": -2.1081,
+        "p_value": 0.98248938
+      },
+      "development_2x_cost": {
+        "trades": 593,
+        "total_pnl": -5275.03,
+        "expectancy": -8.8955,
+        "win_rate": 0.4233,
+        "profit_factor": 0.636,
+        "max_drawdown": 5304.7,
+        "t_stat": -4.7894,
+        "p_value": 0.99999916
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-045",
+      "family": "vwap_trend_pullback",
+      "variant": 4,
+      "threshold": 0.5,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 211,
+          "total_pnl": -432.03,
+          "expectancy": -2.0475,
+          "win_rate": 0.4692,
+          "profit_factor": 0.9209,
+          "max_drawdown": 865.55,
+          "t_stat": -0.5239,
+          "p_value": 0.69983726
+        },
+        {
+          "trades": 211,
+          "total_pnl": -1119.53,
+          "expectancy": -5.3058,
+          "win_rate": 0.4455,
+          "profit_factor": 0.735,
+          "max_drawdown": 1209.67,
+          "t_stat": -1.839,
+          "p_value": 0.96704202
+        },
+        {
+          "trades": 214,
+          "total_pnl": -214.47,
+          "expectancy": -1.0022,
+          "win_rate": 0.486,
+          "profit_factor": 0.9507,
+          "max_drawdown": 1180.26,
+          "t_stat": -0.2997,
+          "p_value": 0.61779809
+        }
+      ],
+      "development": {
+        "trades": 636,
+        "total_pnl": -1766.03,
+        "expectancy": -2.7768,
+        "win_rate": 0.467,
+        "profit_factor": 0.8742,
+        "max_drawdown": 2563.71,
+        "t_stat": -1.414,
+        "p_value": 0.92132139
+      },
+      "development_2x_cost": {
+        "trades": 636,
+        "total_pnl": -4933.31,
+        "expectancy": -7.7568,
+        "win_rate": 0.4277,
+        "profit_factor": 0.6878,
+        "max_drawdown": 5278.49,
+        "t_stat": -3.95,
+        "p_value": 0.99996092
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-046",
+      "family": "vwap_trend_pullback",
+      "variant": 5,
+      "threshold": 0.0,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 43,
+          "total_pnl": -399.14,
+          "expectancy": -9.2823,
+          "win_rate": 0.2558,
+          "profit_factor": 0.4911,
+          "max_drawdown": 549.5,
+          "t_stat": -2.3073,
+          "p_value": 0.98948156
+        },
+        {
+          "trades": 65,
+          "total_pnl": 21.3,
+          "expectancy": 0.3277,
+          "win_rate": 0.4308,
+          "profit_factor": 1.0244,
+          "max_drawdown": 264.48,
+          "t_stat": 0.0928,
+          "p_value": 0.46302246
+        },
+        {
+          "trades": 59,
+          "total_pnl": -612.57,
+          "expectancy": -10.3825,
+          "win_rate": 0.2881,
+          "profit_factor": 0.4161,
+          "max_drawdown": 622.61,
+          "t_stat": -3.2983,
+          "p_value": 0.9995137
+        }
+      ],
+      "development": {
+        "trades": 167,
+        "total_pnl": -990.41,
+        "expectancy": -5.9306,
+        "win_rate": 0.3353,
+        "profit_factor": 0.6341,
+        "max_drawdown": 1060.69,
+        "t_stat": -2.8603,
+        "p_value": 0.99788354
+      },
+      "development_2x_cost": {
+        "trades": 167,
+        "total_pnl": -1822.07,
+        "expectancy": -10.9106,
+        "win_rate": 0.3174,
+        "profit_factor": 0.442,
+        "max_drawdown": 1852.11,
+        "t_stat": -5.2621,
+        "p_value": 0.99999993
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-047",
+      "family": "vwap_trend_pullback",
+      "variant": 6,
+      "threshold": 0.1,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 49,
+          "total_pnl": -264.02,
+          "expectancy": -5.3882,
+          "win_rate": 0.3469,
+          "profit_factor": 0.754,
+          "max_drawdown": 609.44,
+          "t_stat": -0.9324,
+          "p_value": 0.82444354
+        },
+        {
+          "trades": 68,
+          "total_pnl": 43.86,
+          "expectancy": 0.645,
+          "win_rate": 0.4412,
+          "profit_factor": 1.038,
+          "max_drawdown": 274.68,
+          "t_stat": 0.1395,
+          "p_value": 0.44451851
+        },
+        {
+          "trades": 63,
+          "total_pnl": -554.99,
+          "expectancy": -8.8094,
+          "win_rate": 0.3968,
+          "profit_factor": 0.5566,
+          "max_drawdown": 575.03,
+          "t_stat": -2.1465,
+          "p_value": 0.98408531
+        }
+      ],
+      "development": {
+        "trades": 180,
+        "total_pnl": -775.15,
+        "expectancy": -4.3064,
+        "win_rate": 0.4,
+        "profit_factor": 0.7771,
+        "max_drawdown": 990.49,
+        "t_stat": -1.5627,
+        "p_value": 0.94093331
+      },
+      "development_2x_cost": {
+        "trades": 180,
+        "total_pnl": -1671.55,
+        "expectancy": -9.2864,
+        "win_rate": 0.3778,
+        "profit_factor": 0.5845,
+        "max_drawdown": 1802.23,
+        "t_stat": -3.3697,
+        "p_value": 0.99962381
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-048",
+      "family": "vwap_trend_pullback",
+      "variant": 7,
+      "threshold": 0.2,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 58,
+          "total_pnl": 109.91,
+          "expectancy": 1.895,
+          "win_rate": 0.4138,
+          "profit_factor": 1.0823,
+          "max_drawdown": 333.43,
+          "t_stat": 0.2752,
+          "p_value": 0.39156791
+        },
+        {
+          "trades": 72,
+          "total_pnl": -49.81,
+          "expectancy": -0.6918,
+          "win_rate": 0.4583,
+          "profit_factor": 0.9616,
+          "max_drawdown": 253.39,
+          "t_stat": -0.1431,
+          "p_value": 0.55689913
+        },
+        {
+          "trades": 70,
+          "total_pnl": -421.1,
+          "expectancy": -6.0157,
+          "win_rate": 0.4857,
+          "profit_factor": 0.6919,
+          "max_drawdown": 451.14,
+          "t_stat": -1.3382,
+          "p_value": 0.90958145
+        }
+      ],
+      "development": {
+        "trades": 200,
+        "total_pnl": -361.0,
+        "expectancy": -1.805,
+        "win_rate": 0.455,
+        "profit_factor": 0.9097,
+        "max_drawdown": 753.03,
+        "t_stat": -0.5873,
+        "p_value": 0.72150762
+      },
+      "development_2x_cost": {
+        "trades": 200,
+        "total_pnl": -1357.0,
+        "expectancy": -6.785,
+        "win_rate": 0.425,
+        "profit_factor": 0.7019,
+        "max_drawdown": 1605.42,
+        "t_stat": -2.2078,
+        "p_value": 0.9863695
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-049",
+      "family": "vwap_trend_pullback",
+      "variant": 8,
+      "threshold": 0.3,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 61,
+          "total_pnl": -60.03,
+          "expectancy": -0.9841,
+          "win_rate": 0.4098,
+          "profit_factor": 0.9646,
+          "max_drawdown": 577.08,
+          "t_stat": -0.1258,
+          "p_value": 0.55004992
+        },
+        {
+          "trades": 78,
+          "total_pnl": 11.56,
+          "expectancy": 0.1482,
+          "win_rate": 0.4744,
+          "profit_factor": 1.0075,
+          "max_drawdown": 408.09,
+          "t_stat": 0.028,
+          "p_value": 0.48883455
+        },
+        {
+          "trades": 78,
+          "total_pnl": -99.69,
+          "expectancy": -1.2781,
+          "win_rate": 0.5,
+          "profit_factor": 0.9353,
+          "max_drawdown": 433.37,
+          "t_stat": -0.2417,
+          "p_value": 0.59551142
+        }
+      ],
+      "development": {
+        "trades": 217,
+        "total_pnl": -148.16,
+        "expectancy": -0.6828,
+        "win_rate": 0.4654,
+        "profit_factor": 0.969,
+        "max_drawdown": 903.87,
+        "t_stat": -0.1975,
+        "p_value": 0.57826968
+      },
+      "development_2x_cost": {
+        "trades": 217,
+        "total_pnl": -1228.82,
+        "expectancy": -5.6628,
+        "win_rate": 0.4332,
+        "profit_factor": 0.7712,
+        "max_drawdown": 1524.57,
+        "t_stat": -1.6378,
+        "p_value": 0.94926635
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-050",
+      "family": "vwap_trend_pullback",
+      "variant": 9,
+      "threshold": 0.5,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 64,
+          "total_pnl": -231.22,
+          "expectancy": -3.6128,
+          "win_rate": 0.4062,
+          "profit_factor": 0.8863,
+          "max_drawdown": 615.83,
+          "t_stat": -0.4248,
+          "p_value": 0.66451213
+        },
+        {
+          "trades": 95,
+          "total_pnl": -86.85,
+          "expectancy": -0.9142,
+          "win_rate": 0.4842,
+          "profit_factor": 0.9541,
+          "max_drawdown": 259.92,
+          "t_stat": -0.1877,
+          "p_value": 0.57442943
+        },
+        {
+          "trades": 97,
+          "total_pnl": -133.06,
+          "expectancy": -1.3718,
+          "win_rate": 0.5052,
+          "profit_factor": 0.9301,
+          "max_drawdown": 397.67,
+          "t_stat": -0.2799,
+          "p_value": 0.61020443
+        }
+      ],
+      "development": {
+        "trades": 256,
+        "total_pnl": -451.13,
+        "expectancy": -1.7622,
+        "win_rate": 0.4727,
+        "profit_factor": 0.9226,
+        "max_drawdown": 1019.68,
+        "t_stat": -0.5278,
+        "p_value": 0.70119721
+      },
+      "development_2x_cost": {
+        "trades": 256,
+        "total_pnl": -1726.01,
+        "expectancy": -6.7422,
+        "win_rate": 0.4375,
+        "profit_factor": 0.7354,
+        "max_drawdown": 1879.92,
+        "t_stat": -2.0195,
+        "p_value": 0.97828375
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-051",
+      "family": "vwap_deviation_fade",
+      "variant": 0,
+      "threshold": 0.75,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 267,
+          "total_pnl": -1575.91,
+          "expectancy": -5.9023,
+          "win_rate": 0.3858,
+          "profit_factor": 0.613,
+          "max_drawdown": 1701.13,
+          "t_stat": -4.0056,
+          "p_value": 0.99996907
+        },
+        {
+          "trades": 266,
+          "total_pnl": -2037.18,
+          "expectancy": -7.6586,
+          "win_rate": 0.3496,
+          "profit_factor": 0.5078,
+          "max_drawdown": 2062.32,
+          "t_stat": -5.4774,
+          "p_value": 0.99999998
+        },
+        {
+          "trades": 269,
+          "total_pnl": -994.62,
+          "expectancy": -3.6975,
+          "win_rate": 0.4312,
+          "profit_factor": 0.7273,
+          "max_drawdown": 1181.51,
+          "t_stat": -2.5533,
+          "p_value": 0.99466465
+        }
+      ],
+      "development": {
+        "trades": 802,
+        "total_pnl": -4607.71,
+        "expectancy": -5.7453,
+        "win_rate": 0.389,
+        "profit_factor": 0.6114,
+        "max_drawdown": 4898.45,
+        "t_stat": -6.9006,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 802,
+        "total_pnl": -8601.67,
+        "expectancy": -10.7253,
+        "win_rate": 0.3728,
+        "profit_factor": 0.3998,
+        "max_drawdown": 8732.23,
+        "t_stat": -12.882,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-052",
+      "family": "vwap_deviation_fade",
+      "variant": 1,
+      "threshold": 1.0,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 267,
+          "total_pnl": -2347.16,
+          "expectancy": -8.7909,
+          "win_rate": 0.3633,
+          "profit_factor": 0.5951,
+          "max_drawdown": 2347.16,
+          "t_stat": -4.1681,
+          "p_value": 0.99998465
+        },
+        {
+          "trades": 261,
+          "total_pnl": -2569.78,
+          "expectancy": -9.8459,
+          "win_rate": 0.3295,
+          "profit_factor": 0.5034,
+          "max_drawdown": 2627.64,
+          "t_stat": -5.2225,
+          "p_value": 0.99999991
+        },
+        {
+          "trades": 266,
+          "total_pnl": -1794.68,
+          "expectancy": -6.7469,
+          "win_rate": 0.3985,
+          "profit_factor": 0.6497,
+          "max_drawdown": 1975.34,
+          "t_stat": -3.3471,
+          "p_value": 0.99959176
+        }
+      ],
+      "development": {
+        "trades": 794,
+        "total_pnl": -6711.62,
+        "expectancy": -8.4529,
+        "win_rate": 0.364,
+        "profit_factor": 0.583,
+        "max_drawdown": 6877.26,
+        "t_stat": -7.2974,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 794,
+        "total_pnl": -10665.74,
+        "expectancy": -13.4329,
+        "win_rate": 0.3388,
+        "profit_factor": 0.4289,
+        "max_drawdown": 10700.78,
+        "t_stat": -11.5967,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-053",
+      "family": "vwap_deviation_fade",
+      "variant": 2,
+      "threshold": 1.25,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 263,
+          "total_pnl": -2628.49,
+          "expectancy": -9.9943,
+          "win_rate": 0.3612,
+          "profit_factor": 0.6145,
+          "max_drawdown": 2867.56,
+          "t_stat": -3.7518,
+          "p_value": 0.99991222
+        },
+        {
+          "trades": 258,
+          "total_pnl": -2367.34,
+          "expectancy": -9.1757,
+          "win_rate": 0.3605,
+          "profit_factor": 0.5562,
+          "max_drawdown": 2532.19,
+          "t_stat": -4.1499,
+          "p_value": 0.99998337
+        },
+        {
+          "trades": 264,
+          "total_pnl": -1523.47,
+          "expectancy": -5.7707,
+          "win_rate": 0.4318,
+          "profit_factor": 0.7237,
+          "max_drawdown": 2021.16,
+          "t_stat": -2.3621,
+          "p_value": 0.99091529
+        }
+      ],
+      "development": {
+        "trades": 785,
+        "total_pnl": -6519.3,
+        "expectancy": -8.3048,
+        "win_rate": 0.3847,
+        "profit_factor": 0.631,
+        "max_drawdown": 7222.58,
+        "t_stat": -5.8742,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 785,
+        "total_pnl": -10428.6,
+        "expectancy": -13.2848,
+        "win_rate": 0.3452,
+        "profit_factor": 0.4831,
+        "max_drawdown": 10937.66,
+        "t_stat": -9.3966,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-054",
+      "family": "vwap_deviation_fade",
+      "variant": 3,
+      "threshold": 1.5,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 257,
+          "total_pnl": -3127.36,
+          "expectancy": -12.1687,
+          "win_rate": 0.3735,
+          "profit_factor": 0.5922,
+          "max_drawdown": 3317.88,
+          "t_stat": -3.888,
+          "p_value": 0.99994946
+        },
+        {
+          "trades": 250,
+          "total_pnl": -2413.75,
+          "expectancy": -9.655,
+          "win_rate": 0.356,
+          "profit_factor": 0.5476,
+          "max_drawdown": 2540.68,
+          "t_stat": -3.997,
+          "p_value": 0.99996792
+        },
+        {
+          "trades": 256,
+          "total_pnl": -2027.38,
+          "expectancy": -7.9195,
+          "win_rate": 0.4297,
+          "profit_factor": 0.665,
+          "max_drawdown": 2640.38,
+          "t_stat": -2.8311,
+          "p_value": 0.99768061
+        }
+      ],
+      "development": {
+        "trades": 763,
+        "total_pnl": -7568.49,
+        "expectancy": -9.9194,
+        "win_rate": 0.3866,
+        "profit_factor": 0.6028,
+        "max_drawdown": 8321.75,
+        "t_stat": -6.1331,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 763,
+        "total_pnl": -11368.23,
+        "expectancy": -14.8994,
+        "win_rate": 0.3447,
+        "profit_factor": 0.4709,
+        "max_drawdown": 11932.25,
+        "t_stat": -9.2122,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-055",
+      "family": "vwap_deviation_fade",
+      "variant": 4,
+      "threshold": 2.0,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 235,
+          "total_pnl": -2140.3,
+          "expectancy": -9.1077,
+          "win_rate": 0.383,
+          "profit_factor": 0.6956,
+          "max_drawdown": 2285.78,
+          "t_stat": -2.4782,
+          "p_value": 0.9933971
+        },
+        {
+          "trades": 225,
+          "total_pnl": -1253.0,
+          "expectancy": -5.5689,
+          "win_rate": 0.4089,
+          "profit_factor": 0.7163,
+          "max_drawdown": 1374.91,
+          "t_stat": -2.0269,
+          "p_value": 0.97866431
+        },
+        {
+          "trades": 232,
+          "total_pnl": -980.36,
+          "expectancy": -4.2257,
+          "win_rate": 0.4655,
+          "profit_factor": 0.8135,
+          "max_drawdown": 1616.8,
+          "t_stat": -1.3058,
+          "p_value": 0.90418491
+        }
+      ],
+      "development": {
+        "trades": 692,
+        "total_pnl": -4373.66,
+        "expectancy": -6.3203,
+        "win_rate": 0.4191,
+        "profit_factor": 0.7382,
+        "max_drawdown": 4967.02,
+        "t_stat": -3.3645,
+        "p_value": 0.99961658
+      },
+      "development_2x_cost": {
+        "trades": 692,
+        "total_pnl": -7819.82,
+        "expectancy": -11.3003,
+        "win_rate": 0.3786,
+        "profit_factor": 0.5839,
+        "max_drawdown": 8207.39,
+        "t_stat": -6.0155,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-056",
+      "family": "vwap_deviation_fade",
+      "variant": 5,
+      "threshold": 0.75,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 175,
+          "total_pnl": -1436.5,
+          "expectancy": -8.2086,
+          "win_rate": 0.2857,
+          "profit_factor": 0.54,
+          "max_drawdown": 1436.5,
+          "t_stat": -4.0585,
+          "p_value": 0.9999753
+        },
+        {
+          "trades": 186,
+          "total_pnl": -985.03,
+          "expectancy": -5.2959,
+          "win_rate": 0.3333,
+          "profit_factor": 0.655,
+          "max_drawdown": 1046.4,
+          "t_stat": -2.7541,
+          "p_value": 0.99705727
+        },
+        {
+          "trades": 203,
+          "total_pnl": -1687.19,
+          "expectancy": -8.3113,
+          "win_rate": 0.3054,
+          "profit_factor": 0.4967,
+          "max_drawdown": 1712.25,
+          "t_stat": -4.811,
+          "p_value": 0.99999925
+        }
+      ],
+      "development": {
+        "trades": 564,
+        "total_pnl": -4108.72,
+        "expectancy": -7.285,
+        "win_rate": 0.3085,
+        "profit_factor": 0.5596,
+        "max_drawdown": 4108.72,
+        "t_stat": -6.7011,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 564,
+        "total_pnl": -6917.44,
+        "expectancy": -12.265,
+        "win_rate": 0.2961,
+        "profit_factor": 0.3876,
+        "max_drawdown": 6917.44,
+        "t_stat": -11.2819,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-057",
+      "family": "vwap_deviation_fade",
+      "variant": 6,
+      "threshold": 1.0,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 165,
+          "total_pnl": -1951.7,
+          "expectancy": -11.8285,
+          "win_rate": 0.2727,
+          "profit_factor": 0.5196,
+          "max_drawdown": 2051.9,
+          "t_stat": -4.0552,
+          "p_value": 0.99997495
+        },
+        {
+          "trades": 171,
+          "total_pnl": -917.83,
+          "expectancy": -5.3674,
+          "win_rate": 0.3567,
+          "profit_factor": 0.7155,
+          "max_drawdown": 1014.22,
+          "t_stat": -1.9816,
+          "p_value": 0.97623681
+        },
+        {
+          "trades": 191,
+          "total_pnl": -1727.43,
+          "expectancy": -9.0441,
+          "win_rate": 0.3403,
+          "profit_factor": 0.562,
+          "max_drawdown": 1758.05,
+          "t_stat": -3.6427,
+          "p_value": 0.99986511
+        }
+      ],
+      "development": {
+        "trades": 527,
+        "total_pnl": -4596.96,
+        "expectancy": -8.7229,
+        "win_rate": 0.3245,
+        "profit_factor": 0.5908,
+        "max_drawdown": 4697.16,
+        "t_stat": -5.6076,
+        "p_value": 0.99999999
+      },
+      "development_2x_cost": {
+        "trades": 527,
+        "total_pnl": -7221.42,
+        "expectancy": -13.7029,
+        "win_rate": 0.3055,
+        "profit_factor": 0.4457,
+        "max_drawdown": 7271.82,
+        "t_stat": -8.809,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-058",
+      "family": "vwap_deviation_fade",
+      "variant": 7,
+      "threshold": 1.25,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 155,
+          "total_pnl": -2020.65,
+          "expectancy": -13.0365,
+          "win_rate": 0.2903,
+          "profit_factor": 0.5485,
+          "max_drawdown": 2084.64,
+          "t_stat": -3.4535,
+          "p_value": 0.99972334
+        },
+        {
+          "trades": 156,
+          "total_pnl": -1006.88,
+          "expectancy": -6.4544,
+          "win_rate": 0.3718,
+          "profit_factor": 0.6941,
+          "max_drawdown": 1109.72,
+          "t_stat": -1.9693,
+          "p_value": 0.97553952
+        },
+        {
+          "trades": 174,
+          "total_pnl": -1744.02,
+          "expectancy": -10.0231,
+          "win_rate": 0.3678,
+          "profit_factor": 0.5853,
+          "max_drawdown": 1759.04,
+          "t_stat": -3.1175,
+          "p_value": 0.99908799
+        }
+      ],
+      "development": {
+        "trades": 485,
+        "total_pnl": -4771.55,
+        "expectancy": -9.8382,
+        "win_rate": 0.3443,
+        "profit_factor": 0.6015,
+        "max_drawdown": 4835.54,
+        "t_stat": -4.9847,
+        "p_value": 0.99999969
+      },
+      "development_2x_cost": {
+        "trades": 485,
+        "total_pnl": -7186.85,
+        "expectancy": -14.8182,
+        "win_rate": 0.3134,
+        "profit_factor": 0.4715,
+        "max_drawdown": 7191.08,
+        "t_stat": -7.5079,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-059",
+      "family": "vwap_deviation_fade",
+      "variant": 8,
+      "threshold": 1.5,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 142,
+          "total_pnl": -2405.91,
+          "expectancy": -16.943,
+          "win_rate": 0.2958,
+          "profit_factor": 0.4804,
+          "max_drawdown": 2488.95,
+          "t_stat": -3.905,
+          "p_value": 0.99995289
+        },
+        {
+          "trades": 145,
+          "total_pnl": -635.85,
+          "expectancy": -4.3852,
+          "win_rate": 0.4,
+          "profit_factor": 0.7909,
+          "max_drawdown": 778.63,
+          "t_stat": -1.1711,
+          "p_value": 0.87921067
+        },
+        {
+          "trades": 157,
+          "total_pnl": -1091.86,
+          "expectancy": -6.9545,
+          "win_rate": 0.4268,
+          "profit_factor": 0.7062,
+          "max_drawdown": 1167.6,
+          "t_stat": -1.8039,
+          "p_value": 0.9643793
+        }
+      ],
+      "development": {
+        "trades": 444,
+        "total_pnl": -4133.62,
+        "expectancy": -9.31,
+        "win_rate": 0.3761,
+        "profit_factor": 0.637,
+        "max_drawdown": 4267.02,
+        "t_stat": -4.0364,
+        "p_value": 0.99997286
+      },
+      "development_2x_cost": {
+        "trades": 444,
+        "total_pnl": -6344.74,
+        "expectancy": -14.29,
+        "win_rate": 0.3311,
+        "profit_factor": 0.5055,
+        "max_drawdown": 6392.32,
+        "t_stat": -6.1955,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-060",
+      "family": "vwap_deviation_fade",
+      "variant": 9,
+      "threshold": 2.0,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 120,
+          "total_pnl": -2067.6,
+          "expectancy": -17.23,
+          "win_rate": 0.3167,
+          "profit_factor": 0.5072,
+          "max_drawdown": 2097.66,
+          "t_stat": -3.2575,
+          "p_value": 0.99943794
+        },
+        {
+          "trades": 118,
+          "total_pnl": -591.39,
+          "expectancy": -5.0118,
+          "win_rate": 0.3729,
+          "profit_factor": 0.773,
+          "max_drawdown": 1040.8,
+          "t_stat": -1.1123,
+          "p_value": 0.86699462
+        },
+        {
+          "trades": 137,
+          "total_pnl": -824.76,
+          "expectancy": -6.0201,
+          "win_rate": 0.4526,
+          "profit_factor": 0.7418,
+          "max_drawdown": 909.03,
+          "t_stat": -1.4176,
+          "p_value": 0.92184724
+        }
+      ],
+      "development": {
+        "trades": 375,
+        "total_pnl": -3483.75,
+        "expectancy": -9.29,
+        "win_rate": 0.384,
+        "profit_factor": 0.6515,
+        "max_drawdown": 3541.29,
+        "t_stat": -3.433,
+        "p_value": 0.99970156
+      },
+      "development_2x_cost": {
+        "trades": 375,
+        "total_pnl": -5351.25,
+        "expectancy": -14.27,
+        "win_rate": 0.344,
+        "profit_factor": 0.5218,
+        "max_drawdown": 5398.83,
+        "t_stat": -5.2733,
+        "p_value": 0.99999993
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-061",
+      "family": "opening_impulse_continuation",
+      "variant": 0,
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 265,
+          "total_pnl": -1945.95,
+          "expectancy": -7.3432,
+          "win_rate": 0.3472,
+          "profit_factor": 0.5419,
+          "max_drawdown": 2184.25,
+          "t_stat": -5.0321,
+          "p_value": 0.99999976
+        },
+        {
+          "trades": 262,
+          "total_pnl": -1001.01,
+          "expectancy": -3.8206,
+          "win_rate": 0.4237,
+          "profit_factor": 0.7233,
+          "max_drawdown": 1076.07,
+          "t_stat": -2.5828,
+          "p_value": 0.9951001
+        },
+        {
+          "trades": 265,
+          "total_pnl": -1737.2,
+          "expectancy": -6.5555,
+          "win_rate": 0.3736,
+          "profit_factor": 0.5691,
+          "max_drawdown": 1737.36,
+          "t_stat": -4.5563,
+          "p_value": 0.9999974
+        }
+      ],
+      "development": {
+        "trades": 792,
+        "total_pnl": -4684.16,
+        "expectancy": -5.9143,
+        "win_rate": 0.3813,
+        "profit_factor": 0.6063,
+        "max_drawdown": 4759.42,
+        "t_stat": -7.0156,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 792,
+        "total_pnl": -8628.32,
+        "expectancy": -10.8943,
+        "win_rate": 0.3737,
+        "profit_factor": 0.3988,
+        "max_drawdown": 8678.52,
+        "t_stat": -12.9228,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-062",
+      "family": "opening_impulse_continuation",
+      "variant": 1,
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 264,
+          "total_pnl": -2049.72,
+          "expectancy": -7.7641,
+          "win_rate": 0.3712,
+          "profit_factor": 0.6423,
+          "max_drawdown": 2278.83,
+          "t_stat": -3.57,
+          "p_value": 0.9998215
+        },
+        {
+          "trades": 258,
+          "total_pnl": -941.09,
+          "expectancy": -3.6476,
+          "win_rate": 0.4264,
+          "profit_factor": 0.79,
+          "max_drawdown": 961.23,
+          "t_stat": -1.7779,
+          "p_value": 0.9622893
+        },
+        {
+          "trades": 258,
+          "total_pnl": -1279.84,
+          "expectancy": -4.9606,
+          "win_rate": 0.4031,
+          "profit_factor": 0.7338,
+          "max_drawdown": 1284.88,
+          "t_stat": -2.37,
+          "p_value": 0.99110601
+        }
+      ],
+      "development": {
+        "trades": 780,
+        "total_pnl": -4270.65,
+        "expectancy": -5.4752,
+        "win_rate": 0.4,
+        "profit_factor": 0.7156,
+        "max_drawdown": 4270.65,
+        "t_stat": -4.498,
+        "p_value": 0.99999657
+      },
+      "development_2x_cost": {
+        "trades": 780,
+        "total_pnl": -8155.05,
+        "expectancy": -10.4552,
+        "win_rate": 0.3859,
+        "profit_factor": 0.5309,
+        "max_drawdown": 8155.05,
+        "t_stat": -8.5892,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-063",
+      "family": "opening_impulse_continuation",
+      "variant": 2,
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 263,
+          "total_pnl": -2335.99,
+          "expectancy": -8.8821,
+          "win_rate": 0.3916,
+          "profit_factor": 0.6561,
+          "max_drawdown": 2529.87,
+          "t_stat": -3.263,
+          "p_value": 0.99944883
+        },
+        {
+          "trades": 250,
+          "total_pnl": -816.25,
+          "expectancy": -3.265,
+          "win_rate": 0.464,
+          "profit_factor": 0.8289,
+          "max_drawdown": 935.16,
+          "t_stat": -1.3334,
+          "p_value": 0.90880582
+        },
+        {
+          "trades": 238,
+          "total_pnl": -963.99,
+          "expectancy": -4.0504,
+          "win_rate": 0.4454,
+          "profit_factor": 0.8049,
+          "max_drawdown": 1107.88,
+          "t_stat": -1.5241,
+          "p_value": 0.93625333
+        }
+      ],
+      "development": {
+        "trades": 751,
+        "total_pnl": -4116.23,
+        "expectancy": -5.481,
+        "win_rate": 0.4328,
+        "profit_factor": 0.7506,
+        "max_drawdown": 4116.23,
+        "t_stat": -3.626,
+        "p_value": 0.9998561
+      },
+      "development_2x_cost": {
+        "trades": 751,
+        "total_pnl": -7856.21,
+        "expectancy": -10.461,
+        "win_rate": 0.4088,
+        "profit_factor": 0.5793,
+        "max_drawdown": 7856.21,
+        "t_stat": -6.9206,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-064",
+      "family": "opening_impulse_continuation",
+      "variant": 3,
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 257,
+          "total_pnl": -1576.11,
+          "expectancy": -6.1327,
+          "win_rate": 0.428,
+          "profit_factor": 0.7741,
+          "max_drawdown": 2197.43,
+          "t_stat": -1.8843,
+          "p_value": 0.97023653
+        },
+        {
+          "trades": 215,
+          "total_pnl": -161.95,
+          "expectancy": -0.7533,
+          "win_rate": 0.4977,
+          "profit_factor": 0.9585,
+          "max_drawdown": 549.51,
+          "t_stat": -0.2595,
+          "p_value": 0.6023741
+        },
+        {
+          "trades": 207,
+          "total_pnl": -1227.11,
+          "expectancy": -5.9281,
+          "win_rate": 0.43,
+          "profit_factor": 0.758,
+          "max_drawdown": 1369.83,
+          "t_stat": -1.767,
+          "p_value": 0.9613879
+        }
+      ],
+      "development": {
+        "trades": 679,
+        "total_pnl": -2965.17,
+        "expectancy": -4.367,
+        "win_rate": 0.4507,
+        "profit_factor": 0.8142,
+        "max_drawdown": 2995.25,
+        "t_stat": -2.3657,
+        "p_value": 0.99100285
+      },
+      "development_2x_cost": {
+        "trades": 679,
+        "total_pnl": -6346.59,
+        "expectancy": -9.347,
+        "win_rate": 0.4168,
+        "profit_factor": 0.6452,
+        "max_drawdown": 6356.75,
+        "t_stat": -5.0636,
+        "p_value": 0.99999979
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-065",
+      "family": "opening_impulse_continuation",
+      "variant": 4,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 243,
+          "total_pnl": -217.64,
+          "expectancy": -0.8956,
+          "win_rate": 0.4815,
+          "profit_factor": 0.9665,
+          "max_drawdown": 1346.52,
+          "t_stat": -0.237,
+          "p_value": 0.59365602
+        },
+        {
+          "trades": 181,
+          "total_pnl": -600.13,
+          "expectancy": -3.3156,
+          "win_rate": 0.4807,
+          "profit_factor": 0.8464,
+          "max_drawdown": 605.15,
+          "t_stat": -0.9443,
+          "p_value": 0.82748143
+        },
+        {
+          "trades": 169,
+          "total_pnl": -1110.37,
+          "expectancy": -6.5702,
+          "win_rate": 0.4379,
+          "profit_factor": 0.7555,
+          "max_drawdown": 1302.03,
+          "t_stat": -1.587,
+          "p_value": 0.94374469
+        }
+      ],
+      "development": {
+        "trades": 593,
+        "total_pnl": -1928.14,
+        "expectancy": -3.2515,
+        "win_rate": 0.4688,
+        "profit_factor": 0.871,
+        "max_drawdown": 2023.26,
+        "t_stat": -1.464,
+        "p_value": 0.92840327
+      },
+      "development_2x_cost": {
+        "trades": 593,
+        "total_pnl": -4881.28,
+        "expectancy": -8.2315,
+        "win_rate": 0.4418,
+        "profit_factor": 0.7052,
+        "max_drawdown": 4946.52,
+        "t_stat": -3.7063,
+        "p_value": 0.99989483
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-066",
+      "family": "opening_impulse_continuation",
+      "variant": 5,
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 257,
+          "total_pnl": -1366.11,
+          "expectancy": -5.3156,
+          "win_rate": 0.3268,
+          "profit_factor": 0.6809,
+          "max_drawdown": 1391.37,
+          "t_stat": -3.0382,
+          "p_value": 0.99881018
+        },
+        {
+          "trades": 256,
+          "total_pnl": -1163.63,
+          "expectancy": -4.5454,
+          "win_rate": 0.3633,
+          "profit_factor": 0.6981,
+          "max_drawdown": 1257.52,
+          "t_stat": -2.7527,
+          "p_value": 0.99704469
+        },
+        {
+          "trades": 251,
+          "total_pnl": -1254.98,
+          "expectancy": -4.9999,
+          "win_rate": 0.3546,
+          "profit_factor": 0.6833,
+          "max_drawdown": 1426.71,
+          "t_stat": -2.9219,
+          "p_value": 0.99826042
+        }
+      ],
+      "development": {
+        "trades": 764,
+        "total_pnl": -3784.72,
+        "expectancy": -4.9538,
+        "win_rate": 0.3482,
+        "profit_factor": 0.6872,
+        "max_drawdown": 3830.02,
+        "t_stat": -5.0398,
+        "p_value": 0.99999977
+      },
+      "development_2x_cost": {
+        "trades": 764,
+        "total_pnl": -7589.44,
+        "expectancy": -9.9338,
+        "win_rate": 0.3338,
+        "profit_factor": 0.4803,
+        "max_drawdown": 7589.68,
+        "t_stat": -10.1063,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-067",
+      "family": "opening_impulse_continuation",
+      "variant": 6,
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 248,
+          "total_pnl": -260.04,
+          "expectancy": -1.0485,
+          "win_rate": 0.4113,
+          "profit_factor": 0.9472,
+          "max_drawdown": 631.96,
+          "t_stat": -0.4048,
+          "p_value": 0.65717046
+        },
+        {
+          "trades": 243,
+          "total_pnl": -807.64,
+          "expectancy": -3.3236,
+          "win_rate": 0.3909,
+          "profit_factor": 0.8114,
+          "max_drawdown": 1295.85,
+          "t_stat": -1.4576,
+          "p_value": 0.92752324
+        },
+        {
+          "trades": 240,
+          "total_pnl": -896.45,
+          "expectancy": -3.7352,
+          "win_rate": 0.4,
+          "profit_factor": 0.8054,
+          "max_drawdown": 1450.01,
+          "t_stat": -1.5402,
+          "p_value": 0.93824199
+        }
+      ],
+      "development": {
+        "trades": 731,
+        "total_pnl": -1964.13,
+        "expectancy": -2.6869,
+        "win_rate": 0.4008,
+        "profit_factor": 0.8579,
+        "max_drawdown": 2368.85,
+        "t_stat": -1.9107,
+        "p_value": 0.97197967
+      },
+      "development_2x_cost": {
+        "trades": 731,
+        "total_pnl": -5604.51,
+        "expectancy": -7.6669,
+        "win_rate": 0.3776,
+        "profit_factor": 0.6507,
+        "max_drawdown": 5726.96,
+        "t_stat": -5.4521,
+        "p_value": 0.99999998
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-068",
+      "family": "opening_impulse_continuation",
+      "variant": 7,
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 239,
+          "total_pnl": -248.97,
+          "expectancy": -1.0417,
+          "win_rate": 0.4435,
+          "profit_factor": 0.9542,
+          "max_drawdown": 505.55,
+          "t_stat": -0.3298,
+          "p_value": 0.62922727
+        },
+        {
+          "trades": 229,
+          "total_pnl": -990.42,
+          "expectancy": -4.325,
+          "win_rate": 0.4323,
+          "profit_factor": 0.7731,
+          "max_drawdown": 1041.78,
+          "t_stat": -1.6582,
+          "p_value": 0.951366
+        },
+        {
+          "trades": 216,
+          "total_pnl": -129.43,
+          "expectancy": -0.5992,
+          "win_rate": 0.4676,
+          "profit_factor": 0.9703,
+          "max_drawdown": 705.42,
+          "t_stat": -0.1938,
+          "p_value": 0.57682368
+        }
+      ],
+      "development": {
+        "trades": 684,
+        "total_pnl": -1368.82,
+        "expectancy": -2.0012,
+        "win_rate": 0.4474,
+        "profit_factor": 0.9033,
+        "max_drawdown": 1828.24,
+        "t_stat": -1.1692,
+        "p_value": 0.87883775
+      },
+      "development_2x_cost": {
+        "trades": 684,
+        "total_pnl": -4775.14,
+        "expectancy": -6.9812,
+        "win_rate": 0.4152,
+        "profit_factor": 0.7034,
+        "max_drawdown": 4889.92,
+        "t_stat": -4.0788,
+        "p_value": 0.99997736
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-069",
+      "family": "opening_impulse_continuation",
+      "variant": 8,
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 229,
+          "total_pnl": 28.33,
+          "expectancy": 0.1237,
+          "win_rate": 0.4716,
+          "profit_factor": 1.0051,
+          "max_drawdown": 613.94,
+          "t_stat": 0.0338,
+          "p_value": 0.48652573
+        },
+        {
+          "trades": 182,
+          "total_pnl": -488.86,
+          "expectancy": -2.686,
+          "win_rate": 0.4615,
+          "profit_factor": 0.8605,
+          "max_drawdown": 498.98,
+          "t_stat": -0.83,
+          "p_value": 0.79673348
+        },
+        {
+          "trades": 183,
+          "total_pnl": -1175.09,
+          "expectancy": -6.4213,
+          "win_rate": 0.4262,
+          "profit_factor": 0.7363,
+          "max_drawdown": 1414.03,
+          "t_stat": -1.7724,
+          "p_value": 0.96183901
+        }
+      ],
+      "development": {
+        "trades": 594,
+        "total_pnl": -1635.62,
+        "expectancy": -2.7536,
+        "win_rate": 0.4545,
+        "profit_factor": 0.8787,
+        "max_drawdown": 1953.25,
+        "t_stat": -1.3403,
+        "p_value": 0.90992642
+      },
+      "development_2x_cost": {
+        "trades": 594,
+        "total_pnl": -4593.74,
+        "expectancy": -7.7336,
+        "win_rate": 0.4175,
+        "profit_factor": 0.6972,
+        "max_drawdown": 4708.65,
+        "t_stat": -3.7643,
+        "p_value": 0.9999165
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-070",
+      "family": "opening_impulse_continuation",
+      "variant": 9,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 208,
+          "total_pnl": 287.91,
+          "expectancy": 1.3842,
+          "win_rate": 0.4856,
+          "profit_factor": 1.0527,
+          "max_drawdown": 513.18,
+          "t_stat": 0.3151,
+          "p_value": 0.37632891
+        },
+        {
+          "trades": 148,
+          "total_pnl": 92.96,
+          "expectancy": 0.6281,
+          "win_rate": 0.5068,
+          "profit_factor": 1.0344,
+          "max_drawdown": 417.06,
+          "t_stat": 0.1641,
+          "p_value": 0.43482338
+        },
+        {
+          "trades": 146,
+          "total_pnl": -1085.83,
+          "expectancy": -7.4372,
+          "win_rate": 0.3973,
+          "profit_factor": 0.716,
+          "max_drawdown": 1368.18,
+          "t_stat": -1.684,
+          "p_value": 0.95390889
+        }
+      ],
+      "development": {
+        "trades": 502,
+        "total_pnl": -704.96,
+        "expectancy": -1.4043,
+        "win_rate": 0.4661,
+        "profit_factor": 0.9412,
+        "max_drawdown": 1502.89,
+        "t_stat": -0.5621,
+        "p_value": 0.71297301
+      },
+      "development_2x_cost": {
+        "trades": 502,
+        "total_pnl": -3204.92,
+        "expectancy": -6.3843,
+        "win_rate": 0.4343,
+        "profit_factor": 0.7605,
+        "max_drawdown": 3654.86,
+        "t_stat": -2.5554,
+        "p_value": 0.99469675
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-071",
+      "family": "opening_impulse_reversal",
+      "variant": 0,
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 265,
+          "total_pnl": -1400.95,
+          "expectancy": -5.2866,
+          "win_rate": 0.3925,
+          "profit_factor": 0.65,
+          "max_drawdown": 1400.95,
+          "t_stat": -3.5225,
+          "p_value": 0.99978628
+        },
+        {
+          "trades": 262,
+          "total_pnl": -1897.26,
+          "expectancy": -7.2415,
+          "win_rate": 0.3435,
+          "profit_factor": 0.537,
+          "max_drawdown": 1972.36,
+          "t_stat": -5.0211,
+          "p_value": 0.99999974
+        },
+        {
+          "trades": 265,
+          "total_pnl": -1003.45,
+          "expectancy": -3.7866,
+          "win_rate": 0.4264,
+          "profit_factor": 0.726,
+          "max_drawdown": 1308.38,
+          "t_stat": -2.5668,
+          "p_value": 0.99486837
+        }
+      ],
+      "development": {
+        "trades": 792,
+        "total_pnl": -4301.66,
+        "expectancy": -5.4314,
+        "win_rate": 0.3876,
+        "profit_factor": 0.6343,
+        "max_drawdown": 4476.96,
+        "t_stat": -6.3828,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 792,
+        "total_pnl": -8245.82,
+        "expectancy": -10.4114,
+        "win_rate": 0.3813,
+        "profit_factor": 0.4192,
+        "max_drawdown": 8346.42,
+        "t_stat": -12.2351,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-072",
+      "family": "opening_impulse_reversal",
+      "variant": 1,
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 264,
+          "total_pnl": -1423.47,
+          "expectancy": -5.3919,
+          "win_rate": 0.3939,
+          "profit_factor": 0.7338,
+          "max_drawdown": 1423.47,
+          "t_stat": -2.4681,
+          "p_value": 0.99320786
+        },
+        {
+          "trades": 258,
+          "total_pnl": -1667.34,
+          "expectancy": -6.4626,
+          "win_rate": 0.3837,
+          "profit_factor": 0.6539,
+          "max_drawdown": 1757.68,
+          "t_stat": -3.2225,
+          "p_value": 0.99936471
+        },
+        {
+          "trades": 258,
+          "total_pnl": -1366.09,
+          "expectancy": -5.2949,
+          "win_rate": 0.4264,
+          "profit_factor": 0.718,
+          "max_drawdown": 1661.7,
+          "t_stat": -2.5222,
+          "p_value": 0.99416855
+        }
+      ],
+      "development": {
+        "trades": 780,
+        "total_pnl": -4456.9,
+        "expectancy": -5.714,
+        "win_rate": 0.4013,
+        "profit_factor": 0.7031,
+        "max_drawdown": 4628.61,
+        "t_stat": -4.72,
+        "p_value": 0.99999882
+      },
+      "development_2x_cost": {
+        "trades": 780,
+        "total_pnl": -8341.3,
+        "expectancy": -10.694,
+        "win_rate": 0.3718,
+        "profit_factor": 0.5207,
+        "max_drawdown": 8446.42,
+        "t_stat": -8.8336,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-073",
+      "family": "opening_impulse_reversal",
+      "variant": 2,
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 263,
+          "total_pnl": -810.99,
+          "expectancy": -3.0836,
+          "win_rate": 0.4335,
+          "profit_factor": 0.8676,
+          "max_drawdown": 1162.37,
+          "t_stat": -1.0993,
+          "p_value": 0.86417171
+        },
+        {
+          "trades": 250,
+          "total_pnl": -2148.75,
+          "expectancy": -8.595,
+          "win_rate": 0.38,
+          "profit_factor": 0.6102,
+          "max_drawdown": 2220.68,
+          "t_stat": -3.5391,
+          "p_value": 0.99979927
+        },
+        {
+          "trades": 238,
+          "total_pnl": -1393.99,
+          "expectancy": -5.8571,
+          "win_rate": 0.4034,
+          "profit_factor": 0.74,
+          "max_drawdown": 1695.27,
+          "t_stat": -2.1471,
+          "p_value": 0.98410565
+        }
+      ],
+      "development": {
+        "trades": 751,
+        "total_pnl": -4353.73,
+        "expectancy": -5.7972,
+        "win_rate": 0.4061,
+        "profit_factor": 0.7439,
+        "max_drawdown": 4878.07,
+        "t_stat": -3.7684,
+        "p_value": 0.99991784
+      },
+      "development_2x_cost": {
+        "trades": 751,
+        "total_pnl": -8093.71,
+        "expectancy": -10.7772,
+        "win_rate": 0.3822,
+        "profit_factor": 0.5801,
+        "max_drawdown": 8379.34,
+        "t_stat": -7.0055,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-074",
+      "family": "opening_impulse_reversal",
+      "variant": 3,
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 257,
+          "total_pnl": -1239.86,
+          "expectancy": -4.8244,
+          "win_rate": 0.4086,
+          "profit_factor": 0.8162,
+          "max_drawdown": 1944.25,
+          "t_stat": -1.4867,
+          "p_value": 0.93145197
+        },
+        {
+          "trades": 215,
+          "total_pnl": -1713.2,
+          "expectancy": -7.9684,
+          "win_rate": 0.3767,
+          "profit_factor": 0.6405,
+          "max_drawdown": 1833.48,
+          "t_stat": -2.7754,
+          "p_value": 0.99724297
+        },
+        {
+          "trades": 207,
+          "total_pnl": -749.61,
+          "expectancy": -3.6213,
+          "win_rate": 0.4444,
+          "profit_factor": 0.8477,
+          "max_drawdown": 1288.61,
+          "t_stat": -1.0549,
+          "p_value": 0.85425479
+        }
+      ],
+      "development": {
+        "trades": 679,
+        "total_pnl": -3702.67,
+        "expectancy": -5.4531,
+        "win_rate": 0.4094,
+        "profit_factor": 0.7747,
+        "max_drawdown": 4689.92,
+        "t_stat": -2.9465,
+        "p_value": 0.99839312
+      },
+      "development_2x_cost": {
+        "trades": 679,
+        "total_pnl": -7084.09,
+        "expectancy": -10.4331,
+        "win_rate": 0.3814,
+        "profit_factor": 0.6169,
+        "max_drawdown": 7830.89,
+        "t_stat": -5.6374,
+        "p_value": 0.99999999
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-075",
+      "family": "opening_impulse_reversal",
+      "variant": 4,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 243,
+          "total_pnl": -2240.14,
+          "expectancy": -9.2187,
+          "win_rate": 0.3827,
+          "profit_factor": 0.6985,
+          "max_drawdown": 2733.24,
+          "t_stat": -2.5036,
+          "p_value": 0.99385355
+        },
+        {
+          "trades": 181,
+          "total_pnl": -877.63,
+          "expectancy": -4.8488,
+          "win_rate": 0.442,
+          "profit_factor": 0.7824,
+          "max_drawdown": 1217.52,
+          "t_stat": -1.4027,
+          "p_value": 0.91964963
+        },
+        {
+          "trades": 169,
+          "total_pnl": -6.62,
+          "expectancy": -0.0392,
+          "win_rate": 0.4852,
+          "profit_factor": 0.9984,
+          "max_drawdown": 518.54,
+          "t_stat": -0.0092,
+          "p_value": 0.50368659
+        }
+      ],
+      "development": {
+        "trades": 593,
+        "total_pnl": -3124.39,
+        "expectancy": -5.2688,
+        "win_rate": 0.43,
+        "profit_factor": 0.7982,
+        "max_drawdown": 4056.31,
+        "t_stat": -2.3906,
+        "p_value": 0.99159031
+      },
+      "development_2x_cost": {
+        "trades": 593,
+        "total_pnl": -6077.53,
+        "expectancy": -10.2488,
+        "win_rate": 0.4047,
+        "profit_factor": 0.6469,
+        "max_drawdown": 6652.8,
+        "t_stat": -4.6502,
+        "p_value": 0.99999834
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-076",
+      "family": "opening_impulse_reversal",
+      "variant": 5,
+      "threshold": 0.001,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 257,
+          "total_pnl": -1502.36,
+          "expectancy": -5.8458,
+          "win_rate": 0.323,
+          "profit_factor": 0.6497,
+          "max_drawdown": 1580.3,
+          "t_stat": -3.396,
+          "p_value": 0.99965815
+        },
+        {
+          "trades": 256,
+          "total_pnl": -1519.88,
+          "expectancy": -5.937,
+          "win_rate": 0.3242,
+          "profit_factor": 0.6127,
+          "max_drawdown": 1688.04,
+          "t_stat": -3.721,
+          "p_value": 0.99990077
+        },
+        {
+          "trades": 251,
+          "total_pnl": -1259.98,
+          "expectancy": -5.0198,
+          "win_rate": 0.3347,
+          "profit_factor": 0.6852,
+          "max_drawdown": 1309.59,
+          "t_stat": -2.9223,
+          "p_value": 0.99826298
+        }
+      ],
+      "development": {
+        "trades": 764,
+        "total_pnl": -4282.22,
+        "expectancy": -5.605,
+        "win_rate": 0.3272,
+        "profit_factor": 0.6495,
+        "max_drawdown": 4360.16,
+        "t_stat": -5.7893,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 764,
+        "total_pnl": -8086.94,
+        "expectancy": -10.585,
+        "win_rate": 0.3154,
+        "profit_factor": 0.4537,
+        "max_drawdown": 8116.98,
+        "t_stat": -10.933,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-077",
+      "family": "opening_impulse_reversal",
+      "variant": 6,
+      "threshold": 0.0015,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 248,
+          "total_pnl": -1806.29,
+          "expectancy": -7.2834,
+          "win_rate": 0.3266,
+          "profit_factor": 0.6733,
+          "max_drawdown": 1974.07,
+          "t_stat": -2.9607,
+          "p_value": 0.99846511
+        },
+        {
+          "trades": 243,
+          "total_pnl": -957.64,
+          "expectancy": -3.9409,
+          "win_rate": 0.3951,
+          "profit_factor": 0.7697,
+          "max_drawdown": 1242.53,
+          "t_stat": -1.8212,
+          "p_value": 0.96570993
+        },
+        {
+          "trades": 240,
+          "total_pnl": -2208.95,
+          "expectancy": -9.204,
+          "win_rate": 0.3125,
+          "profit_factor": 0.5738,
+          "max_drawdown": 2318.99,
+          "t_stat": -4.0256,
+          "p_value": 0.99997158
+        }
+      ],
+      "development": {
+        "trades": 731,
+        "total_pnl": -4972.88,
+        "expectancy": -6.8028,
+        "win_rate": 0.3447,
+        "profit_factor": 0.6656,
+        "max_drawdown": 5204.37,
+        "t_stat": -5.1003,
+        "p_value": 0.99999983
+      },
+      "development_2x_cost": {
+        "trades": 731,
+        "total_pnl": -8613.26,
+        "expectancy": -11.7828,
+        "win_rate": 0.3311,
+        "profit_factor": 0.5015,
+        "max_drawdown": 8784.99,
+        "t_stat": -8.8339,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-078",
+      "family": "opening_impulse_reversal",
+      "variant": 7,
+      "threshold": 0.002,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 239,
+          "total_pnl": -2582.72,
+          "expectancy": -10.8064,
+          "win_rate": 0.318,
+          "profit_factor": 0.6058,
+          "max_drawdown": 2951.71,
+          "t_stat": -3.5664,
+          "p_value": 0.99981901
+        },
+        {
+          "trades": 229,
+          "total_pnl": -1155.42,
+          "expectancy": -5.0455,
+          "win_rate": 0.4017,
+          "profit_factor": 0.7465,
+          "max_drawdown": 1497.73,
+          "t_stat": -1.9082,
+          "p_value": 0.97181555
+        },
+        {
+          "trades": 216,
+          "total_pnl": -2348.18,
+          "expectancy": -10.8712,
+          "win_rate": 0.3194,
+          "profit_factor": 0.5735,
+          "max_drawdown": 2423.2,
+          "t_stat": -3.6856,
+          "p_value": 0.99988591
+        }
+      ],
+      "development": {
+        "trades": 684,
+        "total_pnl": -6086.32,
+        "expectancy": -8.8981,
+        "win_rate": 0.3465,
+        "profit_factor": 0.6337,
+        "max_drawdown": 6487.77,
+        "t_stat": -5.3414,
+        "p_value": 0.99999995
+      },
+      "development_2x_cost": {
+        "trades": 684,
+        "total_pnl": -9492.64,
+        "expectancy": -13.8781,
+        "win_rate": 0.3289,
+        "profit_factor": 0.497,
+        "max_drawdown": 9844.29,
+        "t_stat": -8.3309,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-079",
+      "family": "opening_impulse_reversal",
+      "variant": 8,
+      "threshold": 0.003,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 229,
+          "total_pnl": -3122.92,
+          "expectancy": -13.6372,
+          "win_rate": 0.3231,
+          "profit_factor": 0.5575,
+          "max_drawdown": 3367.01,
+          "t_stat": -3.9533,
+          "p_value": 0.99996145
+        },
+        {
+          "trades": 182,
+          "total_pnl": -1596.36,
+          "expectancy": -8.7712,
+          "win_rate": 0.3736,
+          "profit_factor": 0.6175,
+          "max_drawdown": 1758.01,
+          "t_stat": -2.7091,
+          "p_value": 0.99662642
+        },
+        {
+          "trades": 183,
+          "total_pnl": -1392.59,
+          "expectancy": -7.6098,
+          "win_rate": 0.3934,
+          "profit_factor": 0.7021,
+          "max_drawdown": 1474.14,
+          "t_stat": -2.0716,
+          "p_value": 0.98084652
+        }
+      ],
+      "development": {
+        "trades": 594,
+        "total_pnl": -6111.87,
+        "expectancy": -10.2893,
+        "win_rate": 0.3603,
+        "profit_factor": 0.6157,
+        "max_drawdown": 6357.17,
+        "t_stat": -5.124,
+        "p_value": 0.99999985
+      },
+      "development_2x_cost": {
+        "trades": 594,
+        "total_pnl": -9069.99,
+        "expectancy": -15.2693,
+        "win_rate": 0.3367,
+        "profit_factor": 0.4914,
+        "max_drawdown": 9254.22,
+        "t_stat": -7.6039,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-080",
+      "family": "opening_impulse_reversal",
+      "variant": 9,
+      "threshold": 0.004,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 208,
+          "total_pnl": -2709.59,
+          "expectancy": -13.0269,
+          "win_rate": 0.3365,
+          "profit_factor": 0.6054,
+          "max_drawdown": 3058.76,
+          "t_stat": -3.1464,
+          "p_value": 0.99917356
+        },
+        {
+          "trades": 148,
+          "total_pnl": -1485.79,
+          "expectancy": -10.0391,
+          "win_rate": 0.3851,
+          "profit_factor": 0.5858,
+          "max_drawdown": 1862.76,
+          "t_stat": -2.6216,
+          "p_value": 0.99562388
+        },
+        {
+          "trades": 146,
+          "total_pnl": -719.58,
+          "expectancy": -4.9286,
+          "win_rate": 0.4384,
+          "profit_factor": 0.7985,
+          "max_drawdown": 1055.82,
+          "t_stat": -1.117,
+          "p_value": 0.86799348
+        }
+      ],
+      "development": {
+        "trades": 502,
+        "total_pnl": -4914.96,
+        "expectancy": -9.7908,
+        "win_rate": 0.3805,
+        "profit_factor": 0.6495,
+        "max_drawdown": 5369.91,
+        "t_stat": -4.043,
+        "p_value": 0.99997361
+      },
+      "development_2x_cost": {
+        "trades": 502,
+        "total_pnl": -7414.92,
+        "expectancy": -14.7708,
+        "win_rate": 0.3426,
+        "profit_factor": 0.5253,
+        "max_drawdown": 7739.11,
+        "t_stat": -6.0994,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-081",
+      "family": "compression_breakout",
+      "variant": 0,
+      "threshold": 0.5,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-082",
+      "family": "compression_breakout",
+      "variant": 1,
+      "threshold": 0.65,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-083",
+      "family": "compression_breakout",
+      "variant": 2,
+      "threshold": 0.8,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-084",
+      "family": "compression_breakout",
+      "variant": 3,
+      "threshold": 1.0,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 2,
+          "total_pnl": 15.04,
+          "expectancy": 7.52,
+          "win_rate": 0.5,
+          "profit_factor": 1.2736,
+          "max_drawdown": 54.98,
+          "t_stat": 0.1203,
+          "p_value": 0.45211483
+        },
+        {
+          "trades": 3,
+          "total_pnl": 177.56,
+          "expectancy": 59.1867,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": 5.4634,
+          "p_value": 2e-08
+        },
+        {
+          "trades": 4,
+          "total_pnl": -59.92,
+          "expectancy": -14.98,
+          "win_rate": 0.5,
+          "profit_factor": 0.3772,
+          "max_drawdown": 96.19,
+          "t_stat": -0.7238,
+          "p_value": 0.7653934
+        }
+      ],
+      "development": {
+        "trades": 9,
+        "total_pnl": 132.68,
+        "expectancy": 14.7422,
+        "win_rate": 0.6667,
+        "profit_factor": 1.8776,
+        "max_drawdown": 96.19,
+        "t_stat": 0.8209,
+        "p_value": 0.20585334
+      },
+      "development_2x_cost": {
+        "trades": 9,
+        "total_pnl": 87.86,
+        "expectancy": 9.7622,
+        "win_rate": 0.5556,
+        "profit_factor": 1.5135,
+        "max_drawdown": 111.13,
+        "t_stat": 0.5436,
+        "p_value": 0.29336125
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-085",
+      "family": "compression_breakout",
+      "variant": 4,
+      "threshold": 1.2,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 16,
+          "total_pnl": -23.43,
+          "expectancy": -1.4644,
+          "win_rate": 0.375,
+          "profit_factor": 0.9503,
+          "max_drawdown": 227.36,
+          "t_stat": -0.0899,
+          "p_value": 0.53581497
+        },
+        {
+          "trades": 29,
+          "total_pnl": 431.83,
+          "expectancy": 14.8907,
+          "win_rate": 0.7241,
+          "profit_factor": 2.3937,
+          "max_drawdown": 129.96,
+          "t_stat": 1.8115,
+          "p_value": 0.03503173
+        },
+        {
+          "trades": 30,
+          "total_pnl": -59.4,
+          "expectancy": -1.98,
+          "win_rate": 0.4667,
+          "profit_factor": 0.9151,
+          "max_drawdown": 293.25,
+          "t_stat": -0.2036,
+          "p_value": 0.58068507
+        }
+      ],
+      "development": {
+        "trades": 75,
+        "total_pnl": 349.0,
+        "expectancy": 4.6533,
+        "win_rate": 0.5467,
+        "profit_factor": 1.2357,
+        "max_drawdown": 357.32,
+        "t_stat": 0.7643,
+        "p_value": 0.2223577
+      },
+      "development_2x_cost": {
+        "trades": 75,
+        "total_pnl": -24.5,
+        "expectancy": -0.3267,
+        "win_rate": 0.4667,
+        "profit_factor": 0.9854,
+        "max_drawdown": 494.97,
+        "t_stat": -0.0537,
+        "p_value": 0.52139344
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-086",
+      "family": "compression_breakout",
+      "variant": 5,
+      "threshold": 0.5,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-087",
+      "family": "compression_breakout",
+      "variant": 6,
+      "threshold": 0.65,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-088",
+      "family": "compression_breakout",
+      "variant": 7,
+      "threshold": 0.8,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        },
+        {
+          "trades": 0,
+          "expectancy": null,
+          "profit_factor": null,
+          "p_value": null
+        }
+      ],
+      "development": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "development_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "p_value": null
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-089",
+      "family": "compression_breakout",
+      "variant": 8,
+      "threshold": 1.0,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 1,
+          "total_pnl": -54.98,
+          "expectancy": -54.98,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "max_drawdown": 54.98,
+          "t_stat": 0.0,
+          "p_value": 0.5
+        },
+        {
+          "trades": 2,
+          "total_pnl": 132.54,
+          "expectancy": 66.27,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": 2.305,
+          "p_value": 0.01058207
+        },
+        {
+          "trades": 1,
+          "total_pnl": -54.98,
+          "expectancy": -54.98,
+          "win_rate": 0.0,
+          "profit_factor": 0.0,
+          "max_drawdown": 54.98,
+          "t_stat": 0.0,
+          "p_value": 0.5
+        }
+      ],
+      "development": {
+        "trades": 4,
+        "total_pnl": 22.58,
+        "expectancy": 5.645,
+        "win_rate": 0.5,
+        "profit_factor": 1.2053,
+        "max_drawdown": 54.98,
+        "t_stat": 0.1529,
+        "p_value": 0.43923496
+      },
+      "development_2x_cost": {
+        "trades": 4,
+        "total_pnl": 2.66,
+        "expectancy": 0.665,
+        "win_rate": 0.5,
+        "profit_factor": 1.0222,
+        "max_drawdown": 59.96,
+        "t_stat": 0.018,
+        "p_value": 0.49281416
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-090",
+      "family": "compression_breakout",
+      "variant": 9,
+      "threshold": 1.2,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 5,
+          "total_pnl": -127.4,
+          "expectancy": -25.48,
+          "win_rate": 0.4,
+          "profit_factor": 0.292,
+          "max_drawdown": 149.92,
+          "t_stat": -1.1942,
+          "p_value": 0.88379872
+        },
+        {
+          "trades": 7,
+          "total_pnl": 358.89,
+          "expectancy": 51.27,
+          "win_rate": 0.8571,
+          "profit_factor": 27.1391,
+          "max_drawdown": 13.73,
+          "t_stat": 2.7255,
+          "p_value": 0.00321046
+        },
+        {
+          "trades": 11,
+          "total_pnl": -84.78,
+          "expectancy": -7.7073,
+          "win_rate": 0.4545,
+          "profit_factor": 0.6769,
+          "max_drawdown": 213.57,
+          "t_stat": -0.5317,
+          "p_value": 0.70253831
+        }
+      ],
+      "development": {
+        "trades": 23,
+        "total_pnl": 146.71,
+        "expectancy": 6.3787,
+        "win_rate": 0.5652,
+        "profit_factor": 1.3217,
+        "max_drawdown": 227.3,
+        "t_stat": 0.5485,
+        "p_value": 0.29168972
+      },
+      "development_2x_cost": {
+        "trades": 23,
+        "total_pnl": 32.17,
+        "expectancy": 1.3987,
+        "win_rate": 0.5217,
+        "profit_factor": 1.063,
+        "max_drawdown": 277.1,
+        "t_stat": 0.1203,
+        "p_value": 0.45213736
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-091",
+      "family": "range_expansion_reversal",
+      "variant": 0,
+      "threshold": 1.2,
+      "stop_points": 4.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 193,
+          "total_pnl": -1101.14,
+          "expectancy": -5.7054,
+          "win_rate": 0.3834,
+          "profit_factor": 0.6255,
+          "max_drawdown": 1226.44,
+          "t_stat": -3.2709,
+          "p_value": 0.99946394
+        },
+        {
+          "trades": 218,
+          "total_pnl": -1205.64,
+          "expectancy": -5.5305,
+          "win_rate": 0.3807,
+          "profit_factor": 0.6131,
+          "max_drawdown": 1370.98,
+          "t_stat": -3.523,
+          "p_value": 0.99978665
+        },
+        {
+          "trades": 229,
+          "total_pnl": -1304.17,
+          "expectancy": -5.6951,
+          "win_rate": 0.3886,
+          "profit_factor": 0.6098,
+          "max_drawdown": 1359.75,
+          "t_stat": -3.6874,
+          "p_value": 0.99988671
+        }
+      ],
+      "development": {
+        "trades": 640,
+        "total_pnl": -3610.95,
+        "expectancy": -5.6421,
+        "win_rate": 0.3844,
+        "profit_factor": 0.6158,
+        "max_drawdown": 3661.11,
+        "t_stat": -6.0654,
+        "p_value": 1.0
+      },
+      "development_2x_cost": {
+        "trades": 640,
+        "total_pnl": -6798.15,
+        "expectancy": -10.6221,
+        "win_rate": 0.375,
+        "profit_factor": 0.4025,
+        "max_drawdown": 6838.23,
+        "t_stat": -11.419,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-092",
+      "family": "range_expansion_reversal",
+      "variant": 1,
+      "threshold": 1.5,
+      "stop_points": 6.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 74,
+          "total_pnl": -182.27,
+          "expectancy": -2.4631,
+          "win_rate": 0.4459,
+          "profit_factor": 0.8663,
+          "max_drawdown": 389.28,
+          "t_stat": -0.5947,
+          "p_value": 0.72398464
+        },
+        {
+          "trades": 108,
+          "total_pnl": -500.34,
+          "expectancy": -4.6328,
+          "win_rate": 0.3981,
+          "profit_factor": 0.7241,
+          "max_drawdown": 645.98,
+          "t_stat": -1.5396,
+          "p_value": 0.93816878
+        },
+        {
+          "trades": 111,
+          "total_pnl": 37.22,
+          "expectancy": 0.3353,
+          "win_rate": 0.5135,
+          "profit_factor": 1.0234,
+          "max_drawdown": 338.11,
+          "t_stat": 0.1114,
+          "p_value": 0.45566116
+        }
+      ],
+      "development": {
+        "trades": 293,
+        "total_pnl": -645.39,
+        "expectancy": -2.2027,
+        "win_rate": 0.4539,
+        "profit_factor": 0.8645,
+        "max_drawdown": 924.71,
+        "t_stat": -1.1584,
+        "p_value": 0.87665196
+      },
+      "development_2x_cost": {
+        "trades": 293,
+        "total_pnl": -2104.53,
+        "expectancy": -7.1827,
+        "win_rate": 0.4334,
+        "profit_factor": 0.6229,
+        "max_drawdown": 2247.71,
+        "t_stat": -3.7774,
+        "p_value": 0.99992077
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-093",
+      "family": "range_expansion_reversal",
+      "variant": 2,
+      "threshold": 1.8,
+      "stop_points": 8.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 37,
+          "total_pnl": -446.76,
+          "expectancy": -12.0746,
+          "win_rate": 0.3514,
+          "profit_factor": 0.5282,
+          "max_drawdown": 569.36,
+          "t_stat": -1.787,
+          "p_value": 0.96303228
+        },
+        {
+          "trades": 56,
+          "total_pnl": -328.88,
+          "expectancy": -5.8729,
+          "win_rate": 0.4107,
+          "profit_factor": 0.7172,
+          "max_drawdown": 375.61,
+          "t_stat": -1.1177,
+          "p_value": 0.86814178
+        },
+        {
+          "trades": 59,
+          "total_pnl": -307.57,
+          "expectancy": -5.2131,
+          "win_rate": 0.4746,
+          "profit_factor": 0.7097,
+          "max_drawdown": 600.77,
+          "t_stat": -1.1243,
+          "p_value": 0.86955639
+        }
+      ],
+      "development": {
+        "trades": 152,
+        "total_pnl": -1083.21,
+        "expectancy": -7.1264,
+        "win_rate": 0.4211,
+        "profit_factor": 0.6582,
+        "max_drawdown": 1294.68,
+        "t_stat": -2.2985,
+        "p_value": 0.98923287
+      },
+      "development_2x_cost": {
+        "trades": 152,
+        "total_pnl": -1840.17,
+        "expectancy": -12.1064,
+        "win_rate": 0.4013,
+        "profit_factor": 0.4913,
+        "max_drawdown": 1996.86,
+        "t_stat": -3.9047,
+        "p_value": 0.99995283
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-094",
+      "family": "range_expansion_reversal",
+      "variant": 3,
+      "threshold": 2.2,
+      "stop_points": 10.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 13,
+          "total_pnl": -102.24,
+          "expectancy": -7.8646,
+          "win_rate": 0.3846,
+          "profit_factor": 0.7335,
+          "max_drawdown": 273.63,
+          "t_stat": -0.5012,
+          "p_value": 0.69189333
+        },
+        {
+          "trades": 25,
+          "total_pnl": -427.0,
+          "expectancy": -17.08,
+          "win_rate": 0.28,
+          "profit_factor": 0.4188,
+          "max_drawdown": 442.04,
+          "t_stat": -1.8871,
+          "p_value": 0.97042565
+        },
+        {
+          "trades": 28,
+          "total_pnl": -219.44,
+          "expectancy": -7.8371,
+          "win_rate": 0.5357,
+          "profit_factor": 0.6131,
+          "max_drawdown": 299.48,
+          "t_stat": -1.0515,
+          "p_value": 0.8534783
+        }
+      ],
+      "development": {
+        "trades": 66,
+        "total_pnl": -748.68,
+        "expectancy": -11.3436,
+        "win_rate": 0.4091,
+        "profit_factor": 0.5558,
+        "max_drawdown": 1000.11,
+        "t_stat": -2.0537,
+        "p_value": 0.97999796
+      },
+      "development_2x_cost": {
+        "trades": 66,
+        "total_pnl": -1077.36,
+        "expectancy": -16.3236,
+        "win_rate": 0.3788,
+        "profit_factor": 0.4287,
+        "max_drawdown": 1283.97,
+        "t_stat": -2.9553,
+        "p_value": 0.99843823
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-095",
+      "family": "range_expansion_reversal",
+      "variant": 4,
+      "threshold": 2.8,
+      "stop_points": 12.0,
+      "reward_risk": 1.5,
+      "require_volume_confirmation": false,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 4,
+          "total_pnl": 75.08,
+          "expectancy": 18.77,
+          "win_rate": 0.5,
+          "profit_factor": 1.7906,
+          "max_drawdown": 94.96,
+          "t_stat": 0.4824,
+          "p_value": 0.3147668
+        },
+        {
+          "trades": 10,
+          "total_pnl": -189.8,
+          "expectancy": -18.98,
+          "win_rate": 0.3,
+          "profit_factor": 0.4726,
+          "max_drawdown": 189.8,
+          "t_stat": -0.9974,
+          "p_value": 0.8407181
+        },
+        {
+          "trades": 11,
+          "total_pnl": 72.72,
+          "expectancy": 6.6109,
+          "win_rate": 0.7273,
+          "profit_factor": 1.373,
+          "max_drawdown": 112.44,
+          "t_stat": 0.427,
+          "p_value": 0.33467748
+        }
+      ],
+      "development": {
+        "trades": 25,
+        "total_pnl": -42.0,
+        "expectancy": -1.68,
+        "win_rate": 0.52,
+        "profit_factor": 0.9354,
+        "max_drawdown": 349.74,
+        "t_stat": -0.1432,
+        "p_value": 0.55694701
+      },
+      "development_2x_cost": {
+        "trades": 25,
+        "total_pnl": -166.5,
+        "expectancy": -6.66,
+        "win_rate": 0.48,
+        "profit_factor": 0.767,
+        "max_drawdown": 414.48,
+        "t_stat": -0.5678,
+        "p_value": 0.71492054
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-096",
+      "family": "range_expansion_reversal",
+      "variant": 5,
+      "threshold": 1.2,
+      "stop_points": 4.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 122,
+          "total_pnl": -982.56,
+          "expectancy": -8.0538,
+          "win_rate": 0.2869,
+          "profit_factor": 0.5389,
+          "max_drawdown": 1095.28,
+          "t_stat": -3.3566,
+          "p_value": 0.99960548
+        },
+        {
+          "trades": 172,
+          "total_pnl": -707.81,
+          "expectancy": -4.1152,
+          "win_rate": 0.3605,
+          "profit_factor": 0.7258,
+          "max_drawdown": 847.89,
+          "t_stat": -2.0139,
+          "p_value": 0.97799146
+        },
+        {
+          "trades": 178,
+          "total_pnl": -1000.19,
+          "expectancy": -5.619,
+          "win_rate": 0.3427,
+          "profit_factor": 0.6449,
+          "max_drawdown": 1190.63,
+          "t_stat": -2.8286,
+          "p_value": 0.99766247
+        }
+      ],
+      "development": {
+        "trades": 472,
+        "total_pnl": -2690.56,
+        "expectancy": -5.7003,
+        "win_rate": 0.3347,
+        "profit_factor": 0.6426,
+        "max_drawdown": 2805.66,
+        "t_stat": -4.656,
+        "p_value": 0.99999839
+      },
+      "development_2x_cost": {
+        "trades": 472,
+        "total_pnl": -5041.12,
+        "expectancy": -10.6803,
+        "win_rate": 0.3263,
+        "profit_factor": 0.4462,
+        "max_drawdown": 5131.32,
+        "t_stat": -8.7236,
+        "p_value": 1.0
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-097",
+      "family": "range_expansion_reversal",
+      "variant": 6,
+      "threshold": 1.5,
+      "stop_points": 6.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 63,
+          "total_pnl": -263.74,
+          "expectancy": -4.1863,
+          "win_rate": 0.381,
+          "profit_factor": 0.7984,
+          "max_drawdown": 476.66,
+          "t_stat": -0.8349,
+          "p_value": 0.79812176
+        },
+        {
+          "trades": 99,
+          "total_pnl": -489.27,
+          "expectancy": -4.9421,
+          "win_rate": 0.3737,
+          "profit_factor": 0.7276,
+          "max_drawdown": 653.64,
+          "t_stat": -1.416,
+          "p_value": 0.92161684
+        },
+        {
+          "trades": 103,
+          "total_pnl": -511.69,
+          "expectancy": -4.9679,
+          "win_rate": 0.4466,
+          "profit_factor": 0.6975,
+          "max_drawdown": 718.22,
+          "t_stat": -1.6112,
+          "p_value": 0.9464266
+        }
+      ],
+      "development": {
+        "trades": 265,
+        "total_pnl": -1264.7,
+        "expectancy": -4.7725,
+        "win_rate": 0.4038,
+        "profit_factor": 0.7363,
+        "max_drawdown": 1526.25,
+        "t_stat": -2.2445,
+        "p_value": 0.98760038
+      },
+      "development_2x_cost": {
+        "trades": 265,
+        "total_pnl": -2584.4,
+        "expectancy": -9.7525,
+        "win_rate": 0.3736,
+        "profit_factor": 0.5394,
+        "max_drawdown": 2771.25,
+        "t_stat": -4.5866,
+        "p_value": 0.99999775
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-098",
+      "family": "range_expansion_reversal",
+      "variant": 7,
+      "threshold": 1.8,
+      "stop_points": 8.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 34,
+          "total_pnl": -391.82,
+          "expectancy": -11.5241,
+          "win_rate": 0.3235,
+          "profit_factor": 0.5656,
+          "max_drawdown": 574.42,
+          "t_stat": -1.4672,
+          "p_value": 0.92884025
+        },
+        {
+          "trades": 55,
+          "total_pnl": -397.65,
+          "expectancy": -7.23,
+          "win_rate": 0.3818,
+          "profit_factor": 0.6705,
+          "max_drawdown": 522.73,
+          "t_stat": -1.2835,
+          "p_value": 0.90033712
+        },
+        {
+          "trades": 59,
+          "total_pnl": -441.32,
+          "expectancy": -7.48,
+          "win_rate": 0.4407,
+          "profit_factor": 0.616,
+          "max_drawdown": 623.17,
+          "t_stat": -1.5579,
+          "p_value": 0.94037064
+        }
+      ],
+      "development": {
+        "trades": 148,
+        "total_pnl": -1230.79,
+        "expectancy": -8.3161,
+        "win_rate": 0.3919,
+        "profit_factor": 0.6222,
+        "max_drawdown": 1422.16,
+        "t_stat": -2.4893,
+        "p_value": 0.99360062
+      },
+      "development_2x_cost": {
+        "trades": 148,
+        "total_pnl": -1967.83,
+        "expectancy": -13.2961,
+        "win_rate": 0.3649,
+        "profit_factor": 0.4712,
+        "max_drawdown": 2129.32,
+        "t_stat": -3.98,
+        "p_value": 0.99996554
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-099",
+      "family": "range_expansion_reversal",
+      "variant": 8,
+      "threshold": 2.2,
+      "stop_points": 10.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 10,
+          "total_pnl": -287.3,
+          "expectancy": -28.73,
+          "win_rate": 0.2,
+          "profit_factor": 0.251,
+          "max_drawdown": 382.32,
+          "t_stat": -1.9094,
+          "p_value": 0.97189791
+        },
+        {
+          "trades": 23,
+          "total_pnl": -468.29,
+          "expectancy": -20.3604,
+          "win_rate": 0.2609,
+          "profit_factor": 0.3615,
+          "max_drawdown": 468.29,
+          "t_stat": -2.0989,
+          "p_value": 0.98208797
+        },
+        {
+          "trades": 28,
+          "total_pnl": -169.44,
+          "expectancy": -6.0514,
+          "win_rate": 0.5357,
+          "profit_factor": 0.7013,
+          "max_drawdown": 290.91,
+          "t_stat": -0.7372,
+          "p_value": 0.76948854
+        }
+      ],
+      "development": {
+        "trades": 61,
+        "total_pnl": -925.03,
+        "expectancy": -15.1644,
+        "win_rate": 0.377,
+        "profit_factor": 0.4508,
+        "max_drawdown": 1125.09,
+        "t_stat": -2.6082,
+        "p_value": 0.99544927
+      },
+      "development_2x_cost": {
+        "trades": 61,
+        "total_pnl": -1228.81,
+        "expectancy": -20.1444,
+        "win_rate": 0.3443,
+        "profit_factor": 0.3463,
+        "max_drawdown": 1413.93,
+        "t_stat": -3.4648,
+        "p_value": 0.99973465
+      },
+      "discovery_survivor": false
+    },
+    {
+      "trial_id": "DISC100-100",
+      "family": "range_expansion_reversal",
+      "variant": 9,
+      "threshold": 2.8,
+      "stop_points": 12.0,
+      "reward_risk": 2.0,
+      "require_volume_confirmation": true,
+      "entry_start_et": "09:45",
+      "entry_end_et": "14:30",
+      "max_hold_bars_5m": 12,
+      "development_regimes": [
+        {
+          "trades": 3,
+          "total_pnl": 20.06,
+          "expectancy": 6.6867,
+          "win_rate": 0.3333,
+          "profit_factor": 1.2112,
+          "max_drawdown": 94.96,
+          "t_stat": 0.1214,
+          "p_value": 0.45170569
+        },
+        {
+          "trades": 10,
+          "total_pnl": -129.8,
+          "expectancy": -12.98,
+          "win_rate": 0.3,
+          "profit_factor": 0.6393,
+          "max_drawdown": 129.96,
+          "t_stat": -0.571,
+          "p_value": 0.71599424
+        },
+        {
+          "trades": 11,
+          "total_pnl": 102.72,
+          "expectancy": 9.3382,
+          "win_rate": 0.7273,
+          "profit_factor": 1.5269,
+          "max_drawdown": 112.44,
+          "t_stat": 0.5485,
+          "p_value": 0.29168067
+        }
+      ],
+      "development": {
+        "trades": 24,
+        "total_pnl": -7.02,
+        "expectancy": -0.2925,
+        "win_rate": 0.5,
+        "profit_factor": 0.9892,
+        "max_drawdown": 289.74,
+        "t_stat": -0.0218,
+        "p_value": 0.50869568
+      },
+      "development_2x_cost": {
+        "trades": 24,
+        "total_pnl": -126.54,
+        "expectancy": -5.2725,
+        "win_rate": 0.4583,
+        "profit_factor": 0.8229,
+        "max_drawdown": 354.48,
+        "t_stat": -0.3929,
+        "p_value": 0.65281553
+      },
+      "discovery_survivor": false
+    }
+  ],
+  "warning": "Development rankings are not execution evidence. Selection and final slices remain sealed."
+}

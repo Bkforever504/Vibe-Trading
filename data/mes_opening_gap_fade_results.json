@@ -1,0 +1,1583 @@
+{
+  "schema_version": 1,
+  "experiment": "MES-OPENING-GAP-FADE-01",
+  "preregistration": "research/MES_OPENING_GAP_FADE_PREREGISTRATION_2026-08-09.md",
+  "mode": "research_only_consumed_history_diagnostic",
+  "evidence_status": "not_independent_confirmation",
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "dataset_period": [
+    "2024-01-02",
+    "2026-07-17"
+  ],
+  "eligible_sessions": 589,
+  "skipped_sessions": {
+    "before_start": 507,
+    "incomplete": 23,
+    "no_prior": 20,
+    "roll_boundary": 9
+  },
+  "family_attempts": 12,
+  "familywise_alpha": 0.004166666666666667,
+  "historical_stability_survivor_count": 0,
+  "historical_stability_survivors": [],
+  "top_diagnostic_candidate": {
+    "config": {
+      "min_gap_pct": 0.35,
+      "confirmation_minutes": 5,
+      "rejection_fraction": 0.25,
+      "min_reward_risk": 1.25,
+      "stop_buffer_ticks": 2,
+      "max_risk_ticks": 60
+    },
+    "name": "gap0p35_confirm5_reject0p25",
+    "annual": {
+      "2024": {
+        "trades": 3,
+        "total_pnl": 33.81,
+        "expectancy": 11.27,
+        "win_rate": 0.3333,
+        "profit_factor": 1.752,
+        "max_drawdown": 44.96,
+        "t_stat": 0.3138,
+        "p_value": 0.37682377
+      },
+      "2025": {
+        "trades": 3,
+        "total_pnl": 202.56,
+        "expectancy": 67.52,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": 1.8761,
+        "p_value": 0.03032399
+      },
+      "2026": {
+        "trades": 2,
+        "total_pnl": 31.29,
+        "expectancy": 15.645,
+        "win_rate": 0.5,
+        "profit_factor": 1.3974,
+        "max_drawdown": 78.73,
+        "t_stat": 0.1658,
+        "p_value": 0.43416708
+      }
+    },
+    "annual_2x_cost": {
+      "2024": {
+        "trades": 3,
+        "total_pnl": 18.87,
+        "expectancy": 6.29,
+        "win_rate": 0.3333,
+        "profit_factor": 1.3436,
+        "max_drawdown": 54.92,
+        "t_stat": 0.1752,
+        "p_value": 0.43047838
+      },
+      "2025": {
+        "trades": 3,
+        "total_pnl": 187.62,
+        "expectancy": 62.54,
+        "win_rate": 0.6667,
+        "profit_factor": 51.5714,
+        "max_drawdown": 3.71,
+        "t_stat": 1.7377,
+        "p_value": 0.04113333
+      },
+      "2026": {
+        "trades": 2,
+        "total_pnl": 21.33,
+        "expectancy": 10.665,
+        "win_rate": 0.5,
+        "profit_factor": 1.2548,
+        "max_drawdown": 83.71,
+        "t_stat": 0.113,
+        "p_value": 0.45501265
+      }
+    },
+    "aggregate": {
+      "trades": 8,
+      "total_pnl": 267.66,
+      "expectancy": 33.4575,
+      "win_rate": 0.625,
+      "profit_factor": 3.164,
+      "max_drawdown": 78.73,
+      "t_stat": 1.2692,
+      "p_value": 0.10218498
+    },
+    "aggregate_2x_cost": {
+      "trades": 8,
+      "total_pnl": 227.82,
+      "expectancy": 28.4775,
+      "win_rate": 0.5,
+      "profit_factor": 2.6005,
+      "max_drawdown": 83.71,
+      "t_stat": 1.0803,
+      "p_value": 0.14000771
+    },
+    "aggregate_3x_cost": {
+      "trades": 8,
+      "total_pnl": 187.98,
+      "expectancy": 23.4975,
+      "win_rate": 0.5,
+      "profit_factor": 2.1585,
+      "max_drawdown": 88.69,
+      "t_stat": 0.8914,
+      "p_value": 0.18636535
+    },
+    "aggregate_2x_cost_one_bar_delay": {
+      "trades": 5,
+      "total_pnl": 190.2,
+      "expectancy": 38.04,
+      "win_rate": 0.6,
+      "profit_factor": 4.1094,
+      "max_drawdown": 46.21,
+      "t_stat": 1.3159,
+      "p_value": 0.09411014
+    },
+    "aggregate_2x_cost_without_top_1pct": {
+      "trades": 8,
+      "total_pnl": 107.78,
+      "expectancy": 13.4725,
+      "win_rate": 0.375,
+      "profit_factor": 1.7572,
+      "max_drawdown": 87.42,
+      "t_stat": 0.5866,
+      "p_value": 0.27874157
+    },
+    "exit_reasons": {
+      "target": 4,
+      "stop": 2,
+      "time": 2
+    },
+    "trades": [
+      {
+        "day": "2024-05-23",
+        "side": "sell",
+        "entry_time": "2024-05-23T09:35:00",
+        "exit_time": "2024-05-23T09:51:00",
+        "entry_price": 5346.0,
+        "exit_price": 5329.25,
+        "stop_price": 5358.75,
+        "target_price": 5329.25,
+        "raw_points": 16.75,
+        "exit_reason": "target"
+      },
+      {
+        "day": "2024-10-08",
+        "side": "sell",
+        "entry_time": "2024-10-08T09:35:00",
+        "exit_time": "2024-10-08T09:54:00",
+        "entry_price": 5766.25,
+        "exit_price": 5774.0,
+        "stop_price": 5774.0,
+        "target_price": 5747.0,
+        "raw_points": -7.75,
+        "exit_reason": "stop"
+      },
+      {
+        "day": "2024-10-17",
+        "side": "sell",
+        "entry_time": "2024-10-17T09:35:00",
+        "exit_time": "2024-10-17T12:00:00",
+        "entry_price": 5911.0,
+        "exit_price": 5910.25,
+        "stop_price": 5925.5,
+        "target_price": 5886.25,
+        "raw_points": 0.75,
+        "exit_reason": "time"
+      },
+      {
+        "day": "2025-02-11",
+        "side": "buy",
+        "entry_time": "2025-02-11T09:35:00",
+        "exit_time": "2025-02-11T10:49:00",
+        "entry_price": 6072.25,
+        "exit_price": 6088.5,
+        "stop_price": 6063.25,
+        "target_price": 6088.5,
+        "raw_points": 16.25,
+        "exit_reason": "target"
+      },
+      {
+        "day": "2025-06-30",
+        "side": "sell",
+        "entry_time": "2025-06-30T09:35:00",
+        "exit_time": "2025-06-30T12:00:00",
+        "entry_price": 6240.5,
+        "exit_price": 6239.25,
+        "stop_price": 6249.5,
+        "target_price": 6223.5,
+        "raw_points": 1.25,
+        "exit_reason": "time"
+      },
+      {
+        "day": "2025-11-03",
+        "side": "sell",
+        "entry_time": "2025-11-03T09:35:00",
+        "exit_time": "2025-11-03T09:55:00",
+        "entry_price": 6898.25,
+        "exit_price": 6872.25,
+        "stop_price": 6910.0,
+        "target_price": 6872.25,
+        "raw_points": 26.0,
+        "exit_reason": "target"
+      },
+      {
+        "day": "2026-01-02",
+        "side": "sell",
+        "entry_time": "2026-01-02T09:35:00",
+        "exit_time": "2026-01-02T09:48:00",
+        "entry_price": 6918.25,
+        "exit_price": 6933.0,
+        "stop_price": 6933.0,
+        "target_price": 6891.75,
+        "raw_points": -14.75,
+        "exit_reason": "stop"
+      },
+      {
+        "day": "2026-01-12",
+        "side": "buy",
+        "entry_time": "2026-01-12T09:35:00",
+        "exit_time": "2026-01-12T11:06:00",
+        "entry_price": 6981.75,
+        "exit_price": 7004.75,
+        "stop_price": 6968.0,
+        "target_price": 7004.75,
+        "raw_points": 23.0,
+        "exit_reason": "target"
+      }
+    ],
+    "historical_stability_pass": false
+  },
+  "topstep_combine_diagnostic": {
+    "method": "circular_block_bootstrap_of_2024plus_double_cost_daily_pnl_including_no_trade_days",
+    "one_mes": {
+      "contracts": 1,
+      "simulations": 2000,
+      "pass_rate": 0.0,
+      "mll_failure_rate": 0.0,
+      "incomplete_rate": 1.0,
+      "median_sessions_to_pass": null,
+      "ending_profit_p05": -66.09,
+      "ending_profit_p50": 86.41,
+      "ending_profit_p95": 307.82
+    },
+    "two_mes": {
+      "contracts": 2,
+      "simulations": 2000,
+      "pass_rate": 0.0,
+      "mll_failure_rate": 0.0,
+      "incomplete_rate": 1.0,
+      "median_sessions_to_pass": null,
+      "ending_profit_p05": -132.18,
+      "ending_profit_p50": 147.58,
+      "ending_profit_p95": 585.32
+    },
+    "warning": "Consumed-history diagnostic; pass rate is not a forecast or purchase signal."
+  },
+  "promotion": {
+    "ready": false,
+    "decision": "historical_gate_failed",
+    "forward_cutoff_exclusive": "2026-07-19",
+    "requirements": [
+      "at least 60 resolved forward outcomes",
+      "at least three forward calendar months",
+      "positive 2x-cost forward expectancy",
+      "forward profit factor >= 1.20",
+      "1-2 MES Combine pass rate >= 0.60 and MLL failure rate <= 0.05"
+    ]
+  },
+  "all_candidates": [
+    {
+      "config": {
+        "min_gap_pct": 0.35,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p35_confirm5_reject0p25",
+      "annual": {
+        "2024": {
+          "trades": 3,
+          "total_pnl": 33.81,
+          "expectancy": 11.27,
+          "win_rate": 0.3333,
+          "profit_factor": 1.752,
+          "max_drawdown": 44.96,
+          "t_stat": 0.3138,
+          "p_value": 0.37682377
+        },
+        "2025": {
+          "trades": 3,
+          "total_pnl": 202.56,
+          "expectancy": 67.52,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": 1.8761,
+          "p_value": 0.03032399
+        },
+        "2026": {
+          "trades": 2,
+          "total_pnl": 31.29,
+          "expectancy": 15.645,
+          "win_rate": 0.5,
+          "profit_factor": 1.3974,
+          "max_drawdown": 78.73,
+          "t_stat": 0.1658,
+          "p_value": 0.43416708
+        }
+      },
+      "annual_2x_cost": {
+        "2024": {
+          "trades": 3,
+          "total_pnl": 18.87,
+          "expectancy": 6.29,
+          "win_rate": 0.3333,
+          "profit_factor": 1.3436,
+          "max_drawdown": 54.92,
+          "t_stat": 0.1752,
+          "p_value": 0.43047838
+        },
+        "2025": {
+          "trades": 3,
+          "total_pnl": 187.62,
+          "expectancy": 62.54,
+          "win_rate": 0.6667,
+          "profit_factor": 51.5714,
+          "max_drawdown": 3.71,
+          "t_stat": 1.7377,
+          "p_value": 0.04113333
+        },
+        "2026": {
+          "trades": 2,
+          "total_pnl": 21.33,
+          "expectancy": 10.665,
+          "win_rate": 0.5,
+          "profit_factor": 1.2548,
+          "max_drawdown": 83.71,
+          "t_stat": 0.113,
+          "p_value": 0.45501265
+        }
+      },
+      "aggregate": {
+        "trades": 8,
+        "total_pnl": 267.66,
+        "expectancy": 33.4575,
+        "win_rate": 0.625,
+        "profit_factor": 3.164,
+        "max_drawdown": 78.73,
+        "t_stat": 1.2692,
+        "p_value": 0.10218498
+      },
+      "aggregate_2x_cost": {
+        "trades": 8,
+        "total_pnl": 227.82,
+        "expectancy": 28.4775,
+        "win_rate": 0.5,
+        "profit_factor": 2.6005,
+        "max_drawdown": 83.71,
+        "t_stat": 1.0803,
+        "p_value": 0.14000771
+      },
+      "aggregate_3x_cost": {
+        "trades": 8,
+        "total_pnl": 187.98,
+        "expectancy": 23.4975,
+        "win_rate": 0.5,
+        "profit_factor": 2.1585,
+        "max_drawdown": 88.69,
+        "t_stat": 0.8914,
+        "p_value": 0.18636535
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 5,
+        "total_pnl": 190.2,
+        "expectancy": 38.04,
+        "win_rate": 0.6,
+        "profit_factor": 4.1094,
+        "max_drawdown": 46.21,
+        "t_stat": 1.3159,
+        "p_value": 0.09411014
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 8,
+        "total_pnl": 107.78,
+        "expectancy": 13.4725,
+        "win_rate": 0.375,
+        "profit_factor": 1.7572,
+        "max_drawdown": 87.42,
+        "t_stat": 0.5866,
+        "p_value": 0.27874157
+      },
+      "exit_reasons": {
+        "target": 4,
+        "stop": 2,
+        "time": 2
+      },
+      "trades": [
+        {
+          "day": "2024-05-23",
+          "side": "sell",
+          "entry_time": "2024-05-23T09:35:00",
+          "exit_time": "2024-05-23T09:51:00",
+          "entry_price": 5346.0,
+          "exit_price": 5329.25,
+          "stop_price": 5358.75,
+          "target_price": 5329.25,
+          "raw_points": 16.75,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2024-10-08",
+          "side": "sell",
+          "entry_time": "2024-10-08T09:35:00",
+          "exit_time": "2024-10-08T09:54:00",
+          "entry_price": 5766.25,
+          "exit_price": 5774.0,
+          "stop_price": 5774.0,
+          "target_price": 5747.0,
+          "raw_points": -7.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2024-10-17",
+          "side": "sell",
+          "entry_time": "2024-10-17T09:35:00",
+          "exit_time": "2024-10-17T12:00:00",
+          "entry_price": 5911.0,
+          "exit_price": 5910.25,
+          "stop_price": 5925.5,
+          "target_price": 5886.25,
+          "raw_points": 0.75,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2025-02-11",
+          "side": "buy",
+          "entry_time": "2025-02-11T09:35:00",
+          "exit_time": "2025-02-11T10:49:00",
+          "entry_price": 6072.25,
+          "exit_price": 6088.5,
+          "stop_price": 6063.25,
+          "target_price": 6088.5,
+          "raw_points": 16.25,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2025-06-30",
+          "side": "sell",
+          "entry_time": "2025-06-30T09:35:00",
+          "exit_time": "2025-06-30T12:00:00",
+          "entry_price": 6240.5,
+          "exit_price": 6239.25,
+          "stop_price": 6249.5,
+          "target_price": 6223.5,
+          "raw_points": 1.25,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2025-11-03",
+          "side": "sell",
+          "entry_time": "2025-11-03T09:35:00",
+          "exit_time": "2025-11-03T09:55:00",
+          "entry_price": 6898.25,
+          "exit_price": 6872.25,
+          "stop_price": 6910.0,
+          "target_price": 6872.25,
+          "raw_points": 26.0,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2026-01-02",
+          "side": "sell",
+          "entry_time": "2026-01-02T09:35:00",
+          "exit_time": "2026-01-02T09:48:00",
+          "entry_price": 6918.25,
+          "exit_price": 6933.0,
+          "stop_price": 6933.0,
+          "target_price": 6891.75,
+          "raw_points": -14.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2026-01-12",
+          "side": "buy",
+          "entry_time": "2026-01-12T09:35:00",
+          "exit_time": "2026-01-12T11:06:00",
+          "entry_price": 6981.75,
+          "exit_price": 7004.75,
+          "stop_price": 6968.0,
+          "target_price": 7004.75,
+          "raw_points": 23.0,
+          "exit_reason": "target"
+        }
+      ],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.5,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p5_confirm5_reject0p25",
+      "annual": {
+        "2024": {
+          "trades": 2,
+          "total_pnl": 77.54,
+          "expectancy": 38.77,
+          "win_rate": 0.5,
+          "profit_factor": 64.0407,
+          "max_drawdown": 1.23,
+          "t_stat": 0.9692,
+          "p_value": 0.16621023
+        },
+        "2025": {
+          "trades": 1,
+          "total_pnl": 125.02,
+          "expectancy": 125.02,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": null,
+          "p_value": 0.0
+        },
+        "2026": {
+          "trades": 2,
+          "total_pnl": 31.29,
+          "expectancy": 15.645,
+          "win_rate": 0.5,
+          "profit_factor": 1.3974,
+          "max_drawdown": 78.73,
+          "t_stat": 0.1658,
+          "p_value": 0.43416708
+        }
+      },
+      "annual_2x_cost": {
+        "2024": {
+          "trades": 2,
+          "total_pnl": 67.58,
+          "expectancy": 33.79,
+          "win_rate": 0.5,
+          "profit_factor": 11.8824,
+          "max_drawdown": 6.21,
+          "t_stat": 0.8447,
+          "p_value": 0.19912522
+        },
+        "2025": {
+          "trades": 1,
+          "total_pnl": 120.04,
+          "expectancy": 120.04,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": null,
+          "p_value": 0.0
+        },
+        "2026": {
+          "trades": 2,
+          "total_pnl": 21.33,
+          "expectancy": 10.665,
+          "win_rate": 0.5,
+          "profit_factor": 1.2548,
+          "max_drawdown": 83.71,
+          "t_stat": 0.113,
+          "p_value": 0.45501265
+        }
+      },
+      "aggregate": {
+        "trades": 5,
+        "total_pnl": 233.85,
+        "expectancy": 46.77,
+        "win_rate": 0.6,
+        "profit_factor": 3.9246,
+        "max_drawdown": 78.73,
+        "t_stat": 1.224,
+        "p_value": 0.11047846
+      },
+      "aggregate_2x_cost": {
+        "trades": 5,
+        "total_pnl": 208.95,
+        "expectancy": 41.79,
+        "win_rate": 0.6,
+        "profit_factor": 3.3237,
+        "max_drawdown": 83.71,
+        "t_stat": 1.0937,
+        "p_value": 0.13705224
+      },
+      "aggregate_3x_cost": {
+        "trades": 5,
+        "total_pnl": 184.05,
+        "expectancy": 36.81,
+        "win_rate": 0.6,
+        "profit_factor": 2.8427,
+        "max_drawdown": 88.69,
+        "t_stat": 0.9633,
+        "p_value": 0.16769077
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 2,
+        "total_pnl": 183.83,
+        "expectancy": 91.915,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": 11.3126,
+        "p_value": 0.0
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 5,
+        "total_pnl": 88.91,
+        "expectancy": 17.782,
+        "win_rate": 0.4,
+        "profit_factor": 1.9888,
+        "max_drawdown": 89.92,
+        "t_stat": 0.5368,
+        "p_value": 0.29568915
+      },
+      "exit_reasons": {
+        "target": 3,
+        "time": 1,
+        "stop": 1
+      },
+      "trades": [
+        {
+          "day": "2024-05-23",
+          "side": "sell",
+          "entry_time": "2024-05-23T09:35:00",
+          "exit_time": "2024-05-23T09:51:00",
+          "entry_price": 5346.0,
+          "exit_price": 5329.25,
+          "stop_price": 5358.75,
+          "target_price": 5329.25,
+          "raw_points": 16.75,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2024-10-17",
+          "side": "sell",
+          "entry_time": "2024-10-17T09:35:00",
+          "exit_time": "2024-10-17T12:00:00",
+          "entry_price": 5911.0,
+          "exit_price": 5910.25,
+          "stop_price": 5925.5,
+          "target_price": 5886.25,
+          "raw_points": 0.75,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2025-11-03",
+          "side": "sell",
+          "entry_time": "2025-11-03T09:35:00",
+          "exit_time": "2025-11-03T09:55:00",
+          "entry_price": 6898.25,
+          "exit_price": 6872.25,
+          "stop_price": 6910.0,
+          "target_price": 6872.25,
+          "raw_points": 26.0,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2026-01-02",
+          "side": "sell",
+          "entry_time": "2026-01-02T09:35:00",
+          "exit_time": "2026-01-02T09:48:00",
+          "entry_price": 6918.25,
+          "exit_price": 6933.0,
+          "stop_price": 6933.0,
+          "target_price": 6891.75,
+          "raw_points": -14.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2026-01-12",
+          "side": "buy",
+          "entry_time": "2026-01-12T09:35:00",
+          "exit_time": "2026-01-12T11:06:00",
+          "entry_price": 6981.75,
+          "exit_price": 7004.75,
+          "stop_price": 6968.0,
+          "target_price": 7004.75,
+          "raw_points": 23.0,
+          "exit_reason": "target"
+        }
+      ],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.35,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p35_confirm15_reject0p25",
+      "annual": {
+        "2024": {
+          "trades": 5,
+          "total_pnl": -59.9,
+          "expectancy": -11.98,
+          "win_rate": 0.4,
+          "profit_factor": 0.6225,
+          "max_drawdown": 94.96,
+          "t_stat": -0.4651,
+          "p_value": 0.67906233
+        },
+        "2025": {
+          "trades": 6,
+          "total_pnl": -32.38,
+          "expectancy": -5.3967,
+          "win_rate": 0.3333,
+          "profit_factor": 0.8339,
+          "max_drawdown": 134.94,
+          "t_stat": -0.1867,
+          "p_value": 0.57404491
+        }
+      },
+      "annual_2x_cost": {
+        "2024": {
+          "trades": 5,
+          "total_pnl": -84.8,
+          "expectancy": -16.96,
+          "win_rate": 0.4,
+          "profit_factor": 0.5116,
+          "max_drawdown": 104.92,
+          "t_stat": -0.6584,
+          "p_value": 0.74486203
+        },
+        "2025": {
+          "trades": 6,
+          "total_pnl": -62.26,
+          "expectancy": -10.3767,
+          "win_rate": 0.3333,
+          "profit_factor": 0.7102,
+          "max_drawdown": 149.88,
+          "t_stat": -0.359,
+          "p_value": 0.6401838
+        }
+      },
+      "aggregate": {
+        "trades": 11,
+        "total_pnl": -92.28,
+        "expectancy": -8.3891,
+        "win_rate": 0.3636,
+        "profit_factor": 0.739,
+        "max_drawdown": 134.94,
+        "t_stat": -0.4487,
+        "p_value": 0.67315824
+      },
+      "aggregate_2x_cost": {
+        "trades": 11,
+        "total_pnl": -147.06,
+        "expectancy": -13.3691,
+        "win_rate": 0.3636,
+        "profit_factor": 0.6214,
+        "max_drawdown": 149.88,
+        "t_stat": -0.715,
+        "p_value": 0.76269012
+      },
+      "aggregate_3x_cost": {
+        "trades": 11,
+        "total_pnl": -201.84,
+        "expectancy": -18.3491,
+        "win_rate": 0.3636,
+        "profit_factor": 0.5232,
+        "max_drawdown": 201.84,
+        "t_stat": -0.9813,
+        "p_value": 0.83678114
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 13,
+        "total_pnl": -6.98,
+        "expectancy": -0.5369,
+        "win_rate": 0.4615,
+        "profit_factor": 0.9784,
+        "max_drawdown": 162.26,
+        "t_stat": -0.0337,
+        "p_value": 0.51344669
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 11,
+        "total_pnl": -237.1,
+        "expectancy": -21.5545,
+        "win_rate": 0.2727,
+        "profit_factor": 0.3897,
+        "max_drawdown": 237.1,
+        "t_stat": -1.3705,
+        "p_value": 0.91473869
+      },
+      "exit_reasons": {
+        "stop": 6,
+        "time": 3,
+        "target": 2
+      },
+      "trades": [
+        {
+          "day": "2024-01-25",
+          "side": "sell",
+          "entry_time": "2024-01-25T09:45:00",
+          "exit_time": "2024-01-25T10:09:00",
+          "entry_price": 4913.0,
+          "exit_price": 4920.5,
+          "stop_price": 4920.5,
+          "target_price": 4898.75,
+          "raw_points": -7.5,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2024-02-07",
+          "side": "sell",
+          "entry_time": "2024-02-07T09:45:00",
+          "exit_time": "2024-02-07T10:13:00",
+          "entry_price": 4990.25,
+          "exit_price": 4999.75,
+          "stop_price": 4999.75,
+          "target_price": 4974.75,
+          "raw_points": -9.5,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2024-05-08",
+          "side": "buy",
+          "entry_time": "2024-05-08T09:45:00",
+          "exit_time": "2024-05-08T10:47:00",
+          "entry_price": 5198.5,
+          "exit_price": 5212.5,
+          "stop_price": 5190.5,
+          "target_price": 5212.5,
+          "raw_points": 14.0,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2024-10-28",
+          "side": "sell",
+          "entry_time": "2024-10-28T09:45:00",
+          "exit_time": "2024-10-28T12:00:00",
+          "entry_price": 5871.25,
+          "exit_price": 5863.5,
+          "stop_price": 5881.25,
+          "target_price": 5845.25,
+          "raw_points": 7.75,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2024-11-19",
+          "side": "buy",
+          "entry_time": "2024-11-19T09:45:00",
+          "exit_time": "2024-11-19T09:50:00",
+          "entry_price": 5893.25,
+          "exit_price": 5881.5,
+          "stop_price": 5881.5,
+          "target_price": 5920.25,
+          "raw_points": -11.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2025-02-10",
+          "side": "sell",
+          "entry_time": "2025-02-10T09:45:00",
+          "exit_time": "2025-02-10T10:04:00",
+          "entry_price": 6071.5,
+          "exit_price": 6082.5,
+          "stop_price": 6082.5,
+          "target_price": 6049.25,
+          "raw_points": -11.0,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2025-02-11",
+          "side": "buy",
+          "entry_time": "2025-02-11T09:45:00",
+          "exit_time": "2025-02-11T10:49:00",
+          "entry_price": 6074.0,
+          "exit_price": 6088.5,
+          "stop_price": 6063.25,
+          "target_price": 6088.5,
+          "raw_points": 14.5,
+          "exit_reason": "target"
+        },
+        {
+          "day": "2025-05-21",
+          "side": "buy",
+          "entry_time": "2025-05-21T09:45:00",
+          "exit_time": "2025-05-21T12:00:00",
+          "entry_price": 5927.5,
+          "exit_price": 5947.5,
+          "stop_price": 5913.5,
+          "target_price": 5959.5,
+          "raw_points": 20.0,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2025-06-30",
+          "side": "sell",
+          "entry_time": "2025-06-30T09:45:00",
+          "exit_time": "2025-06-30T12:00:00",
+          "entry_price": 6238.25,
+          "exit_price": 6239.25,
+          "stop_price": 6249.5,
+          "target_price": 6223.5,
+          "raw_points": -1.0,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2025-07-23",
+          "side": "sell",
+          "entry_time": "2025-07-23T09:45:00",
+          "exit_time": "2025-07-23T11:54:00",
+          "entry_price": 6364.0,
+          "exit_price": 6373.75,
+          "stop_price": 6373.75,
+          "target_price": 6345.5,
+          "raw_points": -9.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2025-12-29",
+          "side": "buy",
+          "entry_time": "2025-12-29T09:45:00",
+          "exit_time": "2025-12-29T10:07:00",
+          "entry_price": 6960.25,
+          "exit_price": 6947.0,
+          "stop_price": 6947.0,
+          "target_price": 6980.0,
+          "raw_points": -13.25,
+          "exit_reason": "stop"
+        }
+      ],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.5,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p5_confirm15_reject0p25",
+      "annual": {
+        "2024": {
+          "trades": 2,
+          "total_pnl": -29.96,
+          "expectancy": -14.98,
+          "win_rate": 0.5,
+          "profit_factor": 0.5299,
+          "max_drawdown": 63.73,
+          "t_stat": -0.3073,
+          "p_value": 0.62068565
+        },
+        "2025": {
+          "trades": 2,
+          "total_pnl": 35.04,
+          "expectancy": 17.52,
+          "win_rate": 0.5,
+          "profit_factor": 1.5842,
+          "max_drawdown": 59.98,
+          "t_stat": 0.2261,
+          "p_value": 0.41057562
+        }
+      },
+      "annual_2x_cost": {
+        "2024": {
+          "trades": 2,
+          "total_pnl": -39.92,
+          "expectancy": -19.96,
+          "win_rate": 0.5,
+          "profit_factor": 0.419,
+          "max_drawdown": 68.71,
+          "t_stat": -0.4094,
+          "p_value": 0.6588901
+        },
+        "2025": {
+          "trades": 2,
+          "total_pnl": 25.08,
+          "expectancy": 12.54,
+          "win_rate": 0.5,
+          "profit_factor": 1.3861,
+          "max_drawdown": 64.96,
+          "t_stat": 0.1618,
+          "p_value": 0.43572914
+        }
+      },
+      "aggregate": {
+        "trades": 4,
+        "total_pnl": 5.08,
+        "expectancy": 1.27,
+        "win_rate": 0.5,
+        "profit_factor": 1.0411,
+        "max_drawdown": 123.71,
+        "t_stat": 0.033,
+        "p_value": 0.48685535
+      },
+      "aggregate_2x_cost": {
+        "trades": 4,
+        "total_pnl": -14.84,
+        "expectancy": -3.71,
+        "win_rate": 0.5,
+        "profit_factor": 0.889,
+        "max_drawdown": 133.67,
+        "t_stat": -0.0963,
+        "p_value": 0.53834666
+      },
+      "aggregate_3x_cost": {
+        "trades": 4,
+        "total_pnl": -34.76,
+        "expectancy": -8.69,
+        "win_rate": 0.5,
+        "profit_factor": 0.758,
+        "max_drawdown": 143.63,
+        "t_stat": -0.2255,
+        "p_value": 0.58920224
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 4,
+        "total_pnl": -12.34,
+        "expectancy": -3.085,
+        "win_rate": 0.5,
+        "profit_factor": 0.9022,
+        "max_drawdown": 126.17,
+        "t_stat": -0.0841,
+        "p_value": 0.53352653
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 4,
+        "total_pnl": -104.88,
+        "expectancy": -26.22,
+        "win_rate": 0.25,
+        "profit_factor": 0.2154,
+        "max_drawdown": 133.67,
+        "t_stat": -1.0841,
+        "p_value": 0.86083553
+      },
+      "exit_reasons": {
+        "time": 2,
+        "stop": 2
+      },
+      "trades": [
+        {
+          "day": "2024-10-28",
+          "side": "sell",
+          "entry_time": "2024-10-28T09:45:00",
+          "exit_time": "2024-10-28T12:00:00",
+          "entry_price": 5871.25,
+          "exit_price": 5863.5,
+          "stop_price": 5881.25,
+          "target_price": 5845.25,
+          "raw_points": 7.75,
+          "exit_reason": "time"
+        },
+        {
+          "day": "2024-11-19",
+          "side": "buy",
+          "entry_time": "2024-11-19T09:45:00",
+          "exit_time": "2024-11-19T09:50:00",
+          "entry_price": 5893.25,
+          "exit_price": 5881.5,
+          "stop_price": 5881.5,
+          "target_price": 5920.25,
+          "raw_points": -11.75,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2025-02-10",
+          "side": "sell",
+          "entry_time": "2025-02-10T09:45:00",
+          "exit_time": "2025-02-10T10:04:00",
+          "entry_price": 6071.5,
+          "exit_price": 6082.5,
+          "stop_price": 6082.5,
+          "target_price": 6049.25,
+          "raw_points": -11.0,
+          "exit_reason": "stop"
+        },
+        {
+          "day": "2025-05-21",
+          "side": "buy",
+          "entry_time": "2025-05-21T09:45:00",
+          "exit_time": "2025-05-21T12:00:00",
+          "entry_price": 5927.5,
+          "exit_price": 5947.5,
+          "stop_price": 5913.5,
+          "target_price": 5959.5,
+          "raw_points": 20.0,
+          "exit_reason": "time"
+        }
+      ],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.75,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p75_confirm15_reject0p25",
+      "annual": {
+        "2025": {
+          "trades": 1,
+          "total_pnl": 95.02,
+          "expectancy": 95.02,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": null,
+          "p_value": 0.0
+        }
+      },
+      "annual_2x_cost": {
+        "2025": {
+          "trades": 1,
+          "total_pnl": 90.04,
+          "expectancy": 90.04,
+          "win_rate": 1.0,
+          "profit_factor": null,
+          "max_drawdown": 0.0,
+          "t_stat": null,
+          "p_value": 0.0
+        }
+      },
+      "aggregate": {
+        "trades": 1,
+        "total_pnl": 95.02,
+        "expectancy": 95.02,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": null,
+        "p_value": 0.0
+      },
+      "aggregate_2x_cost": {
+        "trades": 1,
+        "total_pnl": 90.04,
+        "expectancy": 90.04,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": null,
+        "p_value": 0.0
+      },
+      "aggregate_3x_cost": {
+        "trades": 1,
+        "total_pnl": 85.06,
+        "expectancy": 85.06,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": null,
+        "p_value": 0.0
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 1,
+        "total_pnl": 86.29,
+        "expectancy": 86.29,
+        "win_rate": 1.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": null,
+        "p_value": 0.0
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 1,
+        "total_pnl": 0.0,
+        "expectancy": 0.0,
+        "win_rate": 0.0,
+        "profit_factor": null,
+        "max_drawdown": 0.0,
+        "t_stat": 0.0,
+        "p_value": 0.5
+      },
+      "exit_reasons": {
+        "time": 1
+      },
+      "trades": [
+        {
+          "day": "2025-05-21",
+          "side": "buy",
+          "entry_time": "2025-05-21T09:45:00",
+          "exit_time": "2025-05-21T12:00:00",
+          "entry_price": 5927.5,
+          "exit_price": 5947.5,
+          "stop_price": 5913.5,
+          "target_price": 5959.5,
+          "raw_points": 20.0,
+          "exit_reason": "time"
+        }
+      ],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.35,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p35_confirm5_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.35,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p35_confirm15_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 1,
+        "total_pnl": -29.96,
+        "expectancy": -29.96,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "max_drawdown": 29.96,
+        "t_stat": 0.0,
+        "p_value": 0.5
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.5,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p5_confirm5_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.5,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p5_confirm15_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.75,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.25,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p75_confirm5_reject0p25",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.75,
+        "confirmation_minutes": 5,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p75_confirm5_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    },
+    {
+      "config": {
+        "min_gap_pct": 0.75,
+        "confirmation_minutes": 15,
+        "rejection_fraction": 0.5,
+        "min_reward_risk": 1.25,
+        "stop_buffer_ticks": 2,
+        "max_risk_ticks": 60
+      },
+      "name": "gap0p75_confirm15_reject0p5",
+      "annual": {},
+      "annual_2x_cost": {},
+      "aggregate": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_3x_cost": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_one_bar_delay": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "aggregate_2x_cost_without_top_1pct": {
+        "trades": 0,
+        "expectancy": null,
+        "profit_factor": null,
+        "win_rate": null,
+        "p_value": null
+      },
+      "exit_reasons": {},
+      "trades": [],
+      "historical_stability_pass": false
+    }
+  ]
+}
