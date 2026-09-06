@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,11 @@ from typing import Any, Iterable, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from agent.governance.statistical_gate import (REGISTRY_PATH, StatisticalGate,
+                                                append_gate_history)
 DATA_DIR = ROOT / "data"
 OUTPUT_PATH = DATA_DIR / "shadow_outcomes.jsonl"
 LEDGER_NAMES = (
@@ -334,11 +340,31 @@ def run_once(*, data_dir: Path = DATA_DIR, output_path: Path = OUTPUT_PATH, now:
         with output_path.open("a", encoding="utf-8", newline="\n") as handle:
             for row in rows:
                 handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    gate_evaluations: list[dict[str, Any]] = []
+    gate_errors: list[str] = []
+    if rows and output_path.resolve() == OUTPUT_PATH.resolve():
+        try:
+            registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+            registered = {str(signal.get("id")) for signal in registry.get("signals") or []}
+            touched = sorted({str(row.get(key)) for row in rows for key in
+                              ("strategy_id", "candidate_id", "family_id")
+                              if row.get(key) and str(row.get(key)) in registered})
+            gate = StatisticalGate()
+            for signal_id in touched:
+                decision = gate.evaluate(signal_id)
+                append_gate_history(decision)
+                gate_evaluations.append({"signal_id": signal_id, "status": decision.status})
+        except Exception as exc:
+            # Outcome persistence succeeds independently; governance reports the
+            # exact missing dependency instead of blocking or inventing stats.
+            gate_errors.append(type(exc).__name__)
     return {
         "schema_version": 1,
         "resolved_count": len(rows),
         "existing_count": len(existing),
         "missing_ledgers": sorted(name for name in LEDGER_NAMES if not (data_dir / name).exists()),
+        "statistical_gate_evaluations": gate_evaluations,
+        "statistical_gate_errors": gate_errors,
         "execution_enabled": False,
         "can_submit_orders": False,
     }

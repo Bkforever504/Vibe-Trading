@@ -11,6 +11,7 @@ import csv
 import html
 import json
 import math
+import os
 import re
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -34,8 +35,14 @@ OPTIONS_TRADES_PATH = VIBE_HOME / "options-trades.json"
 POSITION_SIZING_LOG = ROOT / "data" / "position_sizing_sanity_log.jsonl"
 BOT_STATUS_LOG = ROOT / "data" / "bot_status_snapshot_log.jsonl"
 SIGNAL_GRADES_LOG = ROOT / "data" / "signal_stack_grades_log.jsonl"
+SOCIAL_REPLAY_QUEUE = ROOT / "data" / "social_replay_queue.jsonl"
+PRIORITY_SWING_EVENT_LOG = ROOT / "data" / "priority_swing_observation_events.jsonl"
+DATABENTO_CALL_LEDGER = VIBE_HOME / "data" / "databento_call_ledger.jsonl"
+SOCIAL_GAP_MATCH_REPORT = ROOT / "research" / "social_trader_signal_gap_match_2026-09-01.json"
+SESSION_FOCUS_SYMBOLS = ("NVDA", "GOOGL", "AAPL", "META")
 
 REPORTS = {
+    "agent_reach_research": REPORT_DIR / "agent-reach-trading-research.json",
     "bot_status": REPORT_DIR / "bot-status-snapshot.json",
     "daily_eod": REPORT_DIR / "daily-eod-summary.json",
     "grades": REPORT_DIR / "signal-stack-grades.json",
@@ -48,6 +55,19 @@ REPORTS = {
     "portfolio": REPORT_DIR / "portfolio-concentration.json",
     "shadow_pnl": REPORT_DIR / "flip-shadow-pnl-evaluator.json",
     "shadow_consensus": REPORT_DIR / "shadow-consensus-gate.json",
+    "governed_shadow": REPORT_DIR / "governed-shadow-decisions.json",
+    "governed_alert": REPORT_DIR / "governed-shadow-alert-delivery.json",
+    "governed_lifecycle": REPORT_DIR / "governed-shadow-lifecycle.json",
+    "governed_outcomes": REPORT_DIR / "governed-shadow-outcomes.json",
+    "discord_chart_review": REPORT_DIR / "discord-alert-chart-review.json",
+    "execution_readiness": REPORT_DIR / "execution-readiness.json",
+    "latency_budget": REPORT_DIR / "latency-budget-scorecard.json",
+    "statistical_governance": REPORT_DIR / "statistical-governance.json",
+    "scanner_evidence": REPORT_DIR / "scanner-evidence-collection.json",
+    "feed_reference": REPORT_DIR / "scanner-feed-reference-study.json",
+    "governed_rules": REPORT_DIR / "governed-shadow-rule-updates.json",
+    "institutional_confluence": REPORT_DIR / "institutional-confluence-shadow.json",
+    "premarket_thesis": REPORT_DIR / "premarket-thesis-shadow.json",
     "candlestick_context": REPORT_DIR / "candlestick-context.json",
     "higher_timeframe": REPORT_DIR / "higher-timeframe-market-map.json",
     "market_catalyst": REPORT_DIR / "market-catalyst-calendar.json",
@@ -67,10 +87,37 @@ REPORTS = {
     "activity": REPORT_DIR / "daily-bot-activity-2026-07-03.csv",
     "aplus_spotlight": REPORT_DIR / "aplus-spotlight.json",
     "bplus_spotlight": REPORT_DIR / "bplus-spotlight.json",
+    "economic_ranking_regret": REPORT_DIR / "economic-ranking-regret.json",
+    "aplus_contract_feasibility": REPORT_DIR / "aplus-contract-feasibility.json",
+    "aplus_market_context": REPORT_DIR / "aplus-market-context.json",
+    "footprint_evidence": REPORT_DIR / "footprint-evidence-shadow.json",
     "spy_level_reaction": REPORT_DIR / "spy-level-reaction-shadow.json",
     "spy_level_outcomes": REPORT_DIR / "spy-level-reaction-outcomes.json",
     "adversarial_audit": REPORT_DIR / "adversarial-strategy-audit.json",
     "elite_readiness": REPORT_DIR / "elite-bot-readiness-scorecard.json",
+    "shadow_audit": REPORT_DIR / "shadow-logger-audit.json",
+    "operational_gate": REPORT_DIR / "operational-readiness-gate.json",
+    "premarket_readiness": REPORT_DIR / "premarket-operational-readiness.json",
+    "multi_timeframe_edge": REPORT_DIR / "multi-timeframe-edge-tournament.json",
+    "trader_barbie_3m": REPORT_DIR / "trader-barbie-3m-ce-lab.json",
+    "strategy_concept_coverage": REPORT_DIR / "strategy-concept-coverage-audit.json",
+    "uncovered_concept_tournament": REPORT_DIR / "uncovered-concept-tournament.json",
+    "daily_rsi2_200sma": REPORT_DIR / "daily-rsi2-200sma-hold-tournament.json",
+    "intraday_radar": REPORT_DIR / "intraday-opportunity-radar.json",
+    "intraday_sector_posture": REPORT_DIR / "intraday-sector-posture.json",
+    "intraday_lifecycle_shadow": REPORT_DIR / "intraday-trade-lifecycle-shadow.json",
+    "simple_price_action_alerts": REPORT_DIR / "simple-price-action-alerts.json",
+    "wolves_bbr_shadow": REPORT_DIR / "wolves-bbr-shadow.json",
+    "banks_821_shadow": REPORT_DIR / "banks-821-control-shadow.json",
+    "donchian_expansion_shadow": REPORT_DIR / "donchian-expansion-shadow.json",
+    "donchian_expansion_forward_shadow": REPORT_DIR / "donchian-expansion-forward-shadow.json",
+    "liquid_signal_chart_audit": REPORT_DIR / "liquid-signal-chart-audit.json",
+    "spy_5m_0dte_orb": REPORT_DIR / "spy-5m-0dte-orb-shadow.json",
+    "continuous_improvement": REPORT_DIR / "continuous-improvement-scorecard.json",
+    "daily_move_coverage_review": REPORT_DIR / "daily-move-coverage-review.json",
+    "priority_swing_observation": REPORT_DIR / "priority-swing-observation.json",
+    "operational_runs": REPORT_DIR / "operational-run-health.json",
+    "daily_level_map_shadow": REPORT_DIR / "daily-level-map-shadow.json",
 }
 
 
@@ -239,6 +286,15 @@ def parse_credit_pnl_estimate(trade: dict[str, Any]) -> float | None:
     return round(credit * qty * 100 * safe_float(match.group(1)) / 100, 2)
 
 
+def option_pnl_provenance(trade: dict[str, Any]) -> str:
+    """Classify an options outcome without presenting an estimate as a fill."""
+    if trade.get("pnl") not in (None, ""):
+        return "reconciled"
+    if parse_credit_pnl_estimate(trade) is not None:
+        return "estimated_from_exit_rule"
+    return "unreconciled"
+
+
 def option_trade_stats(state: dict[str, Any], positions: list[dict[str, Any]]) -> dict[str, Any]:
     trades = state.get("trades") if isinstance(state.get("trades"), list) else []
     closed = [t for t in trades if t.get("status") == "closed"]
@@ -255,6 +311,9 @@ def option_trade_stats(state: dict[str, Any], positions: list[dict[str, Any]]) -
         "unrealized": unrealized,
         "win_rate": len(wins) / len(known) if known else None,
         "known_pnl_count": len(known),
+        "estimated_pnl_count": sum(1 for t in closed if option_pnl_provenance(t) == "estimated_from_exit_rule"),
+        "reconciled_pnl_count": sum(1 for t in closed if option_pnl_provenance(t) == "reconciled"),
+        "unreconciled_pnl_count": sum(1 for t in closed if option_pnl_provenance(t) == "unreconciled"),
     }
 
 
@@ -392,6 +451,22 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "position_sizing": read_jsonl_latest(POSITION_SIZING_LOG),
         "shadow_pnl": load_json(paths["shadow_pnl"], {}),
         "shadow_consensus": load_json(paths["shadow_consensus"], {}),
+        "governed_shadow": load_json(paths["governed_shadow"], {}),
+        "governed_alert": load_json(paths["governed_alert"], {}),
+        "governed_lifecycle": load_json(paths["governed_lifecycle"], {}),
+        "governed_outcomes": load_json(paths["governed_outcomes"], {}),
+        "discord_chart_review": load_json(paths.get("discord_chart_review", REPORTS["discord_chart_review"]), {}),
+        "execution_readiness": load_json(paths.get("execution_readiness", REPORTS["execution_readiness"]), {}),
+        "latency_budget": load_json(paths.get("latency_budget", REPORTS["latency_budget"]), {}),
+        "statistical_governance": load_json(paths.get("statistical_governance", REPORTS["statistical_governance"]), {}),
+        "scanner_evidence": load_json(paths.get("scanner_evidence", REPORTS["scanner_evidence"]), {}),
+        "feed_reference": load_json(paths.get("feed_reference", REPORTS["feed_reference"]), {}),
+        "governed_rules": load_json(paths["governed_rules"], {}),
+        "institutional_confluence": load_json(paths["institutional_confluence"], {}),
+        "premarket_thesis": load_json(paths.get("premarket_thesis", REPORTS["premarket_thesis"]), {}),
+        "databento_call_ledger": read_jsonl_rows(
+            paths.get("databento_call_ledger", DATABENTO_CALL_LEDGER)
+        ),
         "candlestick_context": load_json(paths["candlestick_context"], {}),
         "higher_timeframe": load_json(paths["higher_timeframe"], {}),
         "market_catalyst": load_json(paths["market_catalyst"], {}),
@@ -416,6 +491,45 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "spy_level_outcomes": load_json(paths["spy_level_outcomes"], {}),
         "adversarial_audit": load_json(paths["adversarial_audit"], {}),
         "elite_readiness": load_json(paths["elite_readiness"], {}),
+        "shadow_audit": load_json(paths["shadow_audit"], {}),
+        "operational_gate": load_json(paths["operational_gate"], {}),
+        "premarket_readiness": load_json(paths["premarket_readiness"], {}),
+        "aplus_spotlight": load_json(paths["aplus_spotlight"], {}),
+        "bplus_spotlight": load_json(paths["bplus_spotlight"], {}),
+        "economic_ranking_regret": load_json(paths["economic_ranking_regret"], {}),
+        "aplus_contract_feasibility": load_json(paths["aplus_contract_feasibility"], {}),
+        "aplus_market_context": load_json(paths["aplus_market_context"], {}),
+        "footprint_evidence": load_json(paths["footprint_evidence"], {}),
+        "multi_timeframe_edge": load_json(paths["multi_timeframe_edge"], {}),
+        "trader_barbie_3m": load_json(paths["trader_barbie_3m"], {}),
+        "strategy_concept_coverage": load_json(paths["strategy_concept_coverage"], {}),
+        "uncovered_concept_tournament": load_json(paths["uncovered_concept_tournament"], {}),
+        "daily_rsi2_200sma": load_json(paths["daily_rsi2_200sma"], {}),
+        "intraday_radar": load_json(paths["intraday_radar"], {}),
+        "intraday_sector_posture": load_json(paths["intraday_sector_posture"], {}),
+        "intraday_lifecycle_shadow": load_json(paths["intraday_lifecycle_shadow"], {}),
+        "simple_price_action_alerts": load_json(paths["simple_price_action_alerts"], {}),
+        "wolves_bbr_shadow": load_json(paths["wolves_bbr_shadow"], {}),
+        "banks_821_shadow": load_json(paths["banks_821_shadow"], {}),
+        "donchian_expansion_shadow": load_json(paths["donchian_expansion_shadow"], {}),
+        "donchian_expansion_forward_shadow": load_json(paths["donchian_expansion_forward_shadow"], {}),
+        "liquid_signal_chart_audit": load_json(paths["liquid_signal_chart_audit"], {}),
+        "spy_5m_0dte_orb": load_json(paths["spy_5m_0dte_orb"], {}),
+        "continuous_improvement": load_json(paths["continuous_improvement"], {}),
+        "daily_move_coverage_review": load_json(
+            paths.get("daily_move_coverage_review", REPORTS["daily_move_coverage_review"]), {}
+        ),
+        "priority_swing_observation": load_json(
+            paths.get("priority_swing_observation", REPORTS["priority_swing_observation"]), {}
+        ),
+        "priority_swing_events": read_jsonl_rows(PRIORITY_SWING_EVENT_LOG),
+        "operational_runs": load_json(paths["operational_runs"], {}),
+        "daily_level_map_shadow": load_json(
+            paths.get("daily_level_map_shadow", REPORTS["daily_level_map_shadow"]), {}
+        ),
+        "agent_reach_research": load_json(paths["agent_reach_research"], {}),
+        "social_replay_queue": read_jsonl_rows(SOCIAL_REPLAY_QUEUE),
+        "social_gap_match": load_json(SOCIAL_GAP_MATCH_REPORT, {}),
     }
     model["positions_by_symbol"] = {str(pos.get("symbol")): pos for pos in positions if isinstance(pos, dict)}
     model["chart_data"] = build_chart_data(model)
@@ -429,6 +543,52 @@ def stat_card(label: str, value: str, sub: str = "", tone: str = "") -> str:
         <strong>{value}</strong>
         <small>{esc(sub)}</small>
       </div>"""
+
+
+def render_continuous_improvement(model: dict[str, Any]) -> str:
+    data = model.get("continuous_improvement") if isinstance(model.get("continuous_improvement"), dict) else {}
+    if not data:
+        return section("Daily Learning Accountability", "<p class='muted'>No scorecard yet.</p>", "Shadow-only · no automatic tuning or promotion")
+    daily = data.get("daily") if isinstance(data.get("daily"), dict) else {}
+    change = data.get("change_vs_previous_session") if isinstance(data.get("change_vs_previous_session"), dict) else {}
+    grade = str(daily.get("grade") or "—")
+    tone = "good" if grade == "A" else "warn" if grade in {"B", "C"} else "bad"
+    delivery = daily.get("delivery_success_pct")
+    p95 = daily.get("p95_alert_latency_seconds")
+    stats = (
+        '<div class="stat-grid">'
+        + stat_card("Daily Grade", grade, "measurement, not performance", tone)
+        + stat_card("Scorecard Date", str(data.get("date") or "—"), f"generated {data.get('generated_at') or '—'}")
+        + stat_card("Core Alerts", str(safe_int(daily.get("core_index_events"))), ", ".join(daily.get("core_symbols_seen") or []) or "none")
+        + stat_card("Discord", f"{delivery:.1f}%" if isinstance(delivery, (int, float)) else "—", f"{safe_int(daily.get('discord_delivered'))}/{safe_int(daily.get('discord_attempts'))} delivered", "bad" if safe_int(daily.get("discord_failures")) else "")
+        + stat_card("P95 Alert Lag", f"{p95:.0f}s" if isinstance(p95, (int, float)) else "—", f"late alerts {safe_int(daily.get('late_alert_count'))}", "bad" if isinstance(p95, (int, float)) and p95 > 180 else "")
+        + stat_card("Discovery Recall", f"{safe_float(daily.get('source_discovery_recall_pct')):.1f}%" if daily.get("source_discovery_recall_pct") is not None else "—", f"Δ {change.get('discovery_recall_pct_delta') if change.get('discovery_recall_pct_delta') is not None else '—'}")
+        + stat_card("Actionable Early", f"{safe_float(daily.get('actionable_early_recall_pct')):.1f}%" if daily.get("actionable_early_recall_pct") is not None else "—", "covered-source denominator")
+        + '</div>'
+    )
+    failure_rows = []
+    for row in data.get("failures") or []:
+        failure_rows.append(
+            f"<tr><td><strong>{esc(row.get('stage'))}</strong></td><td>{esc(row.get('severity'))}</td>"
+            f"<td class='muted small'>{esc(row.get('lesson'))}</td></tr>"
+        )
+    failures = (
+        "<h3>Failures that must be closed</h3><div class='table-wrap'><table><thead><tr><th>Stage</th><th>Severity</th><th>Required lesson</th></tr></thead><tbody>"
+        + ("".join(failure_rows) or "<tr><td colspan='3'>No critical gap detected in the current evidence.</td></tr>")
+        + "</tbody></table></div>"
+    )
+    lesson_rows = []
+    for row in data.get("retained_lessons") or []:
+        lesson_rows.append(
+            f"<tr><td><strong>{esc(row.get('pattern'))}</strong></td><td>{esc(row.get('acceptance'))}</td>"
+            f"<td class='muted small'>{esc(row.get('entry_policy'))}</td><td>{esc(row.get('status'))}</td></tr>"
+        )
+    lessons = (
+        "<h3>Rules retained from reviewed trades</h3><div class='table-wrap'><table><thead><tr><th>Pattern</th><th>Mechanical acceptance</th><th>Alert/entry policy</th><th>Status</th></tr></thead><tbody>"
+        + "".join(lesson_rows)
+        + "</tbody></table></div>"
+    )
+    return section("Daily Learning Accountability", stats + failures + lessons, "Every radar cycle · Shadow-only · Human promotion required")
 
 
 def section(title: str, body: str, subtitle: str = "") -> str:
@@ -490,6 +650,9 @@ def _render_spotlight_cards(setups: list[dict[str, Any]], *, wrapper_cls: str) -
           <div class="lvl"><span>Risk / R:R</span><b>${risk:.2f} · {rr:.2f}R</b></div>
           <div class="lvl"><span>Context</span><b>{esc(sector)} · {esc(alignment)}</b></div>
           <div class="lvl"><span>Intermarket</span><b>{esc(qqq_text)}</b></div>
+          <div class="lvl"><span>Evidence gate</span><b>{esc(str(setup.get('evidence_state') or 'candidate_only'))}</b></div>
+          <div class="lvl"><span>Calibration / contract</span><b>{esc(str(setup.get('calibration_status') or 'unavailable'))} · {esc(str(setup.get('contract_status') or 'unavailable'))}</b></div>
+          <div class="lvl"><span>Footprint evidence</span><b>{esc(str(setup.get('footprint_source_quality') or 'proxy_or_unavailable'))}</b></div>
         </div>"""
         )
     return "".join(cards)
@@ -511,7 +674,7 @@ def render_aplus_spotlight(model: dict[str, Any]) -> str:
         <span>★ A+ Setup Spotlight ★</span>
         <span class="aplus-count">{len(setups)}</span>
       </div>
-      <div class="aplus-sub">Confirmed 5m · grade A · score >= 93 · actionable rank · updated {generated}</div>
+      <div class="aplus-sub">A+ candidates: confirmed 5m · grade A · score >= 93. Evidence gate must pass before executable shadow readiness · updated {generated}</div>
       <div class="aplus-list">{_render_spotlight_cards(setups, wrapper_cls='aplus')}</div>
     </div>"""
 
@@ -525,6 +688,204 @@ def render_bplus_spotlight(model: dict[str, Any]) -> str:
       <div class="bplus-head"><span>B+ Setup Watch</span><span class="bplus-count">0</span></div>
       <div class="bplus-sub">No confirmed B+ / A- setups are live. Watch will glow amber when score >= 75 confirms.</div>
     </div>"""
+
+
+def render_multi_timeframe_edge(model: dict[str, Any]) -> str:
+    """Show research candidates without allowing historical tests to influence ranks."""
+    data = model.get("multi_timeframe_edge") if isinstance(model.get("multi_timeframe_edge"), dict) else {}
+    if not data:
+        return section(
+            "Multi-Timeframe Edge Lab",
+            '<div class="empty">Tournament report unavailable. Scanner ranks are unchanged.</div>',
+            "Historical research only · no rank, alert, sizing, or order authority",
+        )
+    robust = data.get("cross_market_robust_pairs") if isinstance(data.get("cross_market_robust_pairs"), list) else []
+    top = data.get("top_20_research_results") if isinstance(data.get("top_20_research_results"), list) else []
+    rows: list[str] = []
+    for item in top[:8]:
+        if not isinstance(item, dict):
+            continue
+        metrics = item.get("metrics") if isinstance(item.get("metrics"), dict) else {}
+        expectancy = metrics.get("expectancy")
+        pf = metrics.get("profit_factor")
+        rows.append(
+            "<tr>"
+            f"<td>{esc(item.get('market'))}</td>"
+            f"<td>{esc(item.get('family'))}</td>"
+            f"<td>{safe_int(item.get('timeframe_minutes'))}m</td>"
+            f"<td>{safe_int(metrics.get('trades'))}</td>"
+            f"<td>{money(expectancy)}</td>"
+            f"<td>{safe_float(pf):.2f}</td>"
+            f"<td>{'forward shadow' if item.get('cross_market_robust') else 'rejected / research'}</td>"
+            "</tr>"
+        )
+    body = (
+        '<div class="stats">'
+        + stat_card("Trials", str(safe_int(data.get("new_attempt_count"))), "SPY + QQQ")
+        + stat_card("Corrected survivors", str(len(robust)), "must pass both markets", "good" if robust else "warn")
+        + stat_card("Rank effect", "NONE", "historical selection-contaminated")
+        + "</div>"
+        + '<div class="table-wrap"><table><thead><tr><th>Market</th><th>Family</th><th>TF</th><th>Trades</th><th>Net expectancy</th><th>PF</th><th>Status</th></tr></thead><tbody>'
+        + ("".join(rows) or '<tr><td colspan="7">No evaluated trials found.</td></tr>')
+        + "</tbody></table></div>"
+        + f'<p class="muted">Verdict: {esc(data.get("verdict") or "unavailable")}. A historical survivor can only enter a separately measured forward-shadow lane.</p>'
+    )
+    return section(
+        "Multi-Timeframe Edge Lab",
+        body,
+        "Controlled family × timeframe tournament · doubled-friction, walk-forward, and cumulative multiple-testing gates",
+    )
+
+
+def render_trader_barbie_3m(model: dict[str, Any]) -> str:
+    """Render the screenshot-matched 15m-context/3m-entry research lane."""
+    data = model.get("trader_barbie_3m") if isinstance(model.get("trader_barbie_3m"), dict) else {}
+    if not data:
+        return section(
+            "Trader Barbie 3m CE Lab",
+            '<div class="empty">3-minute research report unavailable. Live ranks are unchanged.</div>',
+            "15m context · 3m CE execution · 30-minute maximum hold",
+        )
+    lanes = data.get("lanes") if isinstance(data.get("lanes"), list) else []
+    coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    rows: list[str] = []
+    for lane in lanes:
+        if not isinstance(lane, dict):
+            continue
+        metrics = lane.get("aggregate") if isinstance(lane.get("aggregate"), dict) else {}
+        stress = lane.get("double_friction") if isinstance(lane.get("double_friction"), dict) else {}
+        rows.append(
+            "<tr>"
+            f"<td>{esc(lane.get('lane'))}</td>"
+            f"<td>{safe_int(metrics.get('trades'))}</td>"
+            f"<td>{safe_float(metrics.get('expectancy_r')):+.3f}R</td>"
+            f"<td>{safe_float(metrics.get('profit_factor')):.2f}</td>"
+            f"<td>{pct(metrics.get('win_rate'), scale=True)}</td>"
+            f"<td>{safe_float(stress.get('expectancy_r')):+.3f}R</td>"
+            f"<td>{'SPY gate pass' if lane.get('spy_statistical_gate_pass') else 'rejected / observe'}</td>"
+            "</tr>"
+        )
+    body = (
+        '<div class="stats">'
+        + stat_card("Complete RTH days", str(safe_int(coverage.get("complete_rth_days"))), "strict 390-minute sessions")
+        + stat_card("Context events", str(safe_int(data.get("context_event_count"))), "15m sweep + CE")
+        + stat_card("Rank effect", "NONE", "SPY-only historical research")
+        + "</div>"
+        + '<div class="table-wrap"><table><thead><tr><th>Lane</th><th>Trades</th><th>Net expectancy</th><th>PF</th><th>Win</th><th>8 bps expectancy</th><th>Status</th></tr></thead><tbody>'
+        + ("".join(rows) or '<tr><td colspan="7">No lanes evaluated.</td></tr>')
+        + "</tbody></table></div>"
+        + f'<p class="muted">Verdict: {esc(data.get("verdict") or "unavailable")}. “Failed 2” remains a documented proxy; QQQ 1-minute confirmation and new forward evidence are still missing.</p>'
+    )
+    return section(
+        "Trader Barbie 3m CE Lab",
+        body,
+        "First CE cross vs failed-first/second recross vs second recross + STRAT 2 · maximum 30-minute hold",
+    )
+
+
+def render_daily_rsi2_challenger(model: dict[str, Any]) -> str:
+    """Show the source-matched daily futures challenger without confusing it with intraday alerts."""
+    data = model.get("daily_rsi2_200sma") if isinstance(model.get("daily_rsi2_200sma"), dict) else {}
+    if not data:
+        return section(
+            "Daily RSI(2) Pullback Challenger",
+            '<div class="empty">Research report unavailable. It has no scanner or execution effect.</div>',
+            "Daily ES/NQ underlying research · distinct from intraday options setups",
+        )
+    rows: list[str] = []
+    for item in data.get("results") or []:
+        if not isinstance(item, dict):
+            continue
+        oos = ((item.get("trade_metrics") or {}).get("out_of_sample_2025_plus") or {})
+        rows.append(
+            "<tr>"
+            f"<td>{esc(item.get('instrument'))}</td>"
+            f"<td>{safe_int(oos.get('trades'))}</td>"
+            f"<td>{pct(oos.get('win_rate'), scale=True)}</td>"
+            f"<td>{safe_float(oos.get('average_return_pct')):+.3f}%</td>"
+            f"<td>{safe_float(oos.get('profit_factor')):.2f}</td>"
+            f"<td>{esc(item.get('status'))}</td>"
+            "</tr>"
+        )
+    summary = data.get("out_of_sample_summary") if isinstance(data.get("out_of_sample_summary"), dict) else {}
+    body = (
+        '<div class="stats">'
+        + stat_card("OOS instruments", str(safe_int(summary.get("evaluated_instruments"))), "ES + NQ continuous data")
+        + stat_card("Minimum OOS trades", str(safe_int(summary.get("minimum_oos_trades"))), "2025 onward")
+        + stat_card("Rank effect", "NONE", "daily research only")
+        + "</div>"
+        + '<div class="table-wrap"><table><thead><tr><th>Instrument</th><th>OOS trades</th><th>Win</th><th>Avg underlying return</th><th>PF</th><th>Data</th></tr></thead><tbody>'
+        + ("".join(rows) or '<tr><td colspan="6">No evaluated instruments.</td></tr>')
+        + "</tbody></table></div>"
+        + f'<p class="muted">{esc(data.get("promotion_status") or "promotion blocked")}. This is a daily underlying test, not an options-P&L claim.</p>'
+    )
+    return section(
+        "Daily RSI(2) Pullback Challenger",
+        body,
+        "Exact supplied rules: RSI(2) < 10 above 200-day SMA; exit RSI(2) > 70 or ten sessions · no live authority",
+    )
+
+
+def render_strategy_discovery_coverage(model: dict[str, Any]) -> str:
+    """Expose missing concept evidence so strategy discovery cannot silently stop."""
+    coverage = model.get("strategy_concept_coverage") if isinstance(model.get("strategy_concept_coverage"), dict) else {}
+    tournament = model.get("uncovered_concept_tournament") if isinstance(model.get("uncovered_concept_tournament"), dict) else {}
+    if not coverage:
+        return section(
+            "Strategy Discovery Coverage",
+            '<div class="empty">Concept evidence audit unavailable. Do not interpret implementation count as test coverage.</div>',
+            "Persistent inventory of tested, proxy-only, untested, and data-blocked concepts",
+        )
+    queue = coverage.get("priority_queue") if isinstance(coverage.get("priority_queue"), list) else []
+    queue_rows: list[str] = []
+    for item in queue[:10]:
+        if not isinstance(item, dict):
+            continue
+        queue_rows.append(
+            "<tr>"
+            f"<td>{esc(item.get('id'))}</td>"
+            f"<td>{esc(item.get('evidence_status'))}</td>"
+            f"<td>{esc(item.get('data_readiness'))}</td>"
+            f"<td>{safe_int(item.get('priority_score'))}</td>"
+            f"<td>{esc(item.get('gap') or item.get('next_experiment') or 'isolated tournament required')}</td>"
+            "</tr>"
+        )
+    trial_rows: list[str] = []
+    for item in (tournament.get("top_research_results") if isinstance(tournament.get("top_research_results"), list) else [])[:8]:
+        if not isinstance(item, dict):
+            continue
+        metrics = item.get("aggregate") if isinstance(item.get("aggregate"), dict) else {}
+        trial_rows.append(
+            "<tr>"
+            f"<td>{esc(item.get('market'))}</td>"
+            f"<td>{safe_int(item.get('timeframe_minutes'))}m</td>"
+            f"<td>{esc(item.get('family'))}</td>"
+            f"<td>{safe_int(metrics.get('trades'))}</td>"
+            f"<td>{money(metrics.get('expectancy'))}</td>"
+            f"<td>{safe_float(metrics.get('profit_factor')):.2f}</td>"
+            f"<td>{'forward shadow' if item.get('cross_market_robust') else 'research only'}</td>"
+            "</tr>"
+        )
+    body = (
+        '<div class="stats">'
+        + stat_card("Named concepts", str(safe_int(coverage.get("taxonomy_pattern_count"))), "taxonomy inventory")
+        + stat_card("Isolated coverage", pct(coverage.get("isolated_test_coverage_pct")), "implementation does not count")
+        + stat_card("Data-ready gaps", str(safe_int(coverage.get("data_ready_untested_count"))), "priority tournament queue", "warn")
+        + stat_card("Rank effect", "NONE", "until forward gates pass")
+        + "</div>"
+        + '<h3>Highest-priority evidence gaps</h3><div class="table-wrap"><table><thead><tr><th>Concept</th><th>Evidence</th><th>Data</th><th>Priority</th><th>Gap / next experiment</th></tr></thead><tbody>'
+        + ("".join(queue_rows) or '<tr><td colspan="5">No queued gaps.</td></tr>')
+        + "</tbody></table></div>"
+        + '<h3>Current uncovered-concept tournament</h3><div class="table-wrap"><table><thead><tr><th>Market</th><th>TF</th><th>Family</th><th>Trades</th><th>Net expectancy</th><th>PF</th><th>Status</th></tr></thead><tbody>'
+        + ("".join(trial_rows) or '<tr><td colspan="7">Tournament report pending.</td></tr>')
+        + "</tbody></table></div>"
+        + f'<p class="muted">Coverage verdict: {esc(coverage.get("verdict") or "unavailable")}. Tournament verdict: {esc(tournament.get("verdict") or "pending")}. Proxy results never validate the named concept.</p>'
+    )
+    return section(
+        "Strategy Discovery Coverage",
+        body,
+        "Persistent concept audit + preregistered tournament queue · prevents implemented-but-untested strategies from being forgotten",
+    )
     generated = esc(str(data.get("generated_at") or ""))
     return f"""
     <div class="bplus-spotlight">
@@ -537,18 +898,311 @@ def render_bplus_spotlight(model: dict[str, Any]) -> str:
     </div>"""
 
 
+def render_preconfirmation_heads_up(model: dict[str, Any]) -> str:
+    radar = model.get("intraday_radar") if isinstance(model.get("intraday_radar"), dict) else {}
+    rows = [row for row in radar.get("preconfirmation_heads_up") or [] if isinstance(row, dict)]
+    if not rows:
+        return """
+    <div class="panel" style="margin-bottom:16px"><strong>Early heads-up</strong><br><span class="muted">No liquid pre-confirmation watches are live. This lane never creates an order or overrides the completed-bar gate.</span></div>"""
+    cards = "".join(
+        f"<div class='card'><strong>{esc(str(row.get('symbol') or '?'))}</strong> · {esc(str(row.get('direction') or '?').upper())} · "
+        f"{esc(str(row.get('setup') or 'structure watch').replace('_', ' '))}<br>"
+        f"score {safe_float(row.get('score')):.1f} · waiting for completed 5m confirmation · watch only</div>"
+        for row in rows[:8]
+    )
+    return f"""
+    <div class="panel" style="margin-bottom:16px;border-color:#60a5fa">
+      <strong>Early heads-up · watch only</strong>
+      <div class="muted" style="margin:5px 0 10px">Liquid candidates awaiting a completed 5-minute confirmation. No rank, sizing, order, or execution authority.</div>
+      <div class="grid">{cards}</div>
+    </div>"""
+
+
+def render_simulated_alert_feed(model: dict[str, Any]) -> str:
+    """Expose every current paper-trading alert with its exact decision contract."""
+    data = model.get("simple_price_action_alerts") if isinstance(model.get("simple_price_action_alerts"), dict) else {}
+    signals = [row for row in data.get("signals") or [] if isinstance(row, dict)]
+    confirmed = [row for row in signals if row.get("state") == "CONFIRMED"]
+    watching = [row for row in signals if row.get("state") == "WAIT"]
+    disqualified_priority = [
+        row for row in signals
+        if row.get("state") == "INVALID" and row.get("observation_visible") is True
+    ]
+    if not data:
+        return "<div class='panel'><strong>Simulated alert feed</strong><br><span class='muted'>No fresh alert artifact. The intraday runner will generate it before each dashboard refresh.</span></div>"
+    rows = []
+    for row in (confirmed + watching + disqualified_priority)[:24]:
+        state = str(row.get("state") or "WAIT")
+        cls = "good" if state == "CONFIRMED" else "bad" if state == "INVALID" else "warn"
+        label = "SHADOW ENTRY" if state == "CONFIRMED" else "OBSERVE / DISQUALIFIED" if state == "INVALID" else "WATCH"
+        proxies = [str(value) for value in row.get("index_proxy_for") or []]
+        symbol_label = str(row.get("symbol") or "?")
+        if proxies:
+            symbol_label += " / " + "/".join(proxies)
+        lane = str(row.get("lane") or "STANDARD_SHADOW").replace("_", " ")
+        rows.append(
+            "<tr>"
+            f"<td><span class='{cls}'><b>{esc(label)}</b></span></td>"
+            f"<td>{esc(symbol_label)}</td><td>{esc(lane)}</td><td>{esc(str(row.get('direction') or '?'))}</td>"
+            f"<td>{'YES' if row.get('observation_visible') is True else 'CURRENT'}</td>"
+            f"<td>{'YES' if row.get('execution_review_eligible') is True else 'NO'}</td>"
+            f"<td>{esc(str(row.get('grade') or '--'))} / {safe_float(row.get('score')):.1f}</td>"
+            f"<td>{safe_float(row.get('trigger')):.4f}</td><td>{safe_float(row.get('stop')):.4f}</td><td>{safe_float(row.get('target')):.4f}</td>"
+            f"<td>{esc(str(row.get('bar_completed_at') or 'waiting')[:19])}</td>"
+            f"<td>{esc(str(row.get('decisive_reason') or ''))}</td></tr>"
+        )
+    table = "".join(rows) or "<tr><td colspan='12'>No shadow entries, active watches, or priority observations in this snapshot.</td></tr>"
+    counts = data.get("counts") if isinstance(data.get("counts"), dict) else {}
+    attempts = safe_int(data.get("notification_attempts"))
+    failures = safe_int(data.get("notification_failures"))
+    sent = safe_int(data.get("alerts_sent"))
+    event_rows = []
+    for event in reversed([item for item in data.get("recent_events") or [] if isinstance(item, dict)]):
+        if str(event.get("lane") or "") != "CORE_INDEX_SHADOW":
+            continue
+        proxies = [str(value) for value in event.get("index_proxy_for") or []]
+        event_symbol = str(event.get("symbol") or "?")
+        if proxies:
+            event_symbol += " / " + "/".join(proxies)
+        delivery = "sent" if event.get("discord_delivered") else "failed - retry pending"
+        event_rows.append(
+            "<tr>"
+            f"<td>{esc(str(event.get('detected_at') or '')[:19])}</td><td>{esc(event_symbol)}</td>"
+            f"<td>{esc(str(event.get('state') or ''))}</td><td>{esc(str(event.get('direction') or ''))}</td>"
+            f"<td>{safe_float(event.get('trigger')):.4f}</td><td>{safe_float(event.get('stop')):.4f}</td>"
+            f"<td>{safe_float(event.get('target')):.4f}</td><td>{esc(delivery)}</td></tr>"
+        )
+        if len(event_rows) >= 12:
+            break
+    history = (
+        "<div class='muted' style='margin:12px 0 6px'>Persistent core-index event history</div>"
+        "<table class='data'><thead><tr><th>Detected</th><th>Symbol / proxy</th><th>State</th><th>Side</th><th>Trigger</th><th>Stop</th><th>Target</th><th>Discord</th></tr></thead><tbody>"
+        + ("".join(event_rows) or "<tr><td colspan='8'>No core-index transitions recorded yet.</td></tr>")
+        + "</tbody></table>"
+    )
+    return (
+        "<div class='panel' style='margin-bottom:16px;border-color:#22c55e'><strong>Simulated real-time alert feed</strong>"
+        "<div class='muted' style='margin:5px 0 10px'>Observed and execution-eligible are separate. Green = governed simulated shadow entry after completed 5m confirmation. Yellow = visible watch before confirmation. Red priority rows remain visible as disqualified observations. Priority visibility never bypasses evidence or risk gates; no broker order is sent.</div>"
+        f"<div class='stats'>{stat_card('Shadow entries', str(safe_int(counts.get('CONFIRMED'))), 'green completed-bar alerts', 'good')}{stat_card('Active watches', str(safe_int(counts.get('WAIT'))), 'yellow heads-up alerts', 'warn')}{stat_card('Discord delivery', f'{sent}/{attempts}', f'{failures} failed and pending retry', 'bad' if failures else 'good')}{stat_card('Invalidated', str(safe_int(counts.get('INVALID'))), 'red stand-aside states')}</div>"
+        "<table class='data'><thead><tr><th>Alert</th><th>Symbol / proxy</th><th>Lane</th><th>Side</th><th>Observed</th><th>Execution-eligible</th><th>Grade / Score</th><th>Trigger</th><th>Stop</th><th>2R target</th><th>Bar complete</th><th>Why</th></tr></thead><tbody>"
+        + table + "</tbody></table>" + history + "</div>"
+    )
+
+
+def render_session_focus(model: dict[str, Any]) -> str:
+    """Pin the declared liquid focus universe without overriding scanner gates."""
+    radar = model.get("intraday_radar") if isinstance(model.get("intraday_radar"), dict) else {}
+    rows_by_symbol = {
+        str(row.get("symbol") or "").upper(): row
+        for row in radar.get("ranked_candidates") or [] if isinstance(row, dict)
+    }
+    rows = []
+    for symbol in SESSION_FOCUS_SYMBOLS:
+        row = rows_by_symbol.get(symbol)
+        if not row:
+            rows.append(f"<tr><td><b>{symbol}</b></td><td colspan='6' class='bad'>Missing from current radar — coverage fault</td></tr>")
+            continue
+        gates = row.get("hard_gates") if isinstance(row.get("hard_gates"), dict) else {}
+        pending = ", ".join(key.replace("_", " ") for key, passed in gates.items() if passed is False) or "none"
+        levels = row.get("trade_levels") if isinstance(row.get("trade_levels"), dict) else {}
+        state = str(row.get("confirmation_stage") or row.get("state") or "unknown").replace("_", " ")
+        rows.append(
+            "<tr>"
+            f"<td><b>{symbol}</b></td><td>{esc(str(row.get('direction') or '?').upper())}</td>"
+            f"<td>{esc(str(row.get('grade') or '--'))} / {safe_float(row.get('score')):.1f}</td>"
+            f"<td>{safe_float(row.get('price')):.2f}</td><td>{esc(state)}</td>"
+            f"<td>{safe_float(levels.get('confirmation_trigger')):.2f} / {safe_float(levels.get('invalidation')):.2f} / {safe_float(levels.get('target_2r')):.2f}</td>"
+            f"<td>{esc(pending)}</td></tr>"
+        )
+    return (
+        "<div class='panel' style='margin-bottom:16px;border-color:#60a5fa'><strong>Today’s liquid focus · simulated only</strong>"
+        "<div class='muted' style='margin:5px 0 10px'>NVDA, GOOGL, AAPL, and META are explicitly pinned for every radar cycle. They remain visible even when filtered; a focus designation never bypasses a completed 5-minute confirmation, quote check, or liquidity gate.</div>"
+        "<table class='data'><thead><tr><th>Symbol</th><th>Current side</th><th>Grade / score</th><th>Last</th><th>State</th><th>Trigger / stop / 2R</th><th>Pending gates</th></tr></thead><tbody>"
+        + "".join(rows) + "</tbody></table>"
+        "<p class='muted'>Paper-management template only after a green alert: document the entry quote, then simulate a 30–40% premium trim and a runner with a predeclared stop. It is not an automatic order instruction.</p></div>"
+    )
+
+
+def render_intraday_posture_and_lifecycle(model: dict[str, Any]) -> str:
+    posture_report = model.get("intraday_sector_posture") if isinstance(model.get("intraday_sector_posture"), dict) else {}
+    posture = posture_report.get("posture") if isinstance(posture_report.get("posture"), dict) else {}
+    lifecycle_report = model.get("intraday_lifecycle_shadow") if isinstance(model.get("intraday_lifecycle_shadow"), dict) else {}
+    plans = [row for row in lifecycle_report.get("plans") or [] if isinstance(row, dict)]
+    posture_text = (
+        f"{esc(str(posture.get('state') or 'unavailable').replace('_', ' '))} · "
+        f"{safe_int(posture.get('positive_count'))} positive / {safe_int(posture.get('negative_count'))} negative"
+    )
+    leader_text = ", ".join(
+        f"{esc(str(row.get('etf') or '?'))} {safe_float(row.get('session_return_pct')):+.2f}%"
+        for row in (posture.get("leaders") or [])[:3] if isinstance(row, dict)
+    ) or "unavailable"
+    plan_cards = "".join(
+        f"<div class='card'><strong>{esc(str(row.get('symbol') or '?'))}</strong> · {esc(str(row.get('direction') or '').upper())} · lane {safe_int(row.get('lane_rank'))} · {esc(str(row.get('grade') or ''))}<br>"
+        f"{esc(str(row.get('setup') or 'confirmed structure').replace('_', ' '))}<br>"
+        f"entry {safe_float(row.get('entry')):.2f} · initial stop {safe_float(row.get('initial_stop')):.2f} · 2R {safe_float(row.get('target_2r')):.2f}<br>"
+        f"30m experiment checkpoint {esc(str(row.get('time_stop_at') or ''))}<br>"
+        f"<b>{esc(str((row.get('decision_contract') or {}).get('outcome') or 'do_not_take').replace('_', ' '))}</b><br>"
+        "<span class='muted'>shadow experiment only — no alert or order authority</span></div>"
+        for row in plans[:8]
+    ) or "<div class='card'>No completed-bar lifecycle plans in this snapshot.</div>"
+    return f"""
+    <div class="panel" style="margin-bottom:16px;border-color:#60a5fa">
+      <strong>Confirmed watches first · posture + lifecycle shadow</strong>
+      <div class="muted" style="margin:5px 0 10px">{posture_text} · leaders: {leader_text}</div>
+      <div class="grid">{plan_cards}</div>
+    </div>"""
+
+
+def render_aplus_evidence_contract(model: dict[str, Any]) -> str:
+    """Make A+ evidence debt visible instead of silently upgrading a score."""
+    radar = model.get("intraday_radar") if isinstance(model.get("intraday_radar"), dict) else {}
+    coverage = radar.get("coverage") if isinstance(radar.get("coverage"), dict) else {}
+    rows = [row for row in radar.get("ranked_candidates") or [] if isinstance(row, dict)]
+    incomplete = [
+        row for row in rows
+        if (row.get("a_plus_evidence") or {}).get("classification") == "evidence_incomplete"
+    ]
+    examples = "".join(
+        f"<div class='card'><strong>{esc(str(row.get('symbol') or '?'))}</strong> · "
+        f"missing {esc(', '.join((row.get('a_plus_evidence') or {}).get('missing_required_fields') or [])[:180])}</div>"
+        for row in incomplete[:3]
+    )
+    return f"""
+    <div class="panel" style="margin-bottom:16px;border-color:#f59e0b">
+      <strong>A+ evidence contract · fail closed</strong>
+      <div class="muted" style="margin:5px 0 10px">{safe_int(coverage.get('a_plus_process_candidate_count'))} fully evidenced process candidates · {safe_int(coverage.get('a_plus_evidence_incomplete_count'))} candidates carrying explicit evidence debt. A discovery score, publisher headline, IEX quote, or volume-pace proxy never earns the A+ label by itself.</div>
+      <div class="grid">{examples or "<div class='card'>No A+ evidence record is available from this radar snapshot.</div>"}</div>
+    </div>"""
+
+
+def render_liquid_review_escalations(model: dict[str, Any]) -> str:
+    radar = model.get("intraday_radar") if isinstance(model.get("intraday_radar"), dict) else {}
+    rows = [row for row in radar.get("liquid_review_escalations") or [] if isinstance(row, dict)]
+    if not rows:
+        return ""
+    cards = "".join(
+        f"<div class='card'><strong>{esc(str(row.get('symbol') or '?'))}</strong> · {esc(str(row.get('direction') or '?').upper())}<br>"
+        f"completed 5m {esc(str(row.get('setup') or 'setup').replace('_', ' '))} · score {safe_float(row.get('score')):.1f}<br>"
+        f"<span class='bad'>Quote-quality review required</span> · not ranked or actionable</div>"
+        for row in rows[:8]
+    )
+    return f"""
+    <div class="panel" style="margin-bottom:16px;border-color:#f59e0b">
+      <strong>Liquid setup · quote-quality review</strong>
+      <div class="muted" style="margin:5px 0 10px">Completed-bar setup in a liquid name was blocked only by the underlying quote gate. Visible for data review, never an order or an execution recommendation.</div>
+      <div class="grid">{cards}</div>
+    </div>"""
+
+
+def render_wolves_bbr_shadow(model: dict[str, Any]) -> str:
+    """Show source-matched BBR observations without granting rank authority."""
+    data = model.get("wolves_bbr_shadow") if isinstance(model.get("wolves_bbr_shadow"), dict) else {}
+    coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    hits = data.get("confluence_hits") if isinstance(data.get("confluence_hits"), list) else []
+    rows = []
+    for hit in hits[:8]:
+        if not isinstance(hit, dict):
+            continue
+        ema = hit.get("ema") if isinstance(hit.get("ema"), dict) else {}
+        rows.append(
+            "<tr>"
+            f"<td>{esc(hit.get('symbol'))}</td><td>{esc(hit.get('direction'))}</td>"
+            f"<td>{esc(str(hit.get('behavior') or '').replace('_', ' '))}</td>"
+            f"<td>{safe_float(hit.get('last_close')):.4f}</td><td>{esc(hit.get('ema_alignment'))}</td>"
+            f"<td>{safe_float(ema.get('ema200')):.4f}</td><td>{esc(hit.get('last_completed_bar_at'))}</td>"
+            "</tr>"
+        )
+    return section(
+        "Wolves BBR Confluence · Shadow",
+        f"""
+        <div class=\"stat-grid compact\">
+          {stat_card("Radar candidates", str(safe_int(coverage.get("radar_symbols_considered"))), "same-day candidates checked", "")}
+          {stat_card("Complete level maps", str(safe_int(coverage.get("observations_complete"))), "prior day + premarket + EMA history", "")}
+          {stat_card("Liquid-core data debt", str(safe_int(coverage.get("liquid_core_coverage_debt_count"))), "missing chart history is visible, never imputed", "warn")}
+          {stat_card("BBR observations", str(safe_int(coverage.get("confluence_hits"))), "completed 5m break/hold + EMA stack", "warn")}
+          {stat_card("Promotion", "BLOCKED", "no rank, alert, sizing, or execution effect", "bad")}
+        </div>
+        <div class=\"table-wrap\"><table><thead><tr><th>Symbol</th><th>Direction</th><th>Behavior</th><th>Close</th><th>EMA context</th><th>200 EMA</th><th>Completed bar</th></tr></thead>
+        <tbody>{''.join(rows) or '<tr><td colspan="7">No source-matched BBR confluence in the completed data. Missing premarket data is reported as incomplete rather than guessed.</td></tr>'}</tbody></table></div>
+        """,
+        "Prior-day/premarket levels + completed 5m 200/8/13/48 EMA stack · source-matched observation only · public strategy rules remain incomplete · no order authority",
+    )
+
+
+def render_banks_821_shadow(model: dict[str, Any]) -> str:
+    data = model.get("banks_821_shadow") if isinstance(model.get("banks_821_shadow"), dict) else {}
+    coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    hits = data.get("confluence_hits") if isinstance(data.get("confluence_hits"), list) else []
+    rows = "".join(
+        f"<tr><td>{esc(row.get('symbol'))}</td><td>{esc(row.get('direction'))}</td><td>{safe_float((row.get('ema') or {}).get('ema8')):.4f} / {safe_float((row.get('ema') or {}).get('ema21')):.4f}</td><td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
+        for row in hits[:8] if isinstance(row, dict)
+    )
+    return section(
+        "Banks 8/21 Control · Shadow",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed 5m history', '')}{stat_card('Proxy hits', str(safe_int(coverage.get('hits'))), 'not validated', 'warn')}{stat_card('Promotion', 'BLOCKED', 'separate tournament required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>EMA 8 / 21</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No mechanical proxy hit. Ranging 8/21, weak momentum, chop, or no retest are explicit no-trades.</td></tr>'}</tbody></table></div>",
+        "Public checklist translated into declared assumptions · no rank, alert, sizing, or execution authority",
+    )
+
+
+def render_donchian_expansion_shadow(model: dict[str, Any]) -> str:
+    """Render candidate coverage without confusing it for a trade signal."""
+    data = model.get("donchian_expansion_shadow") if isinstance(model.get("donchian_expansion_shadow"), dict) else {}
+    coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    forward = model.get("donchian_expansion_forward_shadow") if isinstance(model.get("donchian_expansion_forward_shadow"), dict) else {}
+    forward_summary = forward.get("summary") if isinstance(forward.get("summary"), dict) else {}
+    hits = data.get("rankings") if isinstance(data.get("rankings"), list) else []
+    rows = "".join(
+        "<tr>"
+        f"<td>{esc(row.get('symbol'))}</td><td>{esc(row.get('direction'))}</td>"
+        f"<td>{safe_float((row.get('evidence') or {}).get('volume_multiple_vs_prior_20_completed_bars')):.2f}x</td>"
+        f"<td>{safe_float((row.get('evidence') or {}).get('close_location')):.2f}</td>"
+        f"<td>{safe_float((row.get('evidence') or {}).get('true_range_multiple_vs_prior_atr_14')):.2f}x</td>"
+        f"<td>{esc(row.get('last_completed_bar_at'))}</td></tr>"
+        for row in hits[:8] if isinstance(row, dict)
+    )
+    return section(
+        "Donchian Expansion · Shadow",
+        f"<div class='stat-grid compact'>{stat_card('Observed', str(safe_int(coverage.get('observed'))), 'completed RTH 5m bars only', '')}{stat_card('Strict expansions', str(safe_int(coverage.get('strict_hits'))), '20-bar break + RVOL + close + range', 'warn')}{stat_card('Resolved forward', str(safe_int(forward_summary.get('resolved'))), 'next-bar-open, stop-first, 2R / 60m', '')}{stat_card('Mean net R', esc(str(forward_summary.get('mean_net_r_after_costs') if forward_summary.get('mean_net_r_after_costs') is not None else 'pending')), 'fixed slippage stress; not fill evidence', 'warn')}{stat_card('Promotion', 'BLOCKED', 'walk-forward and shadow evaluation required', 'bad')}</div><div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>RVOL</th><th>Close location</th><th>TR / ATR</th><th>Completed bar</th></tr></thead><tbody>{rows or '<tr><td colspan="6">No strict completed-bar expansion. This is candidate coverage only—not an entry or an alert.</td></tr>'}</tbody></table></div>",
+        "Prior-20-bar Donchian break + 1.25x prior completed-bar volume + strong close + 1.20x prior ATR range · forward audit uses next-bar open, signal-bar stop, 2R / 60m and 5 bp/side stress · no execution authority",
+    )
+
+
+def render_liquid_signal_chart_audit(model: dict[str, Any]) -> str:
+    """Render post-signal raw-chart follow-through without implying fills."""
+    data = model.get("liquid_signal_chart_audit") if isinstance(model.get("liquid_signal_chart_audit"), dict) else {}
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    rows = []
+    for signal in (data.get("signals") or [])[:10]:
+        if not isinstance(signal, dict):
+            continue
+        rows.append("<tr>" + f"<td>{esc(signal.get('symbol'))}</td><td>{esc(signal.get('direction'))}</td><td>{esc(str(signal.get('setup') or '').replace('_', ' '))}</td><td>{safe_float(signal.get('forward_5m_return_pct')):+.3f}%</td><td>{safe_float(signal.get('forward_30m_return_pct')):+.3f}%</td><td>{safe_float(signal.get('mfe_pct_60m_or_available')):+.3f}%</td><td>{safe_float(signal.get('mae_pct_60m_or_available')):+.3f}%</td><td>{esc(signal.get('signal_bar_completed_at'))}</td>" + "</tr>")
+    return section(
+        "Liquid Signal Chart Audit",
+        f"""<div class=\"stat-grid compact\">{stat_card("Liquid confirmations", str(safe_int(summary.get("liquid_confirmed_signals"))), "first point-in-time completed 5m signal", "")}{stat_card("Chart-resolved", str(safe_int(summary.get("chart_resolved_signals"))), "actual completed 5m bars", "")}{stat_card("Mean 30m path", pct(summary.get("resolved_30m_mean_return_pct")), "direction-adjusted underlying observation", "warn")}{stat_card("Orders", "NONE", "no fills or options P/L inferred", "bad")}</div><div class=\"table-wrap\"><table><thead><tr><th>Symbol</th><th>Direction</th><th>Pattern</th><th>5m</th><th>30m</th><th>MFE</th><th>MAE</th><th>Signal bar</th></tr></thead><tbody>{''.join(rows) or '<tr><td colspan="8">No liquid confirmed signals have a chart outcome yet.</td></tr>'}</tbody></table></div>""",
+        "Actual completed underlying 5m chart path after the first scanner confirmation · no assumed fill, contract, slippage, or profit · outcome audit only",
+    )
+
+
 def render_spy_level_reaction(model: dict[str, Any]) -> str:
     """Render the explicit pre-mapped SPY level-reaction monitor as context only."""
     data = model.get("spy_level_reaction") if isinstance(model.get("spy_level_reaction"), dict) else {}
     level_map = data.get("level_map") if isinstance(data.get("level_map"), dict) else {}
     levels = level_map.get("levels") if isinstance(level_map.get("levels"), list) else []
     reactions = data.get("reactions") if isinstance(data.get("reactions"), list) else []
+    lifecycles = data.get("level_lifecycles") if isinstance(data.get("level_lifecycles"), list) else []
     health = str(data.get("operational_health") or "unavailable")
     rows: list[str] = []
     for reaction in reactions[:8]:
         if not isinstance(reaction, dict):
             continue
+        features = reaction.get("spy0dte_features") if isinstance(reaction.get("spy0dte_features"), dict) else {}
         status = str(reaction.get("status") or "unknown")
+        touch = f"{esc(features.get('touch_sequence') or 'unavailable')} ({safe_int(features.get('touch_count'))})"
+        rsi = features.get("rsi_14_completed_5m")
+        rsi_text = f"{safe_float(rsi):.1f}" if rsi is not None else esc(features.get("rsi_14_status") or "unavailable")
+        speed = features.get("atr_normalized_approach_speed")
+        speed_text = f"{safe_float(speed):+.2f} ATR" if speed is not None else "unavailable"
+        window = "eligible" if features.get("early_session_eligible") is True else "after cutoff" if features.get("early_session_eligible") is False else "unavailable"
         rows.append(
             "<tr>"
             f"<td>{esc(reaction.get('level_name'))}</td>"
@@ -556,6 +1210,10 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
             f"<td>{esc(reaction.get('direction'))}</td>"
             f"<td><span class='{cls_for_health(status)}'>{esc(status)}</span></td>"
             f"<td>{safe_float(reaction.get('reaction_points')):.2f}</td>"
+            f"<td>{touch}</td>"
+            f"<td>{rsi_text}</td>"
+            f"<td>{speed_text}</td>"
+            f"<td>{window}</td>"
             f"<td>{esc(reaction.get('observed_at'))}</td>"
             "</tr>"
         )
@@ -565,6 +1223,7 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
         if isinstance(level, dict)
     ) or "No completed-session levels yet."
     summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    feature_contract = data.get("spy0dte_feature_contract") if isinstance(data.get("spy0dte_feature_contract"), dict) else {}
     gap = data.get("gap_context") if isinstance(data.get("gap_context"), dict) else {}
     breadth = data.get("breadth_context") if isinstance(data.get("breadth_context"), dict) else {}
     intermarket = data.get("intermarket_context") if isinstance(data.get("intermarket_context"), dict) else {}
@@ -575,6 +1234,20 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
     ) or "unavailable"
     qqq_vs_spy = intermarket.get("qqq_vs_spy_pct")
     qqq_text = f"{safe_float(qqq_vs_spy):+.3f}%" if qqq_vs_spy is not None else "unavailable"
+    lifecycle_rows: list[str] = []
+    for lifecycle in lifecycles[:8]:
+        if not isinstance(lifecycle, dict):
+            continue
+        lifecycle_rows.append(
+            "<tr>"
+            f"<td>{esc(lifecycle.get('level_name'))}</td>"
+            f"<td>{safe_float(lifecycle.get('level')):.2f}</td>"
+            f"<td><span class='{cls_for_health(str(lifecycle.get('state') or 'unknown'))}'>{esc(lifecycle.get('state'))}</span></td>"
+            f"<td>{safe_int(lifecycle.get('touch_count'))}</td>"
+            f"<td>{esc(lifecycle.get('current_side'))}</td>"
+            f"<td>{esc(lifecycle.get('state_observed_at'))}</td>"
+            "</tr>"
+        )
     return section(
         "SPY Mapped-Level Reactions",
         f"""
@@ -582,18 +1255,25 @@ def render_spy_level_reaction(model: dict[str, Any]) -> str:
           {stat_card("Monitor", health.upper(), "completed 5m only", cls_for_health(health))}
           {stat_card("Confirmed", str(safe_int(summary.get('confirmed_reactions'))), "$0.40-$0.80 underlying reaction", "good")}
           {stat_card("No-Chase", str(safe_int(summary.get('extended_no_chase'))), "> $0.80 reaction is not upgraded", "warn")}
+          {stat_card("SPY0DTE Features", "SHADOW", f"completed 5m RSI · cutoff {feature_contract.get('early_session_cutoff_et') or '11:15'} ET", "warn")}
           {stat_card("Gap Path", str(gap.get('fill_bucket') or 'unavailable'), "realized path, never a fill prediction", "")}
           {stat_card("Breadth", str(breadth.get('regime') or 'unavailable'), "frozen challenger, not a gate", "")}
           {stat_card("QQQ-SPY", qqq_text, str(intermarket.get('qqq_spy_regime') or 'unavailable'), "")}
+          {stat_card("Level Lifecycle", str(safe_int(summary.get('active_level_lifecycles'))), "descriptive completed-bar states", "")}
         </div>
         <p><strong>Mapped levels:</strong> {map_text}</p>
         <p><strong>Sector leaders vs SPY:</strong> {leader_text}</p>
         <div class="table-wrap"><table>
-          <thead><tr><th>Level</th><th>Price</th><th>Direction</th><th>State</th><th>Reaction</th><th>Completed bar</th></tr></thead>
-          <tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar level reaction is active. Wait at mapped support/resistance; do not chase a move already extended.</td></tr>'}</tbody>
+          <thead><tr><th>Level</th><th>Price</th><th>Direction</th><th>State</th><th>Reaction</th><th>Touch</th><th>RSI(14)</th><th>30m speed</th><th>Window</th><th>Completed bar</th></tr></thead>
+          <tbody>{''.join(rows) or '<tr><td colspan="10">No completed-bar level reaction is active. Wait at mapped support/resistance; do not chase a move already extended.</td></tr>'}</tbody>
+        </table></div>
+        <h3>Level Lifecycle Context</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Level</th><th>Price</th><th>Lifecycle</th><th>Touches</th><th>Last side</th><th>Observed</th></tr></thead>
+          <tbody>{''.join(lifecycle_rows) or '<tr><td colspan="6">No completed-bar lifecycle state is available yet.</td></tr>'}</tbody>
         </table></div>
         """,
-        "Shadow context only · underlying SPY move is not an options-premium prediction · no order authority",
+        "Independent completed-bar level lifecycle · descriptive context only, never A+ scoring, alert, sizing, or order authority · underlying SPY move is not an options-premium prediction",
     )
 
 
@@ -601,6 +1281,9 @@ def render_spy_level_outcomes(model: dict[str, Any]) -> str:
     """Render frozen gap/breadth/intermarket slices without promoting them."""
     data = model.get("spy_level_outcomes") if isinstance(model.get("spy_level_outcomes"), dict) else {}
     summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    contract = summary.get("contract_feasibility") if isinstance(summary.get("contract_feasibility"), dict) else {}
+    premium_plan = summary.get("fixed_premium_proxy_plan") if isinstance(summary.get("fixed_premium_proxy_plan"), dict) else {}
+    feature_slices = summary.get("spy0dte_candidate_feature_slices") if isinstance(summary.get("spy0dte_candidate_feature_slices"), dict) else {}
     slices = summary.get("gap_time_to_fill_slices") if isinstance(summary.get("gap_time_to_fill_slices"), list) else []
     rows: list[str] = []
     for item in slices:
@@ -617,12 +1300,19 @@ def render_spy_level_outcomes(model: dict[str, Any]) -> str:
             "</tr>"
         )
     blockers = ", ".join(str(item).replace("_", " ") for item in summary.get("promotion_blockers") or []) or "collecting forward observations"
+    captured_features = ", ".join(
+        f"{key.replace('_', ' ')} ({sum(safe_int(item.get('sample_count')) for item in values if isinstance(item, dict))})"
+        for key, values in sorted(feature_slices.items())
+        if isinstance(values, list)
+    ) or "none captured yet"
     return section(
         "SPY Context Outcome Research",
         f"""
         <div class="stat-grid compact">
           {stat_card("Resolved", str(safe_int(summary.get('resolved_count'))), "60-minute underlying proxy", "")}
           {stat_card("Minimum / Bucket", str(data.get('minimum_bucket_sample') or 30), "separate dates and regimes required", "warn")}
+          {stat_card("Contract Quotes", str(contract.get('status') or 'unavailable').replace('_', ' '), str(contract.get('reason') or 'NBBO required'), "bad")}
+          {stat_card("+20% / -12.5%", str(premium_plan.get('status') or 'not available').replace('_', ' '), "not an option result", "warn")}
           {stat_card("Promotion", "BLOCKED", "no execution authority", "bad")}
         </div>
         <p><strong>Gap time-to-fill slices:</strong> frozen at observation time. They describe outcomes; they never forecast that a gap will fill.</p>
@@ -631,8 +1321,9 @@ def render_spy_level_outcomes(model: dict[str, Any]) -> str:
           <tbody>{''.join(rows) or '<tr><td colspan="6">No resolved 60-minute observations yet. The ledger is collecting completed-bar reactions first.</td></tr>'}</tbody>
         </table></div>
         <p><strong>Promotion blockers:</strong> {esc(blockers)}</p>
+        <p><strong>Frozen SPY0DTE feature slices:</strong> {esc(captured_features)}. These are collected for comparison only.</p>
         """,
-        "Shadow-only outcome slices · breadth and QQQ/SPY-sector context remain challengers · not option P&L or a live signal",
+        "Shadow-only outcome slices · fixed premium labels are non-executable until timestamped bid/ask NBBO exists · breadth and QQQ/SPY-sector context remain challengers · not option P&L or a live signal",
     )
 
 
@@ -664,6 +1355,408 @@ def render_overfit_guard(model: dict[str, Any]) -> str:
         <p><strong>Required before any human review:</strong> frozen rules, point-in-time timestamps, independent review, chronological forward outcomes, cost stress, parameter-neighbor and regime stability, and a positive bootstrap lower bound.</p>
         """,
         "Fail-closed governance · scores and social labels are research only · no automatic promotion or order authority",
+    )
+
+
+def render_operational_gate(model: dict[str, Any]) -> str:
+    data = model.get("operational_gate") if isinstance(model.get("operational_gate"), dict) else {}
+    premarket = model.get("premarket_readiness") if isinstance(model.get("premarket_readiness"), dict) else {}
+    passed = data.get("operational_prerequisite_passed") is True
+    status = str(data.get("status") or "missing")
+    observed = safe_int(data.get("observed_sessions_in_window"))
+    passing = safe_int(data.get("passing_sessions_in_window"))
+    required = safe_int(data.get("required_passing_sessions")) or 5
+    current = data.get("current_session") if isinstance(data.get("current_session"), dict) else {}
+    blockers = data.get("blockers") if isinstance(data.get("blockers"), list) else []
+    premarket_status = str(premarket.get("status") or "missing")
+    premarket_blockers = premarket.get("blockers") if isinstance(premarket.get("blockers"), list) else []
+    return section(
+        "Operational Readiness Gate",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Five-Session Gate", "PASS" if passed else "BLOCKED", "operational prerequisite only", "good" if passed else "bad")}
+          {stat_card("Pre-open Gate", premarket_status.replace('_', ' ').upper(), "radar · RVOL · SEC · dashboard", "good" if premarket_status == "ready_for_shadow_observation" else "bad")}
+          {stat_card("Clean Sessions", f"{passing}/{required}", f"observed {observed}", "good" if passed else "warn")}
+          {stat_card("Radar Coverage", "clean" if current.get('radar_coverage_clean') else "not clean", str(current.get('session_date') or 'no session'), "good" if current.get('radar_coverage_clean') else "bad")}
+          {stat_card("Signal Stack", "clean" if current.get('signal_stack_clean') else "not clean", "zero stale/missing/error required", "good" if current.get('signal_stack_clean') else "bad")}
+        </div>
+        <p><strong>Status:</strong> {esc(status)}. <strong>Blockers:</strong> {esc('; '.join(str(item) for item in blockers) or 'none')}</p>
+        <p><strong>Pre-open blockers:</strong> {esc('; '.join(str(item) for item in premarket_blockers) or 'none')}</p>
+        """,
+        "Fail-closed · no live authority · operational integrity does not prove profitability",
+    )
+
+
+def render_operational_runs(model: dict[str, Any]) -> str:
+    """Render machine-readable run evidence; unknown state never appears green."""
+    data = model.get("operational_runs") if isinstance(model.get("operational_runs"), dict) else {}
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    components = data.get("components") if isinstance(data.get("components"), list) else []
+    if not components and isinstance(data.get("latest_runs"), list):
+        components = data["latest_runs"]
+
+    table_rows: list[str] = []
+    open_breakers = 0
+    explicit_successes = 0
+    now = datetime.now(timezone.utc)
+
+    def parse_utc(value: Any) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    for item in components:
+        if not isinstance(item, dict):
+            continue
+        breaker = item.get("breaker") if isinstance(item.get("breaker"), dict) else {}
+        breaker_state = str(item.get("breaker_state") or breaker.get("state") or "UNKNOWN").upper()
+        status = str(item.get("status") or "unknown").lower()
+        finished = parse_utc(item.get("finished_at"))
+        observed = parse_utc(item.get("data_as_of"))
+        try:
+            exit_ok = int(item.get("exit_code")) == 0
+            freshness_sla = max(1, int(item.get("freshness_sla_seconds") or 900))
+        except (TypeError, ValueError):
+            exit_ok = False
+            freshness_sla = 900
+        current_age = (now - observed).total_seconds() if observed else None
+        healthy = (
+            item.get("schema_version") == "run-envelope-v1"
+            and status in {"success", "completed", "ok"}
+            and breaker_state == "CLOSED"
+            and not item.get("failure_class")
+            and finished is not None
+            and observed is not None
+            and exit_ok
+            and current_age is not None
+            and -5 <= current_age <= freshness_sla
+        )
+        explicit_successes += int(healthy)
+        open_breakers += int(breaker_state == "OPEN")
+        tone = "good" if healthy else "warn" if status in {"running", "pending", "unknown"} and breaker_state != "OPEN" else "bad"
+        breaker_tone = "good" if breaker_state == "CLOSED" else "bad" if breaker_state == "OPEN" else "warn"
+        evidence = str(item.get("error") or item.get("last_reason") or item.get("detail") or "")[:300]
+        table_rows.append(
+            "<tr>"
+            f"<td><strong>{esc(item.get('component') or item.get('scanner') or 'unknown')}</strong><small>{esc(item.get('run_id') or '')}</small></td>"
+            f"<td><span class='{tone}'>{esc(status)}</span></td>"
+            f"<td><span class='{breaker_tone}'>{esc(breaker_state)}</span></td>"
+            f"<td>{esc(item.get('last_success_at') or 'never')}</td>"
+            f"<td>{esc(item.get('data_as_of') or 'unknown')}<small>age {esc(item.get('freshness_seconds') if item.get('freshness_seconds') is not None else 'unknown')}s</small></td>"
+            f"<td>{esc(item.get('duration_ms') if item.get('duration_ms') is not None else 'n/a')} ms</td>"
+            f"<td>{safe_int(item.get('input_count'))} / {safe_int(item.get('output_count'))}</td>"
+            f"<td>{safe_int(item.get('alerts_delivered'))}/{safe_int(item.get('alerts_attempted'))}</td>"
+            f"<td>{esc(item.get('failure_class') or 'none')}<small>{esc(evidence)}</small></td>"
+            f"<td>{esc(item.get('next_action') or 'none')}</td>"
+            "</tr>"
+        )
+
+    top_status = str(data.get("status") or "unknown").lower()
+    summary_status = str(summary.get("status") or "unknown").lower()
+    schema_ok = data.get("schema_version") == "run-envelope-v1"
+    declared_consistent = top_status == summary_status and top_status in {"healthy", "success", "ok"}
+    all_explicit = bool(components) and explicit_successes == len(components) and open_breakers == 0
+    overall = "HEALTHY" if schema_ok and declared_consistent and all_explicit else "ATTENTION"
+    overall_tone = "good" if overall == "HEALTHY" else "bad"
+    return section(
+        "Operational Run Evidence",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Run State", overall, "explicit success + closed breaker required", overall_tone)}
+          {stat_card("Components", str(len(components)), f"{explicit_successes} explicit successes", "good" if all_explicit else "warn")}
+          {stat_card("Open Breakers", str(open_breakers), "persistent component-level state", "good" if open_breakers == 0 and components else "bad")}
+          {stat_card("Schema", str(data.get('schema_version') or 'missing'), "run-envelope-v1 expected", "good" if str(data.get('schema_version')) in {'1', 'run-envelope-v1'} else "warn")}
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Component</th><th>Status</th><th>Breaker</th><th>Last Success</th><th>Data</th><th>Duration</th><th>In/Out</th><th>Alerts</th><th>Failure Evidence</th><th>Next Action</th></tr></thead><tbody>{''.join(table_rows) or '<tr><td colspan="10">No normalized run envelopes found. Operational state is unknown and therefore not green.</td></tr>'}</tbody></table></div>
+        """,
+        "Evidence-linked diagnostics · timeout, partial output, stale data, and delivery failures never count as success",
+    )
+
+
+def render_daily_level_map_shadow(model: dict[str, Any]) -> str:
+    """Render daily-map/3m confluence evidence without inventing proprietary levels."""
+    data = model.get("daily_level_map_shadow") if isinstance(model.get("daily_level_map_shadow"), dict) else {}
+    candidates: Any = data.get("symbols")
+    if not isinstance(candidates, list):
+        for alias in ("rows", "setups", "candidates"):
+            if isinstance(data.get(alias), list):
+                candidates = data[alias]
+                break
+    rows = candidates if isinstance(candidates, list) else []
+    allowed_states = {"PREMARKET", "DORMANT", "WATCH", "ARMED", "CONFIRMED", "LATE", "INVALIDATED"}
+    state_counts = Counter()
+    rendered_rows: list[str] = []
+    valid_rows = 0
+    fresh_rows = 0
+    now = datetime.now(timezone.utc)
+
+    def parse_utc(value: Any) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+
+    def first(mapping: dict[str, Any], *names: str) -> Any:
+        for name in names:
+            value = mapping.get(name)
+            if value not in (None, ""):
+                return value
+        return None
+
+    def choose(primary: Any, fallback: Any) -> Any:
+        return fallback if primary in (None, "") else primary
+
+    try:
+        freshness_sla = max(1, int(data.get("freshness_sla_seconds") or 900))
+    except (TypeError, ValueError):
+        freshness_sla = 900
+
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        daily = raw.get("daily_context") if isinstance(raw.get("daily_context"), dict) else {}
+        level = raw.get("nearest_level") if isinstance(raw.get("nearest_level"), dict) else {}
+        confirmation = raw.get("confirmation_3m") if isinstance(raw.get("confirmation_3m"), dict) else {}
+        symbol = str(first(raw, "symbol", "ticker") or "").upper()
+        bias = str(choose(first(raw, "daily_bias"), first(daily, "bias", "daily_bias")) or "unknown")
+        state = str(choose(first(confirmation, "state", "status"), first(raw, "state_3m", "confirmation_state", "state")) or "UNKNOWN").upper()
+        state_counts[state] += 1
+        price = choose(first(level, "price", "level_price", "value"), first(raw, "nearest_level_price", "level_price"))
+        level_type = choose(first(level, "type", "level_type", "name"), first(raw, "nearest_level_type", "level_type"))
+        source = choose(first(level, "source", "source_name"), first(raw, "level_source"))
+        provenance = choose(first(level, "provenance", "provenance_label", "method"), first(raw, "level_provenance"))
+        distance = choose(first(level, "distance_points", "distance", "distance_pct"), first(raw, "distance_points", "distance", "distance_pct"))
+        trigger = choose(first(confirmation, "trigger", "trigger_price", "trigger_rule"), first(raw, "trigger", "trigger_price"))
+        invalidation = choose(first(confirmation, "invalidation", "invalidation_price", "invalidation_rule"), first(raw, "invalidation", "invalidation_price"))
+        next_target = choose(first(confirmation, "next_target", "target", "target_price"), first(raw, "next_target", "target"))
+        observed_raw = choose(first(confirmation, "bar_completed_at", "observed_at", "updated_at", "data_as_of"), first(raw, "bar_completed_at", "observed_at", "updated_at", "data_as_of"))
+        observed = parse_utc(observed_raw)
+        age = (now - observed).total_seconds() if observed else None
+        row_fresh = age is not None and -60 <= age <= freshness_sla
+        required_values = (symbol, bias, price, level_type, source, provenance, distance, trigger)
+        if state not in {"PREMARKET", "DORMANT"}:
+            required_values += (invalidation, next_target)
+        required_present = all(value not in (None, "", "unknown") for value in required_values)
+        row_valid = required_present and state in allowed_states and observed is not None
+        valid_rows += int(row_valid)
+        fresh_rows += int(row_fresh)
+        state_tone = "good" if state == "CONFIRMED" and row_valid and row_fresh else "warn" if state in {"PREMARKET", "DORMANT", "WATCH", "ARMED"} and row_valid and row_fresh else "bad"
+        provenance_text = f"{source} · {provenance}"
+        freshness_text = f"{max(0, int(age))}s old" if age is not None else "timestamp missing/invalid"
+        rendered_rows.append(
+            "<tr>"
+            f"<td><strong>{esc(symbol or 'unknown')}</strong><small>{esc(raw.get('session_date') or data.get('session_date') or '')}</small></td>"
+            f"<td>{esc(bias)}</td>"
+            f"<td><strong>{esc(price if price is not None else 'unknown')}</strong><small>{esc(level_type or 'unknown')}</small></td>"
+            f"<td>{esc(provenance_text)}</td>"
+            f"<td>{esc(distance if distance is not None else 'unknown')}</td>"
+            f"<td><span class='{state_tone}'>{esc(state)}</span><small>{'fresh' if row_fresh else 'STALE / UNKNOWN'}</small></td>"
+            f"<td>{esc(trigger if trigger is not None else 'unknown')}</td>"
+            f"<td>{esc(invalidation if invalidation is not None else 'unknown')}</td>"
+            f"<td>{esc(next_target if next_target is not None else 'unknown')}</td>"
+            f"<td>{esc(observed_raw or 'unknown')}<small>{esc(freshness_text)}</small></td>"
+            "</tr>"
+        )
+
+    generated = parse_utc(data.get("generated_at"))
+    report_age = (now - generated).total_seconds() if generated else None
+    report_fresh = report_age is not None and -60 <= report_age <= freshness_sla
+    schema_ok = data.get("schema_version") == "daily-level-map-shadow-v1"
+    status_ok = str(data.get("status") or "").lower() in {"healthy", "success", "completed", "ok"}
+    shadow_only = data.get("shadow_only") is True and data.get("execution_enabled") is False and data.get("can_submit_orders") is False
+    coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    session_state = str(data.get("session_state") or ("rth" if coverage.get("completed_3m_expected_now") is True else "unknown")).lower()
+    confirmation_expected = coverage.get("completed_3m_expected_now") is True
+    coverage_complete = safe_int(coverage.get("available")) == safe_int(coverage.get("requested")) and safe_int(coverage.get("requested")) > 0
+    all_rows_valid = bool(rows) and valid_rows == len(rows)
+    all_rows_fresh = bool(rows) and fresh_rows == len(rows)
+    overall_ok = confirmation_expected and schema_ok and status_ok and shadow_only and report_fresh and all_rows_valid and all_rows_fresh
+    premarket_ready = schema_ok and status_ok and shadow_only and report_fresh and coverage_complete and session_state == "premarket"
+    postmarket_complete = schema_ok and status_ok and shadow_only and report_fresh and coverage_complete and session_state == "postmarket"
+    overall = "READY" if overall_ok else "PREMARKET READY / 3M WAITING" if premarket_ready else "POSTMARKET / SESSION COMPLETE" if postmarket_complete else "ATTENTION"
+
+    return section(
+        "Daily Map & 3m Confluence",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Map State", overall, "fresh, complete evidence required after 9:33 ET", "good" if overall_ok else "warn" if premarket_ready or postmarket_complete else "bad")}
+          {stat_card("Symbols", str(len(rows)), f"{valid_rows} structurally valid", "good" if all_rows_valid else "bad")}
+          {stat_card("WATCH", str(state_counts['WATCH']), "approaching mapped level", "warn")}
+          {stat_card("ARMED", str(state_counts['ARMED']), "daily aligned at level", "warn")}
+          {stat_card("CONFIRMED", str(state_counts['CONFIRMED']), "completed 3m confirmation", "good" if state_counts['CONFIRMED'] else "")}
+          {stat_card("PREMARKET", str(state_counts['PREMARKET']), "daily map ready; RTH 3m pending", "warn" if state_counts['PREMARKET'] else "")}
+          {stat_card("Late / Invalid", str(state_counts['LATE'] + state_counts['INVALIDATED']), "do not chase / setup failed", "bad" if state_counts['LATE'] + state_counts['INVALIDATED'] else "")}
+        </div>
+        <p class="muted"><strong>SHADOW SIMULATION ONLY · NO ORDERS:</strong> This display maps transparent, provenance-labeled levels. It does not infer or reproduce proprietary formulas.</p>
+        <div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Daily Bias</th><th>Nearest Level</th><th>Source / Provenance</th><th>Distance</th><th>3m State</th><th>Trigger</th><th>Invalidation</th><th>Next Target</th><th>Evidence Time</th></tr></thead><tbody>{''.join(rendered_rows) or '<tr><td colspan="10">No valid daily-map report found. State is unknown and therefore ATTENTION—not green.</td></tr>'}</tbody></table></div>
+        """,
+        f"Report {esc(data.get('generated_at') or 'missing')} · SLA {freshness_sla}s · schema {esc(data.get('schema_version') or 'missing')}",
+    )
+
+
+def render_priority_universe_recall(model: dict[str, Any]) -> str:
+    """Render fixed-universe observation coverage without inventing outcomes."""
+    data = model.get("daily_move_coverage_review") if isinstance(model.get("daily_move_coverage_review"), dict) else {}
+    coverage = data.get("priority_universe_coverage") if isinstance(data.get("priority_universe_coverage"), dict) else {}
+    rows = coverage.get("symbols") if isinstance(coverage.get("symbols"), list) else []
+    moves = {
+        str(row.get("symbol") or "").upper(): row
+        for row in data.get("moves") or []
+        if isinstance(row, dict) and row.get("symbol")
+    }
+    try:
+        sla = max(1, int(data.get("freshness_sla_seconds") or 129600))
+    except (TypeError, ValueError):
+        sla = 129600
+    try:
+        generated = datetime.fromisoformat(str(data.get("generated_at") or "").replace("Z", "+00:00"))
+        generated = generated.astimezone(timezone.utc) if generated.tzinfo else None
+    except (TypeError, ValueError):
+        generated = None
+    age = (datetime.now(timezone.utc) - generated).total_seconds() if generated else None
+    fresh = age is not None and -60 <= age <= sla
+    authority_ok = data.get("execution_enabled") is False and data.get("can_submit_orders") is False
+    schema_ok = data.get("schema_version") == 5
+    valid_rows = [row for row in rows if isinstance(row, dict) and row.get("symbol")]
+    evaluated_count = sum(row.get("evaluated") is True for row in valid_rows)
+    debt_count = sum(bool(row.get("coverage_debt")) for row in valid_rows)
+    execution_eligible_count = 0
+    body_rows: list[str] = []
+    for row in valid_rows:
+        symbol = str(row.get("symbol") or "").upper()
+        move = moves.get(symbol, {})
+        stages = move.get("stages") if isinstance(move.get("stages"), dict) else {}
+        execution_eligible = stages.get("execution_qualified") is True
+        execution_eligible_count += int(execution_eligible)
+        observed = row.get("evaluated") is True
+        debt = str(row.get("coverage_debt") or "none")
+        outcome = str(row.get("outcome_status") or "unknown")
+        body_rows.append(
+            "<tr>"
+            f"<td><strong>{esc(symbol)}</strong></td>"
+            f"<td class='{('good' if observed else 'bad')}'>{'OBSERVED' if observed else 'MISSING'}</td>"
+            f"<td class='{('good' if execution_eligible else 'warn')}'>{'YES' if execution_eligible else 'NO / UNKNOWN'}</td>"
+            f"<td>{esc(outcome)}</td><td class='{('bad' if debt != 'none' else '')}'>{esc(debt)}</td>"
+            "</tr>"
+        )
+    structurally_valid = bool(valid_rows) and len(valid_rows) == len(rows)
+    ready = schema_ok and authority_ok and fresh and structurally_valid and debt_count == 0
+    status = "COMPLETE" if ready else "ATTENTION"
+    freshness = f"{max(0, int(age))}s old" if age is not None else "timestamp missing"
+    recall_reason = str(coverage.get("recall_not_computable_reason") or "not supplied")
+    return section(
+        "Priority-Universe Recall",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Coverage", status, freshness, "good" if ready else "bad")}
+          {stat_card("Observed / evaluated", f"{evaluated_count}/{len(valid_rows)}", "fixed priority denominator", "good" if debt_count == 0 and valid_rows else "warn")}
+          {stat_card("Execution-eligible", str(execution_eligible_count), "separate gated stage; not observation", "warn")}
+          {stat_card("Coverage debt", str(debt_count), "missing symbols remain explicit", "bad" if debt_count else "good")}
+        </div>
+        <p class="muted"><strong>Recall not computable:</strong> {esc(recall_reason)}. Symbols absent from the bounded mover provider have unknown outcomes, not “no move.”</p>
+        <div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Observed / evaluated</th><th>Execution-eligible</th><th>Outcome scope</th><th>Coverage debt</th></tr></thead><tbody>{''.join(body_rows) or '<tr><td colspan="5" class="bad">Priority coverage missing — ATTENTION</td></tr>'}</tbody></table></div>
+        <p class="muted"><strong>Observation only:</strong> evaluation does not authorize an entry. No fill or option premium is inferred. No P/L or profitability is inferred.</p>
+        """,
+        f"Generated {esc(data.get('generated_at') or 'missing')} · {'fresh' if fresh else 'STALE / UNKNOWN'} · shadow-only authority required",
+    )
+
+
+def render_priority_swing_observation(model: dict[str, Any]) -> str:
+    """Render persistent daily swing states as observation, never performance."""
+    data = model.get("priority_swing_observation") if isinstance(model.get("priority_swing_observation"), dict) else {}
+    observations = [row for row in data.get("observations") or [] if isinstance(row, dict)]
+    transitions = [row for row in model.get("priority_swing_events") or [] if isinstance(row, dict)]
+    transitions.extend(row for row in data.get("transition_events") or [] if isinstance(row, dict))
+    priority = [str(value).upper() for value in data.get("priority_symbols") or [] if value]
+    now = datetime.now(timezone.utc)
+
+    def timestamp(value: Any) -> datetime | None:
+        try:
+            parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+
+    try:
+        sla = max(1, int(data.get("freshness_sla_seconds") or 129600))
+    except (TypeError, ValueError):
+        sla = 129600
+    generated = timestamp(data.get("generated_at"))
+    report_age = (now - generated).total_seconds() if generated else None
+    fresh = report_age is not None and -60 <= report_age <= sla
+    authority_ok = data.get("execution_enabled") is False and data.get("can_submit_orders") is False
+    schema_ok = data.get("schema_version") == "priority-swing-observation-v1" and data.get("provider") == "priority_swing_observation"
+    by_symbol = {str(row.get("symbol") or "").upper(): row for row in observations if row.get("symbol")}
+    missing = [symbol for symbol in priority if symbol not in by_symbol]
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    evidence_missing = [
+        symbol for symbol, row in by_symbol.items()
+        if not isinstance(row.get("completed_daily_evidence"), dict)
+        or row.get("completed_daily_evidence", {}).get("status") != "available"
+    ]
+    allowed_states = {"WATCH", "ARMED", "CONFIRMED", "INVALIDATED"}
+    rows: list[str] = []
+    eligible_count = 0
+    for symbol in priority or sorted(by_symbol):
+        row = by_symbol.get(symbol)
+        if row is None:
+            rows.append(f"<tr><td><strong>{esc(symbol)}</strong></td><td colspan='8' class='bad'>MISSING — persistent state coverage fault</td></tr>")
+            continue
+        state = str(row.get("state") or "UNKNOWN").upper()
+        eligible = row.get("strict_execution_eligible") is True
+        eligible_count += int(eligible)
+        matching = [event for event in transitions if str(event.get("symbol") or "").upper() == symbol]
+        matching.sort(key=lambda event: timestamp(event.get("observed_at")) or datetime.min.replace(tzinfo=timezone.utc))
+        last = matching[-1] if matching else {}
+        transitioned = timestamp(last.get("observed_at"))
+        state_age = (now - transitioned).total_seconds() if transitioned else None
+        transition_text = (
+            f"{last.get('previous_state')} → {last.get('state')}"
+            if last else f"{row.get('previous_state') or 'unknown'} → {state} (timestamp unavailable)"
+        )
+        blockers = ", ".join(str(value) for value in row.get("blockers") or []) or "none"
+        row_authority = row.get("execution_enabled") is False and row.get("can_submit_orders") is False
+        state_valid = state in allowed_states
+        tone = "good" if state == "CONFIRMED" and eligible and row_authority else "bad" if state == "INVALIDATED" or not state_valid or not row_authority else "warn"
+        rows.append(
+            "<tr>"
+            f"<td><strong>{esc(symbol)}</strong><small>{esc(row.get('setup_family') or 'unknown')}</small></td>"
+            f"<td class='{tone}'>{esc(state)}</td><td>{'YES' if row.get('continuing_setup') is True else 'NO'}</td>"
+            f"<td>{'YES' if eligible else 'NO'}</td><td>{esc(row.get('validation_status') or 'unknown')}</td>"
+            f"<td>{esc(row.get('trigger') if row.get('trigger') is not None else 'unknown')} / {esc(row.get('invalidation') if row.get('invalidation') is not None else 'unknown')}</td>"
+            f"<td>{esc(transition_text)}</td><td>{esc(f'{int(state_age)}s' if state_age is not None and state_age >= 0 else 'unknown')}</td>"
+            f"<td>{esc(blockers)}</td></tr>"
+        )
+    state_rows_valid = all(str(row.get("state") or "").upper() in allowed_states for row in observations)
+    producer_errors = safe_int(summary.get("errors"), len(data.get("errors") or []))
+    complete = (
+        bool(priority) and not missing and not evidence_missing and len(by_symbol) == len(priority)
+        and safe_int(summary.get("symbols_observed"), len(by_symbol)) == len(priority)
+        and producer_errors == 0
+    )
+    ready = schema_ok and authority_ok and fresh and complete and state_rows_valid
+    status = "CURRENT" if ready else "ATTENTION"
+    age_text = f"{max(0, int(report_age))}s old" if report_age is not None else "timestamp missing"
+    return section(
+        "Persistent Swing Lifecycle",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Lifecycle", status, age_text, "good" if ready else "bad")}
+          {stat_card("Priority states", f"{len(by_symbol)}/{len(priority)}", "persistent across daily refreshes", "good" if complete else "bad")}
+          {stat_card("Execution-eligible", str(eligible_count), "strict gated field; observation is separate", "warn")}
+          {stat_card("Missing / errored", str(len(set(missing + evidence_missing)) + producer_errors), ", ".join(sorted(set(missing + evidence_missing))) or "none", "bad" if missing or evidence_missing or producer_errors else "good")}
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Symbol / setup</th><th>State</th><th>Continuing</th><th>Execution-eligible</th><th>Validation</th><th>Trigger / invalidation</th><th>Last transition</th><th>State age</th><th>Blockers</th></tr></thead><tbody>{''.join(rows) or '<tr><td colspan="9" class="bad">Persistent swing lifecycle missing — ATTENTION</td></tr>'}</tbody></table></div>
+        <p class="muted"><strong>Shadow observation only:</strong> WATCH, ARMED, or CONFIRMED describes lifecycle state, not a return. No fills are assumed. No P/L or profitability is inferred.</p>
+        """,
+        f"Generated {esc(data.get('generated_at') or 'missing')} · {'fresh' if fresh else 'STALE / UNKNOWN'} · source {esc(data.get('universe_source') or 'missing')}",
     )
 
 
@@ -800,6 +1893,7 @@ def render_chart_panel(model: dict[str, Any]) -> str:
 
 def render_daily_pnl(model: dict[str, Any]) -> str:
     by_day: dict[str, list[dict]] = {}
+    unreconciled: list[dict[str, str]] = []
 
     for trade in model["flip_trades"] if isinstance(model["flip_trades"], list) else []:
         pnl = safe_float(trade.get("pnl")) if trade.get("pnl") not in (None, "") else None
@@ -819,16 +1913,25 @@ def render_daily_pnl(model: dict[str, Any]) -> str:
             continue
         pnl = parse_credit_pnl_estimate(trade)
         day = str(trade.get("closed_at") or trade.get("opened_at") or "")[:10]
-        if not day or pnl is None:
+        provenance = option_pnl_provenance(trade)
+        symbol = str(trade.get("label") or trade.get("underlying") or "IWM")
+        if not day:
+            continue
+        if pnl is None:
+            unreconciled.append({
+                "day": day,
+                "symbol": symbol,
+                "detail": str(trade.get("closing_reason") or "closing fill / debit missing"),
+            })
             continue
         by_day.setdefault(day, []).append({
-            "symbol": str(trade.get("label") or trade.get("underlying") or "IWM"),
+            "symbol": symbol,
             "bot": "IWM Bot",
             "pnl": pnl,
-            "detail": str(trade.get("closing_reason") or ""),
+            "detail": f"{'Exact ledger' if provenance == 'reconciled' else 'Estimated from exit rule'} · {str(trade.get('closing_reason') or '')}",
         })
 
-    if not by_day:
+    if not by_day and not unreconciled:
         return section("Daily P/L by Symbol", "<p style='color:var(--muted);padding:12px'>No closed trades found.</p>")
 
     rows = []
@@ -864,10 +1967,22 @@ def render_daily_pnl(model: dict[str, Any]) -> str:
         + "".join(rows)
         + "</tbody></table></div>"
     )
+    reconciliation = ""
+    if unreconciled:
+        missing_rows = "".join(
+            f"<tr><td>{esc(item['day'])}</td><td><strong>{esc(item['symbol'])}</strong></td>"
+            f"<td class='bad'>UNRECONCILED</td><td class='muted small'>{esc(item['detail'][:100])}</td></tr>"
+            for item in unreconciled
+        )
+        reconciliation = (
+            "<h3>Excluded from P/L until reconciled</h3><div class='table-wrap'><table><thead>"
+            "<tr><th>Date</th><th>Symbol</th><th>Status</th><th>Missing evidence</th></tr></thead><tbody>"
+            + missing_rows + "</tbody></table></div>"
+        )
     return section(
         "Daily P/L by Symbol",
-        table,
-        "Closed trades only · Flip Bot uses realized P/L · IWM Bot uses credit estimate when broker P/L absent",
+        table + reconciliation,
+        "Flip = exact ledger P/L · options are labeled reconciled, estimated, or excluded",
     )
 
 
@@ -931,6 +2046,11 @@ def render_shadow_and_health(model: dict[str, Any]) -> str:
     health = model["health"] if isinstance(model["health"], dict) else {}
     summary = health.get("summary") if isinstance(health.get("summary"), dict) else {}
     items = health.get("items") if isinstance(health.get("items"), list) else []
+    shadow_audit = model.get("shadow_audit") if isinstance(model.get("shadow_audit"), dict) else {}
+    audit_summary = shadow_audit.get("summary") if isinstance(shadow_audit.get("summary"), dict) else {}
+    eligible = safe_int(audit_summary.get("performance_eligible_count"))
+    quarantined = safe_int(audit_summary.get("performance_quarantined_count"))
+    eligibility_contract_present = "performance_quarantined_count" in audit_summary
     problem_rows = []
     for item in items:
         status = str(item.get("health") or "")
@@ -957,7 +2077,10 @@ def render_shadow_and_health(model: dict[str, Any]) -> str:
           {stat_card("Stale", str(safe_int(summary.get("stale"))), "needs follow-up", "warn")}
           {stat_card("Error", str(safe_int(summary.get("error"))), "data/feed problem", "bad" if safe_int(summary.get("error")) else "good")}
           {stat_card("Missing", str(safe_int(summary.get("missing"))), "no log found", "bad" if safe_int(summary.get("missing")) else "good")}
+          {stat_card("Performance Eligible", str(eligible), "independently resolved outcomes", "good" if eligibility_contract_present else "bad")}
+          {stat_card("Evidence Quarantined", str(quarantined) if eligibility_contract_present else "unknown", "visible, excluded from performance/promotion", "warn" if eligibility_contract_present else "bad")}
         </div>
+        <p><strong>Fail-closed evidence policy:</strong> raw streams remain visible; streams without independently resolved outcomes cannot support performance or promotion claims.</p>
         <div class="table-wrap">
           <table><thead><tr><th>Logger / Scanner</th><th>Health</th><th>Kind</th><th>Latest</th><th>Rows</th><th>Warnings</th></tr></thead><tbody>{''.join(problem_rows)}</tbody></table>
         </div>
@@ -1214,6 +2337,386 @@ def render_shadow_consensus(model: dict[str, Any]) -> str:
     )
 
 
+def render_scanner_evidence(model: dict[str, Any]) -> str:
+    data = model.get('scanner_evidence') or {}
+    summary = data.get('summary') or {}
+    reference = model.get('feed_reference') or {}
+    counts = reference.get('status_by_feed') or {}
+    iex = (counts.get('iex') or {}).get('evaluated')
+    sip = (counts.get('sip') or {}).get('evaluated')
+    rows = ''.join(f"<tr><td>{esc(name)}</td><td>{esc(row.get('status'))}</td><td>{esc(row.get('capture_timing') or 'unknown')}</td><td>{esc(row.get('source_generated_at') or 'unknown')}</td></tr>" for name, row in (data.get('source_provenance') or {}).items())
+    return section('Scanner Evidence Collection',
+        f"<p>Snapshot {esc(data.get('snapshot_id') or 'missing')} · captured {esc(data.get('captured_at') or 'unknown')}</p>"
+        f"<p>Ranked candidates: {safe_int(summary.get('ranked_candidates'))}; accepted: {safe_int(summary.get('accepted_decisions'))}; rejected: {safe_int(summary.get('rejected_decisions'))}; final quote checks: {safe_int(summary.get('quote_gate_checks'))}.</p>"
+        f"<p>Historical reference session {esc(reference.get('session_date') or 'missing')}: evaluated unique alerts IEX={esc(iex) if iex is not None else 'missing'}, SIP={esc(sip) if sip is not None else 'missing'}. Not live SIP entitlement, actual fills, or promotion evidence.</p>"
+        f"<div class='table-wrap'><table><thead><tr><th>Existing source</th><th>Status</th><th>Capture timing</th><th>Source time</th></tr></thead><tbody>{rows}</tbody></table></div><p>All thresholds remain human-reviewed. Late snapshots cannot establish point-in-time information availability.</p>")
+
+
+def _dashboard_timestamp(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _databento_budget() -> float | None:
+    raw = os.getenv("DATABENTO_DAILY_USD_BUDGET", "").strip()
+    if not raw:
+        env_path = ROOT / "agent" / ".env"
+        try:
+            for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if line.startswith("DATABENTO_DAILY_USD_BUDGET="):
+                    raw = line.split("=", 1)[1].strip()
+                    break
+        except OSError:
+            pass
+    try:
+        value = float(raw or "5.00")
+    except ValueError:
+        return None
+    return value if math.isfinite(value) and value >= 0 else None
+
+
+def _current_premarket_theses(report: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
+    current: list[dict[str, Any]] = []
+    now_et = now.astimezone(ET)
+    for thesis in report.get("theses") or []:
+        if not isinstance(thesis, dict):
+            continue
+        expiry = _dashboard_timestamp(thesis.get("expires_at"))
+        if expiry is None and thesis.get("expires_at_et"):
+            generated = _dashboard_timestamp(
+                thesis.get("generated_at") or thesis.get("as_of") or report.get("generated_at")
+            )
+            try:
+                hour, minute = (int(value) for value in str(thesis["expires_at_et"]).split(":", 1))
+                expiry_day = (generated or now).astimezone(ET).date()
+                expiry = datetime.combine(expiry_day, datetime.min.time(), ET).replace(
+                    hour=hour, minute=minute
+                ).astimezone(timezone.utc)
+            except (TypeError, ValueError):
+                expiry = None
+        if expiry is not None and now.astimezone(timezone.utc) < expiry:
+            current.append(thesis)
+    return current
+
+
+def nbbo_dashboard_state(model: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    """Reduce audited NBBO artifacts to display-safe dashboard facts."""
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    ledger = [row for row in (model.get("databento_call_ledger") or []) if isinstance(row, dict)]
+    today_rows = []
+    for row in ledger:
+        stamp = _dashboard_timestamp(
+            row.get("timestamp") or row.get("requested_at") or row.get("generated_at")
+        )
+        if stamp is not None and stamp.astimezone(ET).date() == now.astimezone(ET).date():
+            today_rows.append((stamp, row))
+    today_rows.sort(key=lambda pair: pair[0])
+    latest_ledger = today_rows[-1][1] if today_rows else {}
+    known_costs = [
+        safe_float(row.get("cost_usd"))
+        for _, row in today_rows
+        if row.get("cost_usd") not in (None, "")
+    ]
+    budget = _databento_budget()
+    cost = round(sum(known_costs), 6) if known_costs else None
+    remaining = round(max(0.0, budget - cost), 6) if budget is not None and cost is not None else None
+
+    confluence = model.get("institutional_confluence")
+    confluence = confluence if isinstance(confluence, dict) else {}
+    flows: list[dict[str, Any]] = []
+    unusual: list[dict[str, Any]] = []
+    for card in confluence.get("cards") or []:
+        if not isinstance(card, dict):
+            continue
+        for source in card.get("sources") or []:
+            if not isinstance(source, dict) or source.get("name") != "nbbo_options_flow":
+                continue
+            flows.append({
+                "symbol": card.get("symbol"),
+                "direction": source.get("direction") or (source.get("facts") or {}).get("directional_flow_bias"),
+                "status": source.get("status") or "missing",
+                "available": source.get("available") is True,
+                "fresh": source.get("fresh") is True,
+                "age_seconds": source.get("age_seconds"),
+                "observed_at": source.get("observed_at"),
+            })
+            facts = source.get("facts") if isinstance(source.get("facts"), dict) else {}
+            for item in facts.get("unusual_prints") or []:
+                if isinstance(item, dict):
+                    unusual.append({**item, "underlying": item.get("underlying") or card.get("symbol")})
+
+    premarket = model.get("premarket_thesis")
+    premarket = premarket if isinstance(premarket, dict) else {}
+    theses = _current_premarket_theses(premarket, now)
+    for thesis in theses:
+        evidence = thesis.get("evidence") if isinstance(thesis.get("evidence"), dict) else {}
+        for item in thesis.get("unusual_prints") or evidence.get("unusual_prints") or []:
+            if isinstance(item, dict):
+                unusual.append({**item, "underlying": item.get("underlying") or thesis.get("symbol")})
+
+    latest_status = str(latest_ledger.get("status") or "").lower()
+    if latest_status in {"success", "cached"}:
+        latest_status = "ok"
+    if latest_status == "cache_hit":
+        latest_status = "ok"
+    if not latest_status and any(flow["available"] and flow["fresh"] for flow in flows):
+        latest_status = "ok"
+    if not latest_status:
+        candidate_status = str(premarket.get("nbbo_status") or premarket.get("feed_status") or "").lower()
+        latest_status = candidate_status if candidate_status in {
+            "ok", "not_configured", "budget_exceeded", "timeout", "missing"
+        } or candidate_status.startswith("http_") else "missing"
+
+    return {
+        "status": latest_status,
+        "cost_usd": cost,
+        "budget_usd": budget,
+        "remaining_usd": remaining,
+        "ledger_calls_today": len(today_rows),
+        "flows": flows,
+        "unusual_prints": unusual[-20:][::-1],
+        "theses": theses,
+    }
+
+
+def render_nbbo_options_flow(model: dict[str, Any], *, now: datetime | None = None) -> str:
+    state = nbbo_dashboard_state(model, now=now)
+    status = str(state["status"] or "missing")
+    ok = status == "ok"
+    flow_rows = []
+    if ok:
+        for row in state["flows"]:
+            age = row.get("age_seconds")
+            freshness = "fresh" if row.get("fresh") and isinstance(age, (int, float)) and age <= 60 else "stale"
+            flow_rows.append(
+                f"<tr><td><strong>{esc(row.get('symbol') or 'missing')}</strong></td>"
+                f"<td>{esc(row.get('direction') or 'NEUTRAL')}</td><td>{esc(row.get('status'))}</td>"
+                f"<td class='{'good' if freshness == 'fresh' else 'bad'}'>{esc(freshness)}</td>"
+                f"<td>{esc(round(float(age), 1)) if isinstance(age, (int, float)) else 'missing'}</td></tr>"
+            )
+    flow_body = "".join(flow_rows) or (
+        f"<tr><td colspan='5'>NBBO status: {esc(status)}. No flow bias is inferred.</td></tr>"
+    )
+
+    print_rows = []
+    if ok:
+        for item in state["unusual_prints"]:
+            premium = item.get("premium") or item.get("premium_usd")
+            print_rows.append(
+                f"<tr><td>{esc(item.get('observed_at') or item.get('event_at') or 'missing')}</td>"
+                f"<td>{esc(item.get('underlying') or 'missing')}</td>"
+                f"<td>{esc(item.get('symbol') or item.get('contract') or 'missing')}</td>"
+                f"<td>{esc(item.get('side') or item.get('right') or 'unknown')}</td>"
+                f"<td>{esc(item.get('strike') if item.get('strike') is not None else 'missing')}</td>"
+                f"<td>{esc(item.get('size') if item.get('size') is not None else 'missing')}</td>"
+                f"<td>{money(premium)}</td></tr>"
+            )
+    print_body = "".join(print_rows) or (
+        f"<tr><td colspan='7'>{'No unusual prints in the current audited evidence.' if ok else 'Unavailable while NBBO status is ' + esc(status) + '.'}</td></tr>"
+    )
+
+    thesis_rows = []
+    if ok:
+        for thesis in state["theses"]:
+            numeric = thesis.get("evidence_numeric") if isinstance(thesis.get("evidence_numeric"), dict) else {}
+            thesis_rows.append(
+                f"<tr><td><strong>{esc(thesis.get('symbol'))}</strong></td>"
+                f"<td>{esc(thesis.get('direction') or 'NO_BIAS')}</td><td>{esc(thesis.get('conviction') or 'low')}</td>"
+                f"<td>{esc(thesis.get('evidence_summary') or 'numeric evidence recorded')}</td>"
+                f"<td>{esc(numeric.get('put_call_dollar_premium_ratio') if numeric.get('put_call_dollar_premium_ratio') is not None else 'missing')}</td>"
+                f"<td>{esc(numeric.get('skew_5pct') if numeric.get('skew_5pct') is not None else 'missing')}</td></tr>"
+            )
+    thesis_body = "".join(thesis_rows) or (
+        f"<tr><td colspan='6'>{'No unexpired premarket thesis card.' if ok else 'No thesis numbers displayed because NBBO is ' + esc(status) + '.'}</td></tr>"
+    )
+
+    cost_text = money(state["cost_usd"]) if state["cost_usd"] is not None else "missing"
+    remaining_text = money(state["remaining_usd"]) if state["remaining_usd"] is not None else "missing"
+    budget_text = money(state["budget_usd"]) if state["budget_usd"] is not None else "missing"
+    return section(
+        "NBBO Options Flow",
+        f"""
+        <div class='stat-grid compact'>
+          {stat_card('API status', status.upper(), 'missing is never converted to OHLCV', 'good' if ok else 'bad')}
+          {stat_card("Today's cost", cost_text, f"{safe_int(state['ledger_calls_today'])} audited calls", '')}
+          {stat_card('Daily budget', budget_text, 'hard cap from DATABENTO_DAILY_USD_BUDGET', '')}
+          {stat_card('Remaining', remaining_text, 'missing when ledger cost is unknown', 'warn' if state['remaining_usd'] is None else '')}
+          {stat_card('Fresh limit', '60s', 'older quotes are stale', 'good')}
+          {stat_card('Authority', 'CRITIC ONLY', 'may veto; cannot approve or execute', 'good')}
+        </div>
+        <h3>Latest per-symbol flow</h3>
+        <div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Bias</th><th>Status</th><th>Freshness</th><th>Age seconds</th></tr></thead><tbody>{flow_body}</tbody></table></div>
+        <h3>Unusual prints · last 20 audited</h3>
+        <div class='table-wrap'><table><thead><tr><th>Observed</th><th>Underlying</th><th>Contract</th><th>Side</th><th>Strike</th><th>Size</th><th>Premium</th></tr></thead><tbody>{print_body}</tbody></table></div>
+        <h3>Unexpired premarket thesis</h3>
+        <div class='table-wrap'><table><thead><tr><th>Symbol</th><th>Direction</th><th>Conviction</th><th>Evidence</th><th>Put/call $</th><th>5% skew</th></tr></thead><tbody>{thesis_body}</tbody></table></div>
+        """,
+        "Databento OPRA evidence · display-safe audit fields only · no raw provider payloads · no order authority",
+    )
+
+
+def render_latency_budget(model: dict[str, Any]) -> str:
+    data = model.get("latency_budget") or {}
+    gap = data.get("historical_gap") if isinstance(data.get("historical_gap"), dict) else {}
+    proof = data.get("paired_pipeline_proof") if isinstance(data.get("paired_pipeline_proof"), dict) else {}
+    rows = []
+    for source, stages in (data.get("by_source") or {}).items():
+        for stage, values in stages.items():
+            cells = [source, stage, values.get("count"), values.get("p50"), values.get("p90"), values.get("p99"), values.get("target"), values.get("status")]
+            rows.append("<tr>" + "".join(f"<td>{esc(value) if value is not None else '—'}</td>" for value in cells) + "</tr>")
+    body = ''.join(rows) or '<tr><td colspan="8">Exact delivery receipts unavailable.</td></tr>'
+    ci = proof.get('ci95_seconds') or [None, None]
+    cards = (stat_card('Pre-instrumentation', str(safe_int(gap.get('pre_instrumentation_rows'))), 'Discord IDs absent; no timestamps imputed', 'warn')
+             + stat_card('Paired samples', str(safe_int(proof.get('paired_samples'))), f"minimum {safe_int(proof.get('minimum_paired_samples'))}", '')
+             + stat_card('Bootstrap verdict', str(proof.get('status') or 'missing'), f"95% CI {ci[0]} to {ci[1]} sec", 'good' if proof.get('status') == 'improvement_supported' else 'warn'))
+    return section("Latency Budget", f"<div class='stat-grid compact'>{cards}</div><p>{esc(data.get('status') or 'missing')} · last {safe_int(data.get('sessions_reviewed'))} observed receipt dates. Seconds; Discord-assigned message timestamp, not user read time. Missing is not zero.</p><div class='table-wrap'><table><thead><tr><th>Source</th><th>Stage</th><th>N</th><th>p50</th><th>p90</th><th>p99</th><th>Target p90</th><th>Status</th></tr></thead><tbody>{body}</tbody></table></div>")
+
+
+def render_statistical_governance(model: dict[str, Any]) -> str:
+    data = model.get("statistical_governance") if isinstance(model.get("statistical_governance"), dict) else {}
+    signals = data.get("signals") if isinstance(data.get("signals"), list) else []
+    proof = data.get("latency_proof") if isinstance(data.get("latency_proof"), dict) else {}
+    rows = []
+    for row in signals:
+        if not isinstance(row, dict):
+            continue
+        confidence = row.get("confidence_intervals") if isinstance(row.get("confidence_intervals"), dict) else {}
+        def metric(name: str, fallback: Any) -> str:
+            item = confidence.get(name) if isinstance(confidence.get(name), dict) else {}
+            if item.get("ci_low") is None:
+                return f"{fallback if fallback is not None else '—'} (n={safe_int(item.get('n', row.get('n_outcomes')))}; insufficient)"
+            return f"{item.get('point'):.4f} [{item.get('ci_low'):.4f}, {item.get('ci_high'):.4f}]"
+        cells = [row.get("signal_id"), row.get("family_key"), row.get("status"),
+                 row.get("n", row.get("n_outcomes")), row.get("t", row.get("n_trials")),
+                 metric("sharpe", row.get("sharpe")), row.get("deflated_sharpe"),
+                 row.get("psr"), row.get("pbo"), row.get("reason")]
+        rows.append("<tr>" + "".join(f"<td>{esc(value) if value is not None else '—'}</td>" for value in cells) + "</tr>")
+    body = "".join(rows) or '<tr><td colspan="10">No statistical gate history. Promotion remains blocked.</td></tr>'
+    result = proof.get("result") if isinstance(proof.get("result"), dict) else {}
+    ci = [result.get("diff_ci_low"), result.get("diff_ci_high")]
+    cards = (
+        stat_card("Gate status", str(data.get("status") or "missing"), "human review required", "warn")
+        + stat_card("Signals evaluated", str(len(signals)), "latest persisted result per signal", "")
+        + stat_card("Latency proof", str(proof.get("status") or "missing"),
+                    f"paired n={safe_int(proof.get('paired_samples'))}; 95% CI {ci[0]} to {ci[1]} ms", "good" if proof.get("status") == "improvement_supported" else "warn")
+    )
+    return section("Statistical Promotion Gate", f"<div class='stat-grid compact'>{cards}</div><p>DSR/PSR/PBO are nomination evidence only. Family assignments and every promotion decision require human review. Missing evidence fails closed; no baseline is never inferred.</p><div class='table-wrap'><table><thead><tr><th>Signal</th><th>Family</th><th>Status</th><th>N</th><th>Trials</th><th>Sharpe CI</th><th>DSR</th><th>PSR</th><th>PBO</th><th>Reason</th></tr></thead><tbody>{body}</tbody></table></div>", "Read-only · no automatic promotion, demotion, parameter change, or order authority")
+
+
+def render_execution_readiness(model: dict[str, Any]) -> str:
+    data = model.get("execution_readiness") if isinstance(model.get("execution_readiness"), dict) else {}
+    criteria = data.get("criteria") if isinstance(data.get("criteria"), list) else []
+    rows = "".join(
+        f"<tr><td><strong>{esc(row.get('name'))}</strong></td><td class='{('good' if row.get('status') == 'PASS' else 'warn' if row.get('status') == 'PENDING' else 'bad')}'>{esc(row.get('status'))}</td><td>{safe_int(row.get('observed')) if row.get('observed') is not None else '—'} / {safe_int(row.get('required')) if row.get('required') is not None else '—'}</td><td>{safe_int(row.get('days_remaining'))}</td></tr>"
+        for row in criteria if isinstance(row, dict)
+    )
+    return section(
+        "Live-Execution Readiness · Draft",
+        f"<div class='stat-grid compact'>{stat_card('Overall', str(data.get('status') or 'PENDING'), 'human promotion only', 'good' if data.get('status') == 'PASS' else 'bad')}{stat_card('Automatic promotion', 'OFF', 'scorecard cannot change configuration', 'good')}{stat_card('Order authority', 'NONE', 'shadow reports only', 'good')}</div><div class='table-wrap'><table><thead><tr><th>Criterion</th><th>Status</th><th>Observed / Required</th><th>Remaining</th></tr></thead><tbody>{rows or '<tr><td colspan="4">No readiness report yet.</td></tr>'}</tbody></table></div>",
+        "Passing evidence still requires explicit human review and a strategy-specific configuration change; this panel cannot enable execution.",
+    )
+
+
+def render_governed_shadow_decision(model: dict[str, Any]) -> str:
+    """Show every decision made by the deterministic, no-order policy."""
+    data = model.get("governed_shadow") if isinstance(model.get("governed_shadow"), dict) else {}
+    delivery = model.get("governed_alert") if isinstance(model.get("governed_alert"), dict) else {}
+    lifecycle = model.get("governed_lifecycle") if isinstance(model.get("governed_lifecycle"), dict) else {}
+    outcomes = model.get("governed_outcomes") if isinstance(model.get("governed_outcomes"), dict) else {}
+    chart_review = model.get("discord_chart_review") if isinstance(model.get("discord_chart_review"), dict) else {}
+    chart_summary = chart_review.get("summary") if isinstance(chart_review.get("summary"), dict) else {}
+    chart_status = chart_summary.get("status_counts") if isinstance(chart_summary.get("status_counts"), dict) else {}
+    rules = model.get("governed_rules") if isinstance(model.get("governed_rules"), dict) else {}
+    confluence = model.get("institutional_confluence") if isinstance(model.get("institutional_confluence"), dict) else {}
+    confluence_summary = confluence.get("summary") if isinstance(confluence.get("summary"), dict) else {}
+    confluence_cards = confluence.get("cards") if isinstance(confluence.get("cards"), list) else []
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    decisions = data.get("decisions") if isinstance(data.get("decisions"), list) else []
+    rows: list[str] = []
+    for row in decisions[:16]:
+        candidate = row.get("candidate") if isinstance(row.get("candidate"), dict) else {}
+        decision = str(row.get("decision") or "unknown")
+        tone = "good" if decision == "shadow_accepted" else "bad" if decision == "shadow_rejected" else "warn"
+        blockers = row.get("blockers") if isinstance(row.get("blockers"), list) else []
+        evidence = row.get("evidence_cards") if isinstance(row.get("evidence_cards"), list) else []
+        rows.append(
+            "<tr>"
+            f"<td><strong>{esc(candidate.get('symbol'))}</strong><small>{esc(candidate.get('setup'))}</small></td>"
+            f"<td>{esc(candidate.get('direction'))}</td>"
+            f"<td>{money(candidate.get('trigger'))}<small>stop {money(candidate.get('stop'))} · target {money(candidate.get('target'))}</small></td>"
+            f"<td class='{tone}'>{esc(decision)}</td>"
+            f"<td>{esc('; '.join(str(item) for item in blockers[:3])) or '—'}</td>"
+            f"<td>{len(evidence)} hashed cards</td>"
+            "</tr>"
+        )
+    reasons = summary.get("rejected_by_reason") if isinstance(summary.get("rejected_by_reason"), dict) else {}
+    reason_text = ", ".join(f"{key}: {safe_int(value)}" for key, value in sorted(reasons.items())) or "none"
+    confluence_rows: list[str] = []
+    for card in confluence_cards[:12]:
+        if not isinstance(card, dict):
+            continue
+        repeat = card.get("repeat_confirmation") if isinstance(card.get("repeat_confirmation"), dict) else {}
+        sources = card.get("sources") if isinstance(card.get("sources"), list) else []
+        source_text = ", ".join(
+            f"{source.get('name')}={'fresh' if source.get('available') and source.get('fresh') else source.get('reason') or source.get('status') or 'unavailable'}"
+            for source in sources if isinstance(source, dict)
+        )
+        recommendation = str(card.get("recommendation") or "missing")
+        tone = "good" if recommendation == "confluence_observed" else "bad" if recommendation == "contradiction_observed" else "warn"
+        confluence_rows.append(
+            "<tr>"
+            f"<td><strong>{esc(card.get('symbol'))}</strong><small>{esc(card.get('direction'))}</small></td>"
+            f"<td class='{tone}'>{esc(recommendation)}</td>"
+            f"<td>{safe_int(card.get('independent_sources_available'))} / {safe_int(card.get('independent_sources_required_for_confluence'))}</td>"
+            f"<td>{safe_int(repeat.get('count'))}<small>{esc(repeat.get('span_minutes'))} min · {'qualified' if repeat.get('qualifies') else 'not qualified'}</small></td>"
+            f"<td class='muted small'>{esc(source_text)}</td>"
+            "</tr>"
+        )
+    return section(
+        "Governed Shadow Decision Gate",
+        f"""
+        <div class="stat-grid compact">
+          {stat_card("Confirmed", str(safe_int(summary.get("confirmed_candidates"))), "scanner candidates", "")}
+          {stat_card("Simulated", str(safe_int(summary.get("shadow_accepted"))), "shadow ledger only", "good" if safe_int(summary.get("shadow_accepted")) else "")}
+          {stat_card("Rejected", str(safe_int(summary.get("shadow_rejected"))), "still visible and replayed", "warn" if safe_int(summary.get("shadow_rejected")) else "")}
+          {stat_card("New ledger rows", str(safe_int(summary.get("new_ledger_events"))), "append-only evidence", "")}
+        </div>
+        <div class="stat-grid compact">
+          {stat_card("Alerts delivered", str(safe_int(delivery.get("alerts_sent"))), f"{safe_int(delivery.get('pending_delivery'))} pending · {safe_int(delivery.get('dashboard_only'))} dashboard-only", "bad" if safe_int(delivery.get("delivery_failures")) else "good")}
+          {stat_card("Sim lifecycles", str(safe_int(lifecycle.get("accepted_for_simulation"))), "accepted decisions only", "")}
+          {stat_card("Outcomes", str(safe_int(outcomes.get("total_reconciled"))), f"{safe_int(outcomes.get('still_pending_or_missing_bars'))} pending · {safe_int(outcomes.get('after_session_ineligible'))} after-session excluded", "warn" if safe_int(outcomes.get("still_pending_or_missing_bars")) or safe_int(outcomes.get("after_session_ineligible")) else "")}
+          {stat_card("Rule nominations", str(safe_int(rules.get("review_nominations"))), f"{safe_int(rules.get('rule_families'))} families evaluated", "")}
+        </div>
+        <h3 style="margin-top:18px">Post-Discord 1m Chart Review</h3>
+        <div class="stat-grid compact">
+          {stat_card("Delivered plans", str(safe_int(chart_summary.get("delivered_trade_alerts"))), f"{safe_int(chart_summary.get('unique_trade_candidates'))} unique", "")}
+          {stat_card("Evaluated", str(safe_int(chart_summary.get("evaluated"))), "first full minute after delivery", "")}
+          {stat_card("Positive", pct(chart_summary.get("positive_pct")), "underlying R proxy", "good" if safe_float(chart_summary.get("positive_pct")) >= 50 else "warn")}
+          {stat_card("Median R", f"{safe_float(chart_summary.get('median_r')):+.2f}R", "after actual Discord timestamp", "good" if safe_float(chart_summary.get("median_r")) > 0 else "bad")}
+          {stat_card("Invalid before entry", str(safe_int(chart_status.get("invalidated_before_entry"))), "late plans rejected", "warn" if safe_int(chart_status.get("invalidated_before_entry")) else "good")}
+          {stat_card("Duplicates", str(safe_int(chart_summary.get("duplicate_trade_alerts"))), "same setup sent more than once", "warn" if safe_int(chart_summary.get("duplicate_trade_alerts")) else "good")}
+        </div>
+        <p class="muted small" style="padding:4px 0 10px">Completed 1m underlying bars beginning after Discord delivery; gap-through entries are repriced and stop-before-entry plans are rejected. This is not option-contract P&amp;L.</p>
+        <p class="muted small" style="padding:4px 0 10px">Rejection reasons: {esc(reason_text)}</p>
+        <div class="table-wrap"><table><thead><tr><th>Symbol / Setup</th><th>Side</th><th>Levels</th><th>Decision</th><th>Blockers</th><th>Evidence</th></tr></thead><tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar candidates recorded yet.</td></tr>'}</tbody></table></div>
+        <h3 style="margin-top:18px">Institutional Confluence · Fail-Honest Source Coverage</h3>
+        <div class="stat-grid compact">
+          {stat_card("Confluence", str(safe_int(confluence_summary.get('confluence_observed'))), "2+ fresh independent sources", "good" if safe_int(confluence_summary.get('confluence_observed')) else "")}
+          {stat_card("Insufficient", str(safe_int(confluence_summary.get('insufficient_independent_evidence'))), "alerts remain visible", "warn" if safe_int(confluence_summary.get('insufficient_independent_evidence')) else "")}
+          {stat_card("Contradictions", str(safe_int(confluence_summary.get('contradictions'))), "critic evidence only", "bad" if safe_int(confluence_summary.get('contradictions')) else "good")}
+          {stat_card("Repeat confirmed", str(safe_int(confluence_summary.get('repeat_confirmed'))), "3 bars over 5+ minutes", "")}
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Assessment</th><th>Independent</th><th>Repeat bars</th><th>Source status</th></tr></thead><tbody>{''.join(confluence_rows) or '<tr><td colspan="5">No confluence evidence report yet.</td></tr>'}</tbody></table></div>
+        """,
+        "Deterministic evidence policy · all candidates logged · simulated positions only · no broker or order authority",
+    )
+
+
 def render_options_heatmap(model: dict[str, Any]) -> str:
     data = model.get("options_heatmap") if isinstance(model.get("options_heatmap"), dict) else {}
     if not data:
@@ -1432,6 +2935,9 @@ def render_learning(model: dict[str, Any]) -> str:
     if not data:
         return section("Flip Bot Learning", "<p style='color:var(--muted);padding:12px'>No report — run scripts/flip_bot_learning_report.py first.</p>")
     actual = data.get("actual") if isinstance(data.get("actual"), dict) else {}
+    recent_regime = data.get("recent_regime") if isinstance(data.get("recent_regime"), dict) else {}
+    trailing_5 = recent_regime.get("trailing_5") if isinstance(recent_regime.get("trailing_5"), dict) else {}
+    trailing_10 = recent_regime.get("trailing_10") if isinstance(recent_regime.get("trailing_10"), dict) else {}
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     readiness = data.get("scanner_readiness") if isinstance(data.get("scanner_readiness"), dict) else {}
     high = [l for l in lessons if l.get("severity") == "high"]
@@ -1443,6 +2949,8 @@ def render_learning(model: dict[str, Any]) -> str:
         + stat_card("Net P/L", money(net), f"win rate {pct(safe_float(actual.get('win_rate')), scale=True)}", "good" if net > 0 else "warn")
         + stat_card("Lessons", str(len(lessons)), f"high={len(high)} medium={len(medium)}", "warn" if high else "")
         + stat_card("Promo-Ready", str(safe_int(readiness.get("promotion_ready_count"))), "scanners ready for candidate review")
+        + stat_card("Recent 5-Trade P/L", money(safe_float(trailing_5.get("net_pnl"))), str(trailing_5.get("status") or "no evidence"), "bad" if trailing_5.get("status") == "degraded_pause_new_entries" else "")
+        + stat_card("Recent 10-Trade P/L", money(safe_float(trailing_10.get("net_pnl"))), str(trailing_10.get("status") or "no evidence"), "bad" if trailing_10.get("status") == "degraded_pause_new_entries" else "")
     )
     rows = []
     for l in lessons:
@@ -1465,7 +2973,98 @@ def render_learning(model: dict[str, Any]) -> str:
         + "</tbody></table></div>"
         + (f'<ul style="margin-top:12px;color:var(--muted)">{actions_html}</ul>' if actions_html else "")
     )
-    return section("Flip Bot Learning", body, "Read-only · No execution · Evidence only")
+    regime_note = str(recent_regime.get("alert_policy") or "")
+    return section("Flip Bot Learning", body, f"Read-only · {regime_note or 'Evidence only'}")
+
+
+def render_social_replay_queue(model: dict[str, Any]) -> str:
+    queue = model.get("social_replay_queue") or []
+    research = model.get("agent_reach_research") or {}
+    gap = model.get("social_gap_match") or {}
+    by_class = research.get("by_classification") or {}
+    by_platform = research.get("by_platform") or {}
+    channel_status = research.get("channel_status") or {}
+    summary = gap.get("summary") or {}
+    stats_html = (
+        stat_card("Replay Queue", str(len(queue)), "eligible: symbol+direction+entry+stop+target+timeframe+published_at")
+        + stat_card("Sources Collected", str(research.get("cumulative_source_count") or 0), "cumulative Agent-Reach intake")
+        + stat_card("Preregistration Candidates", str(len(research.get("preregistration_candidates") or [])), "reproducible + validated rules")
+        + stat_card("Rejected Marketing", str(len(research.get("rejected_marketing_claims") or [])), "promotional_only, no execution authority", "warn" if research.get("rejected_marketing_claims") else "")
+        + stat_card("Extracted Signals", str(summary.get("extracted_count", 0)), f"{summary.get('missing',0)} missing / {summary.get('partial',0)} partial / {summary.get('already_have',0)} already have")
+        + stat_card("New Shadow Backlog", str(summary.get("new_backlog_shadow_entries", 0)), "added to signal_registry as research_backlog stubs")
+    )
+    channel_bits = " · ".join(f"{k}: {v}" for k, v in sorted(channel_status.items()))
+    platform_bits = " / ".join(f"{k}={v}" for k, v in sorted(by_platform.items())) or "none"
+    classification_bits = " / ".join(f"{k}={v}" for k, v in sorted(by_class.items())) or "none"
+    if not queue:
+        queue_html = (
+            "<p class='muted'>No replay-ready callouts yet. Callout enters the queue only when the source explicitly supplies "
+            "one symbol, direction, entry zone, stop, target, timeframe, and publication time. All configured "
+            "social snapshots today are rejected marketing / research-lead only.</p>"
+        )
+    else:
+        rows = []
+        for r in queue[-25:][::-1]:
+            entry = f"{r.get('entry_zone_low','?')}-{r.get('entry_zone_high','?')}" if r.get('entry_zone_high') is not None else str(r.get('entry_zone_low','?'))
+            targets = ", ".join(str(t) for t in (r.get('targets') or [])[:3]) or "n/a"
+            author = esc(str(r.get('author') or 'n/a'))
+            url = esc(str(r.get('url') or ''))
+            src = f"<a href='{url}' target='_blank'>{esc(str(r.get('platform') or '?'))}</a>" if url else esc(str(r.get('platform') or '?'))
+            verified = "✓ indep" if r.get('independent_verification') else "unverified"
+            rows.append(
+                "<tr>"
+                f"<td>{esc(str(r.get('queued_at') or '')[:19])}</td>"
+                f"<td>{esc(str(r.get('symbol') or '?'))}</td>"
+                f"<td>{esc(str(r.get('direction') or '?'))}</td>"
+                f"<td>{esc(entry)}</td>"
+                f"<td>{esc(str(r.get('stop') or '?'))}</td>"
+                f"<td>{esc(targets)}</td>"
+                f"<td>{esc(str(r.get('timeframe') or '?'))}</td>"
+                f"<td>{src} {author}</td>"
+                f"<td>{esc(verified)}</td>"
+                "</tr>"
+            )
+        queue_html = (
+            "<table class='data'><thead><tr>"
+            "<th>Queued</th><th>Sym</th><th>Dir</th><th>Entry</th><th>Stop</th><th>Targets</th><th>TF</th><th>Source</th><th>Verified</th>"
+            "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+        )
+    body = (
+        f"<div class='stats'>{stats_html}</div>"
+        f"<p class='muted'><strong>Channel status:</strong> {esc(channel_bits)}</p>"
+        f"<p class='muted'><strong>By platform:</strong> {esc(platform_bits)} · <strong>By classification:</strong> {esc(classification_bits)}</p>"
+        + queue_html
+        + "<p class='muted' style='margin-top:12px'>Shadow-only research intake. Never a trade recommendation. "
+        "Every callout requires exact preregistration and cost-aware replay before promotion consideration. "
+        f"See <code>{esc(str(SOCIAL_GAP_MATCH_REPORT.relative_to(ROOT)))}</code> for extracted-signal-to-registry gap match.</p>"
+    )
+    return body
+
+
+def render_spy_5m_0dte_orb(model: dict[str, Any]) -> str:
+    """Render the frozen ORB challenger without turning it into an alert."""
+    data = model.get("spy_5m_0dte_orb") or {}
+    if not data:
+        return "<p class='muted'>No replay report yet. This challenger needs supplied, timestamped option bid/ask quotes; it will not assume fills.</p>"
+    outcomes = data.get("outcomes") or []
+    rows = []
+    for item in outcomes[-20:][::-1]:
+        outcome = item.get("option_outcome") or {}
+        rows.append(
+            "<tr>"
+            f"<td>{esc(str(item.get('date') or '?'))}</td><td>{esc(str(item.get('direction') or '?'))}</td>"
+            f"<td>{esc(str(item.get('signal_bar_completed_at') or '')[:19])}</td>"
+            f"<td>{esc(str(outcome.get('outcome') or outcome.get('reason') or outcome.get('status') or '?'))}</td>"
+            f"<td>{esc(str(outcome.get('net_return_pct_after_commission') or 'n/a'))}</td></tr>"
+        )
+    cards = (
+        stat_card("ORB Signals", str(data.get("signal_count") or 0), "first completed 5m-range break only")
+        + stat_card("Quote Paths", str(data.get("resolved_option_quote_paths") or 0), "entry ask / exit bid only")
+        + stat_card("Authority", "SHADOW", "no rank, alert, sizing, or execution authority", "warn")
+    )
+    blockers = "; ".join(str(x) for x in (data.get("promotion_blockers") or []))
+    table = "" if not rows else "<table class='data'><thead><tr><th>Date</th><th>Side</th><th>Decision</th><th>Replay result</th><th>Net %</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+    return f"<div class='stats'>{cards}</div>{table}<p class='muted'>Frozen challenger: M/W/F, 09:30–09:35 ET range, first closed-minute break. {esc(blockers)}</p>"
 
 
 def render_creator_watchlist(model: dict[str, Any]) -> str:
@@ -1885,7 +3484,13 @@ def render_html(model: dict[str, Any]) -> str:
         ("#flip",      "Flip Trades"),
         ("#iwm",       "IWM Trades"),
         ("#positions", "Positions"),
+        ("#daily-map", "Daily Map"),
+        ("#ops-runs",  "Run Evidence"),
         ("#health",    "Health"),
+        ("#alerts",    "Sim Alerts"),
+        ("#focus",     "Focus"),
+        ("#priority-recall", "Priority Recall"),
+        ("#swing-lifecycle", "Swing Lifecycle"),
         ("#mastery",   "Mastery"),
         ("#heatmap",   "Heat Map"),
         ("#kronos",    "Kronos"),
@@ -1894,7 +3499,10 @@ def render_html(model: dict[str, Any]) -> str:
         ("#hot",       "Hot Tickers"),
         ("#asymmetry", "Asymmetry"),
         ("#learning",  "Learning"),
+        ("#improvement", "Daily Accountability"),
         ("#watchlist", "Watchlist"),
+        ("#social",    "Social Replay"),
+        ("#orb",       "5m ORB Replay"),
         ("#alpha",     "Alpha"),
         ("#closure",   "Closure"),
         ("#loops",     "Loops"),
@@ -2289,10 +3897,60 @@ def render_html(model: dict[str, Any]) -> str:
     </div>
 
     {render_overfit_guard(model)}
+    {render_operational_gate(model)}
 
     {render_aplus_spotlight(model)}
 
     {render_bplus_spotlight(model)}
+
+    <div id="alerts" class="section">
+      <div class="section-label"><h2>Simulated Real-Time Alerts</h2><p>Five-minute refresh · Paper entries and watches · No broker execution</p></div>
+      {render_simulated_alert_feed(model)}
+    </div>
+
+    <div id="focus" class="section">
+      <div class="section-label"><h2>Today’s Focus</h2><p>Liquid names pinned from the session plan · Scanner gates remain mandatory</p></div>
+      {render_session_focus(model)}
+    </div>
+
+    <div id="priority-recall" class="section">
+      <div class="section-label"><h2>Priority-Universe Recall</h2><p>Fixed observation denominator · explicit missing coverage · execution eligibility kept separate</p></div>
+      {render_priority_universe_recall(model)}
+    </div>
+
+    <div id="swing-lifecycle" class="section">
+      <div class="section-label"><h2>Persistent Swing Lifecycle</h2><p>Daily state continuity · last transition and age · strict eligibility remains separate</p></div>
+      {render_priority_swing_observation(model)}
+    </div>
+
+    <div id="daily-map" class="section">
+      <div class="section-label"><h2>Daily Map &amp; 3m Confluence</h2><p>Daily directional context · transparent mapped levels · completed 3-minute confirmation</p></div>
+      {render_daily_level_map_shadow(model)}
+    </div>
+
+    {render_preconfirmation_heads_up(model)}
+
+    {render_intraday_posture_and_lifecycle(model)}
+
+    {render_aplus_evidence_contract(model)}
+
+    {render_liquid_review_escalations(model)}
+
+    {render_wolves_bbr_shadow(model)}
+
+    {render_banks_821_shadow(model)}
+
+    {render_donchian_expansion_shadow(model)}
+
+    {render_liquid_signal_chart_audit(model)}
+
+    {render_multi_timeframe_edge(model)}
+
+    {render_trader_barbie_3m(model)}
+
+    {render_daily_rsi2_challenger(model)}
+
+    {render_strategy_discovery_coverage(model)}
 
     {render_spy_level_reaction(model)}
 
@@ -2348,6 +4006,11 @@ def render_html(model: dict[str, Any]) -> str:
       {render_positions(model)}
     </div>
 
+    <div id="ops-runs" class="section">
+      <div class="section-label"><h2>Operational Run Evidence</h2><p>Machine-readable completion, freshness, delivery, and persistent breaker state</p></div>
+      {render_operational_runs(model)}
+    </div>
+
     <div id="health" class="section">
       <div class="section-label"><h2>Signal Health</h2><p>Shadow loggers and scanner freshness</p></div>
       {render_shadow_and_health(model)}
@@ -2383,6 +4046,16 @@ def render_html(model: dict[str, Any]) -> str:
       {render_shadow_consensus(model)}
     </div>
 
+    <div id="governed" class="section">
+      <div class="section-label"><h2>Governed Shadow Decisions</h2><p>Completed-bar evidence → deterministic policy → simulated decision ledger</p></div>
+      {render_governed_shadow_decision(model)}
+    </div>
+
+    {render_execution_readiness(model)}
+    {render_statistical_governance(model)}
+    {render_latency_budget(model)}
+    {render_scanner_evidence(model)}
+
     <div id="grades" class="section">
       <div class="section-label"><h2>Daily Grades</h2><p>Evidence and ops grades — promotion gate requires 30 days + 10 samples</p></div>
       {render_grades(model)}
@@ -2403,9 +4076,24 @@ def render_html(model: dict[str, Any]) -> str:
       {render_learning(model)}
     </div>
 
+    <div id="improvement" class="section">
+      <div class="section-label"><h2>Daily Learning Accountability</h2><p>Scanner → alert → delivery → timeliness → retained lesson</p></div>
+      {render_continuous_improvement(model)}
+    </div>
+
     <div id="watchlist" class="section">
       <div class="section-label"><h2>Creator Watchlist</h2><p>Read-only · Screenshot claims scored against independent shadow evidence</p></div>
       {render_creator_watchlist(model)}
+    </div>
+
+    <div id="social" class="section">
+      <div class="section-label"><h2>Social Replay Queue</h2><p>Shadow-only · Callouts require symbol+direction+entry+stop+target+timeframe+published_at · No execution authority</p></div>
+      {render_social_replay_queue(model)}
+    </div>
+
+    <div id="orb" class="section">
+      <div class="section-label"><h2>SPY 5-Minute 0DTE ORB Replay</h2><p>Frozen challenger · Quote-aware replay only · No trade alert or order authority</p></div>
+      {render_spy_5m_0dte_orb(model)}
     </div>
 
     <div id="alpha" class="section">

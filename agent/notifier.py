@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,16 +87,33 @@ def _chunks(message: str) -> list[str]:
     return chunks
 
 
-def _post_json(url: str, payload: dict[str, Any], timeout: float) -> None:
+def _wait_url(url: str) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["wait"] = "true"
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _message_receipt(value: Any) -> dict[str, str | None]:
+    payload = value if isinstance(value, Mapping) else {}
+    return {
+        "discord_message_id": str(payload.get("id") or "").strip() or None,
+        "discord_delivered_ts": str(payload.get("timestamp") or "").strip() or None,
+    }
+
+
+def _post_json(url: str, payload: dict[str, Any], timeout: float) -> dict[str, Any] | None:
     request = urllib.request.Request(
-        url,
+        _wait_url(url),
         data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
         headers={"Content-Type": "application/json", "User-Agent": "VibeTradingOps/1.0"},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
-        if int(getattr(response, "status", 204)) not in {200, 204}:
+        if int(getattr(response, "status", 200)) not in {200, 204}:
             raise RuntimeError(f"discord_http_{getattr(response, 'status', 'unknown')}")
+        raw = response.read()
+        return json.loads(raw.decode("utf-8")) if raw else None
 
 
 def send_discord(
@@ -113,12 +130,14 @@ def send_discord(
     _validate_webhook(webhook)
     chunks = _chunks(message)
     sent = 0
+    receipts: list[dict[str, str | None]] = []
     try:
         for content in chunks:
             payload = {"content": content, "allowed_mentions": {"parse": []}}
             for attempt in range(max(1, attempts)):
                 try:
-                    transport(webhook, payload, timeout)
+                    response = transport(_wait_url(webhook), payload, timeout)
+                    receipts.append(_message_receipt(response))
                     sent += 1
                     break
                 except (urllib.error.URLError, TimeoutError, RuntimeError):
@@ -132,7 +151,7 @@ def send_discord(
             "chunks": sent,
             "error_type": type(exc).__name__,
         }
-    return {"status": "sent", "sent": True, "chunks": sent}
+    return {"status": "sent", "sent": True, "chunks": sent, "receipts": receipts}
 
 
 def send_discord_embed(
@@ -173,8 +192,9 @@ def send_discord_embed(
     try:
         for attempt in range(max(1, attempts)):
             try:
-                transport(webhook, payload, timeout)
-                return {"status": "sent", "sent": True, "chunks": 1}
+                response = transport(_wait_url(webhook), payload, timeout)
+                return {"status": "sent", "sent": True, "chunks": 1,
+                        "receipts": [_message_receipt(response)]}
             except (urllib.error.URLError, TimeoutError, RuntimeError):
                 if attempt + 1 >= max(1, attempts):
                     raise

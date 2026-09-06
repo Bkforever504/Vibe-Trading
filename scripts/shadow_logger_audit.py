@@ -23,6 +23,24 @@ RESOLVED_STATUSES = {"closed", "resolved", "settled", "winner", "loser", "win", 
 OPEN_STATUSES = {"open", "active", "pending", "entered", "unresolved"}
 
 
+def _performance_eligibility(role: str, evidence_status: str, resolved_count: int) -> tuple[bool, str]:
+    """Return whether a stream may support performance or promotion claims.
+
+    Visibility and eligibility are intentionally separate.  Every discovered
+    stream remains in the audit, while only streams with independently
+    resolved outcomes are allowed into performance evidence.
+    """
+    if role == "derived_report_stream":
+        return False, "derived_stream_not_independent_evidence"
+    if evidence_status == "malformed":
+        return False, "malformed_stream"
+    if evidence_status == "empty":
+        return False, "empty_stream"
+    if resolved_count <= 0:
+        return False, "no_independently_resolved_outcomes"
+    return True, "independently_resolved_outcomes_present"
+
+
 def _load_rows(path: Path) -> tuple[list[dict[str, Any]], int]:
     malformed = 0
     if path.suffix == ".jsonl":
@@ -136,6 +154,10 @@ def audit_path(path: Path, now: datetime) -> dict[str, Any]:
     else:
         evidence_status = "context_only_no_resolved_outcomes"
 
+    performance_eligible, performance_eligibility_reason = _performance_eligibility(
+        role, evidence_status, resolved_count
+    )
+
     issues: list[str] = []
     if freshness == "stale":
         issues.append("stale_log")
@@ -145,6 +167,8 @@ def audit_path(path: Path, now: datetime) -> dict[str, Any]:
         issues.append("malformed_log")
     if role == "primary_shadow_logger" and evidence_status == "context_only_no_resolved_outcomes":
         issues.append("forward_outcome_contract_missing_or_external")
+    if not performance_eligible:
+        issues.append("quarantined_from_performance_and_promotion_claims")
 
     return {
         "path": str(path),
@@ -160,6 +184,8 @@ def audit_path(path: Path, now: datetime) -> dict[str, Any]:
         "business_days_since_latest": age,
         "freshness": freshness,
         "evidence_status": evidence_status,
+        "performance_eligible": performance_eligible,
+        "performance_eligibility_reason": performance_eligibility_reason,
         "issues": issues,
     }
 
@@ -190,9 +216,11 @@ def build_report(data_dir: Path = DATA, now: datetime | None = None) -> dict[str
             "stale_count": sum(row["freshness"] == "stale" for row in rows),
             "issue_count": sum(bool(row["issues"]) for row in rows),
             "sample_size_review_ready_count": evidence_counts["sample_size_review_ready"],
+            "performance_eligible_count": sum(row["performance_eligible"] for row in rows),
+            "performance_quarantined_count": sum(not row["performance_eligible"] for row in rows),
         },
         "rows": rows,
-        "interpretation": "Fresh logs are not evidence of edge. Promotion still requires executable, cost-adjusted, forward outcomes on independent dates.",
+        "interpretation": "Fresh logs remain visible but are quarantined from performance and promotion claims until independently resolved outcomes exist. Promotion still requires executable, cost-adjusted, forward outcomes on independent dates.",
     }
 
 

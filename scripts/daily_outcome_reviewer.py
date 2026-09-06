@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.export_daily_bot_activity_csv import collect_events
+from agent.analytics.outcome_bootstrap import bootstrap_ci, mean_expectancy
 
 VIBE_HOME = Path.home() / ".vibe-trading"
 LOG_PATH = ROOT / "data" / "daily_outcome_review_log.jsonl"
@@ -91,7 +92,16 @@ def summarize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "losing_trade_count": sum(1 for pnl in pnls if pnl < 0),
         "trade_sources": sorted({str(event.get("source")) for event in trades if event.get("source")}),
         "blocked_reasons": sorted({str(event.get("reason")) for event in guard_blocks if event.get("reason")}),
+        "realized_pnls": pnls,
     }
+
+
+def expectancy_confidence(pnls: list[float]) -> dict[str, Any]:
+    result = bootstrap_ci(pnls, mean_expectancy)
+    low_confidence = result.get("ci_low") is None or float(result["ci_low"]) <= 0
+    return {**result, "low_confidence": low_confidence,
+            "review_action": "needs_review" if low_confidence else "confidence_supported",
+            "automatic_parameter_changes": False}
 
 
 def evaluate_posture(posture: str, score: float, event_summary: dict[str, Any], market_force: dict[str, Any] | None) -> dict[str, Any]:
@@ -154,6 +164,7 @@ def build_report(day: str | None = None, paths: dict[str, Path] | None = None) -
     posture = str((exposure or {}).get("posture") or "missing")
     posture_score = float((exposure or {}).get("score") or 0.0)
     evaluation = evaluate_posture(posture, posture_score, event_summary, market_force)
+    confidence = expectancy_confidence(event_summary.pop("realized_pnls"))
     return {
         "date": day,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -168,6 +179,7 @@ def build_report(day: str | None = None, paths: dict[str, Path] | None = None) -
         "breadth_status": ((breadth or {}).get("breadth") or {}).get("uptrend_status") if isinstance((breadth or {}).get("breadth"), dict) else None,
         "distribution_regime": ((distribution or {}).get("aggregate") or {}).get("regime") if isinstance((distribution or {}).get("aggregate"), dict) else None,
         "event_summary": event_summary,
+        "expectancy_confidence": confidence,
         **evaluation,
         "warnings": [
             "Read-only review. No bot settings are changed.",

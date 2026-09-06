@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only HMM-style market regime scanner.
+"""Read-only deterministic market-regime heuristic.
 
-Uses observable return/volatility features to infer sticky hidden regimes:
-trend, chop, and panic. This intentionally avoids adding an hmmlearn dependency;
-the model is a small deterministic Gaussian-state approximation with transition
-counts for operational context. No orders. No broker calls beyond market data.
+Uses observable return/volatility features to classify trend, chop, and panic.
+Despite the legacy filename, this is not a fitted hidden Markov model.  The
+reported ``probabilities`` are trailing observed-label frequencies, not hidden-
+state posteriors. No orders. No broker calls beyond market data.
 """
 from __future__ import annotations
 
@@ -166,6 +166,9 @@ def build_report(day: str | None = None, symbols: list[str] | None = None) -> di
         "date": day,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "provider": "hmm_regime_scanner",
+        "model_type": "deterministic_observable_state_classifier",
+        "probability_semantics": "trailing_20_observed_label_frequency_not_hidden_state_posterior",
+        "calibrated_probability": False,
         "mode": "read_only",
         "execution_enabled": False,
         "can_submit_orders": False,
@@ -173,7 +176,8 @@ def build_report(day: str | None = None, symbols: list[str] | None = None) -> di
         "scans": scans,
         "warnings": [
             "Context only. No orders are placed.",
-            "HMM-style state is a regime classifier, not a price forecast.",
+            "Legacy filename only: this is not a fitted HMM and has no latent-state posterior.",
+            "Probability fields are trailing observed-label frequencies and are not calibrated trade odds.",
             "Requires 30 trading days of forward logs before gate discussion.",
         ],
     }
@@ -193,7 +197,7 @@ def write_report(report: dict[str, Any], path: Path = REPORT_PATH) -> Path:
 
 def print_report(report: dict[str, Any]) -> None:
     agg = report["aggregate"]
-    print("\nHMM Regime Scanner | read-only")
+    print("\nDeterministic Regime Heuristic | read-only")
     print("=" * 72)
     print(f"{report['date']} state={agg.get('state')} probs={agg.get('probabilities')} action={agg.get('action_context')}")
     for scan in report["scans"]:
@@ -214,7 +218,7 @@ def main() -> int:
     if args.print_output:
         print_report(report)
     else:
-        print(f"HMM regime logged to {args.log_path}")
+        print(f"Regime heuristic logged to {args.log_path}")
     return 0
 
 

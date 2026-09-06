@@ -79,7 +79,8 @@ def build_provider_registry(env: Mapping[str, str] | None = None, *, root: Path 
         {
             "name": "opra",
             "status": "local_evidence_available" if any((root / "data" / "databento").glob("opra_*")) else "optional_not_configured",
-            "capabilities": ["options_nbbo", "implied_volatility", "greeks", "open_interest"],
+            "capabilities": ["options_nbbo"],
+            "unavailable_capabilities": ["implied_volatility", "greeks", "open_interest", "trade_aggressor_side"],
             "provenance": "opra_nbbo_no_aggressor_side",
             "required_environment": ["licensed OPRA source such as Databento or Cboe"],
         },

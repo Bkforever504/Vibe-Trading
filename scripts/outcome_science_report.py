@@ -11,6 +11,10 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+try:
+    from scripts.alert_delivery_timing import first_complete_bar_after_delivery
+except ModuleNotFoundError:
+    from alert_delivery_timing import first_complete_bar_after_delivery
 
 try:
     from flip_shadow_pnl_evaluator import LOG_PATH as SHADOW_LOG_PATH

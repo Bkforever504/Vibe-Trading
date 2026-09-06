@@ -65,7 +65,14 @@ def _append(rows: list[dict[str, Any]]) -> None:
 
 
 def _episode_id(row: dict[str, Any]) -> str:
-    return "|".join((row["date"], row["symbol"], str(row["shadow_direction"]), str(row["trigger_at"])))
+    strategy = str(row.get("strategy") or "30m_continuation")
+    fields = (row["date"], row["symbol"], str(row["shadow_direction"]), str(row["trigger_at"]))
+    # Preserve the historical continuation identity so deployment cannot
+    # duplicate existing signals/outcomes. Only the new 2-1-2 family gets a
+    # namespaced ID.
+    if strategy == "30m_continuation":
+        return "|".join(fields)
+    return "|".join((row["date"], row["symbol"], strategy, str(row["shadow_direction"]), str(row["trigger_at"])))
 
 
 def _outcomes(history: list[dict[str, Any]], intraday: dict[str, pd.DataFrame]) -> list[dict[str, Any]]:
@@ -100,6 +107,8 @@ def _outcomes(history: list[dict[str, Any]], intraday: dict[str, pd.DataFrame]) 
             "outcome_schema_version": 2,
             "episode_id": signal["episode_id"],
             "symbol": signal["symbol"],
+            "strategy": signal.get("strategy") or "30m_continuation",
+            "pattern": signal.get("pattern"),
             "direction": direction,
             "trigger_at": signal["trigger_at"],
             "timestamp": evaluated_at,
@@ -127,11 +136,27 @@ def run(trading_day: date | None = None) -> dict[str, Any]:
         if frame is not None:
             intraday[symbol] = frame
         if row.get("shadow_signal"):
-            signal = {**row, "record_type": "signal"}
+            signal = {**row, "record_type": "signal", "strategy": "30m_continuation"}
+            signal["episode_id"] = _episode_id(signal)
+            if signal["episode_id"] not in existing:
+                signals.append(signal)
+        reversal = row.get("intraday_212_reversal")
+        if isinstance(reversal, dict) and reversal.get("shadow_signal"):
+            signal = {
+                **reversal,
+                "record_type": "signal",
+                "strategy": "intraday_30m_212_reversal",
+                "symbol": symbol,
+                "date": trading_day.isoformat(),
+                "authority": "shadow_challenger_only",
+                "execution_enabled": False,
+                "can_submit_orders": False,
+            }
             signal["episode_id"] = _episode_id(signal)
             if signal["episode_id"] not in existing:
                 signals.append(signal)
     outcomes = _outcomes(history, intraday)
+    scan_errors = sum(row.get("status") == "error" for row in scans)
     heartbeat = {
         "record_type": "scan",
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -150,6 +175,9 @@ def run(trading_day: date | None = None) -> dict[str, Any]:
         "can_submit_orders": False,
         "new_signals": len(signals),
         "new_outcomes": len(outcomes),
+        "new_212_reversal_signals": sum(row.get("strategy") == "intraday_30m_212_reversal" for row in signals),
+        "scan_errors": scan_errors,
+        "operational_health": "degraded" if scan_errors else "ok",
         "scans": scans,
         "promotion_requirements": {
             "minimum_forward_signals": 50,

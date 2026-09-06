@@ -35,6 +35,8 @@ SOURCE_PATHS = {
     "options_twin": REPORT_DIR / "options-shadow-twin.json",
     "options_nbbo_curriculum": ROOT / "data" / "options_nbbo_curriculum_results.json",
     "time_buckets": REPORT_DIR / "flip-shadow-time-buckets.json",
+    "shadow_audit": REPORT_DIR / "shadow-logger-audit.json",
+    "operational_gate": REPORT_DIR / "operational-readiness-gate.json",
     "scenario_curriculum": ROOT / "data" / "market_scenario_curriculum_results.json",
 }
 AUTOMATION_TASKS = {
@@ -97,7 +99,9 @@ def _operational(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
     health_ok = bool(health) and sum(_integer(health.get(key)) for key in ("stale", "missing", "error")) == 0
     schedule_ok = bool(s["schedule"].get("passed"))
     audit_ok = bool(s["execution_audit"].get("passed"))
-    raw = (5 if health_ok else 0) + (3 if schedule_ok else 0) + (2 if audit_ok else 0)
+    operational_gate = s["operational_gate"]
+    five_sessions_clean = operational_gate.get("operational_prerequisite_passed") is True
+    raw = (4 if health_ok else 0) + (2 if schedule_ok else 0) + (2 if audit_ok else 0) + (2 if five_sessions_clean else 0)
     blockers = []
     if not health_ok:
         blockers.append("Resolve every stale, missing, or error signal-stack item.")
@@ -105,7 +109,15 @@ def _operational(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
         blockers.append("Restore full market-schedule alignment.")
     if not audit_ok:
         blockers.append("Clear every execution-gate audit issue.")
-    return _category("Operational integrity", raw, 10, [f"health={health}", f"schedule_passed={schedule_ok}", f"execution_audit_passed={audit_ok}"], blockers)
+    if not five_sessions_clean:
+        blockers.append("Complete five distinct market sessions with clean radar coverage and zero stale, missing, or error health states.")
+    return _category(
+        "Operational integrity",
+        raw,
+        10,
+        [f"health={health}", f"schedule_passed={schedule_ok}", f"execution_audit_passed={audit_ok}", f"five_session_operational_gate={five_sessions_clean}"],
+        blockers,
+    )
 
 
 def _risk(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
@@ -453,6 +465,10 @@ def _research_validity(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
         if isinstance(row, dict) and row.get("stage") in {"out_of_sample", "forward"}
     )
     feature_trades = _integer(ablation.get("feature_telemetry_trade_count"))
+    shadow_audit = s["shadow_audit"]
+    shadow_summary = shadow_audit.get("summary") if isinstance(shadow_audit.get("summary"), dict) else {}
+    quarantined_streams = _integer(shadow_summary.get("performance_quarantined_count"))
+    audit_contract_present = "performance_quarantined_count" in shadow_summary
     raw = 0
     raw += 2 if ledger else 0
     raw += 2 if multiple.get("all_attempted_trials_counted") is True else 0
@@ -471,11 +487,19 @@ def _research_validity(s: dict[str, dict[str, Any]]) -> dict[str, Any]:
         blockers.append(f"Collect schema-v1 feature telemetry on at least 30 closed Flip trades; current={feature_trades}.")
     if not all(analytics):
         blockers.append("Restore surface, ablation, and trial-ledger governance reports.")
+    if not audit_contract_present:
+        cap = min(cap, 6)
+        blockers.append("Restore the fail-closed shadow evidence eligibility audit.")
+    elif quarantined_streams:
+        cap = min(cap, 8)
+        blockers.append(
+            f"Keep {quarantined_streams} shadow streams without independent resolved outcomes quarantined from performance and promotion claims."
+        )
     return _category(
         "Research validity",
         raw,
         cap,
-        [f"immutable_trials={trial_count}", f"oos_or_forward_trials={oos_count}", f"feature_telemetry_trades={feature_trades}", f"analytics_read_only={all_read_only}"],
+        [f"immutable_trials={trial_count}", f"oos_or_forward_trials={oos_count}", f"feature_telemetry_trades={feature_trades}", f"analytics_read_only={all_read_only}", f"shadow_audit_contract_present={audit_contract_present}", f"shadow_streams_quarantined={quarantined_streams}"],
         blockers,
     )
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 
@@ -444,10 +444,22 @@ SIGNALS = [
 ]
 
 
-def _latest_jsonl(path: Path) -> tuple[dict | None, int, str | None]:
+def _row_date(row: dict) -> str:
+    return str(
+        row.get("date")
+        or str(row.get("generated_at") or "")[:10]
+        or str(row.get("scanned_at") or "")[:10]
+        or str(row.get("resolved_at") or "")[:10]
+        or str(row.get("timestamp") or "")[:10]
+        or ""
+    )
+
+
+def _latest_jsonl(path: Path, preferred_date: str | None = None) -> tuple[dict | None, int, str | None]:
     if not path.exists():
         return None, 0, "missing"
     rows = []
+    preferred_rows = []
     bad_lines = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -460,10 +472,12 @@ def _latest_jsonl(path: Path) -> tuple[dict | None, int, str | None]:
             continue
         if isinstance(row, dict):
             rows.append(row)
+            if preferred_date and _row_date(row) == preferred_date:
+                preferred_rows.append(row)
     if not rows:
         return None, 0, "empty" if bad_lines == 0 else f"invalid_json_lines={bad_lines}"
     warning = f"invalid_json_lines={bad_lines}" if bad_lines else None
-    return rows[-1], len(rows), warning
+    return (preferred_rows[-1] if preferred_rows else rows[-1]), len(rows), warning
 
 
 def _task_status(task_name: str) -> dict:
@@ -574,14 +588,118 @@ def _row_has_errors(row: dict | None) -> list[str]:
     return errors
 
 
-def _last_weekday(d: date) -> date:
-    """Return d, or the most recent Friday if d is Sat/Sun."""
-    dow = d.weekday()  # 0=Mon … 6=Sun
-    if dow == 5:
-        return d - timedelta(days=1)
-    if dow == 6:
-        return d - timedelta(days=2)
-    return d
+def _nth_weekday(year: int, month: int, weekday: int, occurrence: int) -> date:
+    first = date(year, month, 1)
+    offset = (weekday - first.weekday()) % 7
+    return first + timedelta(days=offset + 7 * (occurrence - 1))
+
+
+def _last_weekday_of_month(year: int, month: int, weekday: int) -> date:
+    if month == 12:
+        cursor = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        cursor = date(year, month + 1, 1) - timedelta(days=1)
+    return cursor - timedelta(days=(cursor.weekday() - weekday) % 7)
+
+
+def _observed_fixed_holiday(day: date) -> date:
+    if day.weekday() == 5:
+        return day - timedelta(days=1)
+    if day.weekday() == 6:
+        return day + timedelta(days=1)
+    return day
+
+
+def _easter_sunday(year: int) -> date:
+    """Return Gregorian Easter using the Meeus/Jones/Butcher algorithm."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    ell = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ell) // 451
+    month = (h + ell - 7 * m + 114) // 31
+    day = (h + ell - 7 * m + 114) % 31 + 1
+    return date(year, month, day)
+
+
+def _nyse_full_day_holidays(year: int) -> frozenset[date]:
+    holidays = {
+        _observed_fixed_holiday(date(year, 1, 1)),
+        _nth_weekday(year, 1, 0, 3),
+        _nth_weekday(year, 2, 0, 3),
+        _easter_sunday(year) - timedelta(days=2),
+        _last_weekday_of_month(year, 5, 0),
+        _observed_fixed_holiday(date(year, 7, 4)),
+        _nth_weekday(year, 9, 0, 1),
+        _nth_weekday(year, 11, 3, 4),
+        _observed_fixed_holiday(date(year, 12, 25)),
+    }
+    if year >= 2022:
+        holidays.add(_observed_fixed_holiday(date(year, 6, 19)))
+    next_new_year = _observed_fixed_holiday(date(year + 1, 1, 1))
+    if next_new_year.year == year:
+        holidays.add(next_new_year)
+    return frozenset(holidays)
+
+
+def is_expected_market_session(day: date) -> bool:
+    """Whether US equities are expected to have a regular/early-close session.
+
+    Only full-day NYSE closures are excluded. Early closes remain expected
+    sessions because producers should still emit rows on those dates. This is
+    public so other operational coverage gates can reuse the same calendar.
+    """
+    return day.weekday() < 5 and day not in _nyse_full_day_holidays(day.year)
+
+
+def _last_expected_market_session(d: date) -> date:
+    cursor = d
+    while not is_expected_market_session(cursor):
+        cursor -= timedelta(days=1)
+    return cursor
+
+
+def _market_session_hours_since(then: datetime | None, now: datetime) -> float | None:
+    """Elapsed regular-session hours, excluding nights/weekends/holidays.
+
+    Task Scheduler and normalized row timestamps use local wall time on this
+    deployment (America/Chicago), where regular trading is 08:30-15:00.
+    """
+    if then is None:
+        return None
+    if then >= now:
+        return 0.0
+    total_seconds = 0.0
+    cursor = then.date()
+    while cursor <= now.date():
+        if is_expected_market_session(cursor):
+            session_open = datetime.combine(cursor, time(8, 30))
+            session_close = datetime.combine(cursor, time(15, 0))
+            start = max(then, session_open)
+            end = min(now, session_close)
+            if end > start:
+                total_seconds += (end - start).total_seconds()
+        cursor += timedelta(days=1)
+    return total_seconds / 3600.0
+
+
+def _is_expected_activity_run(kind: str, run_at: datetime) -> bool:
+    """Whether a task run occurred in its normal data-producing window."""
+    if not is_expected_market_session(run_at.date()):
+        return False
+    minute = run_at.hour * 60 + run_at.minute
+    windows = {
+        "morning": (4 * 60, 14 * 60),
+        "intraday": (8 * 60, 15 * 60 + 30),
+        "close": (14 * 60 + 30, 18 * 60 + 30),
+        "evening": (14 * 60 + 30, 23 * 60 + 59),
+    }
+    start, end = windows.get(kind, (0, 23 * 60 + 59))
+    return start <= minute <= end
 
 
 def _is_before_today(latest_date: str, today_str: str) -> bool:
@@ -728,22 +846,25 @@ def build_strategy_staleness(
 def build_report(today: date | None = None, now: datetime | None = None) -> dict:
     today = today or date.today()
     now = now or datetime.now()
-    today_str = _last_weekday(today).isoformat()
+    today_str = _last_expected_market_session(today).isoformat()
     items = []
     for signal in SIGNALS:
-        latest, row_count, parse_warning = _latest_jsonl(signal["log"])
+        latest, row_count, parse_warning = _latest_jsonl(signal["log"], preferred_date=today_str)
         task = _task_status(signal["task"])
         latest_row = latest or {}
-        latest_date = str(
-            latest_row.get("date")
-            or latest_row.get("generated_at", "")[:10]
-            or latest_row.get("scanned_at", "")[:10]
-            or latest_row.get("resolved_at", "")[:10]
-            or latest_row.get("timestamp", "")[:10]
-            or ""
-        )
+        latest_date = _row_date(latest_row)
         errors = _row_has_errors(latest)
-        stale_before_today = _is_before_today(latest_date, today_str)
+        try:
+            latest_day = date.fromisoformat(latest_date)
+        except ValueError:
+            latest_day = None
+        non_session_row_cannot_clear_gap = bool(
+            latest_day
+            and latest_date > today_str
+            and not is_expected_market_session(latest_day)
+            and str(signal.get("kind")) in {"morning", "intraday", "close"}
+        )
+        stale_before_today = _is_before_today(latest_date, today_str) or non_session_row_cannot_clear_gap
         pending_today = stale_before_today and _pending_scheduled_run_today(task, today, now)
         task_disabled = task.get("status") == "Disabled"
         task_required = bool(signal.get("require_successful_task"))
@@ -757,7 +878,7 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
         activity_path = signal.get("activity_path")
         activity_document = _json_document(activity_path) if isinstance(activity_path, Path) else None
         latest_row_ts = _latest_row_timestamp(activity_document or latest)
-        activity_hours = _hours_since(latest_row_ts, now)
+        activity_hours = _market_session_hours_since(latest_row_ts, now)
         stale_activity = (
             max_activity_hours is not None
             and (latest is None or (activity_hours is not None and activity_hours > max_activity_hours))
@@ -767,6 +888,7 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
         empty_after_run = (
             bool(signal.get("require_activity_after_last_run"))
             and last_run_ts is not None
+            and _is_expected_activity_run(str(signal.get("kind", "")), last_run_ts)
             and (latest_row_ts is None or latest_row_ts < last_run_ts - timedelta(minutes=5))
             and run_hours is not None
             and run_hours < 24
@@ -804,7 +926,7 @@ def build_report(today: date | None = None, now: datetime | None = None) -> dict
         if pending_today:
             warnings.append(f"pending_today latest_date={latest_date}")
         elif stale_before_today:
-            warnings.append(f"latest_date={latest_date}")
+            warnings.append(f"latest_date={latest_date} expected_session={today_str}")
         if empty_after_run:
             warnings.append(
                 f"empty_after_last_run last_run={task.get('last_run_time') or '?'} "

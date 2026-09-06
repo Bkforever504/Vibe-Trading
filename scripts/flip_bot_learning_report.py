@@ -82,9 +82,16 @@ def _load_hardened_flip_trades(path: Path, through_day: str) -> tuple[list[dict[
 
 def _postmortem_rows(path: Path, day: str) -> list[dict[str, Any]]:
     payload = _read_json(path)
-    if not isinstance(payload, dict) or str(payload.get("date")) != day:
+    if not isinstance(payload, dict):
         return []
-    rows = payload.get("postmortems")
+    # Daily postmortems are still displayed as the daily slice, but learning
+    # must retain every prior closed outcome.  Falling back to the legacy
+    # daily field keeps existing reports compatible during rollout.
+    rows = payload.get("historical_postmortems")
+    if not isinstance(rows, list):
+        if str(payload.get("date")) != day:
+            return []
+        rows = payload.get("postmortems")
     if not isinstance(rows, list):
         return []
     return [row for row in rows if isinstance(row, dict) and row.get("bot") == "flip_bot"]
@@ -181,6 +188,42 @@ def _rolling_quality_summary(trades: list[dict[str, Any]], legacy_excluded: int)
         "by_symbol": by_symbol,
         "legacy_pre_hardening_closed_trades_excluded": legacy_excluded,
         "legacy_exclusion_reason": "Risk sizing and contract caps changed after the 69-contract failure.",
+    }
+
+
+def _trailing_regime(trades: list[dict[str, Any]], sample_size: int) -> dict[str, Any]:
+    """Return a recent, chronological evidence gate.
+
+    Lifetime-after-hardening performance can remain positive long after a setup
+    has deteriorated.  The scanner therefore gets an explicit recent-sample
+    status rather than inferring permission from an aggregate statistic.
+    """
+    ordered = sorted(trades, key=lambda row: (_trade_day(row), str(row.get("exit_at") or "")))
+    window = ordered[-sample_size:]
+    pnls = [_safe_float(row.get("pnl")) for row in window]
+    wins = [pnl for pnl in pnls if pnl > 0]
+    losses = [pnl for pnl in pnls if pnl < 0]
+    gross_profit = sum(wins)
+    gross_loss = abs(sum(losses))
+    expectancy = sum(pnls) / len(pnls) if pnls else None
+    profit_factor = gross_profit / gross_loss if gross_loss else (None if not gross_profit else float("inf"))
+    enough = len(window) >= sample_size
+    degraded = enough and (expectancy is not None and expectancy <= 0 or (profit_factor is not None and profit_factor < 1.0))
+    return {
+        "sample_size": sample_size,
+        "closed_count": len(window),
+        "start_date": _trade_day(window[0]) if window else None,
+        "end_date": _trade_day(window[-1]) if window else None,
+        "net_pnl": round(sum(pnls), 2),
+        "expectancy": round(expectancy, 2) if expectancy is not None else None,
+        "profit_factor": round(profit_factor, 3) if profit_factor not in (None, float("inf")) else profit_factor,
+        "win_rate": round(len(wins) / len(window), 3) if window else None,
+        "status": "degraded_pause_new_entries" if degraded else "insufficient_recent_evidence" if not enough else "recent_evidence_positive",
+        "reason": (
+            "Recent expectancy or profit factor is non-positive; keep alerts visible but do not create new shadow positions."
+            if degraded else "Need more completed outcomes before a recent-regime decision."
+            if not enough else "Recent evidence remains positive; continue shadow observation only."
+        ),
     }
 
 
@@ -430,6 +473,8 @@ def build_report(
     postmortems = _postmortem_rows(postmortem_path, day)
     lessons = []
     rolling_actual = _rolling_quality_summary(hardened_trades, legacy_excluded)
+    trailing_5 = _trailing_regime(hardened_trades, 5)
+    trailing_10 = _trailing_regime(hardened_trades, 10)
     lessons.extend(_expectancy_lessons(rolling_actual))
     lessons.extend(_postmortem_outcome_lessons(postmortems))
     lessons.extend(_capture_gap_lessons(postmortems))
@@ -448,6 +493,15 @@ def build_report(
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "actual": _actual_summary(trades),
         "rolling_actual": rolling_actual,
+        "recent_regime": {
+            "trailing_5": trailing_5,
+            "trailing_10": trailing_10,
+            "new_shadow_entries_allowed": all(
+                row.get("status") == "recent_evidence_positive"
+                for row in (trailing_5, trailing_10)
+            ),
+            "alert_policy": "Always alert confirmed setups; a degraded regime is labelled SIMULATION PAUSED, never silently discarded.",
+        },
         "selection_decision": {
             "execution_symbol": execution_focus.get("symbol") or "SPY",
             "reason": execution_focus.get("reason") or "SPY remains the execution benchmark until trusted challenger lifecycles mature.",

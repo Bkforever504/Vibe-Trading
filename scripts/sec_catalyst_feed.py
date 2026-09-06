@@ -65,6 +65,7 @@ def classify_filing(
     filed_at: str,
     primary_document: str,
     items: str = "",
+    accepted_at: str = "",
     cik: str | int | None = None,
 ) -> dict[str, Any]:
     normalized_form = form.strip().upper()
@@ -89,6 +90,7 @@ def classify_filing(
         "event_type": event_type,
         "priority": priority,
         "filed_at": filed_at,
+        "accepted_at": accepted_at or None,
         "items": [value.strip() for value in items.split(",") if value.strip()],
         "accession": accession,
         "primary_document": primary_document,
@@ -114,6 +116,13 @@ def _ticker_map(session: requests.Session) -> dict[str, str]:
     return output
 
 
+def partition_sec_eligible_symbols(symbols: list[str], ticker_map: dict[str, str]) -> tuple[list[str], list[str]]:
+    """Keep non-issuer instruments visible without misclassifying them as EDGAR errors."""
+    eligible = [symbol for symbol in symbols if symbol in ticker_map]
+    skipped = [symbol for symbol in symbols if symbol not in ticker_map]
+    return eligible, skipped
+
+
 def fetch_sec_catalysts(
     symbols: list[str],
     *,
@@ -136,11 +145,9 @@ def fetch_sec_catalysts(
         report["status"] = "degraded"
         return report
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=max(0, lookback_days))).isoformat()
-    for symbol in clean_symbols:
-        cik = mapping.get(symbol)
-        if not cik:
-            errors.append(f"{symbol}:cik_unavailable")
-            continue
+    eligible_symbols, skipped_symbols = partition_sec_eligible_symbols(clean_symbols, mapping)
+    for symbol in eligible_symbols:
+        cik = mapping[symbol]
         try:
             response = client.get(SUBMISSIONS_URL.format(cik=cik), timeout=20)
             response.raise_for_status()
@@ -161,6 +168,7 @@ def fetch_sec_catalysts(
                     filed_at=filed_at,
                     primary_document=str((recent.get("primaryDocument") or [""] * len(forms))[index]),
                     items=str((recent.get("items") or [""] * len(forms))[index]),
+                    accepted_at=str((recent.get("acceptanceDateTime") or [""] * len(forms))[index]),
                     cik=cik,
                 )
             )
@@ -173,6 +181,8 @@ def fetch_sec_catalysts(
         "status": "ok" if catalysts and not errors else "degraded" if errors else "ok",
         "freshness": "live",
         "symbols": clean_symbols,
+        "sec_eligible_symbols": eligible_symbols,
+        "skipped_non_issuer_symbols": skipped_symbols,
         "lookback_days": lookback_days,
         "catalysts": catalysts,
         "errors": errors,

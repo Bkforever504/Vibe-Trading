@@ -16,3 +16,8 @@ if (Test-Path (Join-Path $repo "KILL_SWITCH")) {
 
 uv run --no-project --with yfinance --with pandas --with numpy python scripts\equity_ignition_continuation_shadow.py --mode $Mode
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# Fixed priority-universe swing observation. This remains unvalidated,
+# shadow-only, and has no broker or live-order authority.
+uv run --no-project --with yfinance --with pandas --with numpy python scripts\priority_swing_observation.py --mode $Mode --alert
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

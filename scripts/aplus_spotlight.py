@@ -28,6 +28,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent.notifier import send_discord_embed
+from scripts.alert_delivery_timing import first_complete_bar_after_delivery
 
 RADAR_LOG = ROOT / "data" / "intraday_opportunity_radar_log.jsonl"
 SPOTLIGHT_LOG = ROOT / "data" / "aplus_spotlight_log.jsonl"
@@ -37,6 +38,10 @@ ALERTED_STATE = Path.home() / ".vibe-trading" / "state" / "aplus_alerted.json"
 BPLUS_LOG = ROOT / "data" / "bplus_spotlight_log.jsonl"
 BPLUS_REPORT = Path.home() / ".vibe-trading" / "reports" / "bplus-spotlight.json"
 BPLUS_ALERTED_STATE = Path.home() / ".vibe-trading" / "state" / "bplus_alerted.json"
+CALIBRATION_REPORT = Path.home() / ".vibe-trading" / "reports" / "grade-probability-calibration.json"
+CONTRACT_REPORT = Path.home() / ".vibe-trading" / "reports" / "aplus-contract-feasibility.json"
+CONTEXT_REPORT = Path.home() / ".vibe-trading" / "reports" / "aplus-market-context.json"
+FOOTPRINT_REPORT = Path.home() / ".vibe-trading" / "reports" / "footprint-evidence-shadow.json"
 
 MIN_SCORE = 93.0
 MAX_SIGNAL_AGE_MINUTES = 15.0
@@ -57,6 +62,7 @@ TIERS: dict[str, dict[str, Any]] = {
         "log_path": SPOTLIGHT_LOG,
         "report_path": SPOTLIGHT_REPORT,
         "provider": "aplus_spotlight",
+        "discord_enabled": False,
     },
     "bplus": {
         "label": "B+",
@@ -69,6 +75,10 @@ TIERS: dict[str, dict[str, Any]] = {
         "log_path": BPLUS_LOG,
         "report_path": BPLUS_REPORT,
         "provider": "bplus_spotlight",
+        # Sep-4 delivery-time review found this lane duplicated governed
+        # candidates and its median result was -1R. Keep it visible for
+        # calibration, but do not post a second trade-style Discord message.
+        "discord_enabled": False,
     },
 }
 
@@ -88,6 +98,43 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         if isinstance(row, dict):
             rows.append(row)
     return rows
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _evidence_for(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    """Attach fail-closed evidence labels without hiding A+ candidates."""
+    calibration = _read_json(CALIBRATION_REPORT)
+    contract = _read_json(CONTRACT_REPORT)
+    context = _read_json(CONTEXT_REPORT)
+    footprint = _read_json(FOOTPRINT_REPORT)
+    cal_status = str(calibration.get("status") or calibration.get("summary", {}).get("status") or "unavailable")
+    contract_status = str(contract.get("data_status") or contract.get("status") or "unavailable")
+    context_status = str(context.get("status") or "unavailable")
+    abstain = bool(context.get("abstain_from_aplus"))
+    blockers = []
+    if cal_status not in {"local_forward_validated", "qualified"}:
+        blockers.append("calibration_not_forward_validated")
+    if contract_status not in {"available", "qualified", "executable_shadow_ready"}:
+        blockers.append("contract_feasibility_unavailable")
+    if context_status != "healthy" or abstain:
+        blockers.append("market_context_unavailable_or_abstain")
+    return {
+        "calibration_status": cal_status,
+        "contract_status": contract_status,
+        "market_context_status": context_status,
+        "footprint_status": str(footprint.get("operational_health") or "unavailable"),
+        "footprint_source_quality": "native" if (footprint.get("coverage") or {}).get("native_rows", 0) else "proxy_or_unavailable",
+        "abstain_from_aplus": abstain,
+        "evidence_state": "executable_shadow_ready" if not blockers else "candidate_only",
+        "evidence_blockers": blockers,
+    }
 
 
 def _walk_candidates(obj: Any) -> Iterable[dict[str, Any]]:
@@ -272,6 +319,7 @@ def collect_fresh_for_tier(
                     "confirmation_stage": candidate.get("confirmation_stage"),
                     "confirmation_completed_at": completed_at,
                     "market_context": candidate.get("market_context") if isinstance(candidate.get("market_context"), dict) else {},
+                    **_evidence_for(candidate),
                 }
             )
     fresh.sort(key=lambda row: (-(row.get("ranking_score") or row.get("score") or 0.0), row["symbol"]))
@@ -354,6 +402,7 @@ def format_setup_fields(setup: Mapping[str, Any]) -> list[dict[str, Any]]:
         },
         {"name": "Market Context", "value": context_value, "inline": False},
         {"name": "Catalyst", "value": f"_{catalyst}_"[:1024], "inline": False},
+        {"name": "Evidence gate", "value": f"`{setup.get('evidence_state', 'candidate_only')}`\nCalibration: `{setup.get('calibration_status', 'unavailable')}`\nContract: `{setup.get('contract_status', 'unavailable')}`\nContext: `{setup.get('market_context_status', 'unavailable')}`", "inline": False},
     ]
 
 
@@ -376,8 +425,9 @@ def send_spotlight(
         description = (
             f"**{setup['symbol']}** · **{setup['direction'].upper()}** · confirmed 5m · "
             f"score **{setup['score']:.1f}**\n"
-            f"_State: {setup.get('state', '?')} · {setup.get('confirmation_stage', '?')}_"
+            f"_State: {setup.get('state', '?')} · {setup.get('confirmation_stage', '?')} · Evidence: {setup.get('evidence_state', 'candidate_only')}_"
         )
+        attempted_at = datetime.now(timezone.utc)
         result = send_discord_embed(
             title=title,
             description=description,
@@ -386,7 +436,11 @@ def send_spotlight(
             content=tier["content_prefix"] if mention else "",
             allow_mentions=mention,
         )
-        results.append({"fingerprint": setup["fingerprint"], "symbol": setup["symbol"], "result": result})
+        finished_at = datetime.now(timezone.utc)
+        results.append({"fingerprint": setup["fingerprint"], "symbol": setup["symbol"], "result": result,
+                        "attempted_at": attempted_at.isoformat(),
+                        "delivered_at": finished_at.isoformat() if result.get('sent') is True else None,
+                        "transport_seconds": (finished_at - attempted_at).total_seconds()})
         if result.get("sent"):
             sent += 1
     return {"status": "sent", "sent": sent, "attempts": len(setups), "results": results}
@@ -416,6 +470,7 @@ def append_log(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "delivery_timestamp_semantics": "per_setup_transport_acknowledged",
         "date": datetime.now(ET).date().isoformat(),
         "provider": tier["provider"],
         "tier": tier["label"],
@@ -423,7 +478,7 @@ def append_log(
         "execution_enabled": False,
         "setup_count": len(fresh),
         "setups": fresh,
-        "notification": {k: v for k, v in send_result.items() if k != "results"},
+        "notification": dict(send_result),
     }
     with log_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, separators=(",", ":")) + "\n")
@@ -464,7 +519,14 @@ def _run_tier(
         excluded_fingerprints=excluded_fingerprints,
     )
     fresh = [setup for setup in live if setup["fingerprint"] not in alerted]
-    if dry_run or not fresh:
+    if not tier.get("discord_enabled", True):
+        send_result = {
+            "status": "dashboard_only",
+            "sent": 0,
+            "attempts": 0,
+            "reason": "governed_dispatch_owns_trade_notifications",
+        }
+    elif dry_run or not fresh:
         send_result = {
             "status": "dry_run" if dry_run else "no_new_setups",
             "sent": 0,

@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.priority_focus_universe import PRIORITY_FOCUS_UNIVERSE
+
 VIBE_HOME = Path.home() / ".vibe-trading"
 RADAR_REPORT_PATH = VIBE_HOME / "reports" / "intraday-opportunity-radar.json"
 RADAR_LOG_PATH = ROOT / "data" / "intraday_opportunity_radar_log.jsonl"
@@ -120,6 +126,58 @@ def _unmeasured_outcome_linkage(*, rank: int | None = None) -> dict[str, Any]:
     }
 
 
+def _priority_universe_coverage(
+    movers: list[dict[str, Any]], sessions: list[dict[str, Any]], discovered_at: dict[str, str],
+) -> dict[str, Any]:
+    """Audit reserved names separately from the provider top-mover denominator.
+
+    Absence from a bounded provider response means the final move is unknown;
+    it must never be converted into a no-move row or a 100%-recall claim.
+    """
+    provider_symbols = {str(row.get("symbol") or "").upper() for row in movers}
+    evaluated: set[str] = set()
+    for report in sessions:
+        for row in report.get("ranked_candidates") or []:
+            if isinstance(row, dict) and row.get("symbol"):
+                evaluated.add(str(row["symbol"]).upper())
+        for row in report.get("coverage_trace") or []:
+            if isinstance(row, dict) and row.get("stop_stage") == "evaluated" and row.get("symbol"):
+                evaluated.add(str(row["symbol"]).upper())
+    rows: list[dict[str, Any]] = []
+    for symbol in PRIORITY_FOCUS_UNIVERSE:
+        in_provider = symbol in provider_symbols
+        discovered = symbol in discovered_at
+        was_evaluated = symbol in evaluated
+        coverage_debt = None if was_evaluated else "discovered_not_evaluated" if discovered else "not_discovered"
+        rows.append({
+            "symbol": symbol,
+            "reserved_for_intraday_observation": True,
+            "in_provider_mover_denominator": in_provider,
+            "outcome_in_provider_denominator": in_provider,
+            "outcome_status": "available_in_provider_top_movers" if in_provider else "unknown_not_in_provider_top_movers",
+            "discovered": discovered,
+            "evaluated": was_evaluated,
+            "coverage_debt": coverage_debt,
+            "execution_enabled": False,
+            "can_submit_orders": False,
+        })
+    return {
+        "universe": list(PRIORITY_FOCUS_UNIVERSE),
+        "denominator": "fixed_priority_focus_universe_observation_coverage",
+        "provider_outcome_scope": "bounded_final_top_movers_only",
+        "symbols": rows,
+        "present_in_provider_mover_denominator": [row["symbol"] for row in rows if row["in_provider_mover_denominator"]],
+        "absent_from_provider_mover_denominator": [row["symbol"] for row in rows if not row["in_provider_mover_denominator"]],
+        "evaluated": [row["symbol"] for row in rows if row["evaluated"]],
+        "not_evaluated": [row["symbol"] for row in rows if not row["evaluated"]],
+        "observation_coverage_pct": round(sum(row["evaluated"] for row in rows) / len(rows) * 100.0, 2),
+        "recall_pct": None,
+        "recall_not_computable_reason": "provider_top_movers_do_not_supply_outcomes_for_omitted_priority_symbols",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, Any]:
     review_date = str(latest.get("date") or "")[:10]
     sessions = [row for row in history if str(row.get("date") or "")[:10] == review_date]
@@ -143,6 +201,7 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
 
     movers = [row for row in latest.get("market_movers") or [] if isinstance(row, dict)]
     movers.sort(key=lambda row: abs(_number(row.get("percent_change")) or 0.0), reverse=True)
+    priority_coverage = _priority_universe_coverage(movers, sessions, discovered_at)
     audited: list[dict[str, Any]] = []
     for mover in movers:
         symbol = str(mover.get("symbol") or "").upper()
@@ -154,7 +213,13 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
             blocker_values = [str(value) for value in candidate.get("blockers") or []]
             risk_blockers = sorted(set(blocker_values).intersection(RISK_GATE_BLOCKERS))
             risk_gate_status = "disqualified" if risk_blockers else "qualified"
+            first_failing_gate = (
+                risk_blockers[0] if risk_blockers
+                else "strategy_confirmation_and_revalidation_required" if not _setup_confirmed(candidate)
+                else None
+            )
             first_change = _number(candidate.get("change_pct"))
+            evidence = candidate.get("a_plus_evidence") if isinstance(candidate.get("a_plus_evidence"), dict) else {}
             final_magnitude = abs(final_change or 0.0)
             first_magnitude = abs(first_change or 0.0)
             remaining_share = max(final_magnitude - first_magnitude, 0.0) / final_magnitude if final_magnitude else 0.0
@@ -187,6 +252,9 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
                     "filter_reasons": candidate.get("blockers") or [],
                     "risk_gate_status": risk_gate_status,
                     "risk_gate_blockers": risk_blockers,
+                    "first_failing_gate": first_failing_gate,
+                    "a_plus_evidence_status": evidence.get("classification") or "not_recorded",
+                    "a_plus_evidence_debt": evidence.get("missing_required_fields") or [],
                     "first_actionable_at": (actionable or {}).get("timestamp"),
                     "first_actionable_rank": (actionable or {}).get("rank"),
                     "execution_eligible_at_first_detection": execution_eligible,
@@ -204,6 +272,7 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
                     "filter_reasons": ["not_selected_for_intraday_bar_budget"],
                     "risk_gate_status": "unassessed",
                     "risk_gate_blockers": [],
+                    "first_failing_gate": "not_selected_for_intraday_bar_budget",
                     "first_actionable_at": None,
                     "first_actionable_rank": None,
                     "execution_eligible_at_first_detection": False,
@@ -224,6 +293,7 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
                 "filter_reasons": ["not_returned_by_discovery_sources"],
                 "risk_gate_status": "unassessed",
                 "risk_gate_blockers": [],
+                "first_failing_gate": "not_returned_by_discovery_sources",
                 "first_actionable_at": None,
                 "first_actionable_rank": None,
                 "execution_eligible_at_first_detection": False,
@@ -263,7 +333,7 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
         "execution_qualified": sum(bool(row.get("stages", {}).get("execution_qualified")) for row in audited),
     }
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "provider": "daily_move_coverage_review",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "date": review_date,
@@ -276,8 +346,9 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
             "scope": "final_equity_movers_returned_by_the_radar_provider",
             "no_move_interpretation_allowed_outside_scope": True,
             "no_move_interpretation_permitted_outside_scope": False,
-            "message": "This review cannot establish whether uncovered futures or other instruments moved.",
+            "message": "This review cannot establish whether priority symbols omitted by the bounded provider list, uncovered futures, or other instruments moved.",
         },
+        "priority_universe_coverage": priority_coverage,
         "summary": {
             "stage_counts": stage_counts,
             "stage_denominator": "final_covered_source_market_movers",
@@ -305,6 +376,7 @@ def build_review(latest: dict[str, Any], history: list[dict[str, Any]]) -> dict[
             "Detection is not the same as a profitable or executable entry.",
             "Actionable early requires both meaningful move remaining and no setup-quality blocker at first evaluation.",
             "The review uses Alpaca's final mover list and the radar snapshots actually recorded.",
+            "Priority-universe observation coverage is audited separately; provider-list omissions have unknown outcomes and no recall percentage.",
             "Missing or out-of-scope futures coverage is unknown and must never be reported as no move.",
             "No hindsight-generated trade fills or profit claims are included.",
         ],

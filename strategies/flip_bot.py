@@ -203,6 +203,9 @@ ORB_OTM_SIGMA              = float(os.getenv("FLIP_ORB_OTM_SIGMA", "1.0"))
 ACCOUNT_OVERRIDE  = float(os.getenv("FLIP_ACCOUNT_SIZE_OVERRIDE") or os.getenv("ACCOUNT_SIZE_OVERRIDE", "0") or 0)
 MAX_RISK_PCT      = float(os.getenv("FLIP_MAX_RISK_PCT", "0.0025"))
 MAX_CONTRACTS     = max(1, int(os.getenv("FLIP_MAX_CONTRACTS", "1")))
+MAX_TOTAL_OPEN_CONTRACTS = max(
+    1, int(os.getenv("FLIP_MAX_TOTAL_OPEN_CONTRACTS", str(MAX_CONTRACTS)))
+)
 MAX_DAILY_LOSS_PCT = float(os.getenv("FLIP_MAX_DAILY_LOSS_PCT", "0.005"))
 MAX_ENTRY_SPREAD_CENTS = int(os.getenv("FLIP_MAX_ENTRY_SPREAD_CENTS", "10"))
 MIN_ENTRY_ASK = float(os.getenv("FLIP_MIN_ENTRY_ASK", "0.10"))
@@ -4567,6 +4570,41 @@ def _same_day_reentry_blocker(setup: dict, trades: list[dict]) -> str | None:
     )
 
 
+def _aggregate_exposure_blocker(
+    setup: dict,
+    trades: list[dict],
+    reserved_contracts: int = 0,
+    *,
+    today: str | None = None,
+) -> str | None:
+    """Prevent concurrent duplicate direction and aggregate contract leakage.
+
+    Per-order caps do not protect a portfolio if one scanner pass creates several
+    equivalent entries.  This applies to paper as well as live mode so the
+    simulator cannot learn from an exposure profile that would be forbidden in
+    production.
+    """
+    today = today or str(date.today())
+    symbol = str(setup.get("symbol") or "").upper()
+    right = str(setup.get("right") or "").upper()
+    requested = max(0, int(setup.get("contracts") or 0))
+    open_trades = [trade for trade in trades if trade.get("status") == "open"]
+    open_contracts = sum(max(0, int(trade.get("contracts") or 0)) for trade in open_trades)
+    duplicate_open = any(
+        str(trade.get("symbol") or "").upper() == symbol
+        and str(trade.get("right") or "").upper() == right
+        for trade in open_trades
+    )
+    if duplicate_open:
+        return f"aggregate_exposure_blocked: open {symbol} {right} position already exists"
+    if open_contracts + max(0, reserved_contracts) + requested > MAX_TOTAL_OPEN_CONTRACTS:
+        return (
+            "aggregate_exposure_blocked: requested contracts would exceed "
+            f"FLIP_MAX_TOTAL_OPEN_CONTRACTS={MAX_TOTAL_OPEN_CONTRACTS}"
+        )
+    return None
+
+
 def find_bear_trend_day(account: float) -> dict | None:
     now_et = _now_et()
     if now_et.time() >= BEAR_TREND_ENTRY_CUTOFF_ET:
@@ -6383,6 +6421,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         return
     trades = _load()
     daily_loss_pct = _today_realized_loss_pct(trades, account)
+    reserved_contracts = 0
     for setup in candidates:
         setup_symbol = str(setup.get("symbol") or "").upper()
         if setup.get("paper_only") and not PAPER:
@@ -6422,6 +6461,17 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                 f"PAPER RESEARCH {setup_symbol} {setup.get('strategy')}: "
                 f"contracts {original_contracts} -> {setup['contracts']}"
             )
+        exposure_block = _aggregate_exposure_blocker(
+            setup, trades, reserved_contracts=reserved_contracts
+        )
+        if exposure_block:
+            log.warning(f"EXECUTION BLOCKED {setup_symbol} {setup.get('strategy')}: {exposure_block}")
+            _alert(
+                f"SIMULATION BLOCKED {setup_symbol} {setup.get('strategy')}\n"
+                f"reason={exposure_block}"
+            )
+            _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked", "aggregate_exposure", blocker=exposure_block)
+            continue
         reentry_block = _same_day_reentry_blocker(setup, trades)
         if reentry_block:
             log.warning(f"EXECUTION BLOCKED {setup.get('symbol')} {setup.get('strategy')}: {reentry_block}")
@@ -6456,13 +6506,18 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
             )
         if consensus.get("enabled"):
             blockers = ", ".join(consensus.get("blockers") or []) or consensus.get("recommendation", "needs_review")
-            if not consensus.get("allowed") and not setup.get("momentum_continuation"):
+            # Advisory scoring can still be `allowed` while its explicit
+            # recommendation is stand-aside.  A paper position must honour
+            # that recommendation; scanner alerts remain independently
+            # visible and the rejection is recorded for replay.
+            consensus_recommendation = str(consensus.get("recommendation") or "needs_review").lower()
+            if not consensus.get("allowed") or consensus_recommendation in {"stand_aside", "needs_review"}:
                 log.warning(
                     f"SHADOW CONSENSUS BLOCKED {setup.get('symbol')} {setup.get('strategy')}: "
                     f"{blockers}"
                 )
                 _alert(
-                    f"SHADOW CONSENSUS BLOCKED {setup.get('symbol')} {setup.get('strategy')}\n"
+                    f"SIMULATION BLOCKED {setup.get('symbol')} {setup.get('strategy')}\n"
                     f"reason={blockers}"
                 )
                 _decision(
@@ -6480,11 +6535,6 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
                     setup_score=setup.get("score"),
                 )
                 continue
-            if not consensus.get("allowed") and setup.get("momentum_continuation"):
-                log.info(
-                    f"MOMENTUM CONTINUATION {setup.get('symbol')}: shadow consensus advisory "
-                    f"({blockers}) -- proceeding with 1-contract momentum entry"
-                )
             primary_caution = _primary_consensus_caution_blocker(setup, consensus)
             if primary_caution:
                 log.warning(
@@ -6719,6 +6769,7 @@ def run_entry(account: float, *, intraday_only: bool = False) -> None:
         if not resp:
             _decision(setup_symbol, setup.get("strategy", "unknown"), "blocked", "order_submission_failed")
             continue
+        reserved_contracts += max(0, int(setup.get("contracts") or 0))
 
         time.sleep(6)
         entry_fill = _resolve_entry_fill(resp, setup)

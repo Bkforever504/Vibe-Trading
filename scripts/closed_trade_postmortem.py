@@ -9,9 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 try:
     from flip_exit_taxonomy import classify_exit_quality
@@ -41,6 +44,12 @@ except ModuleNotFoundError:
     )
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from agent.analytics.outcome_bootstrap import (bootstrap_ci, max_drawdown,
+                                                mean_expectancy, sharpe, win_rate)
+
 VIBE_HOME = Path.home() / ".vibe-trading"
 LOG_PATH = ROOT / "data" / "closed_trade_postmortem_log.jsonl"
 REPORT_PATH = VIBE_HOME / "reports" / "closed-trade-postmortem.json"
@@ -498,9 +507,55 @@ def collect_closed_trades(day: str | None = None) -> list[dict[str, Any]]:
     return postmortems
 
 
+def historical_postmortem_summary() -> dict[str, Any]:
+    """Summarize every closed record without treating old trades as today's result.
+
+    The daily report intentionally remains a daily artifact, but its replacement
+    must never make prior closed trades disappear from the operator's view.  This
+    summary is rebuilt directly from the canonical ledgers, so it is safe to
+    regenerate and cannot be lost when a quiet day overwrites the report.
+    """
+    rows = collect_closed_trades(day=None)
+    compatible = [row for row in rows if row.get("current_strategy_eligible") is True]
+    unresolved = [
+        row for row in rows
+        if str((row.get("pnl_explanation") or {}).get("primary_driver") or "").startswith(
+            "realized option P/L is not available"
+        )
+    ]
+    return {
+        "closed_trade_count": len(rows),
+        "compatible_evidence_count": len(compatible),
+        "unresolved_pnl_count": len(unresolved),
+        "first_trade_date": min((str(row.get("date") or "") for row in rows if row.get("date")), default=None),
+        "last_trade_date": max((str(row.get("date") or "") for row in rows if row.get("date")), default=None),
+    }
+
+
+def historical_confidence(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return dependence-aware CIs; small samples stay visibly insufficient."""
+    pnls = [_safe_float(row.get("pnl")) for row in rows
+            if row.get("current_strategy_eligible") is True]
+    values = [value for value in pnls if value is not None]
+    metrics = {}
+    for name, fn in (("expectancy", mean_expectancy), ("win_rate", win_rate),
+                     ("sharpe", sharpe), ("max_drawdown", max_drawdown)):
+        result = bootstrap_ci(values, fn)
+        observed = float(fn(np.asarray(values, dtype=float))) if values else None
+        result["observed_value"] = observed
+        result["display"] = (f"{observed:.4f} (n={len(values)}, insufficient_data)"
+                             if result["ci_low"] is None and observed is not None else
+                             "missing (n=0, insufficient_data)" if observed is None else
+                             f"{result['point']:.4f} [{result['ci_low']:.4f}, {result['ci_high']:.4f}] (n={len(values)})")
+        metrics[name] = result
+    return {"metrics": metrics, "automatic_parameter_changes": False,
+            "execution_enabled": False, "can_submit_orders": False}
+
+
 def build_report(day: str | None = None) -> dict[str, Any]:
     day = day or date.today().isoformat()
     postmortems = collect_closed_trades(day=day)
+    historical_postmortems = collect_closed_trades(day=None)
     compatible = [
         row for row in postmortems
         if row.get("current_strategy_eligible") is True
@@ -520,6 +575,9 @@ def build_report(day: str | None = None) -> dict[str, Any]:
         "excluded_evidence_count": len(postmortems) - len(compatible),
         "avg_score": avg_score,
         "postmortems": postmortems,
+        "historical_postmortems": historical_postmortems,
+        "historical_summary": historical_postmortem_summary(),
+        "historical_confidence": historical_confidence(historical_postmortems),
         "warnings": [
             "Read-only postmortem. No broker orders are wired.",
             "Scores are process quality hints, not a guarantee of future performance.",

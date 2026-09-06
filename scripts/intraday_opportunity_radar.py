@@ -39,11 +39,14 @@ from scripts.premarket_opportunity_radar import (  # noqa: E402
     news_by_symbol,
     snapshot_metrics,
 )
+from scripts.priority_focus_universe import CORE_INDEXES, PRIORITY_FOCUS_UNIVERSE
 
 VIBE_HOME = Path.home() / ".vibe-trading"
 REPORT_PATH = VIBE_HOME / "reports" / "intraday-opportunity-radar.json"
 LOG_PATH = ROOT / "data" / "intraday_opportunity_radar_log.jsonl"
 CADENCE_LOG_PATH = ROOT / "data" / "intraday_opportunity_radar_cadence.jsonl"
+RVOL_BASELINE_REPORT_PATH = VIBE_HOME / "reports" / "intraday-rvol-baseline.json"
+SEC_CATALYST_REPORT_PATH = VIBE_HOME / "reports" / "sec-catalyst-feed.json"
 SCREENER_BASE = "https://data.alpaca.markets/v1beta1/screener"
 MARKET_TZ = ZoneInfo("America/New_York")
 MIN_PRICE = 3.0
@@ -52,10 +55,11 @@ MIN_CURRENT_DOLLAR_VOLUME = 5_000_000.0
 MAX_UNDERLYING_SPREAD_PCT = 0.015
 MAX_BAR_SYMBOLS = 100
 MAX_EVALUATED_SYMBOLS = 160
-CORE_BENCHMARKS = ("SPY", "QQQ", "IWM")
+CORE_BENCHMARKS = CORE_INDEXES
 CORE_LIQUID_SYMBOLS = (
     "SPY", "QQQ", "IWM", "DIA",
-    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO",
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "MU",
+    "MRNA",
     "MSTR", "COIN",
 )
 INTRADAY_EXTENDED_UNIVERSE = [
@@ -68,6 +72,8 @@ KNOWN_LEADERS = list(dict.fromkeys(BASE_UNIVERSE + INTRADAY_EXTENDED_UNIVERSE))
 REPORT_NOMINATION_SOURCES = (
     ("deep_liquid_universe", VIBE_HOME / "reports" / "deep-liquid-universe-scan.json", ("scans", "top_candidates")),
     ("daily_stock_screener", VIBE_HOME / "reports" / "daily-stock-screener.json", ("rankings",)),
+    ("ftfc_continuity", VIBE_HOME / "reports" / "ftfc-continuity-shadow.json", ("rankings",)),
+    ("donchian_expansion_shadow", VIBE_HOME / "reports" / "donchian-expansion-shadow.json", ("rankings",)),
     ("premarket_opportunity_radar", VIBE_HOME / "reports" / "premarket-opportunity-radar.json", ("observations",)),
 )
 
@@ -80,6 +86,11 @@ FACTOR_CONSENSUS_WEIGHTS = {
     "discovery_breadth": 0.08,
     "catalyst": 0.05,
 }
+HEADS_UP_MIN_SCORE = 65.0
+HEADS_UP_ONLY_BLOCKERS = {"strategy_confirmation_and_revalidation_required"}
+EARLY_DIRECTIONAL_CUTOFF = time(10, 30)
+LIQUID_REVIEW_MIN_SCORE = 50.0
+LIQUID_REVIEW_ALLOWED_BLOCKERS = {"underlying_spread"}
 
 # Reuse the frozen Equity ORB v2 sector taxonomy.  This is deliberately a
 # *context* input: a missing or unmapped sector cannot block discovery,
@@ -190,7 +201,35 @@ def select_symbols_for_intraday_bars(
         ),
         reverse=True,
     )
-    selected = [symbol for symbol in CORE_LIQUID_SYMBOLS if symbol in available][:limit]
+    # PRI-01: reserve the explicitly governed focus universe before any
+    # provider top-mover/activity quota.  Membership is observation coverage,
+    # never a score, trade recommendation, risk exception, or order authority.
+    selected = [symbol for symbol in PRIORITY_FOCUS_UNIVERSE if symbol in available][:limit]
+    for symbol in CORE_LIQUID_SYMBOLS:
+        if symbol in available and symbol not in selected:
+            selected.append(symbol)
+        if len(selected) >= limit:
+            return selected[:limit]
+    # A liquid leader nominated by several independent current-day sources is
+    # a coverage obligation.  Reserve it before the official-mover and broad
+    # quotas so a fixed evaluation cap cannot silently drop it (MU, 2026-08-31).
+    corroborated_liquid = sorted(
+        (
+            symbol for symbol in available
+            if "known_liquid_leader" in (discovered[symbol].get("sources") or [])
+            and len(set(discovered[symbol].get("sources") or [])) >= 3
+        ),
+        key=lambda symbol: (
+            -len(set(discovered[symbol].get("sources") or [])),
+            -(_finite(metrics[symbol].get("snapshot_volume")) or 0.0),
+            symbol,
+        ),
+    )
+    for symbol in corroborated_liquid:
+        if symbol not in selected:
+            selected.append(symbol)
+        if len(selected) >= limit:
+            return selected[:limit]
     official_movers = sorted(
         (
             symbol for symbol in available
@@ -208,6 +247,31 @@ def select_symbols_for_intraday_bars(
         ),
     )
     for symbol in official_movers:
+        if symbol not in selected:
+            selected.append(symbol)
+        if len(selected) >= limit:
+            return selected[:limit]
+    # Strict higher-timeframe continuity is a coverage priority after official
+    # movers, never a replacement for them and never an entry/score input.
+    ftfc_priority = sorted(
+        (symbol for symbol in available if "ftfc_continuity" in (discovered[symbol].get("sources") or [])),
+        key=lambda symbol: (_finite(metrics[symbol].get("snapshot_volume")) or 0.0),
+        reverse=True,
+    )
+    for symbol in ftfc_priority:
+        if symbol not in selected:
+            selected.append(symbol)
+        if len(selected) >= limit:
+            return selected[:limit]
+    # A strict completed-bar Donchian expansion is a coverage input only. It
+    # follows official movers and continuity scans and cannot affect the A+
+    # score, execution gate, alert, or position decision.
+    donchian_priority = sorted(
+        (symbol for symbol in available if "donchian_expansion_shadow" in (discovered[symbol].get("sources") or [])),
+        key=lambda symbol: (_finite(metrics[symbol].get("snapshot_volume")) or 0.0),
+        reverse=True,
+    )
+    for symbol in donchian_priority:
         if symbol not in selected:
             selected.append(symbol)
         if len(selected) >= limit:
@@ -238,6 +302,86 @@ def select_symbols_for_intraday_bars(
             if len(selected) >= limit:
                 break
     return selected[:limit]
+
+
+def preconfirmation_heads_up(candidates: list[dict[str, Any]], now_et: datetime | None = None) -> list[dict[str, Any]]:
+    """Expose early, liquid watch items without weakening confirmation gates.
+
+    A heads-up is explicitly not an alert to trade: it is a visible request to
+    watch a named, liquid symbol while the next completed bar decides whether a
+    mechanical setup exists.
+    """
+    heads_up = []
+    now_et = now_et.astimezone(MARKET_TZ) if now_et is not None else None
+    for candidate in candidates:
+        blockers = {str(value) for value in candidate.get("blockers") or []}
+        if (
+            str(candidate.get("state") or "") == "watch"
+            and str(candidate.get("confirmation_stage") or "") == "awaiting_completed_5m_confirmation"
+            and float(candidate.get("score") or 0.0) >= HEADS_UP_MIN_SCORE
+            and blockers.issubset(HEADS_UP_ONLY_BLOCKERS)
+        ):
+            row = dict(candidate)
+            row.update({
+                "heads_up_only": True,
+                "authority": "preconfirmation_watch_only_no_rank_or_execution_authority",
+                "can_submit_orders": False,
+                "execution_enabled": False,
+            })
+            heads_up.append(row)
+            continue
+        # Separate early-session observation lane for the precise cohort that
+        # lacked a directional candidate.  It captures liquid directional
+        # pressure but has no confirmation, rank, alert, or execution effect.
+        bars = candidate.get("structure") if isinstance(candidate.get("structure"), dict) else {}
+        liquid = (
+            (_finite(candidate.get("avg_dollar_volume_20d")) or 0) >= 100_000_000
+            and (_finite(candidate.get("price")) or 0) >= 10
+            # Candidate spread_pct is presented in percent; the source gate is
+            # stored as a decimal fraction. Keep both paths on the same unit.
+            and (_finite(candidate.get("spread_pct")) is not None and (_finite(candidate.get("spread_pct")) or 1) <= MAX_UNDERLYING_SPREAD_PCT * 100.0)
+        )
+        early = now_et is not None and time(9, 30) <= now_et.time() <= EARLY_DIRECTIONAL_CUTOFF
+        bull = bool(bars.get("above_vwap")) and float(bars.get("range_position") or 0) >= 0.65
+        bear = bool(bars.get("below_vwap")) and float(bars.get("range_position") or 1) <= 0.35
+        if liquid and early and bars.get("status") == "ok" and (bull or bear):
+            row = dict(candidate)
+            row.update({
+                "direction": "bullish" if bull else "bearish", "setup": "early_directional_pressure_observation",
+                "heads_up_only": True, "early_directional_observation": True,
+                "authority": "early_session_shadow_observation_no_rank_alert_or_execution_authority",
+                "can_submit_orders": False, "execution_enabled": False,
+                "blockers": sorted(set([*(str(x) for x in row.get("blockers") or []), "completed_5m_confirmation_required"])),
+            })
+            heads_up.append(row)
+    return sorted(heads_up, key=lambda row: float(row.get("ranking_score") or row.get("score") or 0.0), reverse=True)
+
+
+def liquid_review_escalations(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep liquid confirmed moves visible when only the quote-quality gate fails.
+
+    This is a dashboard-only data-quality review lane. It cannot rank, alert,
+    size, or authorize a trade; it makes a bad/stale quote observable instead
+    of silently converting a liquid, completed-bar setup into a disappearance.
+    """
+    escalations = []
+    for candidate in candidates:
+        blockers = {str(value) for value in candidate.get("blockers") or []}
+        if (
+            str(candidate.get("confirmation_stage") or "") == "completed_5m_confirmed"
+            and float(candidate.get("score") or 0.0) >= LIQUID_REVIEW_MIN_SCORE
+            and blockers.issubset(LIQUID_REVIEW_ALLOWED_BLOCKERS)
+            and (_finite(candidate.get("avg_dollar_volume_20d")) or 0.0) >= 100_000_000
+        ):
+            row = dict(candidate)
+            row.update({
+                "liquid_review_escalation": True,
+                "authority": "quote_quality_review_only_no_rank_alert_or_execution_authority",
+                "can_submit_orders": False,
+                "execution_enabled": False,
+            })
+            escalations.append(row)
+    return sorted(escalations, key=lambda row: float(row.get("ranking_score") or row.get("score") or 0.0), reverse=True)
 
 
 def _screen_rows(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -294,6 +438,18 @@ def discovery_map(sources: dict[str, list[dict[str, Any]]]) -> dict[str, dict[st
 
 MOVERS_MIN_PRICE = 5.0
 MOVERS_MIN_ABS_PERCENT_CHANGE = 3.0
+
+
+def _bar_was_completed(row: Mapping[str, Any], *, now_et: datetime, minutes: int = 5) -> bool:
+    """Defensively enforce completed-bar causality on provider responses."""
+    try:
+        started = datetime.fromisoformat(str(row.get("t") or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    completed_at = started.astimezone(timezone.utc) + timedelta(minutes=minutes)
+    return completed_at <= now_et.astimezone(timezone.utc)
 
 
 def normalized_movers(sources: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -377,7 +533,10 @@ def fetch_intraday_bars(symbols: list[str], now_et: datetime) -> tuple[dict[str,
                 errors.append(f"alpaca_intraday_bars:{type(exc).__name__}:{','.join(chunk[:3])}")
                 break
             for symbol, rows in (payload.get("bars") or {}).items():
-                output.setdefault(str(symbol).upper(), []).extend(row for row in rows or [] if isinstance(row, dict))
+                output.setdefault(str(symbol).upper(), []).extend(
+                    row for row in rows or []
+                    if isinstance(row, dict) and _bar_was_completed(row, now_et=now_et)
+                )
             token = payload.get("next_page_token")
             if not token:
                 break
@@ -861,6 +1020,161 @@ def apply_market_context(
     return candidates
 
 
+def aplus_evidence_record(candidate: Mapping[str, Any], observed_at: datetime) -> dict[str, Any]:
+    """Freeze the evidence actually available when a radar candidate is seen.
+
+    This is deliberately stricter than the discovery score.  A headline, a
+    session-volume pace estimate, or generic 2R level is useful context, but
+    cannot be relabelled as verified catalyst, time-matched RVOL, or a fully
+    specified trade plan.  The missing fields remain explicit research debt.
+    """
+    articles = [row for row in candidate.get("catalyst_headlines") or [] if isinstance(row, Mapping)]
+    context = candidate.get("market_context") if isinstance(candidate.get("market_context"), Mapping) else {}
+    structure = candidate.get("structure") if isinstance(candidate.get("structure"), Mapping) else {}
+    confirmation = candidate.get("price_action_confirmation") if isinstance(candidate.get("price_action_confirmation"), Mapping) else {}
+    levels = candidate.get("trade_levels") if isinstance(candidate.get("trade_levels"), Mapping) else {}
+    freshness = candidate.get("data_freshness") if isinstance(candidate.get("data_freshness"), Mapping) else {}
+    time_rvol = candidate.get("time_matched_rvol") if isinstance(candidate.get("time_matched_rvol"), Mapping) else {}
+    primary_catalyst = candidate.get("primary_catalyst") if isinstance(candidate.get("primary_catalyst"), Mapping) else {}
+
+    missing: list[str] = []
+    if not articles:
+        missing.append("timestamped_public_catalyst")
+    # Alpaca news is publisher-provided news. It is not an issuer filing or
+    # exchange/issuer primary release, so it must never satisfy verification.
+    if str(primary_catalyst.get("status") or "") != "verified_primary_sec":
+        missing.append("primary_catalyst_provenance")
+    if str(context.get("status") or "unavailable") != "available":
+        missing.append("complete_market_and_sector_context")
+    if not freshness.get("latest_quote_at"):
+        missing.append("quote_timestamp")
+    missing.append("fresh_nbbo_quote")
+    if str(time_rvol.get("status") or "unavailable") != "available_iex_relative":
+        missing.append("time_matched_rvol_baseline")
+    if str(confirmation.get("state") or "").lower() not in {"bullish_confirmed", "bearish_confirmed"}:
+        missing.append("completed_bar_entry_confirmation")
+    if not all(levels.get(key) is not None for key in ("confirmation_trigger", "invalidation", "target_2r")):
+        missing.append("entry_invalidation_target_levels")
+    missing.extend(("time_stop_rule", "portfolio_risk_constraints", "family_oos_validation"))
+    missing = list(dict.fromkeys(missing))
+
+    return {
+        "schema_version": 1,
+        "observed_at_et": observed_at.isoformat(),
+        "snapshot_policy": "append_only_radar_log_snapshot",
+        "classification": "a_plus_process_candidate" if not missing else "evidence_incomplete",
+        "eligible_for_a_plus_label": not missing,
+        "missing_required_fields": missing,
+        "catalyst": {
+            "status": "verified_primary_sec" if primary_catalyst.get("status") == "verified_primary_sec" else "publisher_headline_unverified" if articles else "unavailable",
+            "headlines": [dict(row) for row in articles[:3]],
+            "primary_source": dict(primary_catalyst),
+            "requirement": "timestamped public catalyst with primary-source provenance",
+        },
+        "market_context": dict(context),
+        "tradeability": {
+            "underlying_spread_pct": candidate.get("spread_pct"),
+            "average_dollar_volume_20d": candidate.get("avg_dollar_volume_20d"),
+            "current_session_dollar_volume": candidate.get("current_session_dollar_volume"),
+            "latest_quote_at": freshness.get("latest_quote_at"),
+            "latest_trade_at": freshness.get("latest_trade_at"),
+            "quote_status": "timestamped_iex_quote_not_nbbo" if freshness.get("latest_quote_at") else "unavailable",
+        },
+        "opening_and_participation": {
+            "opening_range_high": structure.get("opening_range_high"),
+            "opening_range_low": structure.get("opening_range_low"),
+            "vwap_proxy": structure.get("vwap_proxy"),
+            "session_volume_pace_proxy": candidate.get("volume_pace_rvol_proxy"),
+            "time_matched_rvol": time_rvol.get("value"),
+            "time_matched_rvol_status": time_rvol.get("status") or "unavailable_no_same_time_baseline",
+            "time_matched_rvol_detail": dict(time_rvol),
+        },
+        "entry_mechanics": {
+            "confirmation": dict(confirmation),
+            "levels": dict(levels),
+            "completed_bar_only": True,
+        },
+        "risk_and_exit": {
+            "time_stop": None,
+            "portfolio_constraints": None,
+            "status": "incomplete",
+        },
+        "validation": {
+            "status": "unvalidated_strategy_family",
+            "requirement": "preregistered cost-aware out-of-sample and forward-shadow evidence",
+        },
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def attach_aplus_evidence(candidates: list[dict[str, Any]], observed_at: datetime) -> list[dict[str, Any]]:
+    """Attach the same fail-closed evidence contract to every ranked candidate."""
+    for candidate in candidates:
+        candidate["a_plus_evidence"] = aplus_evidence_record(candidate, observed_at)
+    return candidates
+
+
+def attach_time_matched_rvol(candidates: list[dict[str, Any]], baseline_report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Attach a same-clock-time IEX cumulative-volume diagnostic when present.
+
+    Missing or stale profiles remain unavailable; this function never falls back
+    to the session-progress proxy.
+    """
+    profiles = baseline_report.get("profiles") if isinstance(baseline_report.get("profiles"), Mapping) else {}
+    baseline_date = str(baseline_report.get("as_of_et") or "")[:10]
+    for candidate in candidates:
+        structure = candidate.get("structure") if isinstance(candidate.get("structure"), Mapping) else {}
+        profile = profiles.get(str(candidate.get("symbol") or "").upper())
+        stamp = str(structure.get("last_completed_bar_at") or "")
+        try:
+            clock = datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(MARKET_TZ).strftime("%H:%M")
+        except ValueError:
+            clock = ""
+        values = profile.get("cumulative_volume_baseline_by_clock_et") if isinstance(profile, Mapping) else {}
+        baseline = _finite(values.get(clock)) if isinstance(values, Mapping) else None
+        current = _finite(structure.get("session_volume_5m"))
+        current_date = stamp[:10]
+        available = bool(profile and profile.get("status") == "ok" and baseline and baseline > 0 and current is not None and baseline_date == current_date)
+        candidate["time_matched_rvol"] = {
+            "status": "available_iex_relative" if available else "unavailable",
+            "value": round(current / baseline, 3) if available else None,
+            "baseline_cumulative_volume": round(baseline, 2) if baseline is not None else None,
+            "current_cumulative_volume": round(current, 2) if current is not None else None,
+            "clock_et": clock or None,
+            "sessions_used": profile.get("sessions_used") if isinstance(profile, Mapping) else 0,
+            "source": "alpaca_iex_5m_cumulative_same_clock_time",
+        }
+    return candidates
+
+
+def attach_primary_catalysts(candidates: list[dict[str, Any]], sec_report: Mapping[str, Any], observed_at: datetime) -> list[dict[str, Any]]:
+    """Attach timestamped public SEC filings without promoting them to a signal."""
+    by_symbol: dict[str, list[dict[str, Any]]] = {}
+    for filing in sec_report.get("catalysts") or []:
+        if not isinstance(filing, Mapping):
+            continue
+        accepted_at = str(filing.get("accepted_at") or "")
+        try:
+            accepted = datetime.fromisoformat(accepted_at.replace("Z", "+00:00")).astimezone(MARKET_TZ)
+        except ValueError:
+            continue
+        if accepted <= observed_at:
+            by_symbol.setdefault(str(filing.get("symbol") or "").upper(), []).append(dict(filing))
+    feed_status = str(sec_report.get("status") or "unavailable")
+    for candidate in candidates:
+        filings = by_symbol.get(str(candidate.get("symbol") or "").upper(), [])
+        candidate["primary_catalyst"] = {
+            "status": "verified_primary_sec" if filings else "unavailable" if feed_status != "ok" else "no_matching_primary_filing",
+            "filings": filings[:3],
+            "feed_status": feed_status,
+            "feed_generated_at": sec_report.get("generated_at"),
+            "source": "sec_edgar_submissions",
+            "authority": "provenance_only_no_rank_or_execution_effect",
+        }
+    return candidates
+
+
 def evaluate_candidate(
     discovery: dict[str, Any],
     metrics: dict[str, Any],
@@ -1040,6 +1354,11 @@ def evaluate_candidate(
         "price": round(price, 4) if price is not None else None,
         "change_pct": round((change or 0.0) * 100.0, 3),
         "spread_pct": round(spread * 100.0, 4) if spread is not None else None,
+        "data_freshness": {
+            "latest_quote_at": metrics.get("latest_quote_at"),
+            "latest_trade_at": metrics.get("latest_trade_at"),
+            "quote_feed": "alpaca_iex_snapshot",
+        },
         "avg_dollar_volume_20d": round(avg_dollar_volume) if avg_dollar_volume is not None else None,
         "current_session_dollar_volume": round(current_dollar) if current_dollar is not None else None,
         "volume_pace_rvol_proxy": round(pace_rvol, 3) if pace_rvol is not None else None,
@@ -1100,6 +1419,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
     errors.extend(more_errors)
     nominate_symbols(discovered, list(news_by_symbol(broad_news)), "fresh_market_news")
     nominate_symbols(discovered, load_social_symbols(now_et.date()), "social_research")
+    nominate_symbols(discovered, list(PRIORITY_FOCUS_UNIVERSE), "priority_focus_universe")
     nominate_symbols(discovered, KNOWN_LEADERS, "known_liquid_leader")
     for source, path, row_keys in REPORT_NOMINATION_SOURCES:
         symbols_from_report = symbols_from_report_payload(_read_json(path), row_keys, now_et.date().isoformat())
@@ -1136,6 +1456,11 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
     ]
     candidates = apply_cross_sectional_factor_consensus(candidates)
     candidates = apply_market_context(candidates, metrics)
+    rvol_baseline_report = _read_json(RVOL_BASELINE_REPORT_PATH)
+    candidates = attach_time_matched_rvol(candidates, rvol_baseline_report)
+    sec_catalyst_report = _read_json(SEC_CATALYST_REPORT_PATH)
+    candidates = attach_primary_catalysts(candidates, sec_catalyst_report, now_et)
+    candidates = attach_aplus_evidence(candidates, now_et)
     candidates, benchmark_ranked, _broad_ranked = rank_candidates_by_lane(candidates)
     candidates.sort(
         key=lambda row: (
@@ -1154,14 +1479,39 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         ),
         reverse=True,
     )
+    heads_up = preconfirmation_heads_up(candidates, now_et)
+    liquid_escalations = liquid_review_escalations(candidates)
     precision = [row for row in candidates if row.get("state") == "precision_watch"]
     filtered = [row for row in candidates if row.get("state") == "filtered"]
     nomination_source_counts: dict[str, int] = {}
     for item in discovered.values():
         for source in set(item.get("sources") or []):
             nomination_source_counts[source] = nomination_source_counts.get(source, 0) + 1
+    trace = coverage_trace(discovered, snapshots, ranked_for_bars, bars)
+    # A corroborated liquid leader is a coverage obligation, not merely a
+    # nice-to-have.  Surface any regression explicitly rather than allowing a
+    # successful process exit to disguise an unevaluated candidate.
+    liquid_coverage_debts = [
+        row for row in trace
+        if "known_liquid_leader" in (row.get("nomination_sources") or [])
+        and len(set(row.get("nomination_sources") or [])) >= 3
+        and row.get("stop_stage") != "evaluated"
+    ]
+    core_coverage_debts = [
+        row for row in trace
+        if row.get("symbol") in CORE_LIQUID_SYMBOLS and row.get("stop_stage") != "evaluated"
+    ]
+    priority_coverage_debts = [
+        row for row in trace
+        if row.get("symbol") in PRIORITY_FOCUS_UNIVERSE and row.get("stop_stage") != "evaluated"
+    ]
+    operational_health = (
+        "ok"
+        if discovered and snapshots and not errors and not liquid_coverage_debts and not core_coverage_debts and not priority_coverage_debts
+        else "degraded"
+    )
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "provider": "alpaca_marketwide_intraday_discovery",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "as_of_et": now_et.isoformat(),
@@ -1177,9 +1527,43 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
             "symbols_evaluated": len(candidates),
             "precision_watch_count": len(precision),
             "actionable_ranked_count": len(actionable_ranked),
+            "preconfirmation_heads_up_count": len(heads_up),
+            "liquid_review_escalation_count": len(liquid_escalations),
+            "corroborated_liquid_coverage_debt_count": len(liquid_coverage_debts),
+            "corroborated_liquid_coverage_debts": liquid_coverage_debts,
+            "core_liquid_coverage_debt_count": len(core_coverage_debts),
+            "core_liquid_coverage_debts": core_coverage_debts,
+            "priority_focus_universe": list(PRIORITY_FOCUS_UNIVERSE),
+            "reserved_priority_focus": [symbol for symbol in PRIORITY_FOCUS_UNIVERSE if symbol in ranked_for_bars],
+            "priority_focus_coverage_debt_count": len(priority_coverage_debts),
+            "priority_focus_coverage_debts": priority_coverage_debts,
             "factor_consensus_complete_count": sum(
                 (row.get("factor_consensus") or {}).get("status") == "complete" for row in candidates
             ),
+            "a_plus_process_candidate_count": sum(
+                (row.get("a_plus_evidence") or {}).get("eligible_for_a_plus_label") is True for row in candidates
+            ),
+            "a_plus_evidence_incomplete_count": sum(
+                (row.get("a_plus_evidence") or {}).get("classification") == "evidence_incomplete" for row in candidates
+            ),
+            "time_matched_rvol_available_count": sum(
+                (row.get("time_matched_rvol") or {}).get("status") == "available_iex_relative" for row in candidates
+            ),
+            "time_matched_rvol_baseline": {
+                "status": "available" if rvol_baseline_report else "unavailable",
+                "generated_at": rvol_baseline_report.get("generated_at"),
+                "source": rvol_baseline_report.get("provider"),
+                "errors": len(rvol_baseline_report.get("errors") or []) if isinstance(rvol_baseline_report, Mapping) else 0,
+                "authority": "context_only_no_gate_or_sizing_effect",
+            },
+            "primary_catalyst_feed": {
+                "status": sec_catalyst_report.get("status") or "unavailable",
+                "generated_at": sec_catalyst_report.get("generated_at"),
+                "matched_candidate_count": sum(
+                    (row.get("primary_catalyst") or {}).get("status") == "verified_primary_sec" for row in candidates
+                ),
+                "authority": "provenance_only_no_rank_or_execution_effect",
+            },
             "filtered_count": len(filtered),
             "source_counts": {name: len(rows) for name, rows in screeners.items()},
             "nomination_source_counts": dict(sorted(nomination_source_counts.items())),
@@ -1201,7 +1585,7 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
         },
         "market_movers": normalized_movers(screeners),
         "all_discovered_symbols": sorted(discovered),
-        "coverage_trace": coverage_trace(discovered, snapshots, ranked_for_bars, bars),
+        "coverage_trace": trace,
         "benchmark_lane": {
             "symbols": list(CORE_BENCHMARKS),
             "ranked_candidates": benchmark_ranked,
@@ -1219,11 +1603,13 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
             "can_submit_orders": False,
         },
         "precision_watch": precision,
+        "preconfirmation_heads_up": heads_up,
+        "liquid_review_escalations": liquid_escalations,
         "ranked_candidates": candidates,
         "actionable_ranked_candidates": actionable_ranked,
         "filtered_candidates": filtered,
         "errors": errors,
-        "operational_health": "ok" if discovered and snapshots and not errors else "degraded",
+        "operational_health": operational_health,
         "warnings": [
             "Market movers identify moves already underway; they do not predict surprise news.",
             "Standing and report-nominated symbols broaden coverage but do not establish an edge.",
@@ -1237,6 +1623,14 @@ def build_report(now_et: datetime | None = None) -> dict[str, Any]:
                 else []
             ),
             "No paper or live order authority.",
+            *(
+                ["Coverage debt: one or more corroborated liquid leaders were not evaluated."]
+                if liquid_coverage_debts else []
+            ),
+            *(
+                ["Coverage debt: one or more reserved liquid-core symbols were not evaluated."]
+                if core_coverage_debts else []
+            ),
         ],
     }
 

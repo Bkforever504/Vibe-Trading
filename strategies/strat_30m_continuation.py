@@ -1,6 +1,7 @@
 """Pure The Strat + 30-minute continuation shadow evaluator."""
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import pandas as pd
@@ -28,6 +29,82 @@ def _ensure_et(frame: pd.DataFrame) -> pd.DataFrame:
     result.index = index
     result.columns = [str(column).lower() for column in result.columns]
     return result
+
+
+def evaluate_intraday_212_reversal(intraday: pd.DataFrame) -> dict[str, Any]:
+    """Evaluate a 30m 2-1 setup and the first completed lower-timeframe break."""
+    rth = _ensure_et(intraday).between_time("09:30", "15:59")
+    if rth.empty:
+        return {"status": "waiting_for_completed_30m_bars", "shadow_signal": False}
+    grouped = rth.resample(
+        "30min", origin="start_day", offset="9h30min", label="left", closed="left"
+    )
+    bars = grouped.agg({"open": "first", "high": "max", "low": "min", "close": "last"})
+    counts = grouped["close"].count()
+    spacing = rth.index.to_series().diff().dropna().dt.total_seconds().div(60)
+    base_minutes = float(spacing.median()) if not spacing.empty else 30.0
+    expected_rows = max(1, math.ceil(30.0 / max(base_minutes, 1.0)))
+    bars = bars[counts >= expected_rows].dropna()
+    if len(bars) < 3:
+        return {"status": "waiting_for_completed_30m_bars", "shadow_signal": False, "completed_30m_bars": len(bars)}
+
+    direction = None
+    entry = stop = target = None
+    trigger = None
+    sequence: list[str] = []
+    # Search newest-to-oldest for a completed directional bar + completed
+    # inside bar. The trigger is the first subsequently completed source bar
+    # that crosses the inside range, so the counterfactual entry is causal.
+    for position in range(len(bars) - 1, 1, -1):
+        reference, directional, inside = bars.iloc[position - 2], bars.iloc[position - 1], bars.iloc[position]
+        directional_type = classify_bar(directional, reference)
+        if classify_bar(inside, directional) != "1" or directional_type not in {"2U", "2D"}:
+            continue
+        eligible_after = inside.name + pd.Timedelta(minutes=30)
+        future = rth[rth.index >= eligible_after]
+        if directional_type == "2U":
+            crossed = future[future["low"] < float(inside["low"])]
+            if not crossed.empty:
+                direction, trigger = "put", crossed.iloc[0]
+                entry, stop, target = float(trigger["close"]), float(inside["high"]), float(directional["low"])
+                sequence = ["2U", "1", "2D"]
+        else:
+            crossed = future[future["high"] > float(inside["high"])]
+            if not crossed.empty:
+                direction, trigger = "call", crossed.iloc[0]
+                entry, stop, target = float(trigger["close"]), float(inside["low"]), float(directional["high"])
+                sequence = ["2D", "1", "2U"]
+        if direction:
+            break
+    trigger_time = trigger.name + pd.Timedelta(minutes=base_minutes) if trigger is not None else None
+    extended = bool(direction == "put" and entry is not None and target is not None and entry <= target) or bool(
+        direction == "call" and entry is not None and target is not None and entry >= target
+    )
+    risk = abs(entry - stop) if entry is not None and stop is not None else None
+    reward = abs(target - entry) if entry is not None and target is not None else None
+    return {
+        "schema_version": 1,
+        "status": "extended_no_chase" if extended else "confirmed" if direction else "no_pattern",
+        "pattern": "30m_2_1_2_reversal" if direction else None,
+        "sequence": sequence,
+        "shadow_signal": direction is not None and not extended,
+        "shadow_direction": direction,
+        "trigger_bar_at": trigger.name.isoformat() if trigger is not None else None,
+        "trigger_at": trigger_time.isoformat() if trigger_time is not None else None,
+        "decision_available_at": trigger_time.isoformat() if trigger_time is not None else None,
+        "counterfactual": {
+            "entry_underlying": round(entry, 4) if entry is not None else None,
+            "stop_underlying": round(stop, 4) if stop is not None else None,
+            "first_level_target": round(target, 4) if target is not None else None,
+            "risk_points": round(risk, 4) if risk is not None else None,
+            "reward_points": round(reward, 4) if reward is not None else None,
+            "reward_risk": round(reward / risk, 3) if risk and reward is not None else None,
+            "horizon_minutes": 60,
+        },
+        "bar_basis": "completed_directional_and_inside_30m_bars_then_first_completed_source_bar_cross",
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
 
 
 def _period_open(daily: pd.DataFrame, current_day: pd.Timestamp, period: str, day_open: float) -> float:
@@ -172,4 +249,5 @@ def evaluate_strat_30m(symbol: str, daily: pd.DataFrame, intraday: pd.DataFrame)
             "Gamma levels are not included unless a provenance-qualified point-in-time source is available.",
             "Social-media percentage returns are not treated as verified performance evidence.",
         ],
+        "intraday_212_reversal": evaluate_intraday_212_reversal(intraday),
     }

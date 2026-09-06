@@ -25,6 +25,7 @@ VIBE_HOME = Path.home() / ".vibe-trading"
 DEFAULT_CONFIG = ROOT / "research" / "agent_reach_trading_sources.json"
 DEFAULT_LOG = ROOT / "data" / "agent_reach_trading_research_log.jsonl"
 DEFAULT_REPORT = VIBE_HOME / "reports" / "agent-reach-trading-research.json"
+DEFAULT_REPLAY_QUEUE = ROOT / "data" / "social_replay_queue.jsonl"
 DEFAULT_YTDLP = Path.home() / ".agent-reach-venv" / "Scripts" / "yt-dlp.exe"
 
 ENTRY_TERMS = ("entry", "enter", "buy at", "sell at", "breakout", "retest", "trigger")
@@ -73,6 +74,15 @@ STRATEGY_TAGS = {
 }
 CASHTAG_RE = re.compile(r"\$([A-Z][A-Z0-9.]{0,7})\b", re.IGNORECASE)
 PLAIN_SYMBOL_RE = re.compile(r"\b(SPY|SPX|QQQ|MES|ES|MNQ|NQ|AAPL|MSFT|NVDA|TSLA|META|AMZN|SMCI)\b", re.IGNORECASE)
+SIDE_RE = re.compile(r"\b(?:direction|bias|side)\s*[:=-]\s*(long|short|bullish|bearish)\b", re.IGNORECASE)
+ENTRY_RE = re.compile(
+    r"\b(?:entry(?:\s+zone)?|trigger|buy\s+at|sell\s+at)\s*[:=@-]?\s*\$?(\d+(?:\.\d+)?)"
+    r"(?:\s*(?:-|to|–)\s*\$?(\d+(?:\.\d+)?))?",
+    re.IGNORECASE,
+)
+STOP_RE = re.compile(r"\b(?:stop(?:\s+loss)?|invalidation)\s*[:=@-]?\s*\$?(\d+(?:\.\d+)?)", re.IGNORECASE)
+TARGET_RE = re.compile(r"\b(?:target|tp\s*\d*)\s*[:=@-]?\s*\$?(\d+(?:\.\d+)?)", re.IGNORECASE)
+TIMEFRAME_RE = re.compile(r"\b(1|2|3|5|15|30|60)\s*(?:min(?:ute)?|m)\b", re.IGNORECASE)
 
 
 def _now_utc() -> datetime:
@@ -105,6 +115,68 @@ def _append_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> int:
                 continue
             handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
             existing.add(row["source_id"])
+            added += 1
+    return added
+
+
+def _append_replay_queue(path: Path, normalized_rows: Iterable[dict[str, Any]]) -> int:
+    """Append eligible callouts to the shadow-replay queue.
+
+    A row enters the queue ONLY if `trade_callout.eligible_for_shadow_replay` is
+    true — meaning the source explicitly supplied one symbol, direction, entry
+    zone, stop, target, timeframe, and publication time. Queue is deduped by
+    (source_id, source_timestamp).
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing: set[tuple[str, str]] = set()
+    if path.exists():
+        for raw in path.read_text(encoding="utf-8-sig").splitlines():
+            try:
+                row = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            key = (str(row.get("source_id") or ""), str(row.get("source_timestamp") or ""))
+            if key[0]:
+                existing.add(key)
+    added = 0
+    with path.open("a", encoding="utf-8") as handle:
+        for row in normalized_rows:
+            callout = row.get("trade_callout") or {}
+            if not callout.get("eligible_for_shadow_replay"):
+                continue
+            key = (str(row.get("source_id") or ""), str(callout.get("source_timestamp") or ""))
+            if not key[0] or key in existing:
+                continue
+            entry_zone = callout.get("entry_zone") or [None, None]
+            record = {
+                "source_id": row["source_id"],
+                "queued_at": _now_utc().isoformat().replace("+00:00", "Z"),
+                "source_timestamp": callout.get("source_timestamp"),
+                "captured_at_utc": (callout.get("capture_integrity") or {}).get("captured_at_utc"),
+                "immutable_platform_id": (callout.get("capture_integrity") or {}).get("immutable_platform_id"),
+                "raw_content_sha256": (callout.get("capture_integrity") or {}).get("raw_content_sha256"),
+                "capture_provenance": (callout.get("capture_integrity") or {}).get("capture_provenance"),
+                "platform": row.get("platform"),
+                "author": row.get("author"),
+                "url": row.get("url"),
+                "title": row.get("title"),
+                "symbol": (row.get("symbols") or [None])[0],
+                "direction": callout.get("direction"),
+                "entry_zone_low": entry_zone[0] if len(entry_zone) > 0 else None,
+                "entry_zone_high": entry_zone[1] if len(entry_zone) > 1 else None,
+                "stop": callout.get("stop"),
+                "targets": callout.get("targets"),
+                "timeframe": callout.get("timeframe"),
+                "strategy_tags": row.get("strategy_tags") or [],
+                "evidence_tier": row.get("evidence_tier"),
+                "independent_verification": bool(row.get("rule_features", {}).get("independent_verification")),
+                "status": "queued_shadow_replay",
+                "execution_enabled": False,
+                "can_submit_orders": False,
+                "authority": "social_replay_intake_only_no_ranking_or_execution",
+            }
+            handle.write(json.dumps(record, separators=(",", ":"), sort_keys=True) + "\n")
+            existing.add(key)
             added += 1
     return added
 
@@ -360,6 +432,78 @@ def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(term in text for term in terms)
 
 
+def _is_aware_utc_timestamp(value: Any) -> bool:
+    """Accept only parseable, offset-bearing ISO timestamps for replay provenance."""
+    try:
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    return stamp.tzinfo is not None and stamp.utcoffset() is not None
+
+
+def extract_trade_callout(raw: dict[str, Any], *, symbols: list[str], text: str) -> dict[str, Any]:
+    """Extract only explicitly stated levels from a public post/transcript.
+
+    The result is a replay intake record, never a recommendation.  Text such
+    as "buy SPY" is deliberately insufficient: a timestamped source, a
+    symbol, direction, entry, stop, target, and a chart timeframe are all
+    required before it becomes a shadow-replay candidate.
+    """
+    side_match = SIDE_RE.search(text)
+    entry_match = ENTRY_RE.search(text)
+    stop_match = STOP_RE.search(text)
+    targets = [float(match.group(1)) for match in TARGET_RE.finditer(text)]
+    timeframe_match = TIMEFRAME_RE.search(text)
+    direction = side_match.group(1).lower() if side_match else None
+    if direction == "bullish":
+        direction = "long"
+    elif direction == "bearish":
+        direction = "short"
+    entry_low = float(entry_match.group(1)) if entry_match else None
+    entry_high = float(entry_match.group(2)) if entry_match and entry_match.group(2) else entry_low
+    stop = float(stop_match.group(1)) if stop_match else None
+    timeframe = f"{timeframe_match.group(1)}m" if timeframe_match else None
+    source_timestamp = str(raw.get("published_at") or "").strip() or None
+    external_id = str(raw.get("external_id") or "").strip()
+    url = str(raw.get("url") or "").strip()
+    provenance = str(raw.get("capture_provenance") or "").strip()
+    raw_hash = str(raw.get("raw_content_sha256") or "").strip()
+    integrity = {
+        "immutable_platform_id": external_id if external_id and external_id != url else None,
+        "created_at_utc": source_timestamp if _is_aware_utc_timestamp(source_timestamp) else None,
+        "captured_at_utc": raw.get("captured_at") if _is_aware_utc_timestamp(raw.get("captured_at")) else None,
+        "raw_content_sha256": raw_hash if re.fullmatch(r"[0-9a-f]{64}", raw_hash) else None,
+        "capture_provenance": provenance if provenance in {"official_api", "authorized_platform_api"} else None,
+    }
+    required = {
+        "source_timestamp": source_timestamp,
+        "symbol": symbols[0] if len(symbols) == 1 else None,
+        "direction": direction,
+        "entry": entry_low,
+        "stop": stop,
+        "target": targets[0] if targets else None,
+        "timeframe": timeframe,
+        **integrity,
+    }
+    missing = [key for key, value in required.items() if value is None]
+    return {
+        "status": "replay_ready_unvalidated" if not missing else "incomplete_callout",
+        "symbols": symbols,
+        "direction": direction,
+        "entry_zone": [entry_low, entry_high] if entry_low is not None else None,
+        "stop": stop,
+        "targets": targets[:3],
+        "timeframe": timeframe,
+        "source_timestamp": source_timestamp,
+        "capture_integrity": integrity,
+        "missing_fields": missing,
+        "authority": "research_intake_only_no_rank_alert_sizing_or_execution_authority",
+        "eligible_for_shadow_replay": not missing,
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
 def normalize_source(raw: dict[str, Any], *, max_text_characters: int = 6000) -> dict[str, Any]:
     platform = str(raw.get("platform") or "unknown").lower()
     url = str(raw.get("url") or "").strip()
@@ -370,6 +514,9 @@ def normalize_source(raw: dict[str, Any], *, max_text_characters: int = 6000) ->
     symbols = sorted({match.upper() for match in CASHTAG_RE.findall(f"{title} {text}")})
     symbols.extend(symbol for symbol in PLAIN_SYMBOL_RE.findall(f"{title} {text}") if symbol.upper() not in symbols)
     symbols = sorted({str(symbol).upper() for symbol in symbols})
+    callout_raw = dict(raw)
+    callout_raw.setdefault("raw_content_sha256", hashlib.sha256(text.encode("utf-8")).hexdigest())
+    trade_callout = extract_trade_callout(callout_raw, symbols=symbols, text=f"{title} {text}")
     tags = sorted(
         tag for tag, terms in STRATEGY_TAGS.items() if any(term in combined for term in terms)
     )
@@ -462,12 +609,16 @@ def normalize_source(raw: dict[str, Any], *, max_text_characters: int = 6000) ->
         "author": raw.get("author"),
         "title": title,
         "published_at": raw.get("published_at"),
+        "captured_at": raw.get("captured_at"),
+        "capture_provenance": raw.get("capture_provenance"),
+        "raw_content_sha256": raw.get("raw_content_sha256") or hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "engagement": {
             "views": raw.get("view_count"),
             "likes": raw.get("like_count"),
             "comments": raw.get("comment_count"),
         },
         "symbols": symbols,
+        "trade_callout": trade_callout,
         "strategy_tags": tags,
         "text_excerpt": text,
         "rule_features": features,
@@ -527,7 +678,16 @@ def build_report(
     errors.extend(configured_errors)
     for platform in sorted(DIRECT_SOCIAL_PLATFORMS):
         if any(row.get("platform") == platform and row.get("access_mode") for row in configured_rows):
-            channel_status[platform] = "collected_reviewed_snapshot"
+            # A reviewed screenshot/copy is useful provenance, but it must
+            # never be presented as a live platform feed. X additionally has
+            # an explicit direct-collection failure above when credentials or
+            # the official client are unavailable.
+            if platform == "x" and any(problem.startswith("x:") for problem in errors):
+                channel_status[platform] = "direct_capture_unavailable_reviewed_snapshots_only"
+            elif platform == "reddit":
+                channel_status[platform] = "reviewed_snapshots_only_no_live_collector"
+            else:
+                channel_status[platform] = "reviewed_snapshots_only"
         elif platform not in channel_status:
             channel_status[platform] = "not_configured"
     normalized = [normalize_source(row, max_text_characters=max_text) for row in raw_rows]
@@ -541,6 +701,7 @@ def build_report(
         row for row in normalized
         if row["classification"] in {"preregistration_candidate", "verified_preregistration_candidate"}
     ]
+    replay_ready = [row for row in normalized if row["trade_callout"].get("eligible_for_shadow_replay")]
     report = {
         "schema_version": 2,
         "provider": "agent_reach_trading_research",
@@ -554,6 +715,9 @@ def build_report(
         "by_classification": by_classification,
         "preregistration_candidates": [
             row["source_id"] for row in candidates
+        ],
+        "replay_ready_callouts": [
+            row["source_id"] for row in replay_ready
         ],
         "candidate_summaries": [
             {
@@ -591,6 +755,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--log", type=Path, default=DEFAULT_LOG)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
+    parser.add_argument("--replay-queue", type=Path, default=DEFAULT_REPLAY_QUEUE, dest="replay_queue")
     parser.add_argument("--yt-dlp", type=Path, default=DEFAULT_YTDLP)
     parser.add_argument("--no-transcripts", action="store_true")
     parser.add_argument("--print", action="store_true", dest="print_report")
@@ -604,6 +769,11 @@ def main(argv: list[str] | None = None) -> int:
     report["cumulative_source_count"] = sum(
         1 for line in args.log.read_text(encoding="utf-8-sig").splitlines() if line.strip()
     ) if args.log.exists() else 0
+    report["new_replay_queue_count"] = _append_replay_queue(args.replay_queue, rows)
+    report["cumulative_replay_queue_count"] = sum(
+        1 for line in args.replay_queue.read_text(encoding="utf-8-sig").splitlines() if line.strip()
+    ) if args.replay_queue.exists() else 0
+    report["replay_queue_path"] = str(args.replay_queue)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if args.print_report:

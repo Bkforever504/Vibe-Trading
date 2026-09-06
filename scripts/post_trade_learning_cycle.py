@@ -84,6 +84,7 @@ def run_cycle(
     report_path: Path = DEFAULT_REPORT_PATH,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     current_day: date | None = None,
+    reconcile_history: bool = False,
 ) -> tuple[dict[str, Any], int]:
     state = _read_json(state_path, {})
     processed = {str(value) for value in state.get("processed_trade_ids", [])}
@@ -92,7 +93,10 @@ def run_cycle(
     today = current_day or date.today()
     if bootstrapped:
         processed.update(_trade_id(trade) for trade in trades if _exit_day(trade) < today.isoformat())
-    new_trades = [trade for trade in trades if _trade_id(trade) not in processed]
+    # Normal scheduled runs process a trade once.  Reconciliation is an
+    # explicit, idempotent repair path for a ledger that was bootstrapped before
+    # durable postmortems existed; it deliberately replays all closed outcomes.
+    new_trades = trades if reconcile_history else [trade for trade in trades if _trade_id(trade) not in processed]
     days = sorted({_exit_day(trade) for trade in new_trades})
 
     executions: list[dict[str, Any]] = []
@@ -141,6 +145,7 @@ def run_cycle(
         "closed_trade_count": len(trades),
         "new_closed_trade_count": len(new_trades),
         "bootstrapped_existing_history": bootstrapped,
+        "reconciled_history": reconcile_history,
         "new_trade_ids": [_trade_id(trade) for trade in new_trades],
         "exit_dates_processed": days,
         "steps": executions,
@@ -157,8 +162,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--state-path", type=Path, default=DEFAULT_STATE_PATH)
     parser.add_argument("--report-path", type=Path, default=DEFAULT_REPORT_PATH)
     parser.add_argument("--print", action="store_true", dest="do_print")
+    parser.add_argument("--reconcile-history", action="store_true", help="Replay all closed outcomes into durable learning artifacts.")
     args = parser.parse_args(argv)
-    report, returncode = run_cycle(args.trades_path, args.state_path, args.report_path)
+    report, returncode = run_cycle(
+        args.trades_path, args.state_path, args.report_path,
+        reconcile_history=args.reconcile_history,
+    )
     if args.do_print:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

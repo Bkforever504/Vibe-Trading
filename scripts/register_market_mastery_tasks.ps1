@@ -42,12 +42,20 @@ foreach ($task in $tasks) {
         -Execute "powershell.exe" `
         -Argument "-NonInteractive -File `"$($task.Script)`""
 
-    $trigger = New-ScheduledTaskTrigger -Daily -At $task.Time
+    # These producers require an open US equity session.  A daily trigger caused
+    # weekend provider errors and wrote maintenance rows that could obscure a
+    # missing Friday observation in downstream health checks.
+    $trigger = New-ScheduledTaskTrigger `
+        -Weekly `
+        -WeeksInterval 1 `
+        -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday `
+        -At $task.Time
 
     $settings = New-ScheduledTaskSettingsSet `
         -ExecutionTimeLimit (New-TimeSpan -Minutes $task.Minutes) `
         -StartWhenAvailable `
         -RunOnlyIfNetworkAvailable:$false
+    $settings.WakeToRun = $true
 
     Register-ScheduledTask `
         -TaskName $task.Name `

@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +58,7 @@ BUILTIN_NON_EXECUTION_EVIDENCE = {
     "scripts/broker_fill_observer.py",
     "scripts/manual_execution_quality.py",
 }
+PROMOTED_STATUSES = frozenset({"execution_capable_paper"})
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -80,7 +81,30 @@ def _path_for(script: str) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
-def audit_registry(registry: dict[str, Any], *, root: Path = ROOT) -> dict[str, Any]:
+def _latest_gate_row(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    latest = None
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            latest = value
+    return latest
+
+
+def _time(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+    except (TypeError, ValueError):
+        return None
+
+
+def audit_registry(registry: dict[str, Any], *, root: Path = ROOT, now: datetime | None = None) -> dict[str, Any]:
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     issues: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
     known_order_capable = set(registry.get("policy", {}).get("known_order_capable_scripts", [])) | BUILTIN_ORDER_INFRASTRUCTURE
@@ -149,6 +173,14 @@ def audit_registry(registry: dict[str, Any], *, root: Path = ROOT) -> dict[str, 
                 "patterns": broker_read_hits,
             })
 
+        if signal.get("status") in PROMOTED_STATUSES:
+            gate_row = _latest_gate_row(root / "data" / "governance" / "gate_history" / f"{signal.get('id')}.jsonl")
+            evaluated = _time((gate_row or {}).get("evaluated_at"))
+            if evaluated is None or not timedelta(0) <= now - evaluated <= timedelta(hours=24):
+                issues.append({"id": signal.get("id"), "script": script, "severity": "error",
+                               "issue": "promoted_signal_gate_history_missing_or_stale_24h",
+                               "last_evaluation_ts": (gate_row or {}).get("evaluated_at")})
+
     for folder in ("scripts", "strategies"):
         for path in (root / folder).glob("*.py"):
             rel = path.relative_to(root).as_posix()
@@ -173,7 +205,7 @@ def audit_registry(registry: dict[str, Any], *, root: Path = ROOT) -> dict[str, 
 
     return {
         "date": datetime.now(timezone.utc).date().isoformat(),
-        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timestamp": now.isoformat().replace("+00:00", "Z"),
         "provider": "execution_gate_audit",
         "mode": "read_only",
         "execution_enabled": False,

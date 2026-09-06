@@ -35,6 +35,32 @@ CALENDAR_COVERAGE_END = date(2026, 9, 30)
 #             "multi_day" = entire date range.
 # ---------------------------------------------------------------------------
 EVENTS_2026: list[dict[str, Any]] = [
+    # ── September ───────────────────────────────────────────────────────────
+    # Both releases are independently scheduled for 10:00 ET.  They are kept
+    # distinct so the macro-release ORB study can require the dual event rather
+    # than silently treating an ordinary 10:00 bar as a catalyst.
+    {
+        "date": "2026-09-01",
+        "time_et": "10:00",
+        "name": "JOLTS Release (July 2026)",
+        "impact": "high",
+        "veto_type": "intraday",
+        "caution_window_start": "09:55",
+        "caution_window_end": "10:10",
+        "source": "https://www.bls.gov/schedule/news_release/jolts.htm",
+        "notes": "Official BLS JOLTS release. Directional release-reaction research is isolated; no pre-release entries.",
+    },
+    {
+        "date": "2026-09-01",
+        "time_et": "10:00",
+        "name": "ISM Manufacturing PMI Release (August 2026)",
+        "impact": "high",
+        "veto_type": "intraday",
+        "caution_window_start": "09:55",
+        "caution_window_end": "10:10",
+        "source": "https://www.ismworld.org/supply-management-news-and-reports/reports/rob-report-calendar/",
+        "notes": "Official ISM Manufacturing release. It is a separate primary-source event from JOLTS.",
+    },
     # ── July ────────────────────────────────────────────────────────────────
     {
         "date": "2026-07-08",

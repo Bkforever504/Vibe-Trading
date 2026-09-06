@@ -1,4 +1,4 @@
-# Register the read-only EOD equity ignition/contraction/continuation challenger.
+# Register the read-only EOD equity continuation and fixed-priority swing observers.
 # Run as Administrator once:
 #   .\scripts\register_equity_ignition_continuation_shadow_task.ps1
 

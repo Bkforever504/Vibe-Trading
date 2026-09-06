@@ -1,6 +1,7 @@
 param(
     [string]$TaskPath = "\VibeTrade\",
-    [string]$PythonPath = ""
+    [string]$PythonPath = "",
+    [switch]$StartWhenAvailable
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +26,16 @@ Register-NativeTask @(
     "/SC", "DAILY", "/ST", "08:35", "/RI", "5", "/DU", "06:30",
     "/RL", "LIMITED", "/F"
 )
+
+# Opt-in only: changing an installed Scheduler task requires explicit human
+# approval. This prevents a sleeping workstation from permanently recording
+# 0x800710E0 (missed schedule) while keeping registration behavior unchanged
+# unless the operator passes -StartWhenAvailable.
+if ($StartWhenAvailable) {
+    $Task = Get-ScheduledTask -TaskName "PatternGrader-Scanner-Intraday" -TaskPath "$Folder\"
+    $Task.Settings.StartWhenAvailable = $true
+    Set-ScheduledTask -InputObject $Task | Out-Null
+}
 
 # Close-of-day aggregation was previously scheduled at 15:30 CT (an hour later
 # than the regular 15:00 CT cash close plus a five-minute settle window). That

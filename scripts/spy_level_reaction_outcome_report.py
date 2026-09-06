@@ -35,6 +35,44 @@ REPORT_PATH = VIBE_HOME / "reports" / "spy-level-reaction-outcomes.json"
 OUTCOME_LEDGER_PATH = ROOT / "data" / "spy_level_reaction_outcomes.jsonl"
 HORIZON_MINUTES = 60
 MINIMUM_BUCKET_SAMPLE = 30
+FIXED_PREMIUM_PROXY_PLAN = {
+    "label": "fixed_premium_proxy_plan_non_executable_unvalidated",
+    "target_pct": 20.0,
+    "stop_pct": -12.5,
+    "status": "non_executable_unvalidated",
+    "result": "not_inferred",
+    "requires": "timestamped_contract_selection_and_nbbo_quotes",
+}
+
+# These names deliberately accept the feature payload produced by the shadow
+# candidate producer without making that producer a dependency of this report.
+# Values are copied for research slicing only; none are a trading gate.
+SPY0DTE_FEATURE_FIELDS = (
+    "whole_dollar_level",
+    "whole_dollar_level_type",
+    "mapped_level_kind",
+    "touch_count",
+    "touch_sequence",
+    "first_touch",
+    "rsi_1m",
+    "rsi_1m_zone",
+    "rsi_14_completed_5m",
+    "rsi_14_status",
+    "approach_speed",
+    "approach_speed_pct",
+    "approach_speed_bucket",
+    "raw_approach_return_30m_points",
+    "atr_14_completed_5m_points",
+    "atr_normalized_approach_speed",
+    "early_session_eligible",
+    "session_window",
+    "vwap_context",
+    "orb15_context",
+    "trend_guard",
+    "expected_move_context",
+    "volume_context",
+    "mtf_confirmation",
+)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -54,6 +92,37 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 def _candidate_time(candidate: Mapping[str, Any]) -> datetime | None:
     reaction = candidate.get("reaction") if isinstance(candidate.get("reaction"), Mapping) else {}
     return _parse_timestamp(reaction.get("decision_available_at") or reaction.get("observed_at"))
+
+
+def _spy0dte_features(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    """Return only explicitly supplied SPY0DTE research fields.
+
+    Candidate schemas evolve independently.  Supporting a small set of named
+    containers plus reaction/top-level fields keeps historical candidates
+    readable while never synthesizing a feature from price data after the fact.
+    """
+    sources: list[Mapping[str, Any]] = []
+    for key in ("spy0dte_features", "spy0dte_candidate_features", "spy0dte_context", "candidate_features"):
+        value = candidate.get(key)
+        if isinstance(value, Mapping):
+            sources.append(value)
+    reaction = candidate.get("reaction")
+    if isinstance(reaction, Mapping):
+        sources.append(reaction)
+    sources.append(candidate)
+
+    copied: dict[str, Any] = {}
+    for field in SPY0DTE_FEATURE_FIELDS:
+        for source in sources:
+            if field in source and source.get(field) is not None:
+                copied[field] = source[field]
+                break
+    return copied
+
+
+def _premium_proxy_plan() -> dict[str, Any]:
+    """Describe a public fixed-premium plan without pricing or scoring it."""
+    return dict(FIXED_PREMIUM_PROXY_PLAN)
 
 
 def pending_candidates(candidates: Iterable[Mapping[str, Any]], existing_ids: set[str], *, now_et: datetime) -> list[dict[str, Any]]:
@@ -115,8 +184,9 @@ def resolve_candidate(candidate: Mapping[str, Any], rows: Iterable[Mapping[str, 
     gap = candidate.get("gap_context") if isinstance(candidate.get("gap_context"), Mapping) else {}
     breadth = candidate.get("breadth_context") if isinstance(candidate.get("breadth_context"), Mapping) else {}
     intermarket = candidate.get("intermarket_context") if isinstance(candidate.get("intermarket_context"), Mapping) else {}
+    spy0dte_features = _spy0dte_features(candidate)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "candidate_id": candidate.get("candidate_id"),
         "provider": "spy_level_reaction_outcome_resolver",
         "symbol": SYMBOL,
@@ -135,11 +205,25 @@ def resolve_candidate(candidate: Mapping[str, Any], rows: Iterable[Mapping[str, 
         "breadth_regime": str(breadth.get("regime") or "unavailable"),
         "intermarket_regime": str(intermarket.get("qqq_spy_regime") or "unavailable"),
         "sector_leader": ((intermarket.get("sector_leaders") or [{}])[0].get("etf") if isinstance((intermarket.get("sector_leaders") or [{}])[0], Mapping) else None),
+        "spy0dte_candidate_features": spy0dte_features,
+        "underlying_path_comparison": {
+            "status": "underlying_only",
+            "mfe_points": round(mfe, 4),
+            "mae_points": round(mae, 4),
+            "terminal_outcome_points": round(terminal, 4),
+        },
+        "fixed_premium_proxy_plan": _premium_proxy_plan(),
+        "contract_feasibility": {
+            "status": "unavailable",
+            "reason": "quote_required",
+            "required_data": "timestamped_selected_contract_bid_ask_nbbo_and_quote_freshness",
+            "option_return_inferred": False,
+        },
         "cost_adjusted": False,
         "cost_model": "unavailable_underlying_proxy_only",
         "execution_enabled": False,
         "can_submit_orders": False,
-        "limitations": "Underlying 60-minute proxy only; not an option fill, premium, fee, slippage, or live-trading result.",
+        "limitations": "Underlying 60-minute proxy only. The fixed +20%/-12.5% premium plan is non-executable and unvalidated; no option fill, premium result, fee, slippage, or live-trading result is inferred without NBBO quotes.",
     }
 
 
@@ -165,12 +249,27 @@ def _slice(rows: Iterable[Mapping[str, Any]], field: str) -> list[dict[str, Any]
     return result
 
 
+def _spy0dte_feature_slices(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Slice only fields actually captured at candidate time."""
+    present: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        features = row.get("spy0dte_candidate_features")
+        if not isinstance(features, Mapping):
+            continue
+        for field in SPY0DTE_FEATURE_FIELDS:
+            if features.get(field) is not None:
+                item = dict(row)
+                item[field] = features[field]
+                present[field].append(item)
+    return {field: _slice(items, field) for field, items in sorted(present.items())}
+
+
 def build_report(outcomes: Iterable[Mapping[str, Any]], *, generated_at: datetime | None = None) -> dict[str, Any]:
     rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
     now = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     gap_slices = _slice(rows, "gap_fill_bucket")
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "provider": "spy_level_reaction_outcome_resolver",
         "generated_at": now.isoformat().replace("+00:00", "Z"),
         "mode": "shadow_research_only",
@@ -182,6 +281,16 @@ def build_report(outcomes: Iterable[Mapping[str, Any]], *, generated_at: datetim
             "gap_time_to_fill_slices": gap_slices,
             "breadth_regime_slices": _slice(rows, "breadth_regime"),
             "intermarket_regime_slices": _slice(rows, "intermarket_regime"),
+            "spy0dte_candidate_feature_slices": _spy0dte_feature_slices(rows),
+            "fixed_premium_proxy_plan": {
+                **_premium_proxy_plan(),
+                "comparison_basis": "underlying paths are reported beside this plan only; option outcomes are not calculated",
+            },
+            "contract_feasibility": {
+                "status": "unavailable",
+                "reason": "quote_required",
+                "option_return_inferred": False,
+            },
             "promotion_eligible": False,
             "promotion_blockers": [
                 "frozen_forward_sample_below_minimum" if len(rows) < MINIMUM_BUCKET_SAMPLE else "cost_adjusted_execution_model_required",
@@ -193,6 +302,7 @@ def build_report(outcomes: Iterable[Mapping[str, Any]], *, generated_at: datetim
             "Gap-fill buckets describe realized paths only; they do not predict a fill.",
             "Breadth and QQQ/SPY-sector context are challengers, not gates or sizing inputs.",
             "No option premium, fee, spread, slippage, or executable-fill result is inferred from the underlying proxy.",
+            "The fixed +20%/-12.5% premium plan is a non-executable research label, not a calculated option result; timestamped NBBO contract quotes are required.",
         ],
         "execution_enabled": False,
         "can_submit_orders": False,
