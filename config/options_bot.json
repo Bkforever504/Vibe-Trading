@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "execution_enabled": false,
+  "preferred_options_chain_provider": "polygon",
+  "options_chain_provider_priority": ["polygon", "alpaca", "databento"],
+  "provider_cache_ttl_seconds": 60,
+  "polygon_usage_scope": "shadow_research_and_eod_chain",
+  "polygon_execution_eligible": false,
+  "notes": "Router configuration is read-only and shadow-first. Missing providers fail honestly; delayed Polygon data cannot authorize execution."
+}

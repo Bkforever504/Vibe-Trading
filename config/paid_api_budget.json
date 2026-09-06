@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "execution_enabled": false,
+  "providers": {
+    "polygon_options": {
+      "enabled": true,
+      "monthly_budget_usd": 29.0,
+      "hard_cutoff_multiplier": 1.05,
+      "estimated_monthly_cost_usd": 29.0,
+      "estimated_cost_per_fetch_usd": 0.0,
+      "current_month_cost_usd": 0.0,
+      "notes": "Read-only Options Starter estimate. Disable before request if tracked spend reaches 105% of cap."
+    }
+  }
+}
