@@ -10,6 +10,8 @@ import os
 import re
 import sys
 import time as time_module
+from copy import deepcopy
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -27,7 +29,12 @@ DEFAULT_CANDIDATES = ROOT / "data" / "options_shadow_twin_log.jsonl"
 DEFAULT_OUTPUT = ROOT / "data" / "databento" / "options_nbbo_candidate_quotes.jsonl"
 DEFAULT_MANIFEST = ROOT / "data" / "databento_options_nbbo_manifest.json"
 DEFAULT_RESULTS = ROOT / "data" / "options_nbbo_curriculum_results.json"
+DEFAULT_LEDGER = Path.home() / ".vibe-trading" / "data" / "databento_call_ledger.jsonl"
+DEFAULT_SESSION_CACHE = Path.home() / ".vibe-trading" / "cache" / "databento_options_nbbo"
+DEFAULT_DAILY_USD_BUDGET = 5.0
+CACHE_TTL_SECONDS = 60.0
 OCC_PATTERN = re.compile(r"^([A-Z]{1,6})(\d{6}[CP]\d{8})$")
+_SESSION_CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
 
 @dataclass(frozen=True)
@@ -133,6 +140,273 @@ def _load_api_key() -> str:
                 if key:
                     return key
     raise RuntimeError("DATABENTO_API_KEY is not configured")
+
+
+def _configured_api_key() -> str | None:
+    try:
+        return _load_api_key()
+    except RuntimeError:
+        return None
+
+
+def daily_budget_usd() -> float:
+    raw = os.getenv("DATABENTO_DAILY_USD_BUDGET", str(DEFAULT_DAILY_USD_BUDGET)).strip()
+    value = _number(raw)
+    if value is None or value < 0:
+        return DEFAULT_DAILY_USD_BUDGET
+    return value
+
+
+def _ledger_rows(path: Path) -> list[dict[str, Any]]:
+    return _read_jsonl(path)
+
+
+def daily_spend_usd(path: Path = DEFAULT_LEDGER, *, now: datetime | None = None) -> float:
+    day = (now or datetime.now(timezone.utc)).astimezone(timezone.utc).date()
+    total = 0.0
+    for row in _ledger_rows(path):
+        stamp = _parse_ts(row.get("timestamp"))
+        cost = _number(row.get("cost_usd"))
+        if stamp is not None and stamp.date() == day and cost is not None and row.get("billable") is True:
+            total += max(0.0, cost)
+    return round(total, 9)
+
+
+def _append_ledger(path: Path, row: dict[str, Any]) -> None:
+    """Append one sanitized audit row. Payloads and credentials are never written."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n")
+
+
+def _error_class(exc: BaseException) -> str:
+    name = type(exc).__name__ or "provider_error"
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", name)[:80]
+
+
+def _failure_status(exc: BaseException) -> str:
+    name = type(exc).__name__.lower()
+    status_code = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    if isinstance(status_code, int) and 100 <= status_code <= 599:
+        return f"http_{status_code}"
+    if "timeout" in name:
+        return "timeout"
+    return "missing"
+
+
+def _canonical_hash(rows: list[dict[str, Any]]) -> str:
+    body = json.dumps(rows, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(body).hexdigest()
+
+
+def _cache_file(cache_dir: Path, fingerprint: str) -> Path:
+    return cache_dir / f"{fingerprint}.json"
+
+
+def _read_fresh_cache(
+    fingerprint: str,
+    *,
+    cache_dir: Path,
+    now: datetime,
+    ttl_seconds: float,
+) -> dict[str, Any] | None:
+    memory_key = f"{cache_dir.resolve()}::{fingerprint}"
+    memory = _SESSION_CACHE.get(memory_key)
+    if memory and 0 <= (now - memory[0]).total_seconds() <= ttl_seconds:
+        return deepcopy(memory[1])
+    path = _cache_file(cache_dir, fingerprint)
+    payload = _read_json(path)
+    cached_at = _parse_ts(payload.get("cached_at"))
+    response = payload.get("response")
+    if cached_at is None or not isinstance(response, dict):
+        return None
+    if not 0 <= (now - cached_at).total_seconds() <= ttl_seconds:
+        return None
+    _SESSION_CACHE[memory_key] = (cached_at, response)
+    return deepcopy(response)
+
+
+def _write_session_cache(
+    fingerprint: str,
+    response: dict[str, Any],
+    *,
+    cache_dir: Path,
+    now: datetime,
+) -> None:
+    # This is a local, expiring normalized quote cache, not a raw provider payload.
+    memory_key = f"{cache_dir.resolve()}::{fingerprint}"
+    _SESSION_CACHE[memory_key] = (now, deepcopy(response))
+    _write_json(
+        _cache_file(cache_dir, fingerprint),
+        {"cached_at": _iso(now), "response": response},
+    )
+
+
+def _audit_base(spec: RequestSpec, *, now: datetime) -> dict[str, Any]:
+    return {
+        "timestamp": _iso(now),
+        "dataset": DATASET,
+        "schema": SCHEMA,
+        "requested_dataset": DATASET,
+        "requested_schema": SCHEMA,
+        "returned_dataset": None,
+        "returned_schema": None,
+        "symbols": list(spec.symbols),
+        "start": spec.start,
+        "end": spec.end,
+        "timeframe": {"start": spec.start, "end": spec.end},
+        "request_fingerprint": request_fingerprint(spec),
+        "execution_enabled": False,
+        "can_submit_orders": False,
+    }
+
+
+def fetch_options_nbbo(
+    spec: RequestSpec,
+    *,
+    client: Any | None = None,
+    client_factory: Any | None = None,
+    ledger_path: Path = DEFAULT_LEDGER,
+    cache_dir: Path = DEFAULT_SESSION_CACHE,
+    now: datetime | None = None,
+    daily_budget: float | None = None,
+    cache_ttl_seconds: float = CACHE_TTL_SECONDS,
+) -> dict[str, Any]:
+    """Fetch normalized OPRA CBBO data behind cache and a hard daily budget.
+
+    The response deliberately contains only fields verified in the CBBO schema.
+    IV, Greeks, OI, and inferred aggressor side must be supplied by independent
+    sources and are never synthesized here.
+    """
+    called_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    base = _audit_base(spec, now=called_at)
+    fingerprint = str(base["request_fingerprint"])
+    cached = _read_fresh_cache(
+        fingerprint,
+        cache_dir=cache_dir,
+        now=called_at,
+        ttl_seconds=max(0.0, cache_ttl_seconds),
+    )
+    if cached is not None:
+        cached.update({
+            "status": "ok",
+            "cache_hit": True,
+            "cost_usd": 0.0,
+            "projected_cost_usd": 0.0,
+            "daily_cost_usd": daily_spend_usd(ledger_path, now=called_at),
+            "latency_ms": 0.0,
+        })
+        return cached
+
+    key = _configured_api_key()
+    if client is None and key is None:
+        return {
+            **base,
+            "status": "not_configured",
+            "error_class": "missing_api_key",
+            "rows": [],
+            "cache_hit": False,
+            "cost_usd": 0.0,
+            "projected_cost_usd": None,
+            "daily_cost_usd": daily_spend_usd(ledger_path, now=called_at),
+            "latency_ms": 0.0,
+            "response_hash": None,
+            "bytes": 0,
+        }
+
+    started = time_module.perf_counter()
+    estimate: CostEstimate | None = None
+    fetch_attempted = False
+    try:
+        if client is None:
+            if client_factory is None:
+                import databento as db
+
+                client_factory = db.Historical
+            client = client_factory(key)
+        estimate = estimate_cost(client, spec)
+        spent = daily_spend_usd(ledger_path, now=called_at)
+        budget = daily_budget_usd() if daily_budget is None else max(0.0, float(daily_budget))
+        projected = spent + estimate.cost_usd
+        if projected > budget:
+            latency_ms = round((time_module.perf_counter() - started) * 1000, 3)
+            ledger = {
+                **base,
+                "status": "budget_exceeded",
+                "error_class": None,
+                "billable": False,
+                "cache_hit": False,
+                "projected_cost_usd": round(estimate.cost_usd, 9),
+                "daily_cost_usd": spent,
+                "daily_budget_usd": budget,
+                "cost_usd": 0.0,
+                "bytes": estimate.billable_bytes,
+                "credits_consumed": None,
+                "latency_ms": latency_ms,
+                "response_hash": None,
+            }
+            _append_ledger(ledger_path, ledger)
+            return {**ledger, "rows": []}
+
+        fetch_attempted = True
+        store = client.timeseries.get_range(**request_kwargs(spec))
+        normalized, audit = normalize_cbbo_frame(
+            store.to_df(),
+            fingerprint=fingerprint,
+            cache=_cache_file(cache_dir, fingerprint),
+        )
+        response_hash = _canonical_hash(normalized)
+        latency_ms = round((time_module.perf_counter() - started) * 1000, 3)
+        status = "ok" if normalized else "missing"
+        ledger = {
+            **base,
+            "returned_dataset": DATASET,
+            "returned_schema": SCHEMA,
+            "status": status,
+            "error_class": None if normalized else "empty_normalized_response",
+            "billable": True,
+            "cache_hit": False,
+            "projected_cost_usd": round(estimate.cost_usd, 9),
+            "daily_cost_usd": round(spent + estimate.cost_usd, 9),
+            "daily_budget_usd": budget,
+            "cost_usd": round(estimate.cost_usd, 9),
+            "bytes": estimate.billable_bytes,
+            "credits_consumed": None,
+            "latency_ms": latency_ms,
+            "response_hash": response_hash,
+            "response_hash_basis": "canonical_normalized_nbbo_rows",
+            "returned_rows": len(normalized),
+        }
+        _append_ledger(ledger_path, ledger)
+        response = {**ledger, "rows": normalized, "normalization_audit": audit}
+        if status == "ok":
+            _write_session_cache(fingerprint, response, cache_dir=cache_dir, now=called_at)
+        return response
+    except Exception as exc:  # provider exception hierarchy varies by SDK release
+        latency_ms = round((time_module.perf_counter() - started) * 1000, 3)
+        status = _failure_status(exc)
+        spent = daily_spend_usd(ledger_path, now=called_at)
+        conservative_cost = estimate.cost_usd if estimate is not None and fetch_attempted else 0.0
+        ledger = {
+            **base,
+            "status": status,
+            "error_class": _error_class(exc),
+            # Once a data request was dispatched, reserve its projected cost even
+            # when the response times out. This may overcount, but cannot breach
+            # the user's hard daily cap through optimistic accounting.
+            "billable": bool(fetch_attempted and estimate is not None),
+            "cache_hit": False,
+            "projected_cost_usd": round(estimate.cost_usd, 9) if estimate else None,
+            "daily_cost_usd": round(spent + conservative_cost, 9),
+            "daily_budget_usd": daily_budget_usd() if daily_budget is None else max(0.0, float(daily_budget)),
+            "cost_usd": round(conservative_cost, 9),
+            "bytes": estimate.billable_bytes if estimate else 0,
+            "credits_consumed": None,
+            "latency_ms": latency_ms,
+            "response_hash": None,
+        }
+        _append_ledger(ledger_path, ledger)
+        return {**ledger, "rows": []}
 
 
 def compact_occ(symbol: str) -> str:
