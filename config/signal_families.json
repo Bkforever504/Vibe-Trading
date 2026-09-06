@@ -21,7 +21,7 @@
       "example_signals": ["iwm_directional_long_premium"]
     },
     "catalyst_reactive": {
-      "description": "Signals triggered by external events already occurred (EDGAR 8-K, earnings beat, insider Form 4 cluster)",
+      "description": "One-shot signals triggered by a discrete, timestamped disclosure or announcement that already occurred (EDGAR 8-K, earnings beat, or a same-event Form 4 cluster); excludes rolling or longitudinal positioning aggregates",
       "example_signals": ["edgar_8k_watchlist", "edgar_form4_cluster"]
     },
     "catalyst_scheduled": {
@@ -37,7 +37,7 @@
       "example_signals": ["dealer_gex_regime", "zero_dte_pin_risk"]
     },
     "alt_data_smart_money": {
-      "description": "Non-price alternative data implying informed positioning: Congress trades, 13F changes, and insider-buy clusters",
+      "description": "Rolling or longitudinal non-price aggregates implying informed positioning (Congress-trade accumulation, 13F changes, and provider-derived positioning); excludes signals triggered directly by an individual EDGAR/SEC filing or same-event Form 4 cluster",
       "example_signals": ["quiver_congress", "quiver_darkpool_short_vol"]
     },
     "sentiment_retail": {
