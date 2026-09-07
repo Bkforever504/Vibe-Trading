@@ -45,6 +45,13 @@ def test_scanner_runners_use_policy_safe_system_python_resolver() -> None:
         assert ".venv\\Scripts\\python.exe" not in runner
 
 
+def test_uv_shadow_runners_pin_statistical_gate_dependency() -> None:
+    root = Path(__file__).resolve().parents[2]
+    for runner_name in ("run_mes_orb_0932_vix_v2_shadow.ps1", "run_mnq_smt_family_shadow.ps1"):
+        runner = (root / "scripts" / runner_name).read_text(encoding="utf-8")
+        assert "--with purgedcv==0.1.6" in runner
+
+
 def test_notifier_uses_env_first_redacts_and_disables_mentions(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/file/token\n", encoding="utf-8")
