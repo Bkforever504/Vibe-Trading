@@ -63,6 +63,7 @@ dependencies = [
     "weasyprint>=60.0",
     "prompt_toolkit>=3.0.0",
     "tzdata>=2024.1",
+    "pandas_market_calendars==5.4.0",
 ]
 
 [project.urls]
@@ -108,6 +109,13 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-socket>=0.7.0",
+    "hypothesis>=6.100",
+    "pandera[pandas]>=0.20",
+    "lightgbm>=4.0",
+]
+
+orchestration = [
+    "prefect>=3.0,<4.0",
 ]
 
 [tool.pytest.ini_options]

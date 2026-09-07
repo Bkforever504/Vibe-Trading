@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -28,6 +29,8 @@ if str(ROOT) not in sys.path:
 
 from scripts.intraday_opportunity_radar import _credentials
 from scripts.alert_delivery_timing import delivered_at, first_complete_bar_after_delivery
+from scripts.chart_aligned_shadow_learning import align_signal_to_chart, build_bplus_upgrade_nominations
+from scripts.shadow_alert_intelligence import estimate_alert_half_life
 
 ET = ZoneInfo("America/New_York")
 VIBE_HOME = Path.home() / ".vibe-trading"
@@ -309,10 +312,13 @@ def fetch_bars(symbols: Iterable[str], session_date: str) -> dict[str, list[dict
     day = date.fromisoformat(session_date)
     start = datetime.combine(day, time(9, 30), ET).astimezone(timezone.utc)
     end = datetime.combine(day, time(16, 1), ET).astimezone(timezone.utc)
+    requested_feed = str(os.getenv("VIBE_TRADING_STOCK_FEED") or "iex").strip().lower()
+    if requested_feed not in {"iex", "sip"}:
+        raise ValueError("unsupported_stock_feed")
     params = {
             "symbols": ",".join(names), "timeframe": "1Min",
             "start": start.isoformat().replace("+00:00", "Z"), "end": end.isoformat().replace("+00:00", "Z"),
-            "adjustment": "raw", "feed": "iex", "limit": 10000, "sort": "asc",
+            "adjustment": "raw", "feed": requested_feed, "limit": 10000, "sort": "asc",
         }
     headers = _credentials()
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -385,9 +391,59 @@ def build_report(session_date: str, *, now: datetime | None = None) -> dict[str,
         sent, available = delivered_at(row), _timestamp(row.get("signal_available_at"))
         if sent is not None and available is not None:
             delivery_latencies.append((sent - available).total_seconds())
+    requested_feed = str(os.getenv("VIBE_TRADING_STOCK_FEED") or "iex").strip().lower()
+    provider = f"alpaca_{requested_feed}" if requested_feed in {"iex", "sip"} else ""
+    chart_aligned: list[dict[str, Any]] = []
+    for row in unique.values():
+        aligned = align_signal_to_chart(
+            {
+                **row,
+                "signal_id": row.get("outcome_id") or row.get("alert_id"),
+                "family_key": row.get("setup"),
+                "signal_at": row.get("signal_available_at"),
+            },
+            grouped.get(str(row.get("symbol") or "").upper(), []),
+            provider=provider,
+            provider_status="missing" if feed_error or not grouped else "available",
+            horizon_bars=30,
+        )
+        aligned["outcome_id"] = row.get("outcome_id")
+        chart_aligned.append(aligned)
+        row["chart_alignment"] = aligned
+    nomination_evidence = [
+        item
+        for prior in _read_jsonl(HISTORY_PATH)
+        for item in prior.get("chart_aligned_outcomes") or []
+        if isinstance(item, Mapping)
+    ] + chart_aligned
+    recalibration = build_bplus_upgrade_nominations(nomination_evidence, as_of=current)
+    half_life_rows = []
+    for item in nomination_evidence:
+        path = item.get("delivery_path") if isinstance(item.get("delivery_path"), Mapping) else {}
+        regime = item.get("regime_bucket") if isinstance(item.get("regime_bucket"), Mapping) else {}
+        half_life_rows.append({
+            "setup_family": item.get("family_key"),
+            "regime": json.dumps(dict(regime), sort_keys=True, separators=(",", ":")),
+            "resolved_at": item.get("horizon_resolved_at"),
+            # A horizon ending with neither target nor stop is right-censored;
+            # do not pretend the observed window was the setup's true lifetime.
+            "valid_for_seconds": path.get("valid_for_seconds") if path.get("terminal_event") in {"target", "stop"} else None,
+        })
+    half_life_models = []
+    cohorts = sorted({
+        (str(row.get("setup_family") or ""), str(row.get("regime") or ""))
+        for row in half_life_rows if row.get("setup_family") and row.get("regime")
+    })
+    for family, regime in cohorts:
+        half_life_models.append(estimate_alert_half_life(
+            half_life_rows,
+            setup_family=family,
+            regime=regime,
+            as_of=current,
+        ))
     return {
         "schema_version": "discord-alert-chart-review-v2",
-        "provider": "alpaca_iex_completed_1m_post_discord_delivery",
+        "provider": f"{provider or 'missing'}_completed_1m_signal_and_post_discord_alignment",
         "feed_status": "missing" if feed_error or (alerts and not grouped) else "available" if alerts else "not_requested",
         "feed_error_class": feed_error,
         "outcome_policy": "unique_plan_60m_episode_completed_contiguous_bars_gap_stop_open",
@@ -411,6 +467,9 @@ def build_report(session_date: str, *, now: datetime | None = None) -> dict[str,
         "by_setup": _group_stats(unique.values(), "setup"),
         "by_grade": _group_stats(unique.values(), "grade"),
         "by_symbol": _group_stats(unique.values(), "symbol"),
+        "chart_aligned_outcomes": chart_aligned,
+        "bplus_to_aplus_nominations": recalibration,
+        "alert_half_life_models": half_life_models,
         "alerts": reviewed,
         "execution_enabled": False,
         "can_submit_orders": False,

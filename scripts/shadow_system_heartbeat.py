@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from datetime import date, datetime, time, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 from zoneinfo import ZoneInfo
@@ -110,10 +111,24 @@ def _parse_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+@lru_cache(maxsize=32)
+def _equity_session(session_date: date) -> tuple[datetime, datetime] | None:
+    """Exchange schedule, including holidays/early closes; never guess weekdays."""
+    import pandas_market_calendars as mcal
+
+    schedule = mcal.get_calendar("NYSE").schedule(start_date=session_date, end_date=session_date)
+    if schedule.empty:
+        return None
+    row = schedule.iloc[0]
+    opened = row["market_open"].to_pydatetime().astimezone(CT)
+    closed = row["market_close"].to_pydatetime().astimezone(CT)
+    cadence_start = opened.replace(hour=MARKET_OPEN_CT[0], minute=MARKET_OPEN_CT[1])
+    return max(opened, cadence_start), closed
+
+
 def _in_regular_session(now_ct: datetime) -> bool:
-    open_dt = now_ct.replace(hour=MARKET_OPEN_CT[0], minute=MARKET_OPEN_CT[1], second=0, microsecond=0)
-    close_dt = now_ct.replace(hour=MARKET_CLOSE_CT[0], minute=MARKET_CLOSE_CT[1], second=0, microsecond=0)
-    return open_dt <= now_ct <= close_dt and now_ct.weekday() < 5
+    session = _equity_session(now_ct.date())
+    return session is not None and session[0] <= now_ct <= session[1]
 
 
 def _latest_row_timestamp(path: Path) -> datetime | None:
@@ -195,17 +210,22 @@ def report_scanner_gaps(
     because an absence of signals is not evidence that their task did not run.
     """
     now_ct = now.astimezone(CT)
-    in_rth = _in_regular_session(now_ct)
-    weekday = now_ct.weekday() < 5
-    open_ct = now_ct.replace(hour=MARKET_OPEN_CT[0], minute=MARKET_OPEN_CT[1], second=0, microsecond=0)
-    close_ct = now_ct.replace(hour=MARKET_CLOSE_CT[0], minute=MARKET_CLOSE_CT[1], second=0, microsecond=0)
-    session_started = weekday and now_ct >= open_ct
+    try:
+        session = _equity_session(now_ct.date())
+    except Exception as exc:
+        return {"status": "calendar_unavailable", "error_type": type(exc).__name__,
+                "in_regular_session": None, "session_started": None, "any_stalled": None,
+                "worst_gap_minutes": None, "scanners": [], "max_gap_minutes": max_gap_minutes}
+    in_rth = session is not None and session[0] <= now_ct <= session[1]
+    open_ct, close_ct = session or (now_ct, now_ct)
+    session_started = session is not None and now_ct >= open_ct
     observation_end = min(now_ct, close_ct) if session_started else open_ct
     scanners: list[dict[str, Any]] = []
     worst_gap = 0.0
     any_stalled = False
     for name, path in ledgers:
         observations = _session_row_timestamps(path, now_ct.date()) if session_started else []
+        observations = [stamp for stamp in observations if open_ct <= stamp <= observation_end]
         latest = observations[-1] if observations else _latest_row_timestamp(path)
         gap_candidates: list[tuple[float, datetime, datetime]] = []
         if session_started:
@@ -231,7 +251,7 @@ def report_scanner_gaps(
             "stalled": stalled,
         })
     return {
-        "status": "stalled" if any_stalled else "healthy",
+        "status": "stalled" if any_stalled else "healthy" if session is not None else "market_closed",
         "in_regular_session": in_rth,
         "session_started": session_started,
         "max_gap_minutes": max_gap_minutes,
@@ -368,23 +388,39 @@ def probe_tasks() -> list[dict[str, Any]]:
     wanted = [{"path": path, "name": name} for path, name in EXPECTED_TASKS]
     encoded = json.dumps(wanted, separators=(",", ":")).replace("'", "''")
     command = (
+        "$ErrorActionPreference = 'Stop'; "
         f"$wanted = ConvertFrom-Json '{encoded}'; "
+        "$service = New-Object -ComObject 'Schedule.Service'; $service.Connect(); "
+        "$states = @('Unknown','Disabled','Queued','Ready','Running'); $folders = @{}; "
         "$rows = foreach ($item in $wanted) { "
-        "$task = Get-ScheduledTask -TaskPath $item.path -TaskName $item.name -ErrorAction SilentlyContinue; "
-        "if ($null -eq $task) { [pscustomobject]@{TaskPath=$item.path;TaskName=$item.name;State='Missing';LastTaskResult=$null} } "
-        "else { $info = Get-ScheduledTaskInfo -TaskPath $item.path -TaskName $item.name; "
-        "[pscustomobject]@{TaskPath=$task.TaskPath;TaskName=$task.TaskName;State=[string]$task.State;LastTaskResult=$info.LastTaskResult} } }; "
+        "try { if (-not $folders.ContainsKey($item.path)) { "
+        "$folderPath = $item.path.TrimEnd([char]92); if (-not $folderPath) { $folderPath = [string][char]92 }; "
+        "$folders[$item.path] = $service.GetFolder($folderPath) }; "
+        "$task = $folders[$item.path].GetTask($item.name); "
+        "[pscustomobject]@{TaskPath=$item.path;TaskName=$item.name;State=$states[[int]$task.State];LastTaskResult=$task.LastTaskResult} "
+        "} catch { $code = $_.Exception.HResult; $state = 'Unknown'; $errorKind = 'scheduler_query_error'; "
+        "if ($code -eq -2147024894 -or $code -eq -2147024893) { $state = 'Missing'; $errorKind = 'task_missing' }; "
+        "[pscustomobject]@{TaskPath=$item.path;TaskName=$item.name;State=$state;LastTaskResult=$null;ProbeError=$errorKind} } }; "
         "$rows | ConvertTo-Json -Compress"
     )
-    completed = subprocess.run(
-        ["powershell.exe", "-NoProfile", "-Command", command],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=True,
-    )
-    payload = json.loads(completed.stdout or "[]")
-    return payload if isinstance(payload, list) else [payload]
+    error = None
+    try:
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True, text=True, timeout=20, check=True,
+        )
+        payload = json.loads(completed.stdout or "[]")
+        rows = payload if isinstance(payload, list) else [payload]
+        if any(not isinstance(row, dict) for row in rows):
+            raise ValueError("invalid scheduler rows")
+    except subprocess.TimeoutExpired:
+        error, rows = "timeout", []
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        error, rows = "scheduler_probe_unavailable", []
+    indexed = {(row.get("TaskPath"), row.get("TaskName")): row for row in rows}
+    return [indexed.get((path, name), {"TaskPath": path, "TaskName": name,
+            "State": "Unknown", "LastTaskResult": None,
+            "ProbeError": error or "missing_probe_row"}) for path, name in EXPECTED_TASKS]
 
 
 def _task_group(rows: Iterable[Mapping[str, Any]], expected: tuple[tuple[str, str], ...]) -> dict[str, Any]:
@@ -413,6 +449,10 @@ def build_report(
 ) -> dict[str, Any]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     tasks = task_rows if task_rows is not None else probe_tasks()
+    probe_errors = sorted({row["ProbeError"] for row in tasks if row.get("ProbeError")})
+    observed = sum(row.get("State") not in {"Unknown", None} for row in tasks)
+    task_probe = {"status": "complete" if not probe_errors else "partial" if observed else "unavailable",
+                  "errors": probe_errors, "observed_count": observed, "expected_count": len(EXPECTED_TASKS)}
     mes = _task_group(tasks, MES_TASKS)
     scout = _task_group(tasks, SCOUT_TASKS)
     mnq_smt = _task_group(tasks, MNQ_SMT_TASKS)
@@ -465,7 +505,7 @@ def build_report(
         and hmm["fresh"]
         and catalyst["fresh"]
         and pattern_outcomes_ledger["fresh"]
-        and not scanner_gaps["any_stalled"]
+        and scanner_gaps["status"] in {"healthy", "market_closed"}
         and not kill
     )
     research_status = (
@@ -488,6 +528,7 @@ def build_report(
         "status": "PASS" if healthy else "FAIL",
         "status_scope": "core_scheduled_operations",
         "research_status": research_status,
+        "task_probe": task_probe,
         "mes_v2": mes,
         "equity_scout": scout,
         "mnq_smt_family": mnq_smt,
@@ -531,7 +572,7 @@ def format_heartbeat(report: Mapping[str, Any]) -> str:
             f"Catalyst fresh: {check(report['catalyst']['fresh'])} (age={report['catalyst']['age_hours']}h)",
             f"Databento probe fresh: {check(report['databento_capability']['fresh'])} (age={report['databento_capability']['age_hours']}h)",
             f"MNQ MBO evidence fresh: {check(report['mnq_databento_evidence']['fresh'])} (age={report['mnq_databento_evidence']['age_hours']}h)",
-            f"Scanner gaps: {check(not report.get('scanner_gaps', {}).get('any_stalled', False))} (worst={report.get('scanner_gaps', {}).get('worst_gap_minutes', 0)}m, rth={report.get('scanner_gaps', {}).get('in_regular_session', False)})",
+            f"Scanner gaps: {report.get('scanner_gaps', {}).get('status', 'unknown')} (worst={report.get('scanner_gaps', {}).get('worst_gap_minutes')}m, rth={report.get('scanner_gaps', {}).get('in_regular_session')})",
             f"Futures coverage: {report.get('futures_coverage', {}).get('state', 'unknown')}",
             f"Research evidence lane: {report.get('research_status', 'UNKNOWN')}",
             f"Kill switch: {'ACTIVE' if report['kill_switch_active'] else 'clear'}",

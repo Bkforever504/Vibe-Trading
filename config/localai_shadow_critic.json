@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "base_url": "http://127.0.0.1:8080",
+  "model": "qwen3-4b-instruct",
+  "role": "veto_only_alternate_backend",
+  "execution_enabled": false,
+  "can_submit_orders": false,
+  "note": "Enable LocalAI instead of Ollama, never as a latency-adding second vote."
+}

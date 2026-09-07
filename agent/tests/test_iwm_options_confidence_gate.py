@@ -17,6 +17,14 @@ def _isolate_options_decision_log(monkeypatch, tmp_path) -> None:
     from strategies import iwm_options_bot as bot
 
     monkeypatch.setattr(bot, "DECISION_LOG_FILE", str(tmp_path / "options-decisions.jsonl"))
+    # Host reports must not decide which gate a deterministic unit test reaches.
+    # GARCH-specific cases below replace this report and still exercise vetoes.
+    report = tmp_path / "neutral-garch.json"
+    report.write_text(json.dumps({"symbols": [
+        {"symbol": symbol, "status": "ok", "regime": "normal", "position_size_multiplier": 1.0}
+        for symbol in ("AAPL", "IWM", "SPY", "QQQ")
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(bot, "GARCH_RISK_REPORT", report)
 
 
 def _leg(symbol: str, *, delta: float, bid: float, ask: float, expiry: date | None = None, strike: float = 100.0):

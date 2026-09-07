@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+_IMPORT_ROOT = Path(__file__).resolve().parent.parent
+if str(_IMPORT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_IMPORT_ROOT))
 from scripts.options_nbbo_evidence import analyze
 
 

@@ -15,7 +15,7 @@ import signal
 import sys
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, time as wall_time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,6 +28,27 @@ if str(ROOT) not in sys.path:
 from scripts.intraday_opportunity_radar import CORE_LIQUID_SYMBOLS, bar_features, fetch_intraday_bars
 from scripts.market_data_provider_registry import build_provider_registry
 from scripts.market_structure_intelligence import PATTERN_CATALOG, analyze_market_structure
+from scripts.priority_focus_universe import PRIORITY_FOCUS_UNIVERSE
+from scripts.shadow_alert_intelligence import (
+    adaptive_conformal_abstention,
+    build_action_deadline,
+    diversify_discord_queue,
+    event_intensity_challenger,
+    market_data_quorum,
+    schedule_by_action_deadline,
+)
+from agent.src.market_data.event_eyes import (
+    EventKind,
+    EventTimeGuard,
+    HotCandidate,
+    HotSetSelector,
+    LevelDirection,
+    LevelStateMachine,
+    MarketEvent,
+    QuotePersistence,
+    SaleConditionPolicy,
+    TapeTruthBook,
+)
 
 
 MARKET_TZ = ZoneInfo("America/New_York")
@@ -55,6 +76,7 @@ MAX_COMPLETED_BAR_LAG_SECONDS = 10 * 60.0
 MAX_WEBSOCKET_SYMBOLS = 30
 REST_QUOTE_REFRESH_SECONDS = 5.0
 REST_BAR_REFRESH_SECONDS = 60.0
+HOT_SET_REBALANCE_SECONDS = 30.0
 NYSE_HOLIDAYS_2026 = frozenset({
     "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25",
     "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
@@ -65,7 +87,7 @@ NYSE_EARLY_CLOSES_2026 = frozenset({"2026-11-27", "2026-12-24"})
 def _with_core_context_symbols(symbols: list[str]) -> list[str]:
     """Reserve every canonical liquid leader before filling the broker cap."""
     normalized = [str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()]
-    return list(dict.fromkeys([*CORE_LIQUID_SYMBOLS, *normalized]))[:100]
+    return list(dict.fromkeys([*CORE_LIQUID_SYMBOLS, *PRIORITY_FOCUS_UNIVERSE, *normalized]))[:100]
 
 
 def _hybrid_symbol_partition(symbols: list[str]) -> tuple[list[str], list[str]]:
@@ -73,6 +95,19 @@ def _hybrid_symbol_partition(symbols: list[str]) -> tuple[list[str], list[str]]:
     normalized = list(dict.fromkeys(
         str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()
     ))[:100]
+    return normalized[:MAX_WEBSOCKET_SYMBOLS], normalized[MAX_WEBSOCKET_SYMBOLS:]
+
+
+def _event_time_symbol_partition(
+    engine: "LiveOpportunityEngine", symbols: list[str], *, now: datetime | None = None,
+) -> tuple[list[str], list[str]]:
+    """Allocate scarce socket slots to reserved and near-trigger symbols."""
+    snapshot = engine.snapshot(now=now)
+    hot = snapshot.get("event_time_intelligence", {}).get("hot_set", {}).get("symbols") or []
+    normalized = list(dict.fromkeys([
+        *(str(symbol).upper() for symbol in hot),
+        *(str(symbol).strip().upper() for symbol in symbols if str(symbol).strip()),
+    ]))[:100]
     return normalized[:MAX_WEBSOCKET_SYMBOLS], normalized[MAX_WEBSOCKET_SYMBOLS:]
 
 
@@ -596,6 +631,57 @@ class LiveOpportunityEngine:
         self.risk_report_path = risk_report_path
         self._symbols: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
+        self._event_guard = EventTimeGuard()
+        self._sale_conditions = SaleConditionPolicy()
+        self._quote_persistence = QuotePersistence()
+        self._tape_truth = TapeTruthBook()
+        self._level_machines: dict[tuple[str, str], LevelStateMachine] = {}
+        self._event_audit: deque[dict[str, Any]] = deque(maxlen=1000)
+        self._event_lifecycle: deque[dict[str, Any]] = deque(maxlen=1000)
+        self._headsup_pairs: set[str] = set()
+        # Freeze decision availability per completed signal bar. Re-rendering a
+        # snapshot must never manufacture a fresh alert window for an old setup.
+        self._candidate_first_seen_at: dict[str, datetime] = {}
+        self._event_rate_windows: dict[str, deque[dict[str, Any]]] = defaultdict(lambda: deque(maxlen=120))
+
+    def _record_event_rate(self, event: MarketEvent) -> None:
+        bucket = int(event.event_ts.timestamp()) // 10
+        windows = self._event_rate_windows[event.symbol]
+        if not windows or windows[-1]["bucket"] != bucket:
+            windows.append({"bucket": bucket, "quote_changes": 0, "cancels": 0, "price_ticks": 0})
+        row = windows[-1]
+        if event.kind == EventKind.QUOTE:
+            row["quote_changes"] += 1
+        elif event.kind == EventKind.TRADE:
+            # Stock feeds do not supply aggressor side. Keep this as a neutral
+            # price-tick channel rather than inventing aggressive flow.
+            row["price_ticks"] += 1
+        elif event.kind in {EventKind.CORRECTION, EventKind.CANCEL_ERROR}:
+            row["cancels"] += 1
+
+    def _event_intensity_card(self, symbol: str, *, now: datetime) -> dict[str, Any]:
+        current_bucket = int(now.timestamp()) // 10
+        completed = [row for row in self._event_rate_windows.get(symbol, ()) if row["bucket"] < current_bucket]
+        if len(completed) < 4:
+            return event_intensity_challenger({}, {}, persistence_windows=0)
+        if any(right["bucket"] - left["bucket"] != 1 for left, right in zip(completed[-4:], completed[-3:])):
+            return {
+                **event_intensity_challenger({}, {}, persistence_windows=0),
+                "reason": "non_consecutive_event_windows",
+            }
+        baseline_rows, recent_rows = completed[:-2], completed[-2:]
+        if not baseline_rows:
+            return event_intensity_challenger({}, {}, persistence_windows=0)
+        channels = ("quote_changes", "cancels", "price_ticks")
+        baseline = {name: sum(float(row[name]) for row in baseline_rows) / len(baseline_rows) for name in channels}
+        persistence = 0
+        for row in reversed(recent_rows):
+            ratios = [float(row[name]) / baseline[name] for name in channels if baseline[name] > 0]
+            if sum(value >= 2.0 for value in ratios) >= 2:
+                persistence += 1
+            else:
+                break
+        return event_intensity_challenger(recent_rows[-1], baseline, persistence_windows=persistence)
 
     def seed_symbol(
         self,
@@ -609,6 +695,9 @@ class LiveOpportunityEngine:
         benchmark_return: float | None = None,
         sector_return: float | None = None,
         previous_close: float | None = None,
+        mapped_levels: Mapping[str, Any] | None = None,
+        mapped_setup_family: str | None = None,
+        mapped_direction: str | None = None,
     ) -> None:
         with self._lock:
             self._symbols[symbol.strip().upper()] = {
@@ -625,11 +714,152 @@ class LiveOpportunityEngine:
                 "sector_return": _finite(sector_return),
                 "previous_close": _finite(previous_close),
             }
+            level = _finite((mapped_levels or {}).get("confirmation_trigger"))
+            direction = str(mapped_direction or "").lower()
+            family = str(mapped_setup_family or "").strip()
+            if level is not None and family and direction in {"bullish", "long", "bearish", "short"}:
+                self._level_machines[(symbol.strip().upper(), family)] = LevelStateMachine(
+                    symbol=symbol,
+                    level=level,
+                    direction=LevelDirection.LONG if direction in {"bullish", "long"} else LevelDirection.SHORT,
+                )
 
     def update_quote(self, symbol: str, quote: dict[str, Any]) -> None:
         with self._lock:
             state = self._symbols.setdefault(symbol.upper(), {"bars": []})
             state["quote"] = dict(quote)
+
+    def update_market_event(self, event: MarketEvent, *, now: datetime | None = None) -> dict[str, Any]:
+        """Record event-time evidence without changing completed-bar authority."""
+        current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        integrity = self._event_guard.evaluate(event, now=current)
+        with self._lock:
+            state = self._symbols.setdefault(event.symbol, {"quote": {}, "bars": []})
+            if integrity.get("accepted"):
+                self._record_event_rate(event)
+            tape = state.setdefault("event_time_shadow", {})
+            tape["last_integrity"] = integrity
+            tape["last_event_kind"] = event.kind.value
+            tape["last_event_at"] = event.event_ts.isoformat().replace("+00:00", "Z")
+            tape["provider_received_at"] = event.received_ts.isoformat().replace("+00:00", "Z")
+            tape["processed_at"] = current.isoformat().replace("+00:00", "Z")
+            tape["tape_truth"] = self._tape_truth.apply(
+                event, integrity_accepted=bool(integrity.get("accepted"))
+            )
+            # These are current-event/persistent-tradability observations, not
+            # an ever-growing latch. Historical revisions remain append-only in
+            # their own audit field while a later clean quote can clear a
+            # transient stale/unknown observation.
+            shadow_vetoes: set[str] = set()
+            price_forming = bool(integrity.get("accepted"))
+            if not integrity.get("accepted"):
+                shadow_vetoes.add("event_integrity_rejected")
+            if event.kind == EventKind.TRADE:
+                sale = self._sale_conditions.evaluate(event)
+                tape["sale_condition"] = sale
+                if not sale.get("eligible"):
+                    shadow_vetoes.add(str(sale.get("reason") or "trade_condition_unavailable"))
+                    price_forming = False
+            elif event.kind == EventKind.QUOTE:
+                observations = state.setdefault("feed_quote_observations", {})
+                observations[event.source] = {
+                    "source": event.source, "bid": event.bid, "ask": event.ask,
+                    "event_at": event.event_ts.isoformat().replace("+00:00", "Z"),
+                }
+                tape["feed_quorum"] = market_data_quorum(observations.values(), as_of=current)
+                if tape["feed_quorum"].get("status") == "data_disagreement":
+                    shadow_vetoes.add("market_data_disagreement")
+                persistence = self._quote_persistence.observe(event, integrity_accepted=bool(integrity.get("accepted")))
+                tape["quote_persistence"] = persistence
+                if persistence.get("state") == "LIQUIDITY_VACUUM":
+                    tape["liquidity_state"] = "LIQUIDITY_VACUUM"
+            elif event.kind in {EventKind.CORRECTION, EventKind.CANCEL_ERROR, EventKind.UPDATED_BAR}:
+                tape["source_revision"] = {
+                    "status": "observed",
+                    "kind": event.kind.value,
+                    "event_at": tape["last_event_at"],
+                    "original_sequence": event.original_sequence,
+                    "history_policy": "append_only_never_rewrite_delivered_alert",
+                }
+                shadow_vetoes.add("source_revised_or_cancelled")
+            elif event.kind == EventKind.STATUS:
+                tape["trading_status"] = event.status_code
+                tape["trading_status_reason"] = event.reason_code
+                truth_reason = tape["tape_truth"].get("reason")
+                if truth_reason in {"halt_or_pause", "unknown_status_code"}:
+                    shadow_vetoes.add(str(truth_reason))
+            elif event.kind == EventKind.LULD:
+                price = event.price
+                distance = None
+                if price and event.lower_band and event.upper_band:
+                    distance = min(abs(price - event.lower_band), abs(event.upper_band - price)) / price * 10_000
+                tape["luld"] = {
+                    "lower_band": event.lower_band,
+                    "upper_band": event.upper_band,
+                    "distance_bps": round(distance, 4) if distance is not None else None,
+                    "event_at": tape["last_event_at"],
+                }
+                if distance is None or distance <= 10:
+                    shadow_vetoes.add("near_or_unknown_luld_band")
+            if price_forming and event.kind in {EventKind.TRADE, EventKind.QUOTE}:
+                observed_price = event.price if event.kind == EventKind.TRADE else ((event.bid or 0) + (event.ask or 0)) / 2 or None
+                tape["tradability"] = self._tape_truth.tradability(
+                    symbol=event.symbol,
+                    price=observed_price,
+                    as_of=event.event_ts,
+                )
+                shadow_vetoes.update(str(reason) for reason in tape["tradability"].get("reasons") or [])
+                for (symbol, _family), machine in list(self._level_machines.items()):
+                    if symbol == event.symbol:
+                        level_state = machine.observe(price=observed_price, event_ts=event.event_ts)
+                        tape["level_state"] = level_state
+                        quote_ready = bool((tape.get("quote_persistence") or {}).get("quote_persistent"))
+                        # A heads-up may only rise on the fresh quote that
+                        # proves persistence. Trades cannot reuse a cached quote
+                        # after its freshness/quorum context has changed.
+                        heads_up = (
+                            event.kind == EventKind.QUOTE
+                            and level_state.get("state") == "HOLDING"
+                            and quote_ready
+                            and not shadow_vetoes
+                        )
+                        pair_id = f"{event.event_ts.date().isoformat()}:{event.symbol}:{_family}"
+                        newly_ready = heads_up and pair_id not in self._headsup_pairs
+                        if level_state.get("transition") or newly_ready:
+                            if newly_ready:
+                                self._headsup_pairs.add(pair_id)
+                            self._event_lifecycle.append({
+                                "pair_id": pair_id,
+                                "symbol": event.symbol,
+                                "setup_family": _family,
+                                "state": "SHADOW_HEADS_UP" if heads_up else level_state.get("state"),
+                                "level_transition": level_state.get("transition"),
+                                "event_at": tape["last_event_at"],
+                                "provider_received_at": tape["provider_received_at"],
+                                "processed_at": tape["processed_at"],
+                                "quote_persistent": quote_ready,
+                                "shadow_vetoes": sorted(shadow_vetoes),
+                                "paired_bar_lane": "awaiting_completed_5m_candidate",
+                                "notification_authority": "dashboard_shadow_only",
+                                "execution_enabled": False,
+                                "can_submit_orders": False,
+                            })
+            tape["shadow_vetoes"] = sorted(shadow_vetoes)
+            tape["execution_enabled"] = False
+            tape["can_submit_orders"] = False
+            self._event_audit.append({
+                "symbol": event.symbol,
+                "kind": event.kind.value,
+                "event_at": tape["last_event_at"],
+                "provider_received_at": tape["provider_received_at"],
+                "processed_at": tape["processed_at"],
+                "integrity_accepted": bool(integrity.get("accepted")),
+                "transport_latency_ms": integrity.get("transport_latency_ms"),
+                "shadow_vetoes": list(tape["shadow_vetoes"]),
+                "execution_enabled": False,
+                "can_submit_orders": False,
+            })
+            return dict(tape)
 
     def update_completed_bar(self, symbol: str, bar: dict[str, Any]) -> None:
         normalized = _bars_normalized([bar])
@@ -772,8 +1002,16 @@ class LiveOpportunityEngine:
                 decision_state = "READY_TO_REVIEW"
             else:
                 decision_state = "WATCH"
+            bar_completed_at = (
+                _utc(features.get("last_completed_bar_at")) + timedelta(minutes=5)
+                if _utc(features.get("last_completed_bar_at")) else None
+            )
+            bar_identity = bar_completed_at.isoformat().replace("+00:00", "Z") if bar_completed_at else "bar_unknown"
+            candidate_id = f"{symbol}:{family}:{bar_identity}"
+            first_seen = self._candidate_first_seen_at.setdefault(candidate_id, now)
             row = {
-                "candidate_id": f"{now.date().isoformat()}:{symbol}:{family}",
+                "candidate_id": candidate_id,
+                "event_pair_id": f"{now.date().isoformat()}:{symbol}:{family}",
                 "symbol": symbol,
                 "asset_class": "equity",
                 "setup_family": family,
@@ -789,7 +1027,9 @@ class LiveOpportunityEngine:
                 "average_dollar_volume": round(average_dollar) if average_dollar is not None else None,
                 "relative_strength_vs_market_sector": round(relative_strength, 5) if relative_strength is not None else None,
                 "catalyst": state.get("catalyst"),
-                "bar_completed_at": features.get("last_completed_bar_at"),
+                "bar_start_at": features.get("last_completed_bar_at"),
+                "bar_completed_at": bar_identity if bar_completed_at else None,
+                "signal_available_at": first_seen.isoformat().replace("+00:00", "Z"),
                 "source_labels": [f"alpaca_{self.feed}_{self.transport}", "completed_5m_bars", *context_source_labels] + ([str((state.get("catalyst") or {}).get("source") or "catalyst")] if state.get("catalyst") else []),
                 "blockers": blockers,
                 "factor_scores": {
@@ -808,6 +1048,50 @@ class LiveOpportunityEngine:
                 "execution_enabled": False,
                 "can_submit_orders": False,
             }
+            if geometry.get("entry") is not None:
+                key = (symbol, family)
+                direction_value = LevelDirection.LONG if direction == "bullish" else LevelDirection.SHORT
+                machine = self._level_machines.get(key)
+                if machine is None or machine.level != float(geometry["entry"]) or machine.direction != direction_value:
+                    self._level_machines[key] = LevelStateMachine(
+                        symbol=symbol,
+                        level=float(geometry["entry"]),
+                        direction=direction_value,
+                    )
+            for lifecycle in self._event_lifecycle:
+                if (
+                    lifecycle.get("pair_id") == row["event_pair_id"]
+                    and lifecycle.get("paired_bar_lane") == "awaiting_completed_5m_candidate"
+                ):
+                    lifecycle.update({
+                        "paired_bar_lane": "completed_5m_candidate_observed",
+                        "bar_candidate_state": decision_state,
+                        "bar_completed_at": row["bar_completed_at"],
+                        "bar_signal_available_at": row["signal_available_at"],
+                        "event_to_bar_seconds": max(
+                            0.0,
+                            (now - (_utc(lifecycle.get("event_at")) or now)).total_seconds(),
+                        ),
+                    })
+            row["event_time_shadow"] = dict(state.get("event_time_shadow") or {
+                "status": "unavailable", "reason": "no_event_time_observation",
+                "shadow_vetoes": [], "execution_enabled": False, "can_submit_orders": False,
+            })
+            row["alert_deadline_shadow"] = build_action_deadline(
+                row,
+                {
+                    "status": "insufficient_data",
+                    "conservative_validity_seconds": 180,
+                    "fallback_used": True,
+                },
+                now=now,
+            )
+            row["adaptive_conformal_shadow"] = adaptive_conformal_abstention(
+                score / 100.0,
+                [],
+                as_of=now,
+                economic_threshold=0.60,
+            )
             output.append(row)
         return output
 
@@ -890,6 +1174,36 @@ class LiveOpportunityEngine:
                 })
         candidates.sort(key=lambda row: (-float(row["decision_score"]), row["symbol"], row["setup_family"]))
         ready = [row for row in candidates if row["state"] == "READY_TO_REVIEW"]
+        hot_candidates: dict[str, HotCandidate] = {}
+        for row in candidates:
+            quote = row.get("quote") or {}
+            midpoint = _finite(quote.get("midpoint"))
+            entry = _finite(row.get("entry"))
+            distance = abs(midpoint - entry) / entry * 10_000 if midpoint is not None and entry else None
+            symbol = str(row.get("symbol") or "")
+            proposed = HotCandidate(symbol, _finite(row.get("decision_score")), distance)
+            previous = hot_candidates.get(symbol)
+            if previous is None or (proposed.base_score or 0) > (previous.base_score or 0):
+                hot_candidates[symbol] = proposed
+        hot_set = HotSetSelector(MAX_WEBSOCKET_SYMBOLS, reserved_symbols=PRIORITY_FOCUS_UNIVERSE).select(hot_candidates.values())
+        exposure_rows = [
+            {
+                **row,
+                "utility_score": row.get("decision_score"),
+                "exposure_vector": {
+                    "market": 1.0,
+                    "bullish": 1.0 if row.get("direction") == "bullish" else -1.0,
+                    str(row.get("setup_family") or "unknown"): 1.0,
+                },
+            }
+            for row in ready
+        ]
+        deadline_queue = schedule_by_action_deadline(exposure_rows, capacity=min(3, len(exposure_rows)))
+        diversified = diversify_discord_queue(
+            exposure_rows,
+            capacity=min(3, len(exposure_rows)),
+            reserved_symbols=("DELL",),
+        )
         feed = build_feed_provenance({"VIBE_TRADING_STOCK_FEED": self.feed})
         feed["transport"] = self.transport
         feed["label"] = f"alpaca_{self.feed}_{self.transport}"
@@ -917,6 +1231,27 @@ class LiveOpportunityEngine:
                 "execution_enabled": False,
                 "can_submit_orders": False,
             },
+            "event_time_intelligence": {
+                "status": "observing" if any((state.get("event_time_shadow") or {}).get("last_event_at") for state in self._symbols.values()) else "awaiting_events",
+                "hot_set": hot_set,
+                "symbols": {
+                    symbol: dict(state.get("event_time_shadow") or {})
+                    for symbol, state in sorted(self._symbols.items())
+                    if state.get("event_time_shadow")
+                },
+                "recent_event_audit": list(self._event_audit)[-100:],
+                "lifecycle": list(self._event_lifecycle)[-100:],
+                "shadow_heads_up_count": sum(row.get("state") == "SHADOW_HEADS_UP" for row in self._event_lifecycle),
+                "event_intensity": {
+                    symbol: self._event_intensity_card(symbol, now=now)
+                    for symbol in sorted(self._symbols)
+                },
+                "authority": "shadow_challenger_never_overrides_completed_bar_or_deterministic_veto",
+                "execution_enabled": False,
+                "can_submit_orders": False,
+            },
+            "discord_diversification_shadow": diversified,
+            "discord_deadline_queue_shadow": deadline_queue,
             "feed": feed,
             "providers": build_provider_registry(root=ROOT),
             "validation": _validation_snapshot(ROOT),
@@ -932,6 +1267,15 @@ class LiveOpportunityEngine:
         }
 
 
+def _radar_setup_family(source: Mapping[str, Any]) -> str:
+    setup = str(source.get("setup") or "").lower()
+    if "opening_range" in setup:
+        return "opening_range_break_retest"
+    if str(source.get("direction") or "").lower() == "bearish":
+        return "relative_weakness_breakdown"
+    return "vwap_reclaim_pullback"
+
+
 def project_radar_report(radar: dict[str, Any], *, feed: str = "iex") -> dict[str, Any]:
     """Project the existing scheduled radar into the canonical stream schema."""
     candidates: list[dict[str, Any]] = []
@@ -939,8 +1283,7 @@ def project_radar_report(radar: dict[str, Any], *, feed: str = "iex") -> dict[st
         if not isinstance(source, dict):
             continue
         levels = source.get("trade_levels") if isinstance(source.get("trade_levels"), dict) else {}
-        setup = str(source.get("setup") or "").lower()
-        family = "opening_range_break_retest" if "opening_range" in setup else "relative_weakness_breakdown" if source.get("direction") == "bearish" else "vwap_reclaim_pullback"
+        family = _radar_setup_family(source)
         blockers = [str(value) for value in source.get("blockers") or []]
         if "fresh_quote_and_post_friction_geometry_required" not in blockers:
             blockers.append("fresh_quote_and_post_friction_geometry_required")
@@ -1027,6 +1370,62 @@ def _load_alpaca_credentials() -> tuple[str, str]:
 
     headers = _credentials()
     return str(headers.get("APCA-API-KEY-ID") or ""), str(headers.get("APCA-API-SECRET-KEY") or "")
+
+
+def _alpaca_market_event(
+    message: Mapping[str, Any], *, received_at: datetime | None = None, source: str = "alpaca",
+) -> MarketEvent | None:
+    """Normalize a documented Alpaca stock-stream message without inventing fields."""
+    event_type = str(message.get("T") or "")
+    kind = {
+        "t": EventKind.TRADE,
+        "q": EventKind.QUOTE,
+        "b": EventKind.BAR,
+        "u": EventKind.UPDATED_BAR,
+        "c": EventKind.CORRECTION,
+        "x": EventKind.CANCEL_ERROR,
+        "s": EventKind.STATUS,
+        "l": EventKind.LULD,
+    }.get(event_type)
+    event_at = _utc(message.get("t"))
+    symbol = str(message.get("S") or "").upper()
+    if kind is None or event_at is None or not symbol:
+        return None
+    received = (received_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    conditions = message.get("c")
+    condition_tuple = tuple(str(item) for item in conditions) if isinstance(conditions, list) else ((str(conditions),) if conditions else ())
+    original = (
+        message.get("i") if event_type == "x"
+        else message.get("oi") if event_type == "c"
+        else message.get("original_id")
+    )
+    try:
+        original_sequence = int(original) if original is not None else None
+    except (TypeError, ValueError):
+        # Alpaca trade IDs are not guaranteed to be numeric. Retain a stable
+        # local digest solely as a revocation reference, never as venue sequence.
+        original_sequence = int.from_bytes(str(original).encode("utf-8")[:8], "little") if original else None
+    return MarketEvent(
+        symbol=symbol,
+        kind=kind,
+        event_ts=event_at,
+        received_ts=received,
+        sequence=None,
+        source=source,
+        price=_finite(message.get("p") if message.get("p") is not None else message.get("c")),
+        size=_finite(message.get("s")),
+        bid=_finite(message.get("bp")),
+        ask=_finite(message.get("ap")),
+        bid_size=_finite(message.get("bs")),
+        ask_size=_finite(message.get("as")),
+        conditions=condition_tuple,
+        status_code=str(message.get("sc") or message.get("status") or "") or None,
+        reason_code=str(message.get("rc") or message.get("reason") or "") or None,
+        lower_band=_finite(message.get("d") if message.get("d") is not None else message.get("lower_band")),
+        upper_band=_finite(message.get("u") if message.get("u") is not None else message.get("upper_band")),
+        original_sequence=original_sequence,
+        metadata={"provider_message_type": event_type},
+    )
 
 
 def _receive_control(ws: Any, *, expected_type: str, expected_message: str | None = None) -> list[dict[str, Any]]:
@@ -1313,7 +1712,7 @@ def run_stream(
     key, secret = _load_alpaca_credentials()
     if not key or not secret:
         raise RuntimeError("Alpaca market-data credentials are unavailable")
-    websocket_symbols, rest_symbols = _hybrid_symbol_partition(symbols)
+    websocket_symbols, rest_symbols = _event_time_symbol_partition(engine, symbols)
     aggregator = FiveMinuteAggregator()
     delay = 1.0
     while not stop.is_set():
@@ -1322,7 +1721,15 @@ def run_stream(
             _receive_control(ws, expected_type="success", expected_message="connected")
             ws.send(json.dumps({"action": "auth", "key": key, "secret": secret}))
             _receive_control(ws, expected_type="success", expected_message="authenticated")
-            ws.send(json.dumps({"action": "subscribe", "quotes": websocket_symbols, "bars": websocket_symbols}))
+            ws.send(json.dumps({
+                "action": "subscribe",
+                "trades": websocket_symbols,
+                "quotes": websocket_symbols,
+                "bars": websocket_symbols,
+                "updatedBars": websocket_symbols,
+                "statuses": websocket_symbols,
+                "lulds": websocket_symbols,
+            }))
             _receive_control(ws, expected_type="subscription")
             if hasattr(ws, "settimeout"):
                 ws.settimeout(2.0)
@@ -1333,6 +1740,7 @@ def run_stream(
             next_context_refresh = time.monotonic() + 15 * 60.0
             rest_quote_status = "not_required" if not rest_symbols else "pending"
             rest_bar_status = "not_required" if not rest_symbols else "pending"
+            next_hot_rebalance = time.monotonic() + HOT_SET_REBALANCE_SECONDS
             while not stop.is_set():
                 try:
                     messages = json.loads(ws.recv())
@@ -1344,6 +1752,9 @@ def run_stream(
                     if message.get("T") == "error":
                         raise RuntimeError(f"alpaca_stream_error_{message.get('code', 'unknown')}")
                     symbol = str(message.get("S") or "").upper()
+                    normalized_event = _alpaca_market_event(message, source=f"alpaca_{engine.feed}")
+                    if normalized_event is not None:
+                        engine.update_market_event(normalized_event)
                     if message.get("T") == "q" and symbol:
                         engine.update_quote(symbol, {
                             "bid": message.get("bp"),
@@ -1357,6 +1768,24 @@ def run_stream(
                         if completed:
                             engine.update_completed_bar(symbol, completed)
                 current_tick = time.monotonic()
+                if current_tick >= next_hot_rebalance:
+                    desired_websocket, desired_rest = _event_time_symbol_partition(engine, symbols)
+                    removed = sorted(set(websocket_symbols) - set(desired_websocket))
+                    added = sorted(set(desired_websocket) - set(websocket_symbols))
+                    if removed:
+                        ws.send(json.dumps({
+                            "action": "unsubscribe", "trades": removed, "quotes": removed,
+                            "bars": removed, "updatedBars": removed, "statuses": removed,
+                            "lulds": removed,
+                        }))
+                    if added:
+                        ws.send(json.dumps({
+                            "action": "subscribe", "trades": added, "quotes": added,
+                            "bars": added, "updatedBars": added, "statuses": added,
+                            "lulds": added,
+                        }))
+                    websocket_symbols, rest_symbols = desired_websocket, desired_rest
+                    next_hot_rebalance = current_tick + HOT_SET_REBALANCE_SECONDS
                 if rest_symbols and current_tick >= next_rest_quote_refresh:
                     try:
                         quotes = _fetch_latest_quotes(rest_symbols, feed=engine.feed)
@@ -1474,6 +1903,9 @@ def main() -> int:
             higher_timeframes=bootstrap_context.get(symbol) or {},
             average_dollar_volume=_finite(row.get("avg_dollar_volume_20d")),
             catalyst=(row.get("catalyst_headlines") or [None])[0],
+            mapped_levels=row.get("trade_levels") if isinstance(row.get("trade_levels"), dict) else None,
+            mapped_setup_family=_radar_setup_family(row) if row else None,
+            mapped_direction=str(row.get("direction") or "") or None,
         )
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):

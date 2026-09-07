@@ -495,6 +495,14 @@ def test_intraday_radar_runner_defers_spy_research_until_after_delivery() -> Non
     assert runner.index("spy_level_reaction_shadow.py") > runner.index("governed_shadow_alert.py")
 
 
+def test_intraday_radar_runner_defers_ollama_cpu_inference_until_after_delivery() -> None:
+    root = Path(__file__).resolve().parents[2]
+    runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")
+
+    assert "ollama_trade_critic_shadow.py" in runner
+    assert runner.index("ollama_trade_critic_shadow.py") > runner.index("governed_shadow_alert.py")
+
+
 def test_intraday_radar_records_governed_shadow_decision_after_alert_scan() -> None:
     root = Path(__file__).resolve().parents[2]
     runner = (root / "scripts" / "run_intraday_opportunity_radar.ps1").read_text(encoding="utf-8")

@@ -60,6 +60,9 @@ REPORTS = {
     "governed_lifecycle": REPORT_DIR / "governed-shadow-lifecycle.json",
     "governed_outcomes": REPORT_DIR / "governed-shadow-outcomes.json",
     "discord_chart_review": REPORT_DIR / "discord-alert-chart-review.json",
+    "live_opportunity": REPORT_DIR / "live-opportunity-engine.json",
+    "options_tape_intelligence": REPORT_DIR / "options-tape-intelligence-shadow.json",
+    "blsh_bakeoff": REPORT_DIR / "blsh-bakeoff-shadow.json",
     "execution_readiness": REPORT_DIR / "execution-readiness.json",
     "latency_budget": REPORT_DIR / "latency-budget-scorecard.json",
     "statistical_governance": REPORT_DIR / "statistical-governance.json",
@@ -68,6 +71,7 @@ REPORTS = {
     "governed_rules": REPORT_DIR / "governed-shadow-rule-updates.json",
     "institutional_confluence": REPORT_DIR / "institutional-confluence-shadow.json",
     "premarket_thesis": REPORT_DIR / "premarket-thesis-shadow.json",
+    "ollama_shadow_critic": REPORT_DIR / "ollama-shadow-critic.json",
     "candlestick_context": REPORT_DIR / "candlestick-context.json",
     "higher_timeframe": REPORT_DIR / "higher-timeframe-market-map.json",
     "market_catalyst": REPORT_DIR / "market-catalyst-calendar.json",
@@ -456,6 +460,9 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "governed_lifecycle": load_json(paths["governed_lifecycle"], {}),
         "governed_outcomes": load_json(paths["governed_outcomes"], {}),
         "discord_chart_review": load_json(paths.get("discord_chart_review", REPORTS["discord_chart_review"]), {}),
+        "live_opportunity": load_json(paths.get("live_opportunity", REPORTS["live_opportunity"]), {}),
+        "options_tape_intelligence": load_json(paths.get("options_tape_intelligence", REPORTS["options_tape_intelligence"]), {}),
+        "blsh_bakeoff": load_json(paths.get("blsh_bakeoff", REPORTS["blsh_bakeoff"]), {}),
         "execution_readiness": load_json(paths.get("execution_readiness", REPORTS["execution_readiness"]), {}),
         "latency_budget": load_json(paths.get("latency_budget", REPORTS["latency_budget"]), {}),
         "statistical_governance": load_json(paths.get("statistical_governance", REPORTS["statistical_governance"]), {}),
@@ -464,6 +471,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "governed_rules": load_json(paths["governed_rules"], {}),
         "institutional_confluence": load_json(paths["institutional_confluence"], {}),
         "premarket_thesis": load_json(paths.get("premarket_thesis", REPORTS["premarket_thesis"]), {}),
+        "ollama_shadow_critic": load_json(paths.get("ollama_shadow_critic", REPORTS["ollama_shadow_critic"]), {}),
         "databento_call_ledger": read_jsonl_rows(
             paths.get("databento_call_ledger", DATABENTO_CALL_LEDGER)
         ),
@@ -2640,10 +2648,38 @@ def render_governed_shadow_decision(model: dict[str, Any]) -> str:
     chart_review = model.get("discord_chart_review") if isinstance(model.get("discord_chart_review"), dict) else {}
     chart_summary = chart_review.get("summary") if isinstance(chart_review.get("summary"), dict) else {}
     chart_status = chart_summary.get("status_counts") if isinstance(chart_summary.get("status_counts"), dict) else {}
+    chart_aligned = chart_review.get("chart_aligned_outcomes") if isinstance(chart_review.get("chart_aligned_outcomes"), list) else []
+    chart_scored = [row for row in chart_aligned if isinstance(row, dict) and row.get("status") == "scored"]
+    decay_values = [safe_float(row.get("latency_edge_decay_r")) for row in chart_scored if row.get("latency_edge_decay_r") is not None]
+    nominations = chart_review.get("bplus_to_aplus_nominations") if isinstance(chart_review.get("bplus_to_aplus_nominations"), dict) else {}
+    nomination_rows = nominations.get("nominations") if isinstance(nominations.get("nominations"), list) else []
+    half_life_models = chart_review.get("alert_half_life_models") if isinstance(chart_review.get("alert_half_life_models"), list) else []
+    learned_half_lives = [row for row in half_life_models if isinstance(row, dict) and row.get("status") == "estimated"]
+    live_opportunity = model.get("live_opportunity") if isinstance(model.get("live_opportunity"), dict) else {}
+    event_time = live_opportunity.get("event_time_intelligence") if isinstance(live_opportunity.get("event_time_intelligence"), dict) else {}
+    event_symbols = event_time.get("symbols") if isinstance(event_time.get("symbols"), dict) else {}
+    hot_set = event_time.get("hot_set") if isinstance(event_time.get("hot_set"), dict) else {}
+    deadline_queue = live_opportunity.get("discord_deadline_queue_shadow") if isinstance(live_opportunity.get("discord_deadline_queue_shadow"), dict) else {}
+    deadline_selected = deadline_queue.get("selected") if isinstance(deadline_queue.get("selected"), list) else []
+    intensity_cards = event_time.get("event_intensity") if isinstance(event_time.get("event_intensity"), dict) else {}
+    accelerating = sum(isinstance(card, dict) and card.get("state") == "ACCELERATING" for card in intensity_cards.values())
+    options_tape = model.get("options_tape_intelligence") if isinstance(model.get("options_tape_intelligence"), dict) else {}
+    blsh = model.get("blsh_bakeoff") if isinstance(model.get("blsh_bakeoff"), dict) else {}
+    live_candidates = live_opportunity.get("candidates") if isinstance(live_opportunity.get("candidates"), list) else []
+    conformal_abstentions = sum(
+        isinstance(row, dict)
+        and isinstance(row.get("adaptive_conformal_shadow"), dict)
+        and row["adaptive_conformal_shadow"].get("decision") == "ABSTAIN"
+        for row in live_candidates
+    )
     rules = model.get("governed_rules") if isinstance(model.get("governed_rules"), dict) else {}
     confluence = model.get("institutional_confluence") if isinstance(model.get("institutional_confluence"), dict) else {}
     confluence_summary = confluence.get("summary") if isinstance(confluence.get("summary"), dict) else {}
     confluence_cards = confluence.get("cards") if isinstance(confluence.get("cards"), list) else []
+    ollama = model.get("ollama_shadow_critic") if isinstance(model.get("ollama_shadow_critic"), dict) else {}
+    ollama_summary = ollama.get("summary") if isinstance(ollama.get("summary"), dict) else {}
+    ollama_cards = ollama.get("cards") if isinstance(ollama.get("cards"), list) else []
+    ollama_latest = ollama_cards[0] if ollama_cards and isinstance(ollama_cards[0], dict) else {}
     summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
     decisions = data.get("decisions") if isinstance(data.get("decisions"), list) else []
     rows: list[str] = []
@@ -2711,8 +2747,43 @@ def render_governed_shadow_decision(model: dict[str, Any]) -> str:
           {stat_card("Duplicates", str(safe_int(chart_summary.get("duplicate_trade_alerts"))), "same setup sent more than once", "warn" if safe_int(chart_summary.get("duplicate_trade_alerts")) else "good")}
         </div>
         <p class="muted small" style="padding:4px 0 10px">Completed 1m underlying bars beginning after Discord delivery; gap-through entries are repriced and stop-before-entry plans are rejected. This is not option-contract P&amp;L.</p>
+        <h3 style="margin-top:18px">Signal-to-Chart Learning · Shadow Nominations</h3>
+        <div class="stat-grid compact">
+          {stat_card("Chart aligned", str(len(chart_scored)), f"{len(chart_aligned)} attempted · provider bars only", "good" if chart_scored else "warn")}
+          {stat_card("Mean latency decay", f"{(sum(decay_values) / len(decay_values)):+.2f}R" if decay_values else "—", "signal-time MFE minus delivery-time MFE", "warn" if decay_values and sum(decay_values) > 0 else "")}
+          {stat_card("B+→A+ nominations", str(len(nomination_rows)), "human review only · no grade mutation", "warn" if nomination_rows else "good")}
+          {stat_card("Learned half-lives", str(len(learned_half_lives)), f"{len(half_life_models)} cohorts · fallback when underpowered", "good" if learned_half_lives else "warn")}
+        </div>
+        <p class="muted small" style="padding:4px 0 10px">Every nomination uses features completed before the signal, then a separate chronological forward slice. Missing or gapped market data stays unscored; no result can auto-promote a setup.</p>
+        <h3 style="margin-top:18px">Event-Time Eyes · Shadow Challenger</h3>
+        <div class="stat-grid compact">
+          {stat_card("Tape status", str(event_time.get("status") or "not running"), f"{len(event_symbols)} symbols observed", "good" if event_time.get("status") == "observing" else "warn")}
+          {stat_card("Hot stream set", str(len(hot_set.get("symbols") or [])), "reserved + nearest mapped triggers", "")}
+          {stat_card("Shadow heads-up", str(safe_int(event_time.get("shadow_heads_up_count"))), "paired to completed-bar lane", "good" if safe_int(event_time.get("shadow_heads_up_count")) else "")}
+          {stat_card("Deadline queue", str(len(deadline_selected)), "earliest actionable expiry first", "")}
+          {stat_card("Event acceleration", str(accelerating), "requires learned channel baselines", "")}
+          {stat_card("Uncertainty abstains", str(conformal_abstentions), "adaptive conformal shadow", "warn" if conformal_abstentions else "")}
+          {stat_card("OPRA tape", str(options_tape.get("status") or "not run"), "complex/package fail-honest", "good" if options_tape.get("status") == "observed" else "warn")}
+          {stat_card("Execution", "OFF", "event evidence cannot submit orders", "good")}
+        </div>
+        <p class="muted small" style="padding:4px 0 10px">Trades, quotes, revised bars, corrections, cancel errors, trading status and LULD are observed between completed candles. Event evidence can arm or veto only in shadow and cannot override deterministic gates.</p>
+        <h3 style="margin-top:18px">BLSH Common-Fabric Bake-off · Shadow</h3>
+        <div class="stat-grid compact">
+          {stat_card("Status", str(blsh.get("status") or "not run"), "ARPS vs Donchian+Climax vs LightGBM", "good" if blsh.get("status") == "shadow_predictions_ready" else "warn")}
+          {stat_card("Predictions", str(safe_int(blsh.get("prediction_count"))), "same universe · cadence · features", "")}
+          {stat_card("Minimum window", str(safe_int(blsh.get("minimum_live_shadow_days"))) + " days", "before human-review nomination", "")}
+          {stat_card("Execution", "OFF", "no automatic registry promotion", "good")}
+        </div>
         <p class="muted small" style="padding:4px 0 10px">Rejection reasons: {esc(reason_text)}</p>
         <div class="table-wrap"><table><thead><tr><th>Symbol / Setup</th><th>Side</th><th>Levels</th><th>Decision</th><th>Blockers</th><th>Evidence</th></tr></thead><tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar candidates recorded yet.</td></tr>'}</tbody></table></div>
+        <h3 style="margin-top:18px">Local Ollama Critic · Post-Delivery Shadow Only</h3>
+        <div class="stat-grid compact">
+          {stat_card("Candidates", str(safe_int(ollama_summary.get('candidates'))), f"{safe_int(ollama_summary.get('new_evaluations'))} new · {safe_int(ollama_summary.get('deferred_capacity'))} deferred", "")}
+          {stat_card("Schema valid", str(safe_int(ollama_summary.get('ok'))), esc(ollama_latest.get('status') or 'not run'), "good" if safe_int(ollama_summary.get('ok')) else "warn")}
+          {stat_card("Veto observations", str(safe_int(ollama_summary.get('veto'))), "next shadow review only", "warn" if safe_int(ollama_summary.get('veto')) else "")}
+          {stat_card("Authority", "OFF", f"{esc(ollama_latest.get('model') or 'qwen3:4b-instruct')} · {safe_float(ollama_latest.get('latency_ms')):.0f} ms", "good")}
+        </div>
+        <p class="muted small" style="padding:4px 0 10px">Loopback-only, structured output, no tools, no broker, no Discord sender. Missing or invalid output is shown honestly and cannot approve a setup.</p>
         <h3 style="margin-top:18px">Institutional Confluence · Fail-Honest Source Coverage</h3>
         <div class="stat-grid compact">
           {stat_card("Confluence", str(safe_int(confluence_summary.get('confluence_observed'))), "2+ fresh independent sources", "good" if safe_int(confluence_summary.get('confluence_observed')) else "")}

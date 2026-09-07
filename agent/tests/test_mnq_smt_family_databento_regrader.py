@@ -63,7 +63,9 @@ def test_frozen_regime_labeler_emits_one_tag_from_each_axis() -> None:
     assert metrics["directional_efficiency_24x5m"] == 1.0
 
 
-def test_post_preregistration_mbo_row_can_count_but_prior_session_cannot() -> None:
+def test_post_preregistration_mbo_row_can_count_but_prior_session_cannot(monkeypatch) -> None:
+    # Eligibility depends on explicit approval, not the workstation's files.
+    monkeypatch.setattr(regrader, "approval_valid", lambda: True)
     plan = {"direction": "long", "stop_price": 99.0, "signal_trigger_at": "2026-08-25T14:00:00Z",
             "regime_tags": ["trend", "high_vol"], "regime_metrics": {"directional_efficiency_24x5m": 0.5}}
     resolved = {"entry_fill_executable": 100.0, "exit_fill_executable": 102.0,
@@ -81,6 +83,11 @@ def test_post_preregistration_mbo_row_can_count_but_prior_session_cannot() -> No
                                    manifests=manifests, now=datetime(2026, 8, 26, tzinfo=timezone.utc))
     assert prior["promotion_eligible"] is False
     assert prior["evidence_blockers"] == ["pre_preregistration_session"]
+    monkeypatch.setattr(regrader, "approval_valid", lambda: False)
+    unapproved = regrader.build_outcome(entry=_entry(), plan=plan, resolved=resolved, manifests=manifests,
+                                       now=datetime(2026, 8, 26, tzinfo=timezone.utc))
+    assert unapproved["promotion_eligible"] is False
+    assert "kenny_shadow_evidence_approval_missing" in unapproved["evidence_blockers"]
 
 
 def test_status_counts_only_explicitly_qualified_mbo_rows() -> None:

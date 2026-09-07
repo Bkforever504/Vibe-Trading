@@ -31,6 +31,7 @@ LEARNING_PATH = REPORT_DIR / "flip-bot-learning-report.json"
 DEBATE_PATH = REPORT_DIR / "agent-trade-debate.json"
 CONFLUENCE_PATH = REPORT_DIR / "institutional-confluence-shadow.json"
 PREMARKET_THESIS_PATH = REPORT_DIR / "premarket-thesis-shadow.json"
+OLLAMA_CRITIC_PATH = REPORT_DIR / "ollama-shadow-critic.json"
 LEDGER_PATH = ROOT / "data" / "governed_shadow_decision_ledger.jsonl"
 REPORT_PATH = REPORT_DIR / "governed-shadow-decisions.json"
 SCHEMA_VERSION = 2
@@ -184,6 +185,7 @@ def evidence_cards(candidate: dict[str, Any], consensus: dict[str, Any], learnin
 def policy_gate(
     candidate: dict[str, Any], consensus: dict[str, Any], learning: dict[str, Any], prior_keys: set[str],
     *, now: datetime | None = None, institutional: dict[str, Any] | None = None,
+    ollama_critic: dict[str, Any] | None = None,
 ) -> tuple[str, list[str]]:
     """Deterministic shadow gate; agent agreement cannot override these rules."""
     blockers: list[str] = []
@@ -232,12 +234,29 @@ def policy_gate(
     nbbo = next((row for row in institutional.get("sources") or [] if isinstance(row, dict) and row.get("name") == "nbbo_options_flow"), {})
     if nbbo.get("available") is True and nbbo.get("fresh") is True and nbbo.get("contradicts_candidate") is True:
         blockers.append("nbbo_flow_contradicts_direction")
+    # Local model is strictly veto-only. Support/neutral/unavailable output has
+    # no authority and can never erase a deterministic blocker.
+    ollama_critic = ollama_critic if isinstance(ollama_critic, dict) else {}
+    critic_payload = {key: ollama_critic.get(key) for key in ("stance", "veto_reasons", "evidence_refs", "summary")}
+    critic_hash_valid = bool(ollama_critic.get("response_hash")) and ollama_critic.get("response_hash") == _canonical_hash(critic_payload)
+    if (
+        ollama_critic.get("status") == "ok"
+        and ollama_critic.get("authority") == "shadow_veto_only"
+        and ollama_critic.get("execution_enabled") is False
+        and ollama_critic.get("can_submit_orders") is False
+        and ollama_critic.get("stance") == "veto"
+        and ollama_critic.get("veto_reasons")
+        and ollama_critic.get("model_digest")
+        and critic_hash_valid
+    ):
+        blockers.append("ollama_local_critic_veto")
     return ("shadow_rejected" if blockers else "shadow_accepted"), blockers
 
 
 def build_report(*, historical: bool = False) -> dict[str, Any]:
-    alerts, consensus_report, learning, debate, confluence, premarket = (
+    alerts, consensus_report, learning, debate, confluence, premarket, ollama_report = (
         _read_json(ALERTS_PATH), _read_json(CONSENSUS_PATH), _read_json(LEARNING_PATH), _read_json(DEBATE_PATH), _read_json(CONFLUENCE_PATH), _read_json(PREMARKET_THESIS_PATH),
+        _read_json(OLLAMA_CRITIC_PATH),
     )
     events = alerts.get("recent_events") if isinstance(alerts.get("recent_events"), list) else []
     confirmed = _latest_confirmed_candidates(events, historical=historical)
@@ -247,10 +266,13 @@ def build_report(*, historical: bool = False) -> dict[str, Any]:
     for candidate in confirmed:
         symbol = str(candidate.get("symbol") or "").upper()
         consensus = _consensus_for(symbol, consensus_report)
+        candidate_key = _candidate_key(candidate)
+        ollama_card = next((row for row in ollama_report.get("cards") or [] if isinstance(row, dict) and row.get("candidate_key") == candidate_key), {})
         decision, blockers = policy_gate(
             candidate, consensus, learning, prior_keys,
             now=None if historical else datetime.now(timezone.utc),
             institutional=next((row for row in confluence.get("cards") or [] if isinstance(row, dict) and str(row.get("symbol") or "").upper() == symbol), {}),
+            ollama_critic=ollama_card,
         )
         cards = evidence_cards(candidate, consensus, learning, debate, confluence, premarket)
         event_id = _canonical_hash({"candidate": _candidate_key(candidate)})
@@ -281,7 +303,7 @@ def build_report(*, historical: bool = False) -> dict[str, Any]:
     sources = {name: {"path": str(path), "hash": _canonical_hash(_read_json(path))} for name, path in {
         "alerts": ALERTS_PATH, "consensus": CONSENSUS_PATH, "learning": LEARNING_PATH, "debate": DEBATE_PATH,
         "institutional_confluence": CONFLUENCE_PATH,
-        "premarket_thesis": PREMARKET_THESIS_PATH,
+        "premarket_thesis": PREMARKET_THESIS_PATH, "ollama_shadow_critic": OLLAMA_CRITIC_PATH,
     }.items()}
     return {
         "provider": "governed_shadow_decision",

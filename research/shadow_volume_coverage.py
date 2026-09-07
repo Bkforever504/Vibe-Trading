@@ -59,6 +59,7 @@ CLASSIFICATIONS = {
     "ttm_squeeze_shadow_logger.py": ("historical_volume_matrix_complete", "Daily SPY and QQQ event replayed across 19 volume filters; fixed-horizon outcome because the logger has no executable exit."),
     "wavetrend_shadow_logger.py": ("historical_volume_matrix_complete", "Daily SPY and QQQ event replayed across 19 volume filters; fixed-horizon outcome because the logger has no executable exit."),
     "williams_r_shadow_logger.py": ("historical_volume_matrix_complete", "Daily SPY and QQQ replayed across 19 volume filters with chronological holdout and cost stress."),
+    "blsh_bakeoff_shadow.py": ("forward_sample_insufficient", "The common-fabric ARPS, Donchian-climax and LightGBM bake-off is cross-sectional and volume-aware, but requires 63 trading days and 1,000 predictions per scanner before nomination."),
 }
 
 NON_STRATEGY_PROGRAMS = frozenset({
@@ -67,7 +68,10 @@ NON_STRATEGY_PROGRAMS = frozenset({
     "governed_shadow_lifecycle.py", "governed_shadow_outcome.py",
     "governed_shadow_rule_update.py", "institutional_confluence_shadow.py",
     "intraday_trade_lifecycle_shadow.py", "premarket_thesis_shadow.py",
-    "wolves_bbr_shadow.py",
+    "wolves_bbr_shadow.py", "chart_aligned_shadow_learning.py",
+    "options_tape_intelligence_shadow.py", "shadow_alert_intelligence.py",
+    "ollama_trade_critic_shadow.py",
+    "blsh_outcome_shadow.py",
 })
 
 LOGS = {
