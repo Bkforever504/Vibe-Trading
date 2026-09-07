@@ -62,6 +62,7 @@ REPORTS = {
     "discord_chart_review": REPORT_DIR / "discord-alert-chart-review.json",
     "live_opportunity": REPORT_DIR / "live-opportunity-engine.json",
     "options_tape_intelligence": REPORT_DIR / "options-tape-intelligence-shadow.json",
+    "blsh_bakeoff": REPORT_DIR / "blsh-bakeoff-shadow.json",
     "execution_readiness": REPORT_DIR / "execution-readiness.json",
     "latency_budget": REPORT_DIR / "latency-budget-scorecard.json",
     "statistical_governance": REPORT_DIR / "statistical-governance.json",
@@ -461,6 +462,7 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "discord_chart_review": load_json(paths.get("discord_chart_review", REPORTS["discord_chart_review"]), {}),
         "live_opportunity": load_json(paths.get("live_opportunity", REPORTS["live_opportunity"]), {}),
         "options_tape_intelligence": load_json(paths.get("options_tape_intelligence", REPORTS["options_tape_intelligence"]), {}),
+        "blsh_bakeoff": load_json(paths.get("blsh_bakeoff", REPORTS["blsh_bakeoff"]), {}),
         "execution_readiness": load_json(paths.get("execution_readiness", REPORTS["execution_readiness"]), {}),
         "latency_budget": load_json(paths.get("latency_budget", REPORTS["latency_budget"]), {}),
         "statistical_governance": load_json(paths.get("statistical_governance", REPORTS["statistical_governance"]), {}),
@@ -2662,6 +2664,7 @@ def render_governed_shadow_decision(model: dict[str, Any]) -> str:
     intensity_cards = event_time.get("event_intensity") if isinstance(event_time.get("event_intensity"), dict) else {}
     accelerating = sum(isinstance(card, dict) and card.get("state") == "ACCELERATING" for card in intensity_cards.values())
     options_tape = model.get("options_tape_intelligence") if isinstance(model.get("options_tape_intelligence"), dict) else {}
+    blsh = model.get("blsh_bakeoff") if isinstance(model.get("blsh_bakeoff"), dict) else {}
     live_candidates = live_opportunity.get("candidates") if isinstance(live_opportunity.get("candidates"), list) else []
     conformal_abstentions = sum(
         isinstance(row, dict)
@@ -2764,6 +2767,13 @@ def render_governed_shadow_decision(model: dict[str, Any]) -> str:
           {stat_card("Execution", "OFF", "event evidence cannot submit orders", "good")}
         </div>
         <p class="muted small" style="padding:4px 0 10px">Trades, quotes, revised bars, corrections, cancel errors, trading status and LULD are observed between completed candles. Event evidence can arm or veto only in shadow and cannot override deterministic gates.</p>
+        <h3 style="margin-top:18px">BLSH Common-Fabric Bake-off · Shadow</h3>
+        <div class="stat-grid compact">
+          {stat_card("Status", str(blsh.get("status") or "not run"), "ARPS vs Donchian+Climax vs LightGBM", "good" if blsh.get("status") == "shadow_predictions_ready" else "warn")}
+          {stat_card("Predictions", str(safe_int(blsh.get("prediction_count"))), "same universe · cadence · features", "")}
+          {stat_card("Minimum window", str(safe_int(blsh.get("minimum_live_shadow_days"))) + " days", "before human-review nomination", "")}
+          {stat_card("Execution", "OFF", "no automatic registry promotion", "good")}
+        </div>
         <p class="muted small" style="padding:4px 0 10px">Rejection reasons: {esc(reason_text)}</p>
         <div class="table-wrap"><table><thead><tr><th>Symbol / Setup</th><th>Side</th><th>Levels</th><th>Decision</th><th>Blockers</th><th>Evidence</th></tr></thead><tbody>{''.join(rows) or '<tr><td colspan="6">No completed-bar candidates recorded yet.</td></tr>'}</tbody></table></div>
         <h3 style="margin-top:18px">Local Ollama Critic · Post-Delivery Shadow Only</h3>

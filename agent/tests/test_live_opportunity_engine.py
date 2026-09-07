@@ -287,6 +287,49 @@ def test_event_intensity_uses_prior_completed_windows_and_persistence() -> None:
     assert card["persistence_windows"] == 2
 
 
+def test_trade_cannot_reuse_stale_persistent_quote_for_headsup() -> None:
+    start = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol(
+        "QQQ", bars=[], quote={}, mapped_levels={"confirmation_trigger": 100},
+        mapped_setup_family="mapped_test", mapped_direction="bullish",
+    )
+    engine.update_market_event(MarketEvent(
+        symbol="QQQ", kind=EventKind.LULD, event_ts=start, received_ts=start,
+        source="alpaca_sip", lower_band=90, upper_band=110,
+    ), now=start)
+    for seconds in (0.1, 2.6, 5.2):
+        stamp = start + timedelta(seconds=seconds)
+        engine.update_market_event(MarketEvent(
+            symbol="QQQ", kind=EventKind.QUOTE, event_ts=stamp, received_ts=stamp,
+            source="alpaca_sip", bid=99.99, ask=100.01, bid_size=10, ask_size=10,
+        ), now=stamp)
+    engine._event_lifecycle.clear()
+    late = start + timedelta(seconds=66)
+    engine.update_market_event(MarketEvent(
+        symbol="QQQ", kind=EventKind.TRADE, event_ts=late, received_ts=late,
+        source="alpaca_sip", price=100.02, size=10, conditions=("@",),
+    ), now=late)
+    assert not any(row["state"] == "SHADOW_HEADS_UP" for row in engine._event_lifecycle)
+
+
+def test_event_intensity_rejects_bucket_gaps_as_persistence() -> None:
+    start = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol("QQQ", bars=[], quote={})
+    for bucket in (0, 10, 40, 50):
+        stamp = start + timedelta(seconds=bucket)
+        for kind in (EventKind.QUOTE, EventKind.TRADE):
+            kwargs = {"bid": 100, "ask": 100.02, "bid_size": 10, "ask_size": 10} if kind == EventKind.QUOTE else {"price": 100.01, "size": 10, "conditions": ("@",)}
+            engine.update_market_event(MarketEvent(
+                symbol="QQQ", kind=kind, event_ts=stamp, received_ts=stamp,
+                source="alpaca_sip", **kwargs,
+            ), now=stamp)
+    card = engine.snapshot(now=start + timedelta(seconds=60))["event_time_intelligence"]["event_intensity"]["QQQ"]
+    assert card["status"] == "unavailable"
+    assert card["reason"] == "non_consecutive_event_windows"
+
+
 def test_hourly_context_is_anchored_to_rth_and_excludes_extended_hours() -> None:
     rows = [
         {"t": "2026-08-21T13:00:00Z", "o": 99.0, "h": 100.0, "l": 98.0, "c": 99.5, "v": 10},  # 08:00 ET

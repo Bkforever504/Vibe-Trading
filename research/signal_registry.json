@@ -3816,6 +3816,52 @@
         "family_key": "catalyst",
         "requires_human_review": true
       }
+    },
+    {
+      "id": "prefect_orchestration", "name": "Prefect Orchestration Layer",
+      "script": "orchestration/flows/common.py", "runner": "prefect_local_server", "scheduled_tasks": ["VibeTradingPrefectServer"],
+      "status": "intake_shadow", "type": "research_intake", "feeds": ["orchestration_only"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "governance", "family_assignment_review_required": true,
+      "notes": "Local-only control plane; legacy tasks remain enabled until the 48-hour acceptance gate."
+    },
+    {
+      "id": "pandera_contracts", "name": "Shared Data Contracts",
+      "script": "contracts/schemas.py", "runner": "library", "scheduled_tasks": [],
+      "status": "intake_shadow", "type": "research_intake", "feeds": ["validation_only"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "governance", "family_assignment_review_required": true
+    },
+    {
+      "id": "hypothesis_property_tests", "name": "Property-Based Safety Tests",
+      "script": "agent/tests/test_shadow_math_properties.py", "runner": "pytest", "scheduled_tasks": [],
+      "status": "intake_shadow", "type": "research_intake", "feeds": ["test_only"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "governance", "family_assignment_review_required": true
+    },
+    {
+      "id": "arps_scanner", "name": "Adaptive Range Position Scanner",
+      "script": "scripts/blsh_bakeoff_shadow.py", "runner": "blsh_bakeoff", "scheduled_tasks": [],
+      "status": "shadow", "type": "research_intake", "feeds": ["shared_ohlcv_feature_fabric"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "mean_reversion", "family_assignment_review_required": true,
+      "evidence_gate": "At least 63 trading days, 1000 predictions, paired statistical comparison, human review."
+    },
+    {
+      "id": "donchian_climax_scanner", "name": "Donchian Climax Scanner",
+      "script": "scripts/blsh_bakeoff_shadow.py", "runner": "blsh_bakeoff", "scheduled_tasks": [],
+      "status": "shadow", "type": "research_intake", "feeds": ["shared_ohlcv_feature_fabric"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "mean_reversion", "family_assignment_review_required": true,
+      "evidence_gate": "At least 63 trading days, 1000 predictions, paired statistical comparison, human review."
+    },
+    {
+      "id": "lgbm_blsh_scanner", "name": "LightGBM BLSH Scanner",
+      "script": "scripts/blsh_bakeoff_shadow.py", "runner": "blsh_bakeoff", "scheduled_tasks": [],
+      "status": "shadow", "type": "research_intake", "feeds": ["shared_ohlcv_feature_fabric"],
+      "execution_enabled": false, "can_submit_orders": false, "can_read_order_history": false,
+      "family_key": "mean_reversion", "family_assignment_review_required": true,
+      "evidence_gate": "Walk-forward only; at least 63 trading days, 1000 predictions, paired statistical comparison, human review."
     }
   ],
   "statistical_gate_schema_version": 1,

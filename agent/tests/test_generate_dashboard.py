@@ -161,6 +161,7 @@ def test_governed_dashboard_scores_alerts_from_first_full_minute_after_discord()
             "event_time_intelligence": {"status": "observing", "symbols": {"QQQ": {}}, "hot_set": {"symbols": ["SPY", "QQQ", "DELL"]}},
             "discord_deadline_queue_shadow": {"selected": [{"candidate_id": "one"}]},
         },
+        "blsh_bakeoff": {"status": "shadow_predictions_ready", "prediction_count": 300, "minimum_live_shadow_days": 63},
     })
 
     assert "Post-Discord 1m Chart Review" in html
@@ -173,6 +174,8 @@ def test_governed_dashboard_scores_alerts_from_first_full_minute_after_discord()
     assert "human review only" in html
     assert "Event-Time Eyes" in html
     assert "revised bars" in html
+    assert "BLSH Common-Fabric Bake-off" in html
+    assert "300" in html
 
 
 def test_dashboard_renders_execution_readiness_without_promotion_authority() -> None:

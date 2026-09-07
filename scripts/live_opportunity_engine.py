@@ -661,6 +661,11 @@ class LiveOpportunityEngine:
         completed = [row for row in self._event_rate_windows.get(symbol, ()) if row["bucket"] < current_bucket]
         if len(completed) < 4:
             return event_intensity_challenger({}, {}, persistence_windows=0)
+        if any(right["bucket"] - left["bucket"] != 1 for left, right in zip(completed[-4:], completed[-3:])):
+            return {
+                **event_intensity_challenger({}, {}, persistence_windows=0),
+                "reason": "non_consecutive_event_windows",
+            }
         baseline_rows, recent_rows = completed[:-2], completed[-2:]
         if not baseline_rows:
             return event_intensity_challenger({}, {}, persistence_windows=0)
@@ -806,7 +811,15 @@ class LiveOpportunityEngine:
                         level_state = machine.observe(price=observed_price, event_ts=event.event_ts)
                         tape["level_state"] = level_state
                         quote_ready = bool((tape.get("quote_persistence") or {}).get("quote_persistent"))
-                        heads_up = level_state.get("state") == "HOLDING" and quote_ready and not shadow_vetoes
+                        # A heads-up may only rise on the fresh quote that
+                        # proves persistence. Trades cannot reuse a cached quote
+                        # after its freshness/quorum context has changed.
+                        heads_up = (
+                            event.kind == EventKind.QUOTE
+                            and level_state.get("state") == "HOLDING"
+                            and quote_ready
+                            and not shadow_vetoes
+                        )
                         pair_id = f"{event.event_ts.date().isoformat()}:{event.symbol}:{_family}"
                         newly_ready = heads_up and pair_id not in self._headsup_pairs
                         if level_state.get("transition") or newly_ready:
