@@ -55,14 +55,15 @@ def test_universe_and_dm_gate_are_deterministic():
 
 def test_stat_gate_requires_live_window_and_never_auto_promotes():
     rows = pd.DataFrame({"scanner_id": ["a", "b"] * 20, "ts": pd.date_range("2026-01-01", periods=40, tz="UTC"), "excess_return": [.01, 0] * 20})
-    assert statistical_promotion_gate(rows)["status"] == "insufficient_data"
+    assert statistical_promotion_gate(rows)["status"] == "blocked_validation_defects"
     larger = pd.DataFrame({
         "scanner_id": [scanner for day in range(70) for scanner in ("a", "b") for _ in range(15)],
         "ts": [pd.Timestamp("2026-01-01", tz="UTC") + pd.Timedelta(days=day, minutes=slot) for day in range(70) for _scanner in ("a", "b") for slot in range(15)],
         "excess_return": [(.02 + (slot % 3) * .001) if scanner == "a" else (slot % 3) * .001 for _day in range(70) for scanner in ("a", "b") for slot in range(15)],
     })
     gate = statistical_promotion_gate(larger)
-    assert gate["status"] == "human_review_nomination"
+    assert gate["status"] == "blocked_validation_defects"
+    assert gate["winner_candidate"] is None
     assert gate["automatic_registry_change"] is False
 
 

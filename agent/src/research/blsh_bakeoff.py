@@ -130,6 +130,30 @@ def diebold_mariano(left: Iterable[float], right: Iterable[float]) -> dict[str, 
 
 
 def statistical_promotion_gate(outcomes: pd.DataFrame, *, minimum_days: int = 63, minimum_predictions: int = 1000) -> dict[str, Any]:
+    """Quarantine nominations until the end-to-end evidence contract is repaired.
+
+    Row counts alone cannot prove live collection, purged labels, trading-day
+    horizons, benchmark-relative net returns, or correction for trial selection.
+    This block is unconditional: caller-supplied flags cannot bypass it.
+    """
+    return {
+        "status": "blocked_validation_defects",
+        "reason": "bakeoff_evidence_pipeline_requires_revalidation",
+        "winner_candidate": None,
+        "automatic_registry_change": False,
+        "validation_blockers": [
+            "global_time_split_and_label_purging_required",
+            "trading_session_horizons_required",
+            "scanner_independent_outcome_join_required",
+            "live_prediction_timestamp_provenance_required",
+            "benchmark_costs_and_multiple_testing_required",
+            "dependence_robust_paired_statistic_required",
+        ],
+        **AUTHORITY,
+    }
+
+
+def _legacy_statistical_diagnostic(outcomes: pd.DataFrame, *, minimum_days: int = 63, minimum_predictions: int = 1000) -> dict[str, Any]:
     required = {"scanner_id", "ts", "excess_return"}
     if not required.issubset(outcomes.columns):
         return {"status": "insufficient_data", "reason": "required_outcome_columns_missing", **AUTHORITY}
