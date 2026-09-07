@@ -1,0 +1,10 @@
+{
+  "base_url": "http://127.0.0.1:11434",
+  "can_submit_orders": false,
+  "enabled": true,
+  "execution_enabled": false,
+  "model": "qwen3:4b-instruct",
+  "max_new_evaluations_per_run": 2,
+  "role": "veto_only",
+  "timeout_seconds": 30
+}

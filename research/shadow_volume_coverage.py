@@ -66,7 +66,9 @@ NON_STRATEGY_PROGRAMS = frozenset({
     "governed_shadow_lifecycle.py", "governed_shadow_outcome.py",
     "governed_shadow_rule_update.py", "institutional_confluence_shadow.py",
     "intraday_trade_lifecycle_shadow.py", "premarket_thesis_shadow.py",
-    "wolves_bbr_shadow.py",
+    "wolves_bbr_shadow.py", "chart_aligned_shadow_learning.py",
+    "options_tape_intelligence_shadow.py", "shadow_alert_intelligence.py",
+    "ollama_trade_critic_shadow.py",
 })
 
 LOGS = {

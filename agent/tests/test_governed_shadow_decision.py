@@ -43,6 +43,28 @@ def test_policy_accepts_valid_completed_bar_with_positive_recent_evidence():
     assert blockers == []
 
 
+def test_ollama_critic_can_only_add_a_shadow_veto():
+    base = dict(
+        candidate=_candidate(),
+        consensus={"recommendation": "approve", "portfolio_kill_switch": {"active": False}},
+        learning={"recent_regime": {"new_shadow_entries_allowed": True}},
+        prior_keys=set(),
+    )
+    support, support_blockers = gate.policy_gate(**base, ollama_critic={
+        "status": "ok", "authority": "shadow_veto_only", "execution_enabled": False,
+        "can_submit_orders": False, "stance": "support", "veto_reasons": [],
+    })
+    veto_card = {
+        "status": "ok", "authority": "shadow_veto_only", "execution_enabled": False,
+        "can_submit_orders": False, "stance": "veto", "veto_reasons": ["market_regime_conflict"],
+        "evidence_refs": ["e1"], "summary": "Regime conflict.", "model_digest": "sha256:model",
+    }
+    veto_card["response_hash"] = gate._canonical_hash({key: veto_card.get(key) for key in ("stance", "veto_reasons", "evidence_refs", "summary")})
+    veto, veto_blockers = gate.policy_gate(**base, ollama_critic=veto_card)
+    assert support == "shadow_accepted" and support_blockers == []
+    assert veto == "shadow_rejected" and veto_blockers == ["ollama_local_critic_veto"]
+
+
 def test_policy_fails_closed_when_learning_report_is_missing():
     decision, blockers = gate.policy_gate(
         _candidate(),

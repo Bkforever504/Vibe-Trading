@@ -118,6 +118,20 @@ try {
     # Best-effort research and accountability enrich the next snapshot. Their
     # health is logged, but a failure cannot take the real-time core offline.
     try {
+    # Deliberately after Discord delivery and the core dashboard: local CPU
+    # inference must never add latency to the alert path. Its report can only
+    # add a veto to the next shadow review of the identical candidate.
+    Log-Line "STEP ollama_trade_critic_shadow"
+    python scripts\ollama_trade_critic_shadow.py 2>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0) { Log-Line "WARN ollama_trade_critic_shadow exited=$LASTEXITCODE" }
+
+    # Consume a locally staged, timestamped OPRA TCBBO event file when it is
+    # available. Missing input writes an explicit not_configured card; this
+    # optional critic never delays or upgrades the Discord alert lane.
+    Log-Line "STEP options_tape_intelligence_shadow"
+    python scripts\options_tape_intelligence_shadow.py 2>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
+    if ($LASTEXITCODE -ne 0) { Log-Line "WARN options_tape_intelligence_shadow exited=$LASTEXITCODE" }
+
     Log-Line "STEP donchian_expansion_shadow"
     python scripts\donchian_expansion_shadow.py 2>&1 | Out-File -LiteralPath $LogPath -Append -Encoding utf8
     if ($LASTEXITCODE -ne 0) { Log-Line "WARN donchian_expansion_shadow exited=$LASTEXITCODE" }

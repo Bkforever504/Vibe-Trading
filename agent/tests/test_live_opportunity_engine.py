@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from scripts.live_opportunity_engine import (
     SETUP_FAMILIES,
     LiveOpportunityEngine,
+    _alpaca_market_event,
     _aggregate_rth_hourly,
     _aggregate_rth_four_hour,
     _with_core_context_symbols,
@@ -24,6 +25,8 @@ from scripts.live_opportunity_engine import (
 )
 from scripts.intraday_opportunity_radar import CORE_LIQUID_SYMBOLS
 from scripts.market_data_provider_registry import build_provider_registry
+from scripts.priority_focus_universe import PRIORITY_FOCUS_UNIVERSE
+from agent.src.market_data.event_eyes import EventKind, MarketEvent
 
 
 def _bars() -> list[dict[str, float | str]]:
@@ -121,9 +124,167 @@ def test_websocket_subscription_is_capped_at_basic_plan_limit_and_keeps_core(
 
     subscription = next(row for row in sent if row.get("action") == "subscribe")
     assert result == 0
-    assert subscription["quotes"] == symbols[:30]
-    assert subscription["bars"] == symbols[:30]
+    subscribed = subscription["quotes"]
+    assert subscribed[:len(PRIORITY_FOCUS_UNIVERSE)] == list(PRIORITY_FOCUS_UNIVERSE)
+    assert len(subscribed) == 30
+    assert subscription["bars"] == subscribed
+    assert subscription["trades"] == subscribed
+    assert subscription["updatedBars"] == subscribed
+    assert subscription["statuses"] == subscribed
+    assert subscription["lulds"] == subscribed
+    assert "corrections" not in subscription
+    assert "cancelErrors" not in subscription
     assert list(CORE_LIQUID_SYMBOLS) == symbols[: len(CORE_LIQUID_SYMBOLS)]
+    assert "DELL" in symbols[:30]
+
+
+def test_alpaca_event_normalization_and_engine_shadow_tape_state() -> None:
+    received = datetime(2026, 9, 4, 14, 30, 1, tzinfo=timezone.utc)
+    event = _alpaca_market_event({
+        "T": "q", "S": "QQQ", "bp": 100.0, "ap": 100.02,
+        "bs": 10, "as": 12, "t": "2026-09-04T14:30:00Z",
+    }, received_at=received)
+    assert event is not None and event.kind == EventKind.QUOTE
+    engine = LiveOpportunityEngine(feed="sip")
+    card = engine.update_market_event(event, now=received)
+    assert card["last_integrity"]["accepted"] is True
+    assert card["quote_persistence"]["state"] == "OBSERVING"
+    assert "luld_unavailable" in card["shadow_vetoes"]
+    assert card["execution_enabled"] is False
+
+
+def test_alpaca_cancel_error_uses_trade_id_and_status_codes_are_centralized() -> None:
+    received = datetime(2026, 9, 4, 14, 30, 1, tzinfo=timezone.utc)
+    cancelled = _alpaca_market_event({
+        "T": "x", "S": "QQQ", "i": 712, "p": 100.0, "s": 5,
+        "t": "2026-09-04T14:30:00Z",
+    }, received_at=received)
+    assert cancelled is not None and cancelled.original_sequence == 712
+    engine = LiveOpportunityEngine(feed="sip")
+    card = engine.update_market_event(cancelled, now=received)
+    assert card["last_integrity"]["accepted"] is True
+    halted = _alpaca_market_event({
+        "T": "s", "S": "QQQ", "sc": "P", "rc": "LUDP",
+        "t": "2026-09-04T14:30:01Z",
+    }, received_at=received + timedelta(seconds=1))
+    assert halted is not None
+    status = engine.update_market_event(halted, now=received + timedelta(seconds=1))
+    assert "halt_or_pause" in status["shadow_vetoes"]
+    assert halted.reason_code == "LUDP"
+
+
+def test_alpaca_resume_reason_clears_halt_without_guessing_unknown_status() -> None:
+    now = datetime(2026, 9, 4, 14, 30, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    for code, reason, offset in (("H", "T1", 0), ("F", "R4", 1)):
+        event = _alpaca_market_event({
+            "T": "s", "S": "QQQ", "sc": code, "rc": reason,
+            "t": (now + timedelta(seconds=offset)).isoformat(),
+        }, received_at=now + timedelta(seconds=offset))
+        assert event is not None
+        card = engine.update_market_event(event, now=now + timedelta(seconds=offset))
+    assert card["tape_truth"]["halted"] is False
+    assert card["tape_truth"]["reason"] == "trading_resumed"
+
+
+def test_event_lane_emits_paired_shadow_heads_up_after_level_and_quote_hold() -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol(
+        "QQQ", bars=_bars(),
+        quote={"bid": 104.55, "ask": 104.57, "timestamp": now.isoformat()},
+        average_dollar_volume=4_000_000_000,
+        catalyst={"headline": "fresh", "source": "sec"},
+        previous_close=100.0,
+    )
+    initial = engine.snapshot(now=now)
+    candidate = initial["candidates"][0]
+    level = float(candidate["entry"])
+    engine.update_market_event(MarketEvent(
+        symbol="QQQ", kind=EventKind.LULD, event_ts=now, received_ts=now,
+        source="alpaca_sip", lower_band=level * 0.9, upper_band=level * 1.1,
+    ), now=now)
+    for seconds in (0.1, 2.6, 5.2):
+        stamp = now + timedelta(seconds=seconds)
+        engine.update_market_event(MarketEvent(
+            symbol="QQQ", kind=EventKind.QUOTE, event_ts=stamp, received_ts=stamp,
+            source="alpaca_sip", bid=level - 0.01, ask=level + 0.01,
+            bid_size=20, ask_size=20,
+        ), now=stamp)
+    report = engine.snapshot(now=now + timedelta(seconds=5.2))
+    heads_up = [row for row in report["event_time_intelligence"]["lifecycle"] if row["state"] == "SHADOW_HEADS_UP"]
+    assert heads_up
+    assert heads_up[0]["pair_id"] == candidate["event_pair_id"]
+    assert heads_up[0]["notification_authority"] == "dashboard_shadow_only"
+
+
+def test_mapped_level_can_emit_before_completed_bar_candidate_then_pair() -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    probe = LiveOpportunityEngine(feed="sip")
+    probe.seed_symbol(
+        "QQQ", bars=_bars(),
+        quote={"bid": 104.55, "ask": 104.57, "timestamp": now.isoformat()},
+        average_dollar_volume=4_000_000_000,
+        catalyst={"headline": "fresh", "source": "sec"}, previous_close=100.0,
+    )
+    mapped_candidate = probe.snapshot(now=now)["candidates"][0]
+    family = mapped_candidate["setup_family"]
+    level = mapped_candidate["entry"]
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol(
+        "QQQ", bars=_bars(), quote={}, average_dollar_volume=4_000_000_000,
+        catalyst={"headline": "fresh", "source": "sec"}, previous_close=100.0,
+        mapped_levels={"confirmation_trigger": level},
+        mapped_setup_family=family, mapped_direction=mapped_candidate["direction"],
+    )
+    engine.update_market_event(MarketEvent(
+        symbol="QQQ", kind=EventKind.LULD, event_ts=now, received_ts=now,
+        source="alpaca_sip", lower_band=90, upper_band=110,
+    ), now=now)
+    for seconds in (0.1, 2.6, 5.2, 7.8):
+        stamp = now + timedelta(seconds=seconds)
+        engine.update_market_event(MarketEvent(
+            symbol="QQQ", kind=EventKind.QUOTE, event_ts=stamp, received_ts=stamp,
+            source="alpaca_sip", bid=level - 0.01, ask=level + 0.01, bid_size=20, ask_size=20,
+        ), now=stamp)
+    before = list(engine._event_lifecycle)
+    assert any(row["state"] == "SHADOW_HEADS_UP" for row in before)
+    assert all(row["paired_bar_lane"] == "awaiting_completed_5m_candidate" for row in before)
+    report = engine.snapshot(now=now + timedelta(seconds=8))
+    matching = [
+        row for row in report["event_time_intelligence"]["lifecycle"]
+        if row["pair_id"].endswith(f":{family}")
+    ]
+    assert any(row["paired_bar_lane"] == "completed_5m_candidate_observed" for row in matching)
+    assert all(row.get("event_to_bar_seconds", -1) >= 0 for row in matching)
+    frozen = [(row.get("bar_signal_available_at"), row.get("event_to_bar_seconds")) for row in matching]
+    later = engine.snapshot(now=now + timedelta(minutes=2))
+    later_matching = [
+        row for row in later["event_time_intelligence"]["lifecycle"]
+        if row["pair_id"].endswith(f":{family}")
+    ]
+    assert [(row.get("bar_signal_available_at"), row.get("event_to_bar_seconds")) for row in later_matching] == frozen
+
+
+def test_event_intensity_uses_prior_completed_windows_and_persistence() -> None:
+    start = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol("QQQ", bars=[], quote={})
+    for bucket, count in ((0, 1), (10, 1), (20, 4), (30, 4)):
+        for index in range(count):
+            stamp = start + timedelta(seconds=bucket, milliseconds=index * 10)
+            engine.update_market_event(MarketEvent(
+                symbol="QQQ", kind=EventKind.QUOTE, event_ts=stamp, received_ts=stamp,
+                source="alpaca_sip", bid=100, ask=100.02, bid_size=10, ask_size=10,
+            ), now=stamp)
+            engine.update_market_event(MarketEvent(
+                symbol="QQQ", kind=EventKind.TRADE, event_ts=stamp, received_ts=stamp,
+                source="alpaca_sip", price=100.01, size=10, conditions=("@",),
+            ), now=stamp)
+    card = engine.snapshot(now=start + timedelta(seconds=40))["event_time_intelligence"]["event_intensity"]["QQQ"]
+    assert card["status"] == "observed"
+    assert card["state"] == "ACCELERATING"
+    assert card["persistence_windows"] == 2
 
 
 def test_hourly_context_is_anchored_to_rth_and_excludes_extended_hours() -> None:

@@ -152,8 +152,15 @@ def test_governed_dashboard_scores_alerts_from_first_full_minute_after_discord()
                 "positive_pct": 42.86,
                 "median_r": -0.18,
                 "status_counts": {"invalidated_before_entry": 3},
-            }
-        }
+            },
+            "chart_aligned_outcomes": [{"status": "scored", "latency_edge_decay_r": 0.4}],
+            "bplus_to_aplus_nominations": {"nominations": [{"promotion_status": "human_review_required"}]},
+            "alert_half_life_models": [{"status": "estimated"}],
+        },
+        "live_opportunity": {
+            "event_time_intelligence": {"status": "observing", "symbols": {"QQQ": {}}, "hot_set": {"symbols": ["SPY", "QQQ", "DELL"]}},
+            "discord_deadline_queue_shadow": {"selected": [{"candidate_id": "one"}]},
+        },
     })
 
     assert "Post-Discord 1m Chart Review" in html
@@ -161,6 +168,11 @@ def test_governed_dashboard_scores_alerts_from_first_full_minute_after_discord()
     assert "first full minute after delivery" in html
     assert "Invalid before entry" in html
     assert "not option-contract P&amp;L" in html
+    assert "Signal-to-Chart Learning" in html
+    assert "B+→A+ nominations" in html
+    assert "human review only" in html
+    assert "Event-Time Eyes" in html
+    assert "revised bars" in html
 
 
 def test_dashboard_renders_execution_readiness_without_promotion_authority() -> None:
