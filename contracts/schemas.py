@@ -19,6 +19,10 @@ class ContractError(ValueError):
 
 OHLCV_COLUMNS = ("ticker", "timestamp", "open", "high", "low", "close", "volume")
 SCANNER_COLUMNS = ("ticker", "ts", "scanner_id", "score", "side", "features_json")
+IVR_COLUMNS = ("ticker", "timestamp", "ivr", "iv", "rv", "rv_iv_spread")
+HMM_COLUMNS = ("ticker", "timestamp", "state", "prob_trend_up", "prob_chop", "prob_trend_down")
+BREADTH_COLUMNS = ("ts", "adv", "dec", "new_highs", "new_lows", "mcclellan")
+VWAP_COLUMNS = ("ticker", "ts", "vwap", "upper_band", "lower_band", "deviation_z")
 
 
 def _finite(value: Any) -> bool:
@@ -78,6 +82,51 @@ def validate_scanner_output(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) ->
     return output
 
 
+def _validate_numeric_frame(rows: Iterable[Mapping[str, Any]] | pd.DataFrame, columns: tuple[str, ...], *, timestamp: str, bounded_probabilities: tuple[str, ...] = ()) -> pd.DataFrame:
+    frame = rows.copy() if isinstance(rows, pd.DataFrame) else pd.DataFrame(list(rows))
+    missing = [name for name in columns if name not in frame.columns]
+    if missing:
+        raise ContractError(f"snapshot_missing_columns:{','.join(missing)}")
+    if frame.empty:
+        raise ContractError("snapshot_empty")
+    stamps = pd.to_datetime(frame[timestamp], utc=True, errors="coerce")
+    if stamps.isna().any():
+        raise ContractError("snapshot_invalid_timestamp")
+    text_columns = {timestamp, "ticker", "state"}
+    numeric_names = [name for name in columns if name not in text_columns]
+    numeric = frame[numeric_names].apply(pd.to_numeric, errors="coerce")
+    if numeric.isna().any().any() or not numeric.map(_finite).all().all():
+        raise ContractError("snapshot_non_finite")
+    for name in bounded_probabilities:
+        if ((numeric[name] < 0) | (numeric[name] > 1)).any():
+            raise ContractError("snapshot_probability_out_of_bounds")
+    output = frame.copy(); output[timestamp] = stamps; output[numeric_names] = numeric
+    return output
+
+
+def validate_ivr(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
+    return _validate_numeric_frame(rows, IVR_COLUMNS, timestamp="timestamp")
+
+
+def validate_hmm(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
+    output = _validate_numeric_frame(rows, HMM_COLUMNS, timestamp="timestamp", bounded_probabilities=("prob_trend_up", "prob_chop", "prob_trend_down"))
+    totals = output[["prob_trend_up", "prob_chop", "prob_trend_down"]].sum(axis=1)
+    if ((totals - 1).abs() > 1e-6).any():
+        raise ContractError("hmm_probabilities_do_not_sum_to_one")
+    return output
+
+
+def validate_breadth(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
+    return _validate_numeric_frame(rows, BREADTH_COLUMNS, timestamp="ts")
+
+
+def validate_vwap(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
+    output = _validate_numeric_frame(rows, VWAP_COLUMNS, timestamp="ts")
+    if (output["lower_band"] > output["vwap"]).any() or (output["upper_band"] < output["vwap"]).any():
+        raise ContractError("vwap_band_order_invalid")
+    return output
+
+
 try:  # Optional typed documentation surface.
     import pandera.pandas as pa
     from pandera.typing import Series
@@ -98,5 +147,23 @@ try:  # Optional typed documentation surface.
         score: Series[float] = pa.Field(ge=0, le=1)
         side: Series[str] = pa.Field(isin=["LONG", "SHORT", "ABSTAIN"])
         features_json: Series[str]
+
+    class IVRSnapshot(pa.DataFrameModel):
+        ticker: Series[str]; timestamp: Series[pd.Timestamp]
+        ivr: Series[float]; iv: Series[float]; rv: Series[float]; rv_iv_spread: Series[float]
+
+    class HMMState(pa.DataFrameModel):
+        ticker: Series[str]; timestamp: Series[pd.Timestamp]; state: Series[str]
+        prob_trend_up: Series[float] = pa.Field(ge=0, le=1)
+        prob_chop: Series[float] = pa.Field(ge=0, le=1)
+        prob_trend_down: Series[float] = pa.Field(ge=0, le=1)
+
+    class BreadthSnapshot(pa.DataFrameModel):
+        ts: Series[pd.Timestamp]; adv: Series[float]; dec: Series[float]
+        new_highs: Series[float]; new_lows: Series[float]; mcclellan: Series[float]
+
+    class VWAPFrame(pa.DataFrameModel):
+        ticker: Series[str]; ts: Series[pd.Timestamp]
+        vwap: Series[float]; upper_band: Series[float]; lower_band: Series[float]; deviation_z: Series[float]
 except ImportError:  # Manual validation above remains mandatory.
-    OHLCVBar = ScannerOutput = None
+    OHLCVBar = ScannerOutput = IVRSnapshot = HMMState = BreadthSnapshot = VWAPFrame = None
