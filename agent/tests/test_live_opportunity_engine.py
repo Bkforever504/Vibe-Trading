@@ -50,6 +50,27 @@ def _bars() -> list[dict[str, float | str]]:
     return rows
 
 
+def test_snapshot_does_not_refresh_old_candidate_deadline() -> None:
+    now = datetime(2026, 8, 21, 14, 10, tzinfo=timezone.utc)
+    engine = LiveOpportunityEngine(feed="sip")
+    engine.seed_symbol("QQQ", bars=_bars(), quote={
+        "bid": 104.0, "ask": 104.02, "timestamp": now.isoformat(),
+    }, average_dollar_volume=1_000_000_000, previous_close=100.0)
+
+    first = engine.snapshot(now=now)["candidates"]
+    engine.update_quote("QQQ", {
+        "bid": 104.0, "ask": 104.02,
+        "timestamp": (now + timedelta(minutes=4)).isoformat(),
+    })
+    later = engine.snapshot(now=now + timedelta(minutes=4))["candidates"]
+
+    assert first and later
+    assert later[0]["candidate_id"] == first[0]["candidate_id"]
+    assert later[0]["signal_available_at"] == first[0]["signal_available_at"]
+    assert later[0]["alert_deadline_shadow"]["action_deadline_ts"] == first[0]["alert_deadline_shadow"]["action_deadline_ts"]
+    assert later[0]["alert_deadline_shadow"]["seconds_of_slack"] < 0
+
+
 def test_feed_provenance_never_implies_unverified_sip() -> None:
     default = build_feed_provenance({})
     requested = build_feed_provenance({"VIBE_TRADING_STOCK_FEED": "sip"})

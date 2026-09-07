@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -28,7 +27,9 @@ def _rsi(series: pd.Series, period: int) -> pd.Series:
     delta = series.diff()
     up, down = delta.clip(lower=0).rolling(period).mean(), (-delta.clip(upper=0)).rolling(period).mean()
     relative = up / down.replace(0, np.nan)
-    return (100 - 100 / (1 + relative)).fillna(50)
+    result = 100 - 100 / (1 + relative)
+    result = result.mask((down == 0) & (up > 0), 100)
+    return result.mask((down == 0) & (up == 0), 50)
 
 
 def common_feature_fabric(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> pd.DataFrame:
@@ -38,8 +39,9 @@ def common_feature_fabric(rows: Iterable[Mapping[str, Any]] | pd.DataFrame) -> p
         frame = group.copy().sort_values("timestamp")
         close, volume = frame["close"], frame["volume"]
         typical = (frame["high"] + frame["low"] + close) / 3
-        cumulative_volume = volume.cumsum().replace(0, np.nan)
-        frame["vwap"] = (typical * volume).cumsum() / cumulative_volume
+        session = frame["timestamp"].dt.tz_convert("America/New_York").dt.date
+        cumulative_volume = volume.groupby(session).cumsum().replace(0, np.nan)
+        frame["vwap"] = (typical * volume).groupby(session).cumsum() / cumulative_volume
         for window in (5, 20, 60):
             low, high = close.rolling(window).min(), close.rolling(window).max()
             frame[f"range_pos_{window}"] = (close - low) / (high - low).replace(0, np.nan)
@@ -87,35 +89,117 @@ def donchian_climax_predictions(fabric: pd.DataFrame) -> pd.DataFrame:
     return _emit(fabric, "donchian_climax_v1", side, score, ["range_pos_20", "volume_ratio20", "true_range_pct"])
 
 
-def lightgbm_predictions(fabric: pd.DataFrame, *, min_train_rows: int = 252) -> pd.DataFrame:
+def lightgbm_predictions(fabric: pd.DataFrame, *, min_train_rows: int = 252, schedule: pd.DataFrame | None = None) -> pd.DataFrame:
     features = ["range_pos_5", "range_pos_20", "range_pos_60", "rsi_2", "rsi_14", "close_z20", "volume_ratio20", "true_range_pct", "return_1", "trend_20"]
-    base = fabric.dropna(subset=features).copy()
-    if len(base) < min_train_rows + 21:
-        return _emit(fabric, "lightgbm_blsh_v1", pd.Series("ABSTAIN", index=fabric.index), pd.Series(0.0, index=fabric.index), features)
+    sides = pd.Series("ABSTAIN", index=fabric.index)
+    scores = pd.Series(0.0, index=fabric.index)
+    reasons = pd.Series("insufficient_purged_training_history", index=fabric.index)
+    cutoffs = pd.Series(pd.NaT, index=fabric.index, dtype="datetime64[ns, UTC]")
+    label_ends = cutoffs.copy()
+    def emit():
+        output = _emit(fabric, "lightgbm_blsh_v1", sides, scores, features)
+        output["model_status"] = reasons
+        output["training_cutoff"] = cutoffs
+        output["training_label_max_ts"] = label_ends
+        return output
     try:
         import lightgbm as lgb
     except ImportError:
-        return _emit(fabric, "lightgbm_blsh_v1", pd.Series("ABSTAIN", index=fabric.index), pd.Series(0.0, index=fabric.index), features)
-    base["target"] = base.groupby("ticker")["close"].shift(-5) / base["close"] - 1
-    base = base.dropna(subset=["target"])
-    split = max(min_train_rows, int(len(base) * .8))
-    train, test = base.iloc[:split], base.iloc[split:]
-    model = lgb.LGBMClassifier(n_estimators=100, max_depth=3, learning_rate=.03, random_state=7, verbosity=-1)
-    model.fit(train[features], (train["target"] > 0).astype(int))
-    probability = pd.Series(model.predict_proba(test[features])[:, 1], index=test.index)
-    scores = pd.Series(0.0, index=fabric.index); scores.loc[probability.index] = (probability - .5).abs() * 2
-    sides = pd.Series("ABSTAIN", index=fabric.index); sides.loc[probability[probability >= .6].index] = "LONG"; sides.loc[probability[probability <= .4].index] = "SHORT"
-    return _emit(fabric, "lightgbm_blsh_v1", sides, scores, features)
+        reasons[:] = "not_configured_lightgbm"
+        return emit()
+    try:
+        labels = _market_outcomes(fabric, (5,), schedule=schedule)
+    except ImportError:
+        reasons[:] = "not_configured_exchange_calendar"
+        return emit()
+    base = fabric.merge(labels[["ticker", "timestamp", "forward_return_5", "outcome_ts_5"]], on=["ticker", "timestamp"], validate="one_to_one")
+    base.index = fabric.index
+    base = base.dropna(subset=features)
+    # Global calendar-month folds across every ticker; label END must precede
+    # the fold boundary. No prediction-time label is required for test rows.
+    months = base.timestamp.dt.tz_localize(None).dt.to_period("M")
+    for month in sorted(months.unique()):
+        cutoff = month.start_time.tz_localize("UTC")
+        train = base[(base.timestamp >= cutoff - pd.DateOffset(months=12)) & (base.timestamp < cutoff) & (base.outcome_ts_5 < cutoff)].dropna(subset=["forward_return_5"])
+        test = base[months == month]
+        if len(train) < min_train_rows or train.timestamp.min() > cutoff - pd.DateOffset(months=12) + pd.Timedelta(days=7):
+            continue
+        if (train.forward_return_5 > 0).nunique() < 2:
+            reasons.loc[test.index] = "insufficient_target_classes"
+            continue
+        model = lgb.LGBMClassifier(n_estimators=100, max_depth=3, learning_rate=.03, random_state=7, verbosity=-1, n_jobs=1)
+        model.fit(train[features], (train.forward_return_5 > 0).astype(int))
+        probability = pd.Series(model.predict_proba(test[features])[:, 1], index=test.index)
+        scores.loc[test.index] = (probability - .5).abs() * 2
+        sides.loc[probability[probability >= .6].index] = "LONG"
+        sides.loc[probability[probability <= .4].index] = "SHORT"
+        reasons.loc[test.index] = "historical_walk_forward_not_live"
+        cutoffs.loc[test.index] = cutoff
+        label_ends.loc[test.index] = train.outcome_ts_5.max()
+    return emit()
 
 
-def join_forward_returns(predictions: pd.DataFrame, bars: pd.DataFrame, horizons: tuple[int, ...] = (1, 5, 10)) -> pd.DataFrame:
-    validated = validate_scanner_output(predictions)
+def _market_outcomes(bars: pd.DataFrame, horizons: tuple[int, ...], *, schedule: pd.DataFrame | None = None) -> pd.DataFrame:
+    """T+n exchange-session CLOSE outcomes from bar-close-stamped 15m RTH bars.
+
+    Every expected post-signal bar must exist. Missing a day cannot shorten a
+    horizon. An explicit schedule is useful for audited provider calendars/tests.
+    """
     prices = validate_ohlcv(bars)[["ticker", "timestamp", "close", "high", "low"]]
-    merged = validated.merge(prices, left_on=["ticker", "ts"], right_on=["ticker", "timestamp"], how="left")
+    if any(not isinstance(h, int) or h < 1 for h in horizons):
+        raise ValueError("positive_session_horizons_required")
+    if schedule is None:
+        import pandas_market_calendars as mcal
+        schedule = mcal.get_calendar("NYSE").schedule(start_date=prices.timestamp.min().date(), end_date=(prices.timestamp.max() + pd.Timedelta(days=max(horizons) * 3 + 10)).date())
+    schedule = schedule.copy()
+    for column in ("market_open", "market_close"):
+        schedule[column] = pd.to_datetime(schedule[column], utc=True, errors="raise")
+    schedule = schedule.sort_values("market_open").reset_index(drop=True)
+    if schedule.empty or (schedule.market_close <= schedule.market_open).any() or schedule.market_open.duplicated().any() or (schedule.market_open.iloc[1:].reset_index(drop=True) <= schedule.market_close.iloc[:-1].reset_index(drop=True)).any():
+        raise ValueError("invalid_exchange_schedule")
+    expected = [pd.date_range(row.market_open + pd.Timedelta(minutes=15), row.market_close, freq="15min") for row in schedule.itertuples()]
+    session_for_ts = {stamp: i for i, stamps in enumerate(expected) for stamp in stamps}
     for horizon in horizons:
-        merged[f"forward_return_{horizon}"] = merged.groupby("ticker")["close"].shift(-horizon) / merged["close"] - 1
-        merged[f"mfe_{horizon}"] = merged.groupby("ticker")["high"].transform(lambda s: s.shift(-1).rolling(horizon).max().shift(-(horizon - 1))) / merged["close"] - 1
-        merged[f"mae_{horizon}"] = merged.groupby("ticker")["low"].transform(lambda s: s.shift(-1).rolling(horizon).min().shift(-(horizon - 1))) / merged["close"] - 1
+        prices[f"forward_return_{horizon}"] = np.nan
+        prices[f"underlying_max_return_{horizon}"] = np.nan
+        prices[f"underlying_min_return_{horizon}"] = np.nan
+        prices[f"outcome_ts_{horizon}"] = pd.Series(pd.NaT, index=prices.index, dtype="datetime64[ns, UTC]")
+        prices[f"outcome_status_{horizon}"] = "signal_not_on_rth_bar_close"
+    for _, group in prices.groupby("ticker"):
+        lookup = group.set_index("timestamp")
+        for index, row in group.iterrows():
+            session = session_for_ts.get(row.timestamp)
+            if session is None:
+                continue
+            for horizon in horizons:
+                target = session + horizon
+                status_col = f"outcome_status_{horizon}"
+                prices.at[index, status_col] = "missing_future_session_or_bars"
+                if target >= len(expected):
+                    continue
+                stamps = expected[session][expected[session] > row.timestamp]
+                for future in expected[session + 1:target + 1]:
+                    stamps = stamps.append(future)
+                if not stamps.isin(lookup.index).all():
+                    continue
+                path = lookup.loc[stamps]
+                prices.at[index, f"forward_return_{horizon}"] = path.iloc[-1].close / row.close - 1
+                prices.at[index, f"underlying_max_return_{horizon}"] = path.high.max() / row.close - 1
+                prices.at[index, f"underlying_min_return_{horizon}"] = path.low.min() / row.close - 1
+                prices.at[index, f"outcome_ts_{horizon}"] = stamps[-1]
+                prices.at[index, status_col] = "resolved"
+    return prices
+
+
+def join_forward_returns(predictions: pd.DataFrame, bars: pd.DataFrame, horizons: tuple[int, ...] = (1, 5, 10), *, schedule: pd.DataFrame | None = None) -> pd.DataFrame:
+    validated = validate_scanner_output(predictions)
+    prices = _market_outcomes(bars, horizons, schedule=schedule)
+    merged = validated.merge(prices, left_on=["ticker", "ts"], right_on=["ticker", "timestamp"], how="left", validate="many_to_one")
+    for horizon in horizons:
+        high, low = merged[f"underlying_max_return_{horizon}"], merged[f"underlying_min_return_{horizon}"]
+        merged[f"mfe_{horizon}"] = np.where(merged.side == "LONG", high.clip(lower=0), np.where(merged.side == "SHORT", (-low).clip(lower=0), np.nan))
+        merged[f"mae_{horizon}"] = np.where(merged.side == "LONG", low.clip(upper=0), np.where(merged.side == "SHORT", (-high).clip(upper=0), np.nan))
+        merged[f"outcome_status_{horizon}"] = merged[f"outcome_status_{horizon}"].fillna("missing_signal_bar")
     return merged
 
 
@@ -142,12 +226,12 @@ def statistical_promotion_gate(outcomes: pd.DataFrame, *, minimum_days: int = 63
         "winner_candidate": None,
         "automatic_registry_change": False,
         "validation_blockers": [
-            "global_time_split_and_label_purging_required",
-            "trading_session_horizons_required",
-            "scanner_independent_outcome_join_required",
             "live_prediction_timestamp_provenance_required",
-            "benchmark_costs_and_multiple_testing_required",
+            "benchmark_and_transaction_cost_returns_required",
+            "multiple_testing_control_required",
             "dependence_robust_paired_statistic_required",
+            "point_in_time_optionable_universe_required",
+            "complete_hmm_ivr_breadth_feature_fabric_required",
         ],
         **AUTHORITY,
     }
@@ -187,12 +271,27 @@ def append_prediction_ledger(rows: pd.DataFrame, path: Path) -> int:
     return len(combined) - len(existing)
 
 
-def build_bakeoff(rows: Iterable[Mapping[str, Any]], *, as_of: datetime | None = None) -> dict[str, Any]:
-    fabric = common_feature_fabric(rows)
-    predictions = pd.concat([arps_predictions(fabric), donchian_climax_predictions(fabric), lightgbm_predictions(fabric)], ignore_index=True)
+def build_bakeoff(rows: Iterable[Mapping[str, Any]], *, as_of: datetime | None = None, schedule: pd.DataFrame | None = None) -> dict[str, Any]:
+    observed_at = datetime.now(timezone.utc)
+    cutoff = pd.Timestamp(as_of or observed_at)
+    if cutoff.tzinfo is None:
+        raise ValueError("as_of_timezone_required")
+    bars = validate_ohlcv(rows)
+    bars = bars[bars.timestamp <= cutoff]
+    if bars.empty:
+        raise ValueError("no_bars_available_as_of")
+    fabric = common_feature_fabric(bars)
+    predictions = pd.concat([arps_predictions(fabric), donchian_climax_predictions(fabric), lightgbm_predictions(fabric, schedule=schedule)], ignore_index=True)
+    # Bulk historical regeneration is never proof of prospective collection.
+    predictions["recorded_at"] = observed_at.isoformat()
+    predictions["collection_mode"] = "historical_replay"
+    predictions["live_evidence_eligible"] = False
     return {
         "schema_version": 1, "generated_at": (as_of or datetime.now(timezone.utc)).isoformat().replace("+00:00", "Z"),
-        "status": "shadow_predictions_ready", "prediction_count": len(predictions),
+        "status": "quarantined_research_predictions", "prediction_count": len(predictions),
+        "statistical_gate": statistical_promotion_gate(pd.DataFrame()),
+        "collection_mode": "historical_replay", "live_evidence_eligible": False,
+        "feature_limitations": ["bar_windows_not_verified_daily_windows", "point_in_time_optionable_universe_unverified", "hmm_ivr_breadth_context_not_wired", "fixed_rule_weights_not_calibrated"],
         "scanner_counts": predictions.groupby("scanner_id").size().to_dict(),
         "predictions": predictions.assign(ts=predictions["ts"].astype(str)).to_dict("records"),
         "minimum_live_shadow_days": 63, **AUTHORITY,

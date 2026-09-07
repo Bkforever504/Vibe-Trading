@@ -639,6 +639,9 @@ class LiveOpportunityEngine:
         self._event_audit: deque[dict[str, Any]] = deque(maxlen=1000)
         self._event_lifecycle: deque[dict[str, Any]] = deque(maxlen=1000)
         self._headsup_pairs: set[str] = set()
+        # Freeze decision availability per completed signal bar. Re-rendering a
+        # snapshot must never manufacture a fresh alert window for an old setup.
+        self._candidate_first_seen_at: dict[str, datetime] = {}
         self._event_rate_windows: dict[str, deque[dict[str, Any]]] = defaultdict(lambda: deque(maxlen=120))
 
     def _record_event_rate(self, event: MarketEvent) -> None:
@@ -999,8 +1002,15 @@ class LiveOpportunityEngine:
                 decision_state = "READY_TO_REVIEW"
             else:
                 decision_state = "WATCH"
+            bar_completed_at = (
+                _utc(features.get("last_completed_bar_at")) + timedelta(minutes=5)
+                if _utc(features.get("last_completed_bar_at")) else None
+            )
+            bar_identity = bar_completed_at.isoformat().replace("+00:00", "Z") if bar_completed_at else "bar_unknown"
+            candidate_id = f"{symbol}:{family}:{bar_identity}"
+            first_seen = self._candidate_first_seen_at.setdefault(candidate_id, now)
             row = {
-                "candidate_id": f"{now.date().isoformat()}:{symbol}:{family}",
+                "candidate_id": candidate_id,
                 "event_pair_id": f"{now.date().isoformat()}:{symbol}:{family}",
                 "symbol": symbol,
                 "asset_class": "equity",
@@ -1018,11 +1028,8 @@ class LiveOpportunityEngine:
                 "relative_strength_vs_market_sector": round(relative_strength, 5) if relative_strength is not None else None,
                 "catalyst": state.get("catalyst"),
                 "bar_start_at": features.get("last_completed_bar_at"),
-                "bar_completed_at": (
-                    (_utc(features.get("last_completed_bar_at")) + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
-                    if _utc(features.get("last_completed_bar_at")) else None
-                ),
-                "signal_available_at": now.isoformat().replace("+00:00", "Z"),
+                "bar_completed_at": bar_identity if bar_completed_at else None,
+                "signal_available_at": first_seen.isoformat().replace("+00:00", "Z"),
                 "source_labels": [f"alpaca_{self.feed}_{self.transport}", "completed_5m_bars", *context_source_labels] + ([str((state.get("catalyst") or {}).get("source") or "catalyst")] if state.get("catalyst") else []),
                 "blockers": blockers,
                 "factor_scores": {

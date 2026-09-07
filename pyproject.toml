@@ -63,6 +63,7 @@ dependencies = [
     "weasyprint>=60.0",
     "prompt_toolkit>=3.0.0",
     "tzdata>=2024.1",
+    "pandas_market_calendars==5.4.0",
 ]
 
 [project.urls]

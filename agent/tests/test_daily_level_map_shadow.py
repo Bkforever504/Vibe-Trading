@@ -115,6 +115,7 @@ def test_report_contract_is_shadow_only_and_append_log_is_idempotent(tmp_path) -
     assert report["shadow_only"] is True
     assert report["execution_enabled"] is False
     assert report["can_submit_orders"] is False
+    assert report["pending_delivery"] == 0
     assert report["symbols"][0]["confirmation_3m"]["state"] in subject.ALERT_STATES | {"DORMANT"}
     assert "magnet/magnitude" in report["warning"]
     path = tmp_path / "events.jsonl"

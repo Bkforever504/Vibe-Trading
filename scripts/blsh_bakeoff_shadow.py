@@ -2,6 +2,7 @@
 """Run the common-fabric BLSH bake-off from a supplied OHLCV JSON file."""
 from __future__ import annotations
 import argparse, json, sys
+from datetime import datetime, timezone
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
@@ -19,7 +20,7 @@ def main() -> int:
         report = build_bakeoff(rows); import pandas as pd
         ledger_rows = pd.DataFrame(report.pop("predictions")); report["ledger_rows_added"] = append_prediction_ledger(ledger_rows, args.ledger)
     except Exception as exc:
-        report = {"schema_version": 1, "status": "unavailable", "reason": type(exc).__name__, "execution_enabled": False, "can_submit_orders": False, "promotion_authority": "human_review_only"}
+        report = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(), "status": "unavailable", "reason": type(exc).__name__, "execution_enabled": False, "can_submit_orders": False, "promotion_authority": "human_review_only"}
     args.report.parent.mkdir(parents=True, exist_ok=True); args.report.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
-    return 0
+    return 1 if report["status"] == "unavailable" else 0
 if __name__ == "__main__": raise SystemExit(main())

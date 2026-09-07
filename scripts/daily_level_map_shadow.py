@@ -449,7 +449,8 @@ def build_report(
             "completed_3m_fresh": confirmation_fresh,
             "completed_3m_expected_now": confirmation_expected,
         },
-        "errors": errors, "notification_attempts": 0, "alerts_sent": 0, "notification_failures": 0,
+        "errors": errors, "notification_attempts": 0, "alerts_sent": 0,
+        "notification_failures": 0, "pending_delivery": 0,
         "custom_level_contract": {
             "schema_version": 1,
             "required_fields": ["symbol", "name", "price", "role", "session_date", "created_at", "source"],

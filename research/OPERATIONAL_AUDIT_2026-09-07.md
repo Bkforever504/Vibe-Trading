@@ -1,6 +1,17 @@
 # Operational and overfitting audit — 2026-09-07
 
-Verdict: NOT READY for a claim of error-free operation or validated improvement.
+Verdict: infrastructure repairs verified; strategy promotion remains NOT READY pending prospective evidence.
+
+## Repair update
+
+- Scheduler probing was changed from serial CIM calls to one bounded Task Scheduler COM session. It now preserves partial evidence instead of discarding the full heartbeat on timeout.
+- Scanner cadence uses the NYSE calendar, including holidays and early closes. Calendar failure is explicit `calendar_unavailable`; it can never become a healthy weekday guess.
+- BLSH outcomes are built once from market bars and joined many-to-one to scanners, preventing cross-scanner contamination. Horizons use complete exchange sessions and fail honest on missing 15-minute coverage.
+- LightGBM uses global calendar-month walk-forward folds and purges labels whose outcome ends at or after the prediction boundary. Historical replay rows are explicitly ineligible as live evidence.
+- Session VWAP resets by New York trading date. CLI input failures now return nonzero with a timestamped `unavailable` report.
+- Live opportunity candidates freeze `signal_available_at` and deadlines for a completed signal bar; repeated dashboard snapshots can no longer make an old setup look fresh.
+- Unit tests no longer depend on workstation GARCH or approval files. Missing approval, future/stale gate evidence, and risk veto behavior remain separately tested.
+- The repaired statistical gate stays quarantined. Benchmark-relative net returns, multiple-testing control, point-in-time optionable universes, the full HMM/IVR/breadth feature fabric, and prospective three-month collection are still required before a human-review nomination.
 
 ## Observed deployment
 
