@@ -122,6 +122,8 @@ REPORTS = {
     "priority_swing_observation": REPORT_DIR / "priority-swing-observation.json",
     "operational_runs": REPORT_DIR / "operational-run-health.json",
     "daily_level_map_shadow": REPORT_DIR / "daily-level-map-shadow.json",
+    "catalyst_symbol_tape": REPORT_DIR / "catalyst-symbol-tape-shadow.json",
+    "catalyst_tape": REPORT_DIR / "catalyst-tape-shadow.json",
 }
 
 
@@ -535,6 +537,10 @@ def load_model(paths: dict[str, Path] = REPORTS) -> dict[str, Any]:
         "daily_level_map_shadow": load_json(
             paths.get("daily_level_map_shadow", REPORTS["daily_level_map_shadow"]), {}
         ),
+        "catalyst_symbol_tape": load_json(
+            paths.get("catalyst_symbol_tape", REPORTS["catalyst_symbol_tape"]), {}
+        ),
+        "catalyst_tape": load_json(paths.get("catalyst_tape", REPORTS["catalyst_tape"]), {}),
         "agent_reach_research": load_json(paths["agent_reach_research"], {}),
         "social_replay_queue": read_jsonl_rows(SOCIAL_REPLAY_QUEUE),
         "social_gap_match": load_json(SOCIAL_GAP_MATCH_REPORT, {}),
@@ -909,7 +915,9 @@ def render_strategy_discovery_coverage(model: dict[str, Any]) -> str:
 def render_preconfirmation_heads_up(model: dict[str, Any]) -> str:
     radar = model.get("intraday_radar") if isinstance(model.get("intraday_radar"), dict) else {}
     rows = [row for row in radar.get("preconfirmation_heads_up") or [] if isinstance(row, dict)]
-    if not rows:
+    catalyst_data = model.get("catalyst_symbol_tape") if isinstance(model.get("catalyst_symbol_tape"), dict) else {}
+    catalyst_rows = [row for row in catalyst_data.get("observations") or [] if isinstance(row, dict)]
+    if not rows and not catalyst_rows:
         return """
     <div class="panel" style="margin-bottom:16px"><strong>Early heads-up</strong><br><span class="muted">No liquid pre-confirmation watches are live. This lane never creates an order or overrides the completed-bar gate.</span></div>"""
     cards = "".join(
@@ -918,11 +926,18 @@ def render_preconfirmation_heads_up(model: dict[str, Any]) -> str:
         f"score {safe_float(row.get('score')):.1f} · waiting for completed 5m confirmation · watch only</div>"
         for row in rows[:8]
     )
+    catalyst_cards = "".join(
+        f"<div class='card'><strong>{esc(str(row.get('symbol') or '?'))}</strong> · "
+        f"{esc(str(row.get('state') or 'WATCH'))} · {esc(str(row.get('direction') or 'NONE'))}<br>"
+        f"verified SEC {esc(str((row.get('primary_catalyst') or {}).get('form') or 'filing'))} · "
+        f"completed 1m {esc(str(row.get('bar_completed_at') or 'waiting')[:19])} · shadow only</div>"
+        for row in catalyst_rows[:8]
+    )
     return f"""
     <div class="panel" style="margin-bottom:16px;border-color:#60a5fa">
       <strong>Early heads-up · watch only</strong>
-      <div class="muted" style="margin:5px 0 10px">Liquid candidates awaiting a completed 5-minute confirmation. No rank, sizing, order, or execution authority.</div>
-      <div class="grid">{cards}</div>
+      <div class="muted" style="margin:5px 0 10px">Liquid candidates and verified SEC-catalyst tape awaiting deterministic completed 5-minute confirmation. No rank, sizing, order, or execution authority.</div>
+      <div class="grid">{catalyst_cards}{cards}</div>
     </div>"""
 
 

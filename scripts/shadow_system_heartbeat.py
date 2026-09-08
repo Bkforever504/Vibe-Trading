@@ -76,6 +76,7 @@ PATTERN_GRADER_TASKS = (
 OPTIONS_TASKS = (("\\", "IWM-Bot-Entry"), ("\\", "IWM-Bot-Monitor"))
 RADAR_TASKS = (("\\", "IntradayOpportunityRadar"),)
 APLUS_TASKS = (("\\VibeTrade\\", "APlusSpotlight"),)
+CATALYST_TAPE_TASKS = (("\\VibeTrade\\", "CatalystTapeShadow"),)
 OPS_TASKS = (
     ("\\VibeTrade\\", "HMMRegimeScanner"),
     ("\\VibeTrade\\", "SundayShadowPreflight"),
@@ -90,7 +91,7 @@ OBSERVABILITY_TASKS = (
 )
 EXPECTED_TASKS = (
     MES_TASKS + SCOUT_TASKS + MNQ_SMT_TASKS + MNQ_EVIDENCE_TASKS + PATTERN_GRADER_TASKS
-    + OPTIONS_TASKS + RADAR_TASKS + APLUS_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
+    + OPTIONS_TASKS + RADAR_TASKS + APLUS_TASKS + CATALYST_TAPE_TASKS + OPS_TASKS + OBSERVABILITY_TASKS
 )
 
 

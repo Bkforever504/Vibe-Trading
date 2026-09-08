@@ -72,6 +72,8 @@ NON_STRATEGY_PROGRAMS = frozenset({
     "options_tape_intelligence_shadow.py", "shadow_alert_intelligence.py",
     "ollama_trade_critic_shadow.py",
     "blsh_outcome_shadow.py",
+    "sec_latest_filings_shadow.py", "catalyst_symbol_tape_shadow.py",
+    "catalyst_tape_shadow.py",
 })
 
 LOGS = {

@@ -273,6 +273,7 @@ def test_heartbeat_fails_when_pattern_outcomes_ledger_did_not_grow(tmp_path: Pat
 def test_heartbeat_does_not_create_circular_dependency_on_its_consumers() -> None:
     assert ("\\", "IntradayOpportunityRadar") in heartbeat.EXPECTED_TASKS
     assert ("\\VibeTrade\\", "APlusSpotlight") in heartbeat.EXPECTED_TASKS
+    assert ("\\VibeTrade\\", "CatalystTapeShadow") in heartbeat.EXPECTED_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "EodShadowCheckin") in heartbeat.OBSERVABILITY_TASKS
     assert ("\\VibeTrade\\", "ShadowSystemHeartbeat") not in heartbeat.OPS_TASKS

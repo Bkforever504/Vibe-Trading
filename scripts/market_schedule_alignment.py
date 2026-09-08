@@ -52,6 +52,9 @@ def _minute_series(start: str, end: str, step_minutes: int) -> set[str]:
 
 
 EXPECTED_TASKS = {
+    # Primary-source discovery begins when EDGAR opens; completed-bar tape logic
+    # remains inactive until the regular equity session.
+    r"\VibeTrade\CatalystTapeShadow": {"05:00"},
     # Timing governance before the rest of the day starts.
     r"\VibeTrade\MarketScheduleAlignment": {"08:10", "19:58"},
     # Premarket context before regular cash open.
@@ -162,6 +165,7 @@ EXPECTED_TASKS = {
 }
 
 EXPECTED_TASK_REPETITIONS = {
+    r"\VibeTrade\CatalystTapeShadow": {"interval": "PT1M", "duration": "PT10H5M"},
     r"\VibeTrade\APlusSpotlight": {"interval": "PT5M", "duration": "PT6H21M"},
     r"\VibeTrade\PatternGrader-Scanner-Intraday": {"interval": "PT5M", "duration": "PT6H30M"},
     r"\VibeTradingOptionsShadowTwin": {"interval": "PT1M", "duration": "PT6H10M"},

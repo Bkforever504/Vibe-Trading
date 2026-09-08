@@ -50,6 +50,12 @@ def test_marketwide_radar_full_intraday_cadence_is_governed() -> None:
     assert alignment.EXPECTED_TASKS[r"\DailyMoveCoverageReview"] == {"15:08"}
 
 
+def test_catalyst_tape_shadow_has_governed_one_minute_cadence() -> None:
+    task = r"\VibeTrade\CatalystTapeShadow"
+    assert alignment.EXPECTED_TASKS[task] == {"05:00"}
+    assert alignment.EXPECTED_TASK_REPETITIONS[task] == {"interval": "PT1M", "duration": "PT10H5M"}
+
+
 def test_build_report_flags_missing_expected_time() -> None:
     bad_task = r"\Flip-Bot-Entry"
     report = alignment.build_report(_rows_from_expected({bad_task: {"08:40"}}))

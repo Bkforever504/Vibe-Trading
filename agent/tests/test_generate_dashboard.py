@@ -15,6 +15,20 @@ from scripts import generate_dashboard as dashboard
 ET = ZoneInfo("America/New_York")
 
 
+def test_dashboard_renders_verified_catalyst_tape_as_watch_only() -> None:
+    rendered = dashboard.render_preconfirmation_heads_up({
+        "catalyst_symbol_tape": {"observations": [{
+            "symbol": "QCOM", "state": "ARMED", "direction": "LONG",
+            "bar_completed_at": "2026-09-08T14:02:00Z",
+            "primary_catalyst": {"form": "8-K"},
+        }]},
+        "intraday_radar": {},
+    })
+    assert "QCOM" in rendered
+    assert "verified SEC 8-K" in rendered
+    assert "No rank, sizing, order, or execution authority" in rendered
+
+
 def test_aplus_spotlight_hides_stale_or_prior_day_cards() -> None:
     now = datetime(2026, 8, 27, 10, 30, tzinfo=ET)
     setup = {"symbol": "CRM"}
