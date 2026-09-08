@@ -104,6 +104,8 @@ def test_scheduler_is_one_low_authority_five_minute_rth_family_task() -> None:
     registration = (root / "scripts" / "register_mnq_smt_family_shadow_task.ps1").read_text(encoding="utf-8")
     runner = (root / "scripts" / "run_mnq_smt_family_shadow.ps1").read_text(encoding="utf-8")
     assert "--with purgedcv==0.1.6" in runner
+    assert "--with arch==8.0.0" in runner
+    assert "--with tsbootstrap==0.7.2" in runner
     assert '(Get-TimeZone).Id -ne "Central Standard Time"' in registration
     assert '-TaskPath "\\VibeTrade\\"' in registration
     assert 'MnqSmtCisdFamilyShadow' in registration

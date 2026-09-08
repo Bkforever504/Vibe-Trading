@@ -47,9 +47,15 @@ def test_scanner_runners_use_policy_safe_system_python_resolver() -> None:
 
 def test_uv_shadow_runners_pin_statistical_gate_dependency() -> None:
     root = Path(__file__).resolve().parents[2]
-    for runner_name in ("run_mes_orb_0932_vix_v2_shadow.ps1", "run_mnq_smt_family_shadow.ps1"):
+    for runner_name in (
+        "run_mes_orb_0932_vix_v2_shadow.ps1",
+        "run_mes_reopen_drift_v2_shadow.ps1",
+        "run_mnq_smt_family_shadow.ps1",
+    ):
         runner = (root / "scripts" / runner_name).read_text(encoding="utf-8")
         assert "--with purgedcv==0.1.6" in runner
+        assert "--with arch==8.0.0" in runner
+        assert "--with tsbootstrap==0.7.2" in runner
 
 
 def test_notifier_uses_env_first_redacts_and_disables_mentions(tmp_path: Path) -> None:
@@ -149,6 +155,14 @@ def test_entry_and_resolve_alerts_include_levels_grades_and_outcomes() -> None:
     assert "Setups scanned=0" in summary
     assert "W/L/Flat=1/1/0" in summary
     assert "AAPL win net=$4.20" in summary
+
+
+def test_duplicate_retry_with_no_new_rows_never_notifies() -> None:
+    assert runner._should_notify({"notify_empty": True}, "entry", []) is False
+    assert runner._should_notify({"notify_empty": False}, "entry", []) is False
+    no_signal = [{"event_type": "entry", "should_enter": False}]
+    assert runner._should_notify({"notify_empty": True}, "entry", no_signal) is True
+    assert runner._should_notify({"notify_empty": False}, "entry", no_signal) is False
 
 
 def _ready_tasks() -> list[dict]:
@@ -332,6 +346,25 @@ def test_preflight_no_network_validates_spec_universe_tasks_and_sources(tmp_path
     assert report["market_data"]["mode"] == "no_network_smoke"
     assert report["execution_enabled"] is False
     assert report["can_submit_orders"] is False
+
+
+def test_preflight_can_recover_when_its_own_previous_result_is_red(tmp_path: Path, monkeypatch) -> None:
+    hmm = tmp_path / "hmm.json"
+    catalyst = tmp_path / "catalyst.json"
+    _fresh_report(hmm)
+    _fresh_report(catalyst)
+    monkeypatch.setattr(preflight, "HMM_PATH", hmm)
+    monkeypatch.setattr(preflight, "CATALYST_PATH", catalyst)
+    monkeypatch.setattr(preflight, "kill_switch_active", lambda: False)
+    rows = _ready_tasks()
+    for row in rows:
+        if (row["TaskPath"], row["TaskName"]) in {preflight.SELF_TASK, *heartbeat.OBSERVABILITY_TASKS}:
+            row["LastTaskResult"] = 1
+
+    report = preflight.run_preflight(now=NOW, network=False, task_rows=rows)
+
+    assert report["status"] == "PASS"
+    assert all(row["task_name"] != "SundayShadowPreflight" for row in report["scheduler"]["tasks"])
 
 
 def test_registration_scripts_define_required_cadences_and_master_scope() -> None:

@@ -23,6 +23,7 @@ from scripts.shadow_system_heartbeat import (
     CATALYST_PATH,
     EXPECTED_TASKS,
     HMM_PATH,
+    OBSERVABILITY_TASKS,
     _task_group,
     probe_tasks,
     report_freshness,
@@ -31,6 +32,14 @@ from scripts.shadow_system_heartbeat import (
 
 CT = ZoneInfo("America/Chicago")
 REPORT_PATH = Path.home() / ".vibe-trading" / "reports" / "sunday-shadow-preflight.json"
+SELF_TASK = ("\\VibeTrade\\", "SundayShadowPreflight")
+# Preflight must be able to recover from a previous red run. Its own prior
+# result and downstream observability consumers are not upstream readiness
+# dependencies.
+PREFLIGHT_TASKS = tuple(
+    task for task in EXPECTED_TASKS
+    if task != SELF_TASK and task not in OBSERVABILITY_TASKS
+)
 
 
 def previous_trading_weekday(value: date) -> date:
@@ -61,7 +70,7 @@ def run_preflight(
     universe = scout.load_universe()
     spec = validate_spec(ROOT / scout.SPEC_PATH)
     tasks = task_rows if task_rows is not None else probe_tasks()
-    task_status = _task_group(tasks, EXPECTED_TASKS)
+    task_status = _task_group(tasks, PREFLIGHT_TASKS)
     hmm = report_freshness(HMM_PATH, now=now, max_age_hours=72.0)
     catalyst = report_freshness(CATALYST_PATH, now=now, max_age_hours=36.0)
 

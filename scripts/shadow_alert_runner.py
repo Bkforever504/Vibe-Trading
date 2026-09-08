@@ -170,6 +170,11 @@ def _has_actionable_rows(mode: str, rows: list[Mapping[str, Any]]) -> bool:
     return any(row.get("event_type") == "exit" and row.get("outcome") for row in rows)
 
 
+def _should_notify(config: Mapping[str, Any], mode: str, rows: list[Mapping[str, Any]]) -> bool:
+    """Never turn an idempotent retry with zero new evidence into Discord noise."""
+    return bool(rows) and (bool(config.get("notify_empty", True)) or _has_actionable_rows(mode, rows))
+
+
 def run_guarded(
     scanner: str,
     mode: str,
@@ -226,7 +231,7 @@ def run_guarded(
             )
             if hmm_skip is not None:
                 message = "**MES ORB v2 AUTO-HALT FOR STALE/MISSING HMM**\n" + message
-        should_notify = bool(config.get("notify_empty", True)) or _has_actionable_rows(mode, rows)
+        should_notify = _should_notify(config, mode, rows)
         notification = notify(message) if should_notify else {"status": "suppressed_no_action", "sent": False}
         return {
             "status": "completed",
